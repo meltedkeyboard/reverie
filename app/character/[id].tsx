@@ -10,6 +10,7 @@ import { Field } from '@/components/Field'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { ParamSlider } from '@/components/ParamSlider'
+import { PromptGenModal } from '@/components/PromptGenModal'
 import { DEFAULT_SAMPLING, deleteCharacter, getCharacter, saveCharacter, type ThinkingMode } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { pickAvatar, persistAvatar, removeAvatar } from '@/lib/avatars'
@@ -46,6 +47,7 @@ export default function CharacterEditorScreen() {
   const [topP, setTopP] = useState<number>(DEFAULT_SAMPLING.topP)
   const [replyLimit, setReplyLimit] = useState<number | null>(null)
   const [thinking, setThinking] = useState<ThinkingMode>('auto')
+  const [showPromptGen, setShowPromptGen] = useState(false)
   const storedAvatar = useRef<string | null>(null)
 
   useEffect(() => {
@@ -207,14 +209,25 @@ export default function CharacterEditorScreen() {
             multiline
           />
 
+          <View style={styles.systemPromptHeader}>
+            <Text style={styles.systemPromptLabel}>{t('editor.systemPromptLabel')}</Text>
+            <Pressable onPress={() => setShowPromptGen(true)} hitSlop={8}>
+              <Text style={styles.link}>{t('editor.generateWithAi')}</Text>
+            </Pressable>
+          </View>
           <Field
-            label={t('editor.systemPromptLabel')}
             hint={t('editor.systemPromptHint')}
             value={systemPrompt}
             onChangeText={setSystemPrompt}
             placeholder={t('editor.systemPromptPlaceholder')}
             multiline
             style={{ minHeight: 180 }}
+          />
+
+          <PromptGenModal
+            visible={showPromptGen}
+            onClose={() => setShowPromptGen(false)}
+            onGenerated={(prompt) => setSystemPrompt(prompt)}
           />
 
           {!isNew ? (
@@ -251,6 +264,15 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
     link: { color: colors.accent, fontSize: 15 },
     linkMuted: { color: colors.textMuted, fontSize: 15 },
     section: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, marginTop: 8, marginBottom: 12 },
+    systemPromptHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+      marginLeft: 4,
+      marginRight: 4,
+    },
+    systemPromptLabel: { color: colors.textMuted, fontSize: 13 },
     hint: { color: colors.textFaint, fontSize: 12, marginTop: -4, marginBottom: 4, marginHorizontal: 4 },
     segment: {
       flexDirection: 'row',

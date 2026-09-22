@@ -4,7 +4,7 @@ import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-na
 import { useTheme } from '@/theme'
 
 type Props = TextInputProps & {
-  label: string
+  label?: string
   hint?: string
 }
 
@@ -13,7 +13,7 @@ export function Field({ label, hint, style, multiline, ...input }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors])
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
         {...input}
         multiline={multiline}
