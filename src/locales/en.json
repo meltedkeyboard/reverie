@@ -64,6 +64,7 @@
   "characters.emptyTitle": "No one here yet",
   "characters.emptyText": "Create your first character and start a story.",
   "characters.createCharacter": "Create character",
+  "characters.wideWelcomeText": "Pick a character on the left, or add a new one to start a story.",
 
   "onboarding.slide1.title": "Your own characters",
   "onboarding.slide1.text": "Set a name, personality and way of speaking — and start a conversation from a blank page.",

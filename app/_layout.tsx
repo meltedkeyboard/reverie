@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from 'expo-router'
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, type Theme } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite'
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -6,9 +6,11 @@ import { Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 
+import { Sidebar } from '@/components/Sidebar'
 import { StartupBoundary } from '@/components/StartupBoundary'
 import { migrate } from '@/db/schema'
 import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
+import { useIsWideWeb } from '@/hooks/useResponsive'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { DialogHost } from '@/lib/dialogs'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
@@ -60,6 +62,9 @@ function ThemedApp() {
 
 function AppShell() {
   const { colors, scheme } = useTheme()
+  const pathname = usePathname()
+  // Onboarding is a full-bleed introduction, not a screen alongside the character rail.
+  const showSidebar = useIsWideWeb() && pathname !== '/onboarding'
   const navigationTheme: Theme = useMemo(
     () => ({
       ...(scheme === 'light' ? DefaultTheme : DarkTheme),
@@ -75,12 +80,23 @@ function AppShell() {
     [colors, scheme]
   )
 
+  const stack = <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+
   return (
     <>
       <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
       <ThemeProvider value={navigationTheme}>
-        <View style={[styles.shell, { borderColor: colors.border }]}>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+        <View style={[styles.backdrop, Platform.OS === 'web' && { backgroundColor: scheme === 'light' ? '#E7E7EE' : '#000000' }]}>
+          <View style={[styles.shell, showSidebar && styles.shellWide, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+            {showSidebar ? (
+              <View style={styles.desktopRow}>
+                <Sidebar />
+                <View style={styles.desktopMain}>{stack}</View>
+              </View>
+            ) : (
+              stack
+            )}
+          </View>
         </View>
       </ThemeProvider>
       <DialogHost />
@@ -88,8 +104,10 @@ function AppShell() {
   )
 }
 
-// Stretched across a desktop monitor the chat falls apart, so on the web the app
-// keeps to a phone-width column in the middle of the page.
+// Stretched across a desktop monitor the chat falls apart, so on narrow web the app
+// keeps to a phone-width column in the middle of the page; wide web instead gets a
+// persistent character rail next to the routed screen, like the phone-width column
+// widened into a two-pane layout.
 const shell: ViewStyle =
   Platform.OS === 'web'
     ? { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center', borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth }
@@ -97,5 +115,18 @@ const shell: ViewStyle =
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: darkColors.bg },
+  backdrop: { flex: 1 },
   shell,
+  shellWide: {
+    maxWidth: 1100,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginVertical: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 40,
+  },
+  desktopRow: { flex: 1, flexDirection: 'row' },
+  desktopMain: { flex: 1, position: 'relative' },
 })

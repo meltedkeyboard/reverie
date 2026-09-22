@@ -64,6 +64,7 @@
   "characters.emptyTitle": "Пока никого нет",
   "characters.emptyText": "Создайте первого персонажа и начните историю.",
   "characters.createCharacter": "Создать персонажа",
+  "characters.wideWelcomeText": "Выберите персонажа слева или добавьте нового, чтобы начать историю.",
 
   "onboarding.slide1.title": "Свои персонажи",
   "onboarding.slide1.text": "Задайте имя, характер и манеру речи — и начните разговор с чистого листа.",

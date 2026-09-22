@@ -12,6 +12,7 @@ import { deleteCharacter, listCharacters, type CharacterPreview } from '@/db/cha
 import { createChat, pruneUntouchedChats } from '@/db/chats'
 import { isOnboardingComplete } from '@/db/onboarding'
 import { loadSettings } from '@/db/settings'
+import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
 import { removeAvatar } from '@/lib/avatars'
 import { confirm, showSheet } from '@/lib/dialogs'
@@ -25,6 +26,7 @@ export default function CharactersScreen() {
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
   const { t } = useTranslation()
+  const isWideWeb = useIsWideWeb()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
   const [serverSet, setServerSet] = useState(true)
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
@@ -49,6 +51,17 @@ export default function CharactersScreen() {
   )
 
   if (!onboarded) return <View style={styles.screen} />
+
+  // The character list already lives in the sidebar on wide web, so the root route
+  // just welcomes the visitor instead of repeating it.
+  if (isWideWeb) {
+    return (
+      <View style={styles.wideWelcome}>
+        <Text style={styles.wideWelcomeTitle}>{t('characters.title')}</Text>
+        <Text style={styles.wideWelcomeText}>{t('characters.wideWelcomeText')}</Text>
+      </View>
+    )
+  }
 
   const startChat = async (character: CharacterPreview) => {
     router.push(`/chat/${await createChat(db, character)}`)
@@ -138,6 +151,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   title: { color: colors.text, fontFamily: fonts.prose, fontSize: 24, fontWeight: '600' },
+  wideWelcome: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, paddingHorizontal: 40 },
+  wideWelcomeTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 26, marginBottom: 10 },
+  wideWelcomeText: { color: colors.textMuted, fontSize: 15, textAlign: 'center', maxWidth: 360, lineHeight: 21 },
   notice: {
     backgroundColor: colors.accentSoft,
     borderWidth: 1,
