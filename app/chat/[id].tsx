@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -108,6 +109,10 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
 
   const listRef = useRef<FlatList<RowMessage>>(null)
   const composerHeight = useSharedValue(0)
+  // react-native-keyboard-controller's extraContentPadding keeps the list clear of the
+  // composer on native; on web that mechanism doesn't reserve any space, so the plain
+  // height below drives an explicit padding instead (see contentContainerStyle).
+  const [webComposerHeight, setWebComposerHeight] = useState(0)
   const restInset = useRef(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [selecting, setSelecting] = useState<string | null>(null)
@@ -292,7 +297,11 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
         ListFooterComponent={loaded && !empty ? <Intro character={character} chat={chat} /> : null}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: 8, paddingBottom: headerHeight + 12 }}
+        contentContainerStyle={{
+          // The list is inverted, so this visually sits just above the composer.
+          paddingTop: 8 + (Platform.OS === 'web' ? webComposerHeight : 0),
+          paddingBottom: headerHeight + 12,
+        }}
       />
 
       {empty ? (
@@ -336,6 +345,7 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
 
       <Composer
         height={composerHeight}
+        onHeightChange={Platform.OS === 'web' ? setWebComposerHeight : undefined}
         generating={!idle}
         editing={editing}
         accessory={

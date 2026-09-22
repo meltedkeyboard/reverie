@@ -11,7 +11,7 @@ import { showSheet } from '@/lib/dialogs'
 import { imageDataUrl } from '@/lib/images'
 import { messageActions, type MessageAction } from '@/lib/messageActions'
 import { splitRoleplay } from '@/lib/roleplay'
-import { fonts, useColors } from '@/theme'
+import { CHAT_MAX_WIDTH, fonts, useColors } from '@/theme'
 
 import { IconButton } from './IconButton'
 import { NativeMenu } from './NativeMenu'
@@ -308,7 +308,9 @@ function Picture({ message, onOpen, onLongPress }: PictureProps) {
 
 const createStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-  userRow: { alignItems: 'flex-end', paddingLeft: 56, paddingRight: 16, marginVertical: 8 },
+  // maxWidth is a no-op on any phone-width screen; it only kicks in once the desktop
+  // pane is wide enough that a full-bleed bubble would otherwise be hard to read.
+  userRow: { alignItems: 'flex-end', paddingLeft: 56, paddingRight: 16, marginVertical: 8, width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
   bubble: {
     backgroundColor: colors.bubble,
     borderRadius: 20,
@@ -317,7 +319,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
   },
   picture: { borderRadius: 18, marginBottom: 4, backgroundColor: colors.surface },
   userText: { color: colors.text, fontSize: 16, lineHeight: 22 },
-  botRow: { alignItems: 'flex-start', paddingHorizontal: 20, marginVertical: 12 },
+  botRow: { alignItems: 'flex-start', paddingHorizontal: 20, marginVertical: 12, width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
   botText: { color: colors.text, fontFamily: fonts.prose, fontSize: 17, lineHeight: 27, letterSpacing: 0.1 },
   action: { fontStyle: 'italic', color: colors.textMuted },
   thought: {

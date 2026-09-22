@@ -33,7 +33,7 @@ import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { imageDataUrl, pickMessageImage } from '@/lib/images'
 import { liquidGlass } from '@/lib/nativeUI'
-import { useTheme } from '@/theme'
+import { CHAT_MAX_WIDTH, useTheme } from '@/theme'
 
 type Props = {
   height: SharedValue<number>
@@ -47,9 +47,23 @@ type Props = {
   onContinue?: () => void
   onSubmitEdit: (text: string) => void
   onCancelEdit: () => void
+  // Plain (non-worklet) mirror of `height`, for callers that need to react to it outside
+  // reanimated — e.g. reserving list space on web, where extraContentPadding isn't wired up.
+  onHeightChange?: (height: number) => void
 }
 
-export function Composer({ height, generating, editing, accessory, onSend, onStop, onContinue, onSubmitEdit, onCancelEdit }: Props) {
+export function Composer({
+  height,
+  generating,
+  editing,
+  accessory,
+  onSend,
+  onStop,
+  onContinue,
+  onSubmitEdit,
+  onCancelEdit,
+  onHeightChange,
+}: Props) {
   const insets = useSafeAreaInsets()
   const { colors, scheme } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
@@ -129,6 +143,7 @@ export function Composer({ height, generating, editing, accessory, onSend, onSto
 
   const measure = (e: LayoutChangeEvent) => {
     height.value = e.nativeEvent.layout.height
+    onHeightChange?.(e.nativeEvent.layout.height)
   }
 
   const row = (
@@ -239,7 +254,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   banner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingTop: 2 },
   bannerText: { flex: 1, color: colors.textMuted, fontSize: 13 },
   bannerClose: { width: 28, height: 28 },
-  row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  // Matches MessageRow's cap so the composer lines up with the message column; a no-op
+  // on phone widths.
+  row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
   field: { flex: 1, borderRadius: 22, padding: 4 },
   fieldSolid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   attachment: { alignSelf: 'flex-start', margin: 6, marginBottom: 2 },

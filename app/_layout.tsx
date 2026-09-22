@@ -65,6 +65,7 @@ function AppShell() {
   const pathname = usePathname()
   // Onboarding is a full-bleed introduction, not a screen alongside the character rail.
   const showSidebar = useIsWideWeb() && pathname !== '/onboarding'
+  useWebScrollbarStyle(colors, scheme)
   const navigationTheme: Theme = useMemo(
     () => ({
       ...(scheme === 'light' ? DefaultTheme : DarkTheme),
@@ -87,7 +88,7 @@ function AppShell() {
       <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
       <ThemeProvider value={navigationTheme}>
         <View style={[styles.backdrop, Platform.OS === 'web' && { backgroundColor: scheme === 'light' ? '#E7E7EE' : '#000000' }]}>
-          <View style={[styles.shell, showSidebar && styles.shellWide, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+          <View style={[showSidebar ? styles.shellWide : styles.shell, { borderColor: colors.border, backgroundColor: colors.bg }]}>
             {showSidebar ? (
               <View style={styles.scaleClip}>
                 <View style={styles.scaleInner}>
@@ -108,10 +109,34 @@ function AppShell() {
   )
 }
 
+// Injects (and keeps updated) a themed scrollbar for every scroll container on web —
+// react-native-web leaves the browser's stock scrollbar untouched otherwise, which
+// looks out of place next to the rest of the UI.
+function useWebScrollbarStyle(colors: ReturnType<typeof useTheme>['colors'], scheme: 'light' | 'dark') {
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    const thumb = scheme === 'light' ? 'rgba(0, 0, 0, 0.22)' : 'rgba(255, 255, 255, 0.22)'
+    const thumbHover = scheme === 'light' ? 'rgba(0, 0, 0, 0.32)' : 'rgba(255, 255, 255, 0.32)'
+    let tag = document.getElementById('web-scrollbar-style') as HTMLStyleElement | null
+    if (!tag) {
+      tag = document.createElement('style')
+      tag.id = 'web-scrollbar-style'
+      document.head.appendChild(tag)
+    }
+    tag.textContent = `
+      * { scrollbar-width: thin; scrollbar-color: ${thumb} transparent; }
+      *::-webkit-scrollbar { width: 10px; height: 10px; }
+      *::-webkit-scrollbar-track { background: transparent; }
+      *::-webkit-scrollbar-thumb { background-color: ${thumb}; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+      *::-webkit-scrollbar-thumb:hover { background-color: ${thumbHover}; background-clip: padding-box; }
+      *::-webkit-scrollbar-corner { background: transparent; }
+    `
+  }, [colors, scheme])
+}
+
 // Stretched across a desktop monitor the chat falls apart, so on narrow web the app
 // keeps to a phone-width column in the middle of the page; wide web instead gets a
-// persistent character rail next to the routed screen, like the phone-width column
-// widened into a two-pane layout.
+// full-bleed two-pane layout (character rail + routed screen) filling the monitor.
 const shell: ViewStyle =
   Platform.OS === 'web'
     ? { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center', borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth }
@@ -133,16 +158,10 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: darkColors.bg },
   backdrop: { flex: 1 },
   shell,
-  shellWide: {
-    maxWidth: 1600,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginVertical: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 40,
-  },
+  // Full-bleed on wide web: independent of the phone-width `shell` (rather than
+  // overriding its maxWidth: 640, since react-native-web's style flattening ignores an
+  // `undefined` override and would keep the cap), filling the monitor edge to edge.
+  shellWide: { flex: 1, width: '100%' },
   scaleClip: { flex: 1, overflow: 'hidden' },
   scaleInner,
   desktopRow: { flex: 1, flexDirection: 'row' },

@@ -68,6 +68,10 @@ export const fonts = {
 
 export const HEADER_ROW_HEIGHT = 52
 
+// A no-op on phone widths (always narrower than this), but keeps message bubbles and
+// the composer from stretching edge to edge once the desktop pane fills the monitor.
+export const CHAT_MAX_WIDTH = 820
+
 type ThemeContextValue = {
   colors: Colors
   scheme: Scheme
