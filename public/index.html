@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="color-scheme" content="dark" />
+    <title>%WEB_TITLE%</title>
+    <!-- Overrides the default Expo template so the page is dark before the bundle loads. -->
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+      }
+      /* The lists inside the app own the scrolling. */
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #0f0f12;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+      ::selection {
+        background-color: rgba(139, 92, 246, 0.35);
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>Для работы Reverie нужен включённый JavaScript.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

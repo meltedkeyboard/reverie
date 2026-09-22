@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Reverie",
+    "slug": "reverie",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "reverie",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0F0F12",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.example.reverie",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSLocalNetworkUsageDescription": "Reverie подключается к серверу модели в вашей локальной сети."
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "lang": "ru",
+      "themeColor": "#0F0F12"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F0F12"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Reverie использует фото для аватаров персонажей и сообщений.",
+          "cameraPermission": "Reverie использует камеру, чтобы отправить снимок в чат."
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "android": {
+      "package": "com.example.reverie"
+    }
+  }
+}
