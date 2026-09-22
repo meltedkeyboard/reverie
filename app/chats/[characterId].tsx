@@ -10,6 +10,7 @@ import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { getCharacter, type Character } from '@/db/characters'
 import { deleteChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
+import { useTranslation } from '@/i18n'
 import { confirm, promptText, showSheet } from '@/lib/dialogs'
 import { fonts, useColors } from '@/theme'
 
@@ -21,6 +22,7 @@ export default function CharacterChatsScreen() {
   const headerHeight = useHeaderHeight()
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t } = useTranslation()
   const [character, setCharacter] = useState<Character | null>(null)
   const [chats, setChats] = useState<ChatPreview[] | null>(null)
 
@@ -40,17 +42,17 @@ export default function CharacterChatsScreen() {
 
   const openMenu = (chat: ChatPreview) => {
     showSheet(chat.title ?? undefined, [
-      { label: 'Переименовать', onSelect: () => promptRename(chat) },
-      { label: 'Удалить чат', destructive: true, onSelect: () => confirmDelete(chat) },
+      { label: t('chat.menuRename'), onSelect: () => promptRename(chat) },
+      { label: t('chat.menuDeleteChat'), destructive: true, onSelect: () => confirmDelete(chat) },
     ])
   }
 
   const promptRename = (chat: ChatPreview) => {
     promptText({
-      title: 'Название чата',
-      message: 'Оставьте поле пустым, чтобы убрать название.',
+      title: t('chat.renameChatTitle'),
+      message: t('chat.renameChatMessage'),
       initial: chat.title ?? '',
-      confirmLabel: 'Сохранить',
+      confirmLabel: t('common.save'),
       onSubmit: async (text) => {
         await setChatTitle(db, chat.id, text)
         reload()
@@ -60,9 +62,9 @@ export default function CharacterChatsScreen() {
 
   const confirmDelete = (chat: ChatPreview) => {
     confirm({
-      title: 'Удалить чат?',
-      message: 'Переписка будет удалена без возможности восстановления.',
-      confirmLabel: 'Удалить',
+      title: t('chat.deleteChatTitle'),
+      message: t('chat.deleteChatMessage'),
+      confirmLabel: t('common.delete'),
       destructive: true,
       onConfirm: async () => {
         await deleteChat(db, chat.id)
@@ -81,14 +83,12 @@ export default function CharacterChatsScreen() {
         ListEmptyComponent={
           chats ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>Чатов пока нет</Text>
-              <Text style={styles.emptyText}>
-                Персонаж — это шаблон: с ним можно вести сколько угодно отдельных историй.
-              </Text>
+              <Text style={styles.emptyTitle}>{t('chatsList.emptyTitle')}</Text>
+              <Text style={styles.emptyText}>{t('chatsList.emptyText')}</Text>
               <Link href={`/chat/new?character=${characterId}`} asChild>
                 <Link.AppleZoom>
                   <Pressable style={styles.emptyButton}>
-                    <Text style={styles.emptyButtonText}>Начать чат</Text>
+                    <Text style={styles.emptyButtonText}>{t('chatsList.startChat')}</Text>
                   </Pressable>
                 </Link.AppleZoom>
               </Link>

@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
@@ -10,17 +11,11 @@ import { testConnection } from '@/api/llm'
 import { Field } from '@/components/Field'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
-import { SegmentedControl } from '@/components/SegmentedControl'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
+import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
-import { fonts, useTheme, type ThemePreference } from '@/theme'
-
-const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: 'system', label: 'Системная' },
-  { value: 'light', label: 'Светлая' },
-  { value: 'dark', label: 'Тёмная' },
-]
+import { fonts, useColors, useTheme, type ThemePreference } from '@/theme'
 
 type Status = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok' | 'error'; text: string }
 
@@ -29,8 +24,21 @@ export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
-  const { colors, preference, setPreference } = useTheme()
+  const colors = useColors()
+  const { preference, setPreference } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
+
+  const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: t('theme.system') },
+    { value: 'light', label: t('theme.light') },
+    { value: 'dark', label: t('theme.dark') },
+  ]
+  const LANGUAGE_OPTIONS: { value: LocalePreference; label: string }[] = [
+    { value: 'system', label: t('language.system') },
+    { value: 'ru', label: t('language.ru') },
+    { value: 'en', label: t('language.en') },
+  ]
 
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
@@ -58,7 +66,10 @@ export default function SettingsScreen() {
     try {
       const found = await testConnection(cfg)
       setModels(found)
-      setStatus({ kind: 'ok', text: found.length ? `Подключено. Моделей на сервере: ${found.length}` : 'Подключено' })
+      setStatus({
+        kind: 'ok',
+        text: found.length ? t('settings.connectedWithModels', { count: found.length }) : t('settings.connected'),
+      })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (err) {
       setModels([])
@@ -72,7 +83,7 @@ export default function SettingsScreen() {
     try {
       await exportBackup(db)
     } catch (err) {
-      showMessage('Не удалось экспортировать', err instanceof Error ? err.message : String(err))
+      showMessage(t('settings.exportFailedTitle'), err instanceof Error ? err.message : String(err))
     } finally {
       setExporting(false)
     }
@@ -82,9 +93,9 @@ export default function SettingsScreen() {
     setImporting(true)
     try {
       const result = await importBackup(db)
-      if (result) showMessage('Готово', `Добавлено персонажей: ${result.characters}`)
+      if (result) showMessage(t('settings.importDoneTitle'), t('settings.importDoneMessage', { count: result.characters }))
     } catch (err) {
-      showMessage('Не удалось импортировать', err instanceof Error ? err.message : String(err))
+      showMessage(t('settings.importFailedTitle'), err instanceof Error ? err.message : String(err))
     } finally {
       setImporting(false)
     }
@@ -92,9 +103,9 @@ export default function SettingsScreen() {
 
   const onWipe = () => {
     confirm({
-      title: 'Стереть все данные?',
-      message: 'Все персонажи, переписки, аватары и адрес сервера будут удалены без возможности восстановления.',
-      confirmLabel: 'Стереть всё',
+      title: t('settings.wipeConfirmTitle'),
+      message: t('settings.wipeConfirmMessage'),
+      confirmLabel: t('settings.wipeConfirmLabel'),
       destructive: true,
       onConfirm: async () => {
         setWiping(true)
@@ -103,7 +114,7 @@ export default function SettingsScreen() {
           setCfg(DEFAULT_SETTINGS)
           router.dismissTo('/')
         } catch (err) {
-          showMessage('Не удалось стереть данные', err instanceof Error ? err.message : String(err))
+          showMessage(t('settings.wipeFailedTitle'), err instanceof Error ? err.message : String(err))
         } finally {
           setWiping(false)
         }
@@ -120,162 +131,258 @@ export default function SettingsScreen() {
           keyboardDismissMode="interactive"
           contentContainerStyle={{ paddingTop: headerHeight + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }}
         >
-          <Text style={styles.section}>Оформление</Text>
-          <View style={{ marginBottom: 20 }}>
-            <SegmentedControl options={THEME_OPTIONS} value={preference} onChange={setPreference} />
+          <Text style={styles.section}>{t('settings.appearance')}</Text>
+          <View style={styles.card}>
+            <View style={styles.cardPad}>
+              <Text style={styles.label}>{t('settings.appearance')}</Text>
+              <Segmented options={THEME_OPTIONS} value={preference} onChange={setPreference} />
+              <Text style={[styles.label, { marginTop: 18 }]}>{t('settings.language')}</Text>
+              <Segmented options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
+            </View>
           </View>
 
-          <Text style={[styles.section, { marginTop: 36 }]}>Сервер</Text>
-          <Field
-            label="Base URL"
-            hint="Адрес в Tailscale или локальной сети. Путь /v1 добавлять не нужно."
-            value={cfg.baseUrl}
-            onChangeText={(baseUrl) => update({ baseUrl })}
-            placeholder="http://100.x.y.z:1234"
-            keyboardType="url"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Field
-            label="API key"
-            hint="LM Studio, llama.cpp и Ollama обычно ключ не проверяют."
-            value={cfg.apiKey}
-            onChangeText={(apiKey) => update({ apiKey })}
-            placeholder="not-needed"
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Field
-            label="Модель"
-            value={cfg.model}
-            onChangeText={(model) => update({ model })}
-            placeholder="local-model"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.server')}</Text>
+          <View style={styles.card}>
+            <View style={styles.cardPad}>
+              <Field
+                label={t('settings.baseUrlLabel')}
+                hint={t('settings.baseUrlHint')}
+                value={cfg.baseUrl}
+                onChangeText={(baseUrl) => update({ baseUrl })}
+                placeholder={t('settings.baseUrlPlaceholder')}
+                keyboardType="url"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Field
+                label={t('settings.apiKeyLabel')}
+                hint={t('settings.apiKeyHint')}
+                value={cfg.apiKey}
+                onChangeText={(apiKey) => update({ apiKey })}
+                placeholder={t('settings.apiKeyPlaceholder')}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Field
+                label={t('settings.modelLabel')}
+                value={cfg.model}
+                onChangeText={(model) => update({ model })}
+                placeholder={t('settings.modelPlaceholder')}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
 
-          {models.length > 0 ? (
-            <View style={styles.chips}>
-              {models.map((id) => {
-                const active = id === cfg.model
-                return (
-                  <Pressable
-                    key={id}
-                    onPress={() => update({ model: id })}
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, active && { color: colors.text }]} numberOfLines={1}>
-                      {id}
-                    </Text>
-                  </Pressable>
-                )
-              })}
+              {models.length > 0 ? (
+                <View style={styles.chips}>
+                  {models.map((id) => {
+                    const active = id === cfg.model
+                    return (
+                      <Pressable
+                        key={id}
+                        onPress={() => update({ model: id })}
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, active && { color: colors.accent }]} numberOfLines={1}>
+                          {id}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+              ) : null}
+
+              <Pressable
+                onPress={onTest}
+                disabled={status.kind === 'testing'}
+                style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
+              >
+                {status.kind === 'testing' ? (
+                  <ActivityIndicator color={colors.accent} />
+                ) : (
+                  <>
+                    <Ionicons name="pulse-outline" size={18} color={colors.accent} />
+                    <Text style={styles.actionButtonText}>{t('settings.testConnection')}</Text>
+                  </>
+                )}
+              </Pressable>
+
+              {status.kind === 'ok' || status.kind === 'error' ? (
+                <View style={styles.status}>
+                  <View style={[styles.dot, { backgroundColor: status.kind === 'ok' ? colors.success : colors.danger }]} />
+                  <Text style={styles.statusText}>{status.text}</Text>
+                </View>
+              ) : null}
             </View>
-          ) : null}
+          </View>
 
-          <Pressable
-            onPress={onTest}
-            disabled={status.kind === 'testing'}
-            style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}
-          >
-            {status.kind === 'testing' ? (
-              <ActivityIndicator color={colors.accent} />
-            ) : (
-              <Text style={styles.buttonText}>Проверить связь</Text>
-            )}
-          </Pressable>
+          <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.backupTitle')}</Text>
+          <Text style={styles.note}>{t('settings.backupNote')}</Text>
+          <View style={styles.card}>
+            <Row
+              icon="share-outline"
+              title={t('settings.exportJson')}
+              onPress={onExport}
+              loading={exporting}
+              disabled={exporting}
+            />
+            <Row
+              icon="download-outline"
+              title={t('settings.importJson')}
+              onPress={onImport}
+              loading={importing}
+              disabled={importing}
+              last
+            />
+          </View>
 
-          {status.kind === 'ok' || status.kind === 'error' ? (
-            <View style={styles.status}>
-              <View style={[styles.dot, { backgroundColor: status.kind === 'ok' ? colors.success : colors.danger }]} />
-              <Text style={styles.statusText}>{status.text}</Text>
-            </View>
-          ) : null}
+          <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.aboutTitle')}</Text>
+          <View style={styles.card}>
+            <Row icon="information-circle-outline" title={t('settings.aboutReverie')} onPress={() => router.push('/about')} chevron last />
+          </View>
 
-          <Text style={[styles.section, { marginTop: 36 }]}>Резервная копия</Text>
-          <Text style={styles.note}>
-            Файл JSON содержит персонажей, переписки и аватары. Ключ API в него не попадает. Его можно сохранить в
-            Файлы или iCloud Drive.
-          </Text>
-          <Pressable
-            onPress={onExport}
-            disabled={exporting}
-            style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}
-          >
-            {exporting ? <ActivityIndicator color={colors.accent} /> : <Text style={styles.buttonText}>Экспорт в JSON</Text>}
-          </Pressable>
-          <Pressable
-            onPress={onImport}
-            disabled={importing}
-            style={({ pressed }) => [styles.button, { marginTop: 10 }, pressed && { opacity: 0.7 }]}
-          >
-            {importing ? <ActivityIndicator color={colors.accent} /> : <Text style={styles.buttonText}>Импорт из JSON</Text>}
-          </Pressable>
-
-          <Text style={[styles.section, { marginTop: 36 }]}>О приложении</Text>
-          <Pressable
-            onPress={() => router.push('/about')}
-            style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={styles.buttonText}>О Reverie</Text>
-          </Pressable>
-
-          <Text style={[styles.section, { color: colors.danger, marginTop: 36 }]}>Опасная зона</Text>
-          <Text style={styles.note}>
-            Стирает всех персонажей, переписки, аватары и адрес сервера. Отменить нельзя.
-          </Text>
-          <Pressable
-            onPress={onWipe}
-            disabled={wiping}
-            style={({ pressed }) => [styles.button, styles.dangerButton, pressed && { opacity: 0.7 }]}
-          >
-            {wiping ? (
-              <ActivityIndicator color={colors.danger} />
-            ) : (
-              <Text style={[styles.buttonText, { color: colors.danger }]}>Стереть все данные</Text>
-            )}
-          </Pressable>
+          <Text style={[styles.section, { color: colors.danger, marginTop: 32 }]}>{t('settings.dangerZone')}</Text>
+          <Text style={styles.note}>{t('settings.dangerNote')}</Text>
+          <View style={[styles.card, styles.dangerCard]}>
+            <Row
+              icon="trash-outline"
+              title={t('settings.wipeAll')}
+              onPress={onWipe}
+              loading={wiping}
+              disabled={wiping}
+              tint={colors.danger}
+              last
+            />
+          </View>
         </KeyboardAwareScrollView>
       ) : null}
 
       <GlassHeader left={<IconButton name="chevron-back" size={26} onPress={() => router.back()} />}>
-        <Text style={styles.title}>Настройки</Text>
+        <Text style={styles.title}>{t('settings.title')}</Text>
       </GlassHeader>
     </View>
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (value: T) => void
+}) {
+  const colors = useColors()
+  const styles = useMemo(() => createStyles(colors), [colors])
+  return (
+    <View style={styles.segment}>
+      {options.map((opt) => (
+        <Pressable
+          key={opt.value}
+          onPress={() => onChange(opt.value)}
+          style={[styles.segmentItem, value === opt.value && styles.segmentItemActive]}
+        >
+          <Text style={[styles.segmentText, value === opt.value && styles.segmentTextActive]}>{opt.label}</Text>
+        </Pressable>
+      ))}
+    </View>
+  )
+}
+
+function Row({
+  icon,
+  title,
+  onPress,
+  loading,
+  disabled,
+  chevron,
+  tint,
+  last,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name']
+  title: string
+  onPress: () => void
+  loading?: boolean
+  disabled?: boolean
+  chevron?: boolean
+  tint?: string
+  last?: boolean
+}) {
+  const colors = useColors()
+  const styles = useMemo(() => createStyles(colors), [colors])
+  const color = tint ?? colors.accent
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [styles.row, last && { borderBottomWidth: 0 }, pressed && { opacity: 0.6 }]}
+    >
+      <Ionicons name={icon} size={19} color={color} style={{ width: 24 }} />
+      <Text style={[styles.rowLabel, { color }]}>{title}</Text>
+      {loading ? (
+        <ActivityIndicator color={color} />
+      ) : chevron ? (
+        <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+      ) : null}
+    </Pressable>
+  )
+}
+
+const createStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
-    section: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, marginBottom: 14 },
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20, marginTop: -6 },
+    section: { color: colors.textMuted, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8, marginLeft: 4 },
+    card: {
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    dangerCard: { borderColor: 'rgba(240, 97, 109, 0.35)' },
+    cardPad: { padding: 16 },
+    label: { color: colors.textMuted, fontSize: 13, marginBottom: 8 },
+    segment: { flexDirection: 'row', backgroundColor: colors.surfaceRaised, borderRadius: 10, padding: 3 },
+    segmentItem: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+    segmentItemActive: { backgroundColor: colors.accentSoft },
+    segmentText: { color: colors.textMuted, fontSize: 13 },
+    segmentTextActive: { color: colors.accent, fontWeight: '600' },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -6, marginBottom: 16 },
     chip: {
       maxWidth: '100%',
       paddingVertical: 7,
       paddingHorizontal: 12,
       borderRadius: 14,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceRaised,
       borderWidth: 1,
       borderColor: colors.border,
     },
     chipActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
     chipText: { color: colors.textMuted, fontSize: 13 },
-    button: {
-      height: 48,
+    actionButton: {
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 14,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
+      gap: 8,
+      height: 46,
+      borderRadius: 12,
+      backgroundColor: colors.accentSoft,
     },
-    buttonText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
-    dangerButton: { borderColor: 'rgba(240, 97, 109, 0.35)' },
-    status: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14, paddingHorizontal: 4 },
+    actionButtonText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    rowLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
+    status: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14 },
     dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
     statusText: { flex: 1, color: colors.textMuted, fontSize: 14, lineHeight: 20 },
-    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 14 },
+    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 10, marginLeft: 4 },
   })

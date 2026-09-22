@@ -29,6 +29,7 @@ import { TextSheet } from '@/components/TextSheet'
 import { getCharacter, type Character } from '@/db/characters'
 import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
+import { useTranslation } from '@/i18n'
 import { confirm, promptText, showMessage } from '@/lib/dialogs'
 import { formatWhen } from '@/lib/format'
 import type { MessageAction } from '@/lib/messageActions'
@@ -80,6 +81,7 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
   const headerHeight = useHeaderHeight()
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t, locale } = useTranslation()
   const {
     messages,
     loaded,
@@ -196,9 +198,9 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
       else if (action === 'regenerate') regenerate(message.id)
       else if (action === 'refine') {
         promptText({
-          title: 'Уточнить ответ',
-          message: 'Как переписать ответ? Например: "больше удивления", "грустнее", "короче и без описаний".',
-          confirmLabel: 'Перегенерировать',
+          title: t('chat.refineTitle'),
+          message: t('chat.refineMessage'),
+          confirmLabel: t('chat.refineConfirm'),
           onSubmit: (text) => {
             if (text.trim()) regenerate(message.id, text)
           },
@@ -226,9 +228,9 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
 
   const confirmDelete = () => {
     confirm({
-      title: 'Удалить чат?',
-      message: 'Переписка будет удалена без возможности восстановления.',
-      confirmLabel: 'Удалить',
+      title: t('chat.deleteChatTitle'),
+      message: t('chat.deleteChatMessage'),
+      confirmLabel: t('common.delete'),
       destructive: true,
       onConfirm: async () => {
         discard()
@@ -240,34 +242,34 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
 
   const promptRename = () => {
     promptText({
-      title: 'Название чата',
-      message: 'Оставьте поле пустым, чтобы убрать название.',
+      title: t('chat.renameChatTitle'),
+      message: t('chat.renameChatMessage'),
       initial: title ?? '',
-      confirmLabel: 'Сохранить',
+      confirmLabel: t('common.save'),
       onSubmit: (text) => rename(text),
     })
   }
 
   const suggestName = async () => {
     try {
-      if (!(await autoName())) showMessage('Название не придумалось', 'Модель вернула пустой ответ. Попробуйте ещё раз.')
+      if (!(await autoName())) showMessage(t('chat.titleNotFoundTitle'), t('chat.titleNotFoundMessage'))
     } catch (err) {
-      showMessage('Не удалось придумать название', err instanceof Error ? err.message : String(err))
+      showMessage(t('chat.titleFailedTitle'), err instanceof Error ? err.message : String(err))
     }
   }
 
   const chatMenu: MenuItem[] = [
-    { label: 'Переименовать', systemImage: 'pencil', onSelect: promptRename },
-    { label: 'Придумать название', systemImage: 'sparkles', onSelect: suggestName },
-    { label: 'Изменить персонажа', systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}`) },
-    { label: 'Удалить чат', systemImage: 'trash', destructive: true, onSelect: confirmDelete },
+    { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
+    { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
+    { label: t('chat.menuEditCharacter'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}`) },
+    { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: confirmDelete },
   ]
 
   const errorCard = error ? (
     <View style={styles.error}>
       <Text style={styles.errorText}>{error}</Text>
       <Pressable onPress={retry} style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}>
-        <Text style={styles.retryText}>Повторить</Text>
+        <Text style={styles.retryText}>{t('chat.retry')}</Text>
       </Pressable>
     </View>
   ) : null
@@ -295,7 +297,7 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
 
       {empty ? (
         <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="none">
-          <Intro character={character} chat={chat} hint="Напишите первое сообщение" />
+          <Intro character={character} chat={chat} hint={t('chat.emptyHint')} />
         </Animated.View>
       ) : null}
 
@@ -324,7 +326,7 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
               </View>
               {title || naming ? (
                 <Text style={styles.subtitle} numberOfLines={1}>
-                  {title ?? 'Придумываю название...'}
+                  {title ?? t('chat.namingInProgress')}
                 </Text>
               ) : null}
             </View>
@@ -378,11 +380,12 @@ function ChatView({ chat, character }: { chat: Chat; character: Character }) {
 function Intro({ character, chat, hint }: { character: Character; chat: Chat; hint?: string }) {
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { locale } = useTranslation()
   return (
     <View style={styles.intro}>
       <Avatar name={character.name} file={character.avatar} size={72} />
       <Text style={styles.introName}>{character.name}</Text>
-      <Text style={styles.introMeta}>{hint ?? formatWhen(chat.createdAt)}</Text>
+      <Text style={styles.introMeta}>{hint ?? formatWhen(chat.createdAt, locale)}</Text>
     </View>
   )
 }

@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { useTranslation } from '@/i18n'
 import { fonts, useColors } from '@/theme'
 
 type Props = { text: string | null; onClose: () => void }
@@ -10,6 +11,7 @@ export function TextSheet({ text, onClose }: Props) {
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t } = useTranslation()
   // Keeps the text on screen while the sheet slides away after text turns null.
   const shown = useRef('')
   if (text !== null) shown.current = text
@@ -24,9 +26,9 @@ export function TextSheet({ text, onClose }: Props) {
     >
       <View style={styles.root}>
         <View style={styles.header}>
-          <Text style={styles.title}>Выделение текста</Text>
+          <Text style={styles.title}>{t('textSheet.title')}</Text>
           <Pressable onPress={onClose} hitSlop={10}>
-            <Text style={styles.done}>Готово</Text>
+            <Text style={styles.done}>{t('textSheet.done')}</Text>
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 24 }}>

@@ -10,6 +10,7 @@ import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useShake } from '@/hooks/useShake'
+import { useTranslation } from '@/i18n'
 import { fonts, useColors } from '@/theme'
 
 const version = Constants.expoConfig?.version ?? '1.0.0'
@@ -21,6 +22,7 @@ export default function AboutScreen() {
   const headerHeight = useHeaderHeight()
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t } = useTranslation()
 
   const restartOnboarding = useCallback(async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
@@ -39,21 +41,21 @@ export default function AboutScreen() {
           <Text style={styles.markGlyph}>R</Text>
         </View>
         <Text style={styles.name}>Reverie</Text>
-        <Text style={styles.version}>Версия {version}</Text>
+        <Text style={styles.version}>{t('about.version', { version })}</Text>
 
-        <Text style={styles.tagline}>Приватный ролевой чат с персонажами, который говорит с вашей собственной моделью.</Text>
+        <Text style={styles.tagline}>{t('about.tagline')}</Text>
 
         <View style={styles.card}>
-          <Row title="Данные" text="Персонажи, переписки и аватары хранятся только на этом устройстве, в локальной базе SQLite." />
-          <Row title="Сервер" text="Reverie не отправляет ничего сторонним сервисам — только на адрес, указанный в настройках." />
-          <Row title="Резервные копии" text="Экспорт и импорт сохраняют переписки в файл JSON, который остаётся у вас." last />
+          <Row title={t('about.dataTitle')} text={t('about.dataText')} />
+          <Row title={t('about.serverTitle')} text={t('about.serverText')} />
+          <Row title={t('about.backupsTitle')} text={t('about.backupsText')} last />
         </View>
 
-        <Text style={styles.shakeHint}>Потрясите телефон, чтобы заново пройти онбординг.</Text>
+        <Text style={styles.shakeHint}>{t('about.shakeHint')}</Text>
       </ScrollView>
 
       <GlassHeader left={<IconButton name="chevron-back" size={26} onPress={() => router.back()} />}>
-        <Text style={styles.title}>О приложении</Text>
+        <Text style={styles.title}>{t('settings.aboutTitle')}</Text>
       </GlassHeader>
     </View>
   )

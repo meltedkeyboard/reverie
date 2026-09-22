@@ -8,7 +8,8 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 
 import { StartupBoundary } from '@/components/StartupBoundary'
 import { migrate } from '@/db/schema'
-import { loadThemePreference, saveThemePreference } from '@/db/settings'
+import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
+import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { DialogHost } from '@/lib/dialogs'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
 
@@ -31,9 +32,11 @@ export default function RootLayout() {
 function ThemedApp() {
   const db = useSQLiteContext()
   const [preference, setPreferenceState] = useState<ThemePreference>('system')
+  const [localePreference, setLocalePreferenceState] = useState<LocalePreference>('system')
 
   useEffect(() => {
     loadThemePreference(db).then(setPreferenceState)
+    loadLocalePreference(db).then(setLocalePreferenceState)
   }, [db])
 
   const setPreference = (pref: ThemePreference) => {
@@ -41,10 +44,17 @@ function ThemedApp() {
     saveThemePreference(db, pref)
   }
 
+  const setLocalePreference = (pref: LocalePreference) => {
+    setLocalePreferenceState(pref)
+    saveLocalePreference(db, pref)
+  }
+
   return (
-    <ThemeContextProvider preference={preference} setPreference={setPreference}>
-      <AppShell />
-    </ThemeContextProvider>
+    <LocaleContextProvider preference={localePreference} setPreference={setLocalePreference}>
+      <ThemeContextProvider preference={preference} setPreference={setPreference}>
+        <AppShell />
+      </ThemeContextProvider>
+    </LocaleContextProvider>
   )
 }
 

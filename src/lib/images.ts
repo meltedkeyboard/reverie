@@ -2,6 +2,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 
 import type { MessageImage } from '@/db/messages'
+import { t } from '@/i18n'
 
 // Vision models downscale large inputs anyway, and every photo in the context window
 // is sent again with each reply, so a smaller picture keeps requests fast.
@@ -10,7 +11,7 @@ const MAX_SIDE = 1024
 export async function pickMessageImage(source: 'library' | 'camera'): Promise<MessageImage | null> {
   if (source === 'camera') {
     const permission = await ImagePicker.requestCameraPermissionsAsync()
-    if (!permission.granted) throw new Error('Нет доступа к камере. Его можно включить в настройках iOS.')
+    if (!permission.granted) throw new Error(t('images.cameraPermission'))
   }
   const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 1 }
   const picked =
@@ -26,7 +27,7 @@ export async function pickMessageImage(source: 'library' | 'camera'): Promise<Me
   }
   const rendered = await context.renderAsync()
   const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.8, base64: true })
-  if (!saved.base64) throw new Error('Не удалось прочитать изображение')
+  if (!saved.base64) throw new Error(t('images.readFailed'))
   return { base64: saved.base64, width: saved.width, height: saved.height }
 }
 

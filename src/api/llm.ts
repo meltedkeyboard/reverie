@@ -3,6 +3,7 @@ import { Platform } from 'react-native'
 
 import type { ThinkingMode } from '@/db/characters'
 import type { ServerSettings } from '@/db/settings'
+import { t } from '@/i18n'
 
 export const CONTEXT_WINDOW = 20
 
@@ -32,41 +33,45 @@ function requestHeaders(cfg: ServerSettings) {
   return headers
 }
 
+// Marks errors that already describe a server-side failure, so callers don't wrap
+// them again as "unreachable" — independent of the message's language.
+class ServerError extends Error {}
+
 async function readServerError(res: Awaited<ReturnType<typeof fetch>>) {
   const body = await res.text().catch(() => '')
   try {
     const parsed = JSON.parse(body)
     const msg = typeof parsed.error === 'string' ? parsed.error : parsed.error?.message
-    if (msg) return `Сервер вернул ошибку ${res.status}: ${msg}`
+    if (msg) return new ServerError(t('llm.serverError', { status: res.status, msg }))
   } catch {
     // Body is not JSON, fall through to the raw text.
   }
-  return `Сервер вернул ошибку ${res.status}${body ? `: ${body.slice(0, 200)}` : ''}`
+  return new ServerError(t('llm.serverErrorNoMsg', { status: res.status, body: body ? `: ${body.slice(0, 200)}` : '' }))
 }
 
 // In a browser a request blocked by the same-origin policy looks exactly like an
 // unreachable host, and a server started without CORS is the usual reason.
 function unreachable(err: unknown) {
   const detail = err instanceof Error ? err.message : String(err)
-  const hint = Platform.OS === 'web' ? '. Если сервер запущен, включите на нём CORS: браузер блокирует запрос без него' : ''
-  return new Error(`Сервер недоступен: ${detail}${hint}`)
+  const hint = Platform.OS === 'web' ? t('llm.corsHint') : ''
+  return new Error(t('llm.unreachable', { detail, hint }))
 }
 
 export async function testConnection(cfg: ServerSettings) {
   const base = normalizeBaseUrl(cfg.baseUrl)
-  if (!base) throw new Error('Укажите адрес сервера')
+  if (!base) throw new Error(t('llm.setBaseUrl'))
 
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 8000)
   try {
     const res = await fetch(`${base}/v1/models`, { headers: requestHeaders(cfg), signal: ctrl.signal })
-    if (!res.ok) throw new Error(await readServerError(res))
+    if (!res.ok) throw await readServerError(res)
     const body = await res.json()
     const models: string[] = Array.isArray(body?.data) ? body.data.map((m: { id: string }) => m.id) : []
     return models
   } catch (err) {
-    if (ctrl.signal.aborted) throw new Error('Сервер не ответил за 8 секунд. Проверьте адрес и сеть.')
-    if (err instanceof Error && err.message.startsWith('Сервер')) throw err
+    if (ctrl.signal.aborted) throw new Error(t('llm.timeout'))
+    if (err instanceof ServerError) throw err
     throw unreachable(err)
   } finally {
     clearTimeout(timer)
@@ -75,7 +80,7 @@ export async function testConnection(cfg: ServerSettings) {
 
 async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: boolean, signal?: AbortSignal) {
   const base = normalizeBaseUrl(cfg.baseUrl)
-  if (!base) throw new Error('Адрес сервера не задан. Откройте настройки и укажите его.')
+  if (!base) throw new Error(t('llm.baseUrlMissing'))
 
   let res
   try {
@@ -99,7 +104,7 @@ async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: 
     if (signal?.aborted) throw err
     throw unreachable(err)
   }
-  if (!res.ok) throw new Error(await readServerError(res))
+  if (!res.ok) throw await readServerError(res)
   return res
 }
 
@@ -159,7 +164,7 @@ class ThinkSplitter {
 
 export async function* streamChat(cfg: ServerSettings, req: ChatRequest, signal: AbortSignal) {
   const res = await requestCompletion(cfg, req, true, signal)
-  if (!res.body) throw new Error('Сервер не поддерживает потоковую передачу')
+  if (!res.body) throw new Error(t('llm.noStreaming'))
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()

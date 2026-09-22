@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { SFIcon } from '@/components/SFIcon'
 import { setOnboardingComplete } from '@/db/onboarding'
+import { useTranslation } from '@/i18n'
 import { fonts, useColors } from '@/theme'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -17,34 +18,34 @@ const HERO_HEIGHT = Math.round(SCREEN_HEIGHT * 0.72)
 type Slide = {
   icon: Parameters<typeof SFIcon>[0]['name']
   fallback: Parameters<typeof SFIcon>[0]['fallback']
-  title: string
-  text: string
+  titleKey: string
+  textKey: string
 }
 
 const SLIDES: Slide[] = [
   {
     icon: 'person.crop.circle.badge.plus',
     fallback: 'person-add-outline',
-    title: 'Свои персонажи',
-    text: 'Задайте имя, характер и манеру речи — и начните разговор с чистого листа.',
+    titleKey: 'onboarding.slide1.title',
+    textKey: 'onboarding.slide1.text',
   },
   {
     icon: 'slider.horizontal.3',
     fallback: 'options-outline',
-    title: 'Полный контроль',
-    text: 'Temperature, top-P, длина ответа — у каждого персонажа свои настройки генерации.',
+    titleKey: 'onboarding.slide2.title',
+    textKey: 'onboarding.slide2.text',
   },
   {
     icon: 'server.rack',
     fallback: 'hardware-chip-outline',
-    title: 'Ваша модель',
-    text: 'Reverie говорит с сервером в вашей сети — LM Studio, Ollama, llama.cpp. Ничего не уходит наружу.',
+    titleKey: 'onboarding.slide3.title',
+    textKey: 'onboarding.slide3.text',
   },
   {
     icon: 'lock.shield',
     fallback: 'shield-checkmark-outline',
-    title: 'Всё остаётся у вас',
-    text: 'Переписки и аватары хранятся только на этом устройстве, в локальной базе.',
+    titleKey: 'onboarding.slide4.title',
+    textKey: 'onboarding.slide4.text',
   },
 ]
 
@@ -56,6 +57,7 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t } = useTranslation()
   const scrollX = useRef(new Animated.Value(0)).current
   const welcomeIn = useRef(new Animated.Value(0)).current
   const [page, setPage] = useState(0)
@@ -97,13 +99,13 @@ export default function OnboardingScreen() {
         scrollEventThrottle={16}
       >
         {SLIDES.map((slide) => (
-          <View key={slide.title} style={styles.page}>
+          <View key={slide.titleKey} style={styles.page}>
             <View style={styles.copy}>
               <View style={styles.iconWrap}>
                 <SFIcon name={slide.icon} fallback={slide.fallback} size={26} color={colors.text} />
               </View>
-              <Text style={styles.title}>{slide.title}</Text>
-              <Text style={styles.text}>{slide.text}</Text>
+              <Text style={styles.title}>{t(slide.titleKey)}</Text>
+              <Text style={styles.text}>{t(slide.textKey)}</Text>
             </View>
           </View>
         ))}
@@ -119,8 +121,8 @@ export default function OnboardingScreen() {
               <View style={styles.iconWrap}>
                 <SFIcon name="sparkles" fallback="sparkles-outline" size={26} color={colors.text} />
               </View>
-              <Text style={styles.welcomeTitle}>Welcome to Reverie</Text>
-              <Text style={styles.text}>Персонажи, истории и ваша собственная модель — в одном приватном чате.</Text>
+              <Text style={styles.welcomeTitle}>{t('onboarding.welcomeTitle')}</Text>
+              <Text style={styles.text}>{t('onboarding.welcomeText')}</Text>
             </Animated.View>
           </View>
         </View>
@@ -129,7 +131,7 @@ export default function OnboardingScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
         {page === PAGE_COUNT - 1 ? (
           <Pressable onPress={finish} style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}>
-            <Text style={styles.ctaText}>Get Started</Text>
+            <Text style={styles.ctaText}>{t('onboarding.getStarted')}</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -140,7 +142,7 @@ export default function OnboardingScreen() {
             hitSlop={8}
             style={({ pressed }) => pressed && { opacity: 0.6 }}
           >
-            <Text style={styles.skip}>Пропустить</Text>
+            <Text style={styles.skip}>{t('onboarding.skip')}</Text>
           </Pressable>
         )}
         <View style={styles.dots}>

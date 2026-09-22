@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { ChatPreview } from '@/db/chats'
+import { useTranslation } from '@/i18n'
 import { formatWhen, plural } from '@/lib/format'
 import { plainPreview } from '@/lib/roleplay'
 import { useColors } from '@/theme'
@@ -17,10 +18,11 @@ type Props = {
 export function ChatCard({ chat, onOpen, onMenu }: Props) {
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
-  const preview = plainPreview(chat.lastMessage ?? '') || 'Пустой чат'
+  const { t, locale } = useTranslation()
+  const preview = plainPreview(chat.lastMessage ?? '') || t('chatCard.emptyChat')
   const count = chat.messageCount
-  const when = formatWhen(chat.lastActivity)
-  const messages = `${count} ${plural(count, 'сообщение', 'сообщения', 'сообщений')}`
+  const when = formatWhen(chat.lastActivity, locale)
+  const messages = `${count} ${plural(count, locale, ['сообщение', 'сообщения', 'сообщений'], ['message', 'messages'])}`
   return (
     <Pressable
       onPress={onOpen}

@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useMemo } from 'react'
 import { Platform, Pressable, StyleSheet } from 'react-native'
 
+import { useTranslation } from '@/i18n'
 import { useColors } from '@/theme'
 
 import { GlassSurface } from './Glass'
@@ -17,6 +18,7 @@ type Props = {
 export function AttachButton({ disabled, onPick }: Props) {
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t } = useTranslation()
   const circle = (
     <GlassSurface style={styles.circle} fallbackStyle={styles.solid}>
       <Ionicons name="add" size={24} color={colors.text} />
@@ -42,8 +44,8 @@ export function AttachButton({ disabled, onPick }: Props) {
       disabled={disabled}
       style={disabled && { opacity: 0.55 }}
       items={[
-        { label: 'Выбрать фото', systemImage: 'photo.on.rectangle', onSelect: () => onPick('library') },
-        { label: 'Сделать снимок', systemImage: 'camera', onSelect: () => onPick('camera') },
+        { label: t('attach.choosePhoto'), systemImage: 'photo.on.rectangle', onSelect: () => onPick('library') },
+        { label: t('attach.takePhoto'), systemImage: 'camera', onSelect: () => onPick('camera') },
       ]}
     >
       {circle}

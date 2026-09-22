@@ -17,6 +17,7 @@ import {
   type Thought,
 } from '@/db/messages'
 import { loadSettings } from '@/db/settings'
+import { t } from '@/i18n'
 import { imageDataUrl } from '@/lib/images'
 import { suggestTitle } from '@/lib/titles'
 
@@ -179,7 +180,7 @@ export function useChat(chat: Chat, character: Character) {
       } finally {
         // An empty reply otherwise vanishes silently, as if the tap did nothing.
         if (!text.trim() && !ctrl.signal.aborted) {
-          setError((prev) => prev ?? 'Модель вернула пустой ответ')
+          setError((prev) => prev ?? t('chat.emptyReply'))
         }
         if (frame) cancelAnimationFrame(frame)
         const reply = discarded.current.has(ctrl) ? '' : text.trim()

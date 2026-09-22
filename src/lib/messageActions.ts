@@ -1,5 +1,6 @@
 import { Platform } from 'react-native'
 
+import { t } from '@/i18n'
 import type { Role } from '@/db/messages'
 
 // refine regenerates with a wish from the user, like "more surprised" or "sadder".
@@ -22,18 +23,18 @@ type Options = {
 export function messageActions(message: { role: Role; content: string }, { canRegenerate, locked }: Options) {
   const items: ActionItem[] = []
   if (message.content) {
-    items.push({ action: 'copy', label: 'Копировать', systemImage: 'doc.on.doc' })
+    items.push({ action: 'copy', label: t('action.copy'), systemImage: 'doc.on.doc' })
     // In the browser the text is selectable in place.
-    if (Platform.OS !== 'web') items.push({ action: 'select', label: 'Выделить текст', systemImage: 'text.cursor' })
+    if (Platform.OS !== 'web') items.push({ action: 'select', label: t('action.selectText'), systemImage: 'text.cursor' })
   }
   if (!locked) {
     if (canRegenerate) {
-      const label = message.role === 'user' ? 'Ответить заново' : 'Перегенерировать'
+      const label = message.role === 'user' ? t('action.replyAgain') : t('action.regenerate')
       items.push({ action: 'regenerate', label, systemImage: 'arrow.clockwise' })
-      items.push({ action: 'refine', label: 'Уточнить...', systemImage: 'text.bubble' })
+      items.push({ action: 'refine', label: t('action.refine'), systemImage: 'text.bubble' })
     }
-    items.push({ action: 'edit', label: 'Изменить', systemImage: 'pencil' })
-    items.push({ action: 'delete', label: 'Удалить', systemImage: 'trash', destructive: true })
+    items.push({ action: 'edit', label: t('action.edit'), systemImage: 'pencil' })
+    items.push({ action: 'delete', label: t('action.delete'), systemImage: 'trash', destructive: true })
   }
   return items
 }

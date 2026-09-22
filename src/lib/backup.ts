@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { loadSettings, saveSettings } from '@/db/settings'
+import { t } from '@/i18n'
 import { pickJsonFile } from '@/lib/pickJson'
 import { readAvatarBase64, removeAllAvatars, writeAvatarBase64 } from '@/lib/avatars'
 import { saveJson } from '@/lib/download'
@@ -85,10 +86,10 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
   try {
     dump = JSON.parse(text)
   } catch {
-    throw new Error('Файл повреждён или это не резервная копия Reverie.')
+    throw new Error(t('backup.corrupted'))
   }
   if (dump.app !== 'reverie' || !Array.isArray(dump.characters)) {
-    throw new Error('Это не резервная копия Reverie.')
+    throw new Error(t('backup.notBackup'))
   }
 
   const characterIds = new Map<number, number>()

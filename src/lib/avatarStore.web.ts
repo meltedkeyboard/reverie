@@ -1,3 +1,5 @@
+import { t } from '@/i18n'
+
 // expo-file-system has no web implementation, so in the browser the avatars are
 // kept in localStorage as data URLs. The database still stores only the name.
 const PREFIX = 'reverie.avatar.'
@@ -17,7 +19,7 @@ export async function persistAvatar(tempUri: string) {
     localStorage.setItem(PREFIX + name, dataUrl)
   } catch {
     // localStorage is capped at a few megabytes and gives no way to ask for more.
-    throw new Error('В хранилище браузера не осталось места для ещё одного аватара.')
+    throw new Error(t('avatarStore.noSpace'))
   }
   return name
 }
@@ -39,7 +41,7 @@ export async function writeAvatarBase64(name: string, base64: string) {
   try {
     localStorage.setItem(PREFIX + name, `data:image/jpeg;base64,${base64}`)
   } catch {
-    throw new Error('В хранилище браузера не осталось места для ещё одного аватара.')
+    throw new Error(t('avatarStore.noSpace'))
   }
 }
 
@@ -58,7 +60,7 @@ async function readAsDataUrl(uri: string) {
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(new Error('Не удалось прочитать изображение'))
+    reader.onerror = () => reject(new Error(t('images.readFailed')))
     reader.readAsDataURL(blob)
   })
 }

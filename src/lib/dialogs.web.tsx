@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
+import { t } from '@/i18n'
 import { fonts, useColors } from '@/theme'
 
 export type SheetAction = {
@@ -61,7 +62,7 @@ function subscribe(listener: () => void) {
 }
 
 export function showSheet(title: string | undefined, actions: SheetAction[]) {
-  publish({ title, actions, dismissLabel: 'Отмена' })
+  publish({ title, actions, dismissLabel: t('common.cancel') })
 }
 
 export function confirm({ title, message, confirmLabel, destructive, onConfirm }: Confirmation) {
@@ -69,7 +70,7 @@ export function confirm({ title, message, confirmLabel, destructive, onConfirm }
     title,
     message,
     actions: [{ label: confirmLabel, destructive, onSelect: onConfirm }],
-    dismissLabel: 'Отмена',
+    dismissLabel: t('common.cancel'),
   })
 }
 
@@ -79,12 +80,12 @@ export function promptText({ title, message, initial, confirmLabel, onSubmit }: 
     message,
     input: { initial: initial ?? '' },
     actions: [{ label: confirmLabel, onSelect: onSubmit }],
-    dismissLabel: 'Отмена',
+    dismissLabel: t('common.cancel'),
   })
 }
 
 export function showMessage(title: string, message: string) {
-  publish({ title, message, actions: [], dismissLabel: 'Закрыть' })
+  publish({ title, message, actions: [], dismissLabel: t('common.close') })
 }
 
 export function DialogHost() {

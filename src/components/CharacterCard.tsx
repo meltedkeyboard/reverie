@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { CharacterPreview } from '@/db/characters'
+import { useTranslation } from '@/i18n'
 import { plural } from '@/lib/format'
 import { plainPreview } from '@/lib/roleplay'
 import { useColors } from '@/theme'
@@ -18,7 +19,8 @@ type Props = {
 export function CharacterCard({ character, onOpen, onMenu }: Props) {
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
-  const preview = plainPreview(character.lastMessage ?? character.systemPrompt) || 'Без описания'
+  const { t, locale } = useTranslation()
+  const preview = plainPreview(character.lastMessage ?? character.systemPrompt) || t('characterCard.noDescription')
   const chats = character.chatCount
   return (
     <Pressable
@@ -34,7 +36,7 @@ export function CharacterCard({ character, onOpen, onMenu }: Props) {
           </Text>
           {chats > 0 ? (
             <Text style={styles.chats}>
-              {chats} {plural(chats, 'чат', 'чата', 'чатов')}
+              {chats} {plural(chats, locale, ['чат', 'чата', 'чатов'], ['chat', 'chats'])}
             </Text>
           ) : null}
         </View>

@@ -1,5 +1,7 @@
 import { ActionSheetIOS, Alert } from 'react-native'
 
+import { t } from '@/i18n'
+
 export type SheetAction = {
   label: string
   destructive?: boolean
@@ -27,7 +29,7 @@ export function showSheet(title: string | undefined, actions: SheetAction[]) {
   ActionSheetIOS.showActionSheetWithOptions(
     {
       title,
-      options: [...actions.map((action) => action.label), 'Отмена'],
+      options: [...actions.map((action) => action.label), t('common.cancel')],
       destructiveButtonIndex: destructive >= 0 ? destructive : undefined,
       cancelButtonIndex: actions.length,
       userInterfaceStyle: 'dark',
@@ -38,7 +40,7 @@ export function showSheet(title: string | undefined, actions: SheetAction[]) {
 
 export function confirm({ title, message, confirmLabel, destructive, onConfirm }: Confirmation) {
   Alert.alert(title, message, [
-    { text: 'Отмена', style: 'cancel' },
+    { text: t('common.cancel'), style: 'cancel' },
     { text: confirmLabel, style: destructive ? 'destructive' : 'default', onPress: onConfirm },
   ])
 }
@@ -48,7 +50,7 @@ export function promptText({ title, message, initial, confirmLabel, onSubmit }: 
     title,
     message,
     [
-      { text: 'Отмена', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
       { text: confirmLabel, onPress: (text?: string) => onSubmit(text ?? '') },
     ],
     'plain-text',

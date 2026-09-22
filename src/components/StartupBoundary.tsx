@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { t } from '@/i18n'
 import { colors, fonts } from '@/theme'
 
 type Props = { children: ReactNode }
@@ -22,19 +23,16 @@ export class StartupBoundary extends Component<Props, State> {
 
     return (
       <View style={styles.screen}>
-        <Text style={styles.title}>Не удалось открыть базу данных</Text>
+        <Text style={styles.title}>{t('startup.dbFailedTitle')}</Text>
         <Text style={styles.text}>{error.message}</Text>
         {Platform.OS === 'web' ? (
           <>
-            <Text style={styles.text}>
-              База данных доступна только одной вкладке. Закройте остальные вкладки с Reverie и перезагрузите
-              страницу.
-            </Text>
+            <Text style={styles.text}>{t('startup.webSingleTab')}</Text>
             <Pressable
               onPress={() => window.location.reload()}
               style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}
             >
-              <Text style={styles.buttonText}>Перезагрузить</Text>
+              <Text style={styles.buttonText}>{t('startup.reload')}</Text>
             </Pressable>
           </>
         ) : null}

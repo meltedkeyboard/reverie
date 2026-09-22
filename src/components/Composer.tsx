@@ -29,6 +29,7 @@ import { GlassSurface } from './Glass'
 import { IconButton } from './IconButton'
 import { SFIcon } from './SFIcon'
 import type { MessageImage } from '@/db/messages'
+import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { imageDataUrl, pickMessageImage } from '@/lib/images'
 import { liquidGlass } from '@/lib/nativeUI'
@@ -52,6 +53,7 @@ export function Composer({ height, generating, editing, accessory, onSend, onSto
   const insets = useSafeAreaInsets()
   const { colors, scheme } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t } = useTranslation()
   const [text, setText] = useState('')
   const textRef = useRef(text)
   textRef.current = text
@@ -110,7 +112,7 @@ export function Composer({ height, generating, editing, accessory, onSend, onSto
       const picked = await pickMessageImage(source)
       if (picked) setImage(picked)
     } catch (err) {
-      showMessage('Не удалось прикрепить фото', err instanceof Error ? err.message : String(err))
+      showMessage(t('composer.attachFailedTitle'), err instanceof Error ? err.message : String(err))
     } finally {
       setPicking(false)
     }
@@ -136,7 +138,7 @@ export function Composer({ height, generating, editing, accessory, onSend, onSto
         {editing ? (
           <View style={styles.banner}>
             <Ionicons name="create-outline" size={15} color={colors.accent} />
-            <Text style={styles.bannerText}>Редактирование сообщения</Text>
+            <Text style={styles.bannerText}>{t('chat.editingMessage')}</Text>
             <IconButton name="close" size={18} color={colors.textMuted} onPress={onCancelEdit} style={styles.bannerClose} />
           </View>
         ) : null}
@@ -154,7 +156,7 @@ export function Composer({ height, generating, editing, accessory, onSend, onSto
             value={text}
             onChangeText={setText}
             onKeyPress={Platform.OS === 'web' ? onKeyPress : undefined}
-            placeholder="Сообщение"
+            placeholder={t('chat.messagePlaceholder')}
             placeholderTextColor={colors.textFaint}
             multiline
             keyboardAppearance={scheme}
@@ -165,7 +167,7 @@ export function Composer({ height, generating, editing, accessory, onSend, onSto
             onPress={onPress}
             disabled={mode === 'idle'}
             hitSlop={6}
-            accessibilityLabel={mode === 'continue' ? 'Продолжить' : undefined}
+            accessibilityLabel={mode === 'continue' ? t('chat.continueAccessibility') : undefined}
           >
             <Animated.View style={[styles.send, buttonStyle]}>
               {/* The symbol bounces when the button changes its meaning (send, stop, save),

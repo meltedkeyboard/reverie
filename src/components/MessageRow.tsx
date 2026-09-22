@@ -6,6 +6,7 @@ import { memo, useEffect, useMemo, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { Message } from '@/db/messages'
+import { useTranslation } from '@/i18n'
 import { showSheet } from '@/lib/dialogs'
 import { imageDataUrl } from '@/lib/images'
 import { messageActions, type MessageAction } from '@/lib/messageActions'
@@ -235,6 +236,7 @@ type ThoughtProps = {
 function ThoughtBlock({ text, ms }: ThoughtProps) {
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [seconds, setSeconds] = useState(0)
   const live = ms === null
@@ -265,8 +267,8 @@ function ThoughtBlock({ text, ms }: ThoughtProps) {
           effect={{ effect: 'breathe' }}
           active={live}
         />
-        <Text style={styles.thoughtLabel}>{live ? 'Размышляет...' : 'Размышления'}</Text>
-        {shown > 0 ? <Text style={styles.thoughtTime}>{shown} с</Text> : null}
+        <Text style={styles.thoughtLabel}>{live ? t('message.thinking') : t('message.reasoning')}</Text>
+        {shown > 0 ? <Text style={styles.thoughtTime}>{shown} {t('message.secondsShort')}</Text> : null}
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
       </Pressable>
       {open ? (
