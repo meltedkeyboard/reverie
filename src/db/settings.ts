@@ -24,15 +24,24 @@ export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> 
   }
 }
 
-export async function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
-  await db.withTransactionAsync(async () => {
-    for (const field of Object.keys(KEYS) as (keyof typeof KEYS)[]) {
-      await db.runAsync(
-        'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-        [KEYS[field], settings[field]]
-      )
-    }
-  })
+// The settings screen saves on every keystroke, and withTransactionAsync is not
+// exclusive: overlapping calls fail with "cannot start a transaction within a
+// transaction" and the later keystrokes are lost. Saves are chained to run one at a time.
+let saveQueue: Promise<void> = Promise.resolve()
+
+export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
+  const next = saveQueue.then(() =>
+    db.withTransactionAsync(async () => {
+      for (const field of Object.keys(KEYS) as (keyof typeof KEYS)[]) {
+        await db.runAsync(
+          'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          [KEYS[field], settings[field]]
+        )
+      }
+    })
+  )
+  saveQueue = next.catch(() => {})
+  return next
 }
 
 const THEME_KEY = 'theme_preference'

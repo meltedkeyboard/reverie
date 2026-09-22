@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -10,7 +11,7 @@ import { Field } from '@/components/Field'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { ParamSlider } from '@/components/ParamSlider'
-import { PromptGenModal } from '@/components/PromptGenModal'
+import { PromptGenModal, type GeneratedCharacter } from '@/components/PromptGenModal'
 import { DEFAULT_SAMPLING, deleteCharacter, getCharacter, saveCharacter, type ThinkingMode } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { pickAvatar, persistAvatar, removeAvatar } from '@/lib/avatars'
@@ -48,6 +49,9 @@ export default function CharacterEditorScreen() {
   const [replyLimit, setReplyLimit] = useState<number | null>(null)
   const [thinking, setThinking] = useState<ThinkingMode>('auto')
   const [showPromptGen, setShowPromptGen] = useState(false)
+  // What the prompt and greeting were before the last AI result replaced them, until
+  // the user edits the prompt by hand.
+  const [beforeGen, setBeforeGen] = useState<{ prompt: string; greeting: string } | null>(null)
   const storedAvatar = useRef<string | null>(null)
 
   useEffect(() => {
@@ -116,6 +120,19 @@ export default function CharacterEditorScreen() {
         router.dismissTo('/')
       },
     })
+  }
+
+  const applyGenerated = (result: GeneratedCharacter) => {
+    setBeforeGen({ prompt: systemPrompt, greeting })
+    setSystemPrompt(result.prompt)
+    if (result.greeting !== null) setGreeting(result.greeting)
+  }
+
+  const undoGenerated = () => {
+    if (!beforeGen) return
+    setSystemPrompt(beforeGen.prompt)
+    setGreeting(beforeGen.greeting)
+    setBeforeGen(null)
   }
 
   const hasPhoto = Boolean(pickedUri || avatar)
@@ -211,14 +228,28 @@ export default function CharacterEditorScreen() {
 
           <View style={styles.systemPromptHeader}>
             <Text style={styles.systemPromptLabel}>{t('editor.systemPromptLabel')}</Text>
-            <Pressable onPress={() => setShowPromptGen(true)} hitSlop={8}>
-              <Text style={styles.link}>{t('editor.generateWithAi')}</Text>
-            </Pressable>
+            {beforeGen ? (
+              <Pressable onPress={undoGenerated} hitSlop={8}>
+                <Text style={styles.linkMuted}>{t('editor.undoGenerated')}</Text>
+              </Pressable>
+            ) : null}
           </View>
+          <Pressable
+            onPress={() => setShowPromptGen(true)}
+            style={({ pressed }) => [styles.aiButton, pressed && { opacity: 0.7 }]}
+          >
+            <Ionicons name="sparkles" size={16} color={colors.accent} />
+            <Text style={styles.aiButtonText}>
+              {systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
+            </Text>
+          </Pressable>
           <Field
             hint={t('editor.systemPromptHint')}
             value={systemPrompt}
-            onChangeText={setSystemPrompt}
+            onChangeText={(v) => {
+              setSystemPrompt(v)
+              setBeforeGen(null)
+            }}
             placeholder={t('editor.systemPromptPlaceholder')}
             multiline
             style={{ minHeight: 180 }}
@@ -226,8 +257,11 @@ export default function CharacterEditorScreen() {
 
           <PromptGenModal
             visible={showPromptGen}
+            name={name}
+            currentPrompt={systemPrompt}
+            currentGreeting={greeting}
             onClose={() => setShowPromptGen(false)}
-            onGenerated={(prompt) => setSystemPrompt(prompt)}
+            onApply={applyGenerated}
           />
 
           {!isNew ? (
@@ -273,6 +307,17 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
       marginRight: 4,
     },
     systemPromptLabel: { color: colors.textMuted, fontSize: 13 },
+    aiButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      marginBottom: 10,
+      borderRadius: 14,
+      backgroundColor: colors.accentSoft,
+    },
+    aiButtonText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
     hint: { color: colors.textFaint, fontSize: 12, marginTop: -4, marginBottom: 4, marginHorizontal: 4 },
     segment: {
       flexDirection: 'row',
