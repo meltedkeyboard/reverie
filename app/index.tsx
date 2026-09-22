@@ -5,6 +5,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { CharacterCard } from '@/components/CharacterCard'
+import { GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { deleteCharacter, listCharacters, type CharacterPreview } from '@/db/characters'
@@ -97,8 +98,10 @@ export default function CharactersScreen() {
               <Text style={styles.emptyText}>{t('characters.emptyText')}</Text>
               <Link href="/character/new" asChild>
                 <Link.AppleZoom>
-                  <Pressable style={styles.emptyButton}>
-                    <Text style={styles.emptyButtonText}>{t('characters.createCharacter')}</Text>
+                  <Pressable>
+                    <GlassSurface interactive tintColor={colors.accent} style={styles.emptyButton} fallbackStyle={{ backgroundColor: colors.accent }}>
+                      <Text style={styles.emptyButtonText}>{t('characters.createCharacter')}</Text>
+                    </GlassSurface>
                   </Pressable>
                 </Link.AppleZoom>
               </Link>
@@ -148,6 +151,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80, paddingHorizontal: 24 },
   emptyTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 22, marginBottom: 8 },
   emptyText: { color: colors.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 21, marginBottom: 20 },
-  emptyButton: { backgroundColor: colors.accent, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12 },
+  emptyButton: { borderRadius: 16, minWidth: 200, paddingHorizontal: 28, paddingVertical: 15, alignItems: 'center' },
   emptyButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 })

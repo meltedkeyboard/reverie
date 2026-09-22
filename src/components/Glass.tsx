@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import type { ComponentProps } from 'react'
 import { useMemo } from 'react'
-import { Pressable, StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
 
 import { glassEffect, liquidGlass } from '@/lib/nativeUI'
 import { useTheme } from '@/theme'
@@ -12,9 +12,10 @@ type SurfaceProps = ViewProps & {
   // Applied only when Liquid Glass is unavailable, in place of the glass material.
   fallbackStyle?: StyleProp<ViewStyle>
   interactive?: boolean
+  tintColor?: ColorValue
 }
 
-export function GlassSurface({ style, fallbackStyle, interactive, children, ...rest }: SurfaceProps) {
+export function GlassSurface({ style, fallbackStyle, interactive, tintColor, children, ...rest }: SurfaceProps) {
   const { scheme } = useTheme()
   if (!glassEffect) {
     return (
@@ -25,7 +26,14 @@ export function GlassSurface({ style, fallbackStyle, interactive, children, ...r
   }
   const { GlassView } = glassEffect
   return (
-    <GlassView glassEffectStyle="regular" colorScheme={scheme} isInteractive={interactive} style={style} {...rest}>
+    <GlassView
+      glassEffectStyle="regular"
+      colorScheme={scheme}
+      isInteractive={interactive}
+      tintColor={tintColor}
+      style={style}
+      {...rest}
+    >
       {children}
     </GlassView>
   )
