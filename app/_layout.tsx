@@ -89,9 +89,13 @@ function AppShell() {
         <View style={[styles.backdrop, Platform.OS === 'web' && { backgroundColor: scheme === 'light' ? '#E7E7EE' : '#000000' }]}>
           <View style={[styles.shell, showSidebar && styles.shellWide, { borderColor: colors.border, backgroundColor: colors.bg }]}>
             {showSidebar ? (
-              <View style={styles.desktopRow}>
-                <Sidebar />
-                <View style={styles.desktopMain}>{stack}</View>
+              <View style={styles.scaleClip}>
+                <View style={styles.scaleInner}>
+                  <View style={styles.desktopRow}>
+                    <Sidebar />
+                    <View style={styles.desktopMain}>{stack}</View>
+                  </View>
+                </View>
               </View>
             ) : (
               stack
@@ -113,20 +117,34 @@ const shell: ViewStyle =
     ? { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center', borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth }
     : { flex: 1 }
 
+// The phone-optimized text and controls read as tiny once the shell is simply widened
+// on a 2K/4K monitor, so the two-pane content is scaled up as a block instead — laid
+// out at 1/DESKTOP_SCALE of the box and then CSS-scaled back to fill it, which enlarges
+// every screen without touching each one's own sizes.
+const DESKTOP_SCALE = 1.35
+const scaleInner = {
+  width: `${100 / DESKTOP_SCALE}%`,
+  height: `${100 / DESKTOP_SCALE}%`,
+  transform: [{ scale: DESKTOP_SCALE }],
+  transformOrigin: 'top left',
+} as unknown as ViewStyle
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: darkColors.bg },
   backdrop: { flex: 1 },
   shell,
   shellWide: {
-    maxWidth: 1100,
+    maxWidth: 1600,
     borderRadius: 16,
     overflow: 'hidden',
-    marginVertical: 24,
+    marginVertical: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.35,
     shadowRadius: 40,
   },
+  scaleClip: { flex: 1, overflow: 'hidden' },
+  scaleInner,
   desktopRow: { flex: 1, flexDirection: 'row' },
   desktopMain: { flex: 1, position: 'relative' },
 })
