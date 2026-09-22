@@ -10,10 +10,11 @@ import { testConnection } from '@/api/llm'
 import { Field } from '@/components/Field'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
+import { SegmentedControl } from '@/components/SegmentedControl'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
-import { fonts, useColors, useTheme, type ThemePreference } from '@/theme'
+import { fonts, useTheme, type ThemePreference } from '@/theme'
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'Системная' },
@@ -28,8 +29,7 @@ export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
-  const colors = useColors()
-  const { preference, setPreference } = useTheme()
+  const { colors, preference, setPreference } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
 
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
@@ -121,18 +121,8 @@ export default function SettingsScreen() {
           contentContainerStyle={{ paddingTop: headerHeight + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }}
         >
           <Text style={styles.section}>Оформление</Text>
-          <View style={styles.segment}>
-            {THEME_OPTIONS.map((opt) => (
-              <Pressable
-                key={opt.value}
-                onPress={() => setPreference(opt.value)}
-                style={[styles.segmentItem, preference === opt.value && styles.segmentItemActive]}
-              >
-                <Text style={[styles.segmentText, preference === opt.value && styles.segmentTextActive]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={{ marginBottom: 20 }}>
+            <SegmentedControl options={THEME_OPTIONS} value={preference} onChange={setPreference} />
           </View>
 
           <Text style={[styles.section, { marginTop: 36 }]}>Сервер</Text>
@@ -256,16 +246,11 @@ export default function SettingsScreen() {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
     section: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, marginBottom: 14 },
-    segment: { flexDirection: 'row', backgroundColor: colors.surfaceRaised, borderRadius: 10, padding: 3, marginBottom: 20 },
-    segmentItem: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-    segmentItemActive: { backgroundColor: colors.accentSoft },
-    segmentText: { color: colors.textMuted, fontSize: 13 },
-    segmentTextActive: { color: colors.accent, fontWeight: '600' },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20, marginTop: -6 },
     chip: {
       maxWidth: '100%',

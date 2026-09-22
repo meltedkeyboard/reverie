@@ -10,10 +10,11 @@ import { Field } from '@/components/Field'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { ParamSlider } from '@/components/ParamSlider'
+import { SegmentedControl } from '@/components/SegmentedControl'
 import { DEFAULT_SAMPLING, deleteCharacter, getCharacter, saveCharacter, type ThinkingMode } from '@/db/characters'
 import { pickAvatar, persistAvatar, removeAvatar } from '@/lib/avatars'
 import { confirm, showMessage } from '@/lib/dialogs'
-import { fonts, useColors } from '@/theme'
+import { fonts, useTheme } from '@/theme'
 
 const THINKING_OPTIONS: { value: ThinkingMode; label: string }[] = [
   { value: 'auto', label: 'Как на сервере' },
@@ -28,7 +29,7 @@ export default function CharacterEditorScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
-  const colors = useColors()
+  const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
 
   const [ready, setReady] = useState(isNew)
@@ -164,16 +165,8 @@ export default function CharacterEditorScreen() {
           />
 
           <Text style={styles.section}>Режим размышления</Text>
-          <View style={styles.segment}>
-            {THINKING_OPTIONS.map((opt) => (
-              <Pressable
-                key={opt.value}
-                onPress={() => setThinking(opt.value)}
-                style={[styles.segmentItem, thinking === opt.value && styles.segmentItemActive]}
-              >
-                <Text style={[styles.segmentText, thinking === opt.value && styles.segmentTextActive]}>{opt.label}</Text>
-              </Pressable>
-            ))}
+          <View style={{ marginBottom: 8 }}>
+            <SegmentedControl options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
           </View>
           <Text style={styles.hint}>
             «Как на сервере» ничего не добавляет к запросу — модель думает или нет так, как настроено в LM Studio. «Включено» и
@@ -238,7 +231,7 @@ export default function CharacterEditorScreen() {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
@@ -249,17 +242,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
   linkMuted: { color: colors.textMuted, fontSize: 15 },
   section: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, marginTop: 8, marginBottom: 12 },
   hint: { color: colors.textFaint, fontSize: 12, marginTop: -4, marginBottom: 4, marginHorizontal: 4 },
-  segment: {
-    flexDirection: 'row',
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: 10,
-    padding: 3,
-    marginBottom: 8,
-  },
-  segmentItem: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-  segmentItemActive: { backgroundColor: colors.accentSoft },
-  segmentText: { color: colors.textMuted, fontSize: 13 },
-  segmentTextActive: { color: colors.accent, fontWeight: '600' },
   delete: { alignItems: 'center', marginTop: 32, paddingVertical: 14 },
   deleteText: { color: colors.danger, fontSize: 16 },
 })
