@@ -74,7 +74,7 @@
   "onboarding.slide3.text": "Reverie говорит с сервером в вашей сети — LM Studio, Ollama, llama.cpp. Ничего не уходит наружу.",
   "onboarding.slide4.title": "Всё остаётся у вас",
   "onboarding.slide4.text": "Переписки и аватары хранятся только на этом устройстве, в локальной базе.",
-  "onboarding.welcomeTitle": "Добро пожаловать в Reverie",
+  "onboarding.welcomeTitle": "Добро пожаловать",
   "onboarding.getStarted": "Продолжить",
 
   "editor.thinkingAuto": "Как на сервере",

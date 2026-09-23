@@ -4,14 +4,14 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { AppMark } from '@/components/AppMark'
 import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
 import { Group } from '@/components/Group'
+import { Wordmark } from '@/components/Wordmark'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useShake } from '@/hooks/useShake'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
-import { fonts, useStyles, type Colors } from '@/theme'
+import { useStyles, type Colors } from '@/theme'
 
 const version = Constants.expoConfig?.version ?? '1.0.0'
 
@@ -33,8 +33,7 @@ export default function AboutScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={padding}>
-        <AppMark style={{ marginBottom: 16 }} />
-        <Text style={styles.name}>Reverie</Text>
+        <Wordmark width={220} optical style={styles.wordmark} />
         <Text style={styles.version}>{t('about.version', { version })}</Text>
 
         <Text style={styles.tagline}>{t('about.tagline')}</Text>
@@ -68,8 +67,8 @@ function Row({ title, text }: { title: string; text: string }) {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  name: { color: colors.text, fontFamily: fonts.prose, fontSize: 24, fontWeight: '600', textAlign: 'center' },
-  version: { color: colors.textFaint, fontSize: 13, textAlign: 'center', marginTop: 4, marginBottom: 20 },
+  wordmark: { alignSelf: 'center', marginTop: 8 },
+  version: { color: colors.textFaint, fontSize: 13, textAlign: 'center', marginTop: 12, marginBottom: 20 },
   tagline: {
     color: colors.textMuted,
     fontSize: 15,

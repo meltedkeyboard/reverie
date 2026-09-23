@@ -4,9 +4,9 @@ import { useEffect, useRef } from 'react'
 import { AccessibilityInfo, Animated, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { AppMark } from '@/components/AppMark'
 import { Button } from '@/components/Button'
 import { SFIcon } from '@/components/SFIcon'
+import { Wordmark } from '@/components/Wordmark'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
@@ -82,7 +82,7 @@ export default function OnboardingScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: appear, transform: [{ translateY: rise }] }}>
-          <AppMark size={96} style={{ marginBottom: 24 }} />
+          <Wordmark width={260} optical style={styles.wordmark} />
           <Text style={styles.title} accessibilityRole="header">
             {t('onboarding.welcomeTitle')}
           </Text>
@@ -114,6 +114,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     content: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingHorizontal: 32, paddingBottom: 24 },
+    wordmark: { alignSelf: 'center', marginBottom: 28 },
     title: {
       color: colors.text,
       fontSize: 34,

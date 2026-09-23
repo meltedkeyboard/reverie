@@ -74,7 +74,7 @@
   "onboarding.slide3.text": "Reverie talks to a server on your network — LM Studio, Ollama, llama.cpp. Nothing leaves it.",
   "onboarding.slide4.title": "It all stays with you",
   "onboarding.slide4.text": "Chats and avatars are stored only on this device, in a local database.",
-  "onboarding.welcomeTitle": "Welcome to Reverie",
+  "onboarding.welcomeTitle": "Welcome",
   "onboarding.getStarted": "Continue",
 
   "editor.thinkingAuto": "Same as server",

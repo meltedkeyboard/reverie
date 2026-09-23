@@ -8,10 +8,11 @@ import { pruneUntouchedChats } from '@/db/chats'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useTranslation } from '@/i18n'
 import { characterPreview } from '@/lib/roleplay'
-import { fonts, useStyles, type Colors } from '@/theme'
+import { useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { IconButton } from './IconButton'
+import { Wordmark } from './Wordmark'
 
 // Persistent character rail shown next to the routed Stack on wide web viewports, so
 // switching characters doesn't cost a round trip back to the root route. It mirrors
@@ -50,7 +51,7 @@ export function Sidebar() {
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t('characters.title')}</Text>
+        <Wordmark width={120} />
         <View style={styles.headerActions}>
           <IconButton name="settings-outline" size={20} onPress={() => router.push('/settings')} />
           <Link href="/character/new" asChild>
@@ -62,6 +63,7 @@ export function Sidebar() {
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
         contentContainerStyle={{ padding: 8, paddingBottom: 16 }}
+        ListHeaderComponent={<Text style={styles.section}>{t('characters.title')}</Text>}
         renderItem={({ item: character }) => {
           const active = character.id === activeId
           return (
@@ -110,7 +112,16 @@ const createStyles = (colors: Colors) =>
       borderBottomColor: colors.border,
     },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-    title: { color: colors.text, fontFamily: fonts.prose, fontSize: 20, fontWeight: '600' },
+    section: {
+      color: colors.textFaint,
+      fontSize: 12,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+      marginTop: 8,
+      marginBottom: 6,
+      marginHorizontal: 10,
+    },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 14, marginBottom: 2 },
     rowActive: { backgroundColor: colors.accentSoft },
     rowBody: { flex: 1 },

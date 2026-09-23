@@ -1,11 +1,12 @@
-// Renders every app icon, splash and favicon from the two SVGs in assets/brand.
-// Run after changing them: npm run icons
+// Renders every app icon, splash, favicon and the wordmark images from the SVGs in
+// assets/brand. Run after changing them: npm run icons
 import { Resvg } from '@resvg/resvg-js'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 const BRAND = 'assets/brand'
 const light = readFileSync(`${BRAND}/icon-light.svg`, 'utf8')
 const dark = readFileSync(`${BRAND}/icon-dark.svg`, 'utf8')
+const wordmark = readFileSync(`${BRAND}/wordmark.svg`, 'utf8')
 
 // The icon's inner markup, to be placed inside other SVGs.
 function body(svg) {
@@ -50,6 +51,24 @@ function favicon() {
 <g clip-path="url(#favicon_round)">${themed}</g></svg>`
 }
 
+// The link preview: the wordmark on the dark background, its letters (not the spark
+// sticking out past them) centered.
+function ogImage() {
+  const [vx, vy, vw, vh] = wordmark.match(/viewBox="([^"]+)"/)[1].split(' ').map(Number)
+  const width = 760
+  const scale = width / vw
+  const height = vh * scale
+  const x = (1200 - width) / 2 + (vx + vw / 2 - LETTERS.x) * scale
+  const y = (630 - height) / 2 + (vy + vh / 2 - LETTERS.y) * scale
+  const inner = wordmark.replace(/^[\s\S]*?<g /, '<g ').replace(/<\/svg>\s*$/, '')
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<rect width="1200" height="630" fill="#0F0F12"/>
+<g transform="translate(${x} ${y}) scale(${scale}) translate(${-vx} ${-vy})">${inner}</g></svg>`
+}
+
+// Middle of the letters in wordmark.svg units; the spark reaches past them up and left.
+const LETTERS = { x: 7173.6 / 2, y: 1058 / 2 }
+
 function png(svg, file, width = 1024) {
   const image = new Resvg(svg, { fitTo: { mode: 'width', value: width } }).render()
   writeFileSync(file, image.asPng())
@@ -68,3 +87,6 @@ png(rounded(light, 'favicon_light'), 'assets/images/favicon.png', 196)
 writeFileSync('public/favicon.svg', favicon())
 console.log('public/favicon.svg')
 png(light, 'public/apple-touch-icon.png', 180)
+
+png(wordmark, 'assets/images/wordmark.png', 1200)
+png(ogImage(), 'public/og-image.png', 1200)

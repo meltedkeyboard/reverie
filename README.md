@@ -1,4 +1,6 @@
-# Reverie
+<p align="center">
+  <img src="assets/brand/wordmark.svg" alt="Reverie" width="420" />
+</p>
 
 Клиент для ролевых чатов на Expo (iOS и веб). Работает напрямую с локальным сервером по OpenAI-совместимому API (LM Studio, llama.cpp, Ollama). Все данные хранятся на устройстве.
 
