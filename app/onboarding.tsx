@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef } from 'react'
-import { AccessibilityInfo, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { AccessibilityInfo, Animated, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { GlassSurface } from '@/components/Glass'
+import { Button } from '@/components/Button'
 import { SFIcon } from '@/components/SFIcon'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useTranslation } from '@/i18n'
@@ -105,16 +105,7 @@ export default function OnboardingScreen() {
       </ScrollView>
 
       <Animated.View style={[styles.footer, { paddingBottom: insets.bottom + 16, opacity: appear }]}>
-        <Pressable onPress={finish} style={({ pressed }) => pressed && { transform: [{ scale: 0.98 }] }}>
-          <GlassSurface
-            interactive
-            tintColor={colors.accent}
-            style={styles.cta}
-            fallbackStyle={{ backgroundColor: colors.accent }}
-          >
-            <Text style={styles.ctaText}>{t('onboarding.getStarted')}</Text>
-          </GlassSurface>
-        </Pressable>
+        <Button variant="glass" label={t('onboarding.getStarted')} onPress={finish} />
       </Animated.View>
     </View>
   )
@@ -153,6 +144,4 @@ const createStyles = (colors: Colors) =>
     featureTitle: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 3 },
     featureText: { color: colors.textMuted, fontSize: 15, lineHeight: 21 },
     footer: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 12 },
-    cta: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-    ctaText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
   })

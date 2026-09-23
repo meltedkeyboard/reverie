@@ -1,12 +1,13 @@
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useState } from 'react'
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { FlatList, StyleSheet, Text, View } from 'react-native'
 
 import { Avatar } from '@/components/Avatar'
+import { Button } from '@/components/Button'
 import { ChatCard } from '@/components/ChatCard'
-import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
+import { EmptyState, ListSeparator } from '@/components/EmptyState'
+import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { getCharacter, type Character } from '@/db/characters'
 import { deleteChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
@@ -19,8 +20,7 @@ export default function CharacterChatsScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>()
   const db = useSQLiteContext()
   const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const headerHeight = useHeaderHeight()
+  const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [character, setCharacter] = useState<Character | null>(null)
@@ -66,21 +66,21 @@ export default function CharacterChatsScreen() {
       <FlatList
         data={chats ?? []}
         keyExtractor={(c) => String(c.id)}
-        contentContainerStyle={{ paddingTop: headerHeight + 16, paddingBottom: insets.bottom + 24, paddingHorizontal: 16, flexGrow: 1 }}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        contentContainerStyle={padding}
+        ItemSeparatorComponent={ListSeparator}
         ListEmptyComponent={
           chats ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>{t('chatsList.emptyTitle')}</Text>
-              <Text style={styles.emptyText}>{t('chatsList.emptyText')}</Text>
-              <Link href={`/chat/new?character=${characterId}`} asChild>
-                <Link.AppleZoom>
-                  <Pressable style={styles.emptyButton}>
-                    <Text style={styles.emptyButtonText}>{t('chatsList.startChat')}</Text>
-                  </Pressable>
-                </Link.AppleZoom>
-              </Link>
-            </View>
+            <EmptyState
+              title={t('chatsList.emptyTitle')}
+              text={t('chatsList.emptyText')}
+              action={
+                <Link href={`/chat/new?character=${characterId}`} asChild>
+                  <Link.AppleZoom>
+                    <Button variant="glass" label={t('chatsList.startChat')} style={styles.emptyButton} />
+                  </Link.AppleZoom>
+                </Link>
+              }
+            />
           ) : null
         }
         renderItem={({ item: chat }) => (
@@ -120,9 +120,5 @@ const createStyles = (colors: Colors) =>
   screen: { flex: 1, backgroundColor: colors.bg },
   who: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80, paddingHorizontal: 24 },
-  emptyTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 22, marginBottom: 8 },
-  emptyText: { color: colors.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 21, marginBottom: 20 },
-  emptyButton: { backgroundColor: colors.accent, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12 },
-  emptyButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  emptyButton: { minWidth: 200 },
 })

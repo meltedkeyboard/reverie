@@ -1,12 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { ChatTurn } from '@/api/llm'
-import { Segmented } from '@/components/Segmented'
 import { loadSettings } from '@/db/settings'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
@@ -24,6 +23,10 @@ import {
   type PromptLength,
 } from '@/lib/promptGen'
 import { fonts, useStyles, useTheme, type Colors } from '@/theme'
+
+import { Button } from './Button'
+import { PageSheet } from './PageSheet'
+import { Segmented } from './Segmented'
 
 export type GeneratedCharacter = { prompt: string; greeting: string | null }
 
@@ -395,112 +398,66 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
   const footer =
     phase === 'compose' ? (
-      <PrimaryButton
+      <Button
         icon="sparkles"
         label={effectiveMode === 'improve' ? t('promptGen.improve') : t('promptGen.generate')}
         onPress={() => run()}
         disabled={!canGenerate}
-        styles={styles}
       />
     ) : busy ? (
-      <SecondaryButton icon="stop" label={t('promptGen.stop')} onPress={stop} styles={styles} />
+      <Button variant="secondary" icon="stop" label={t('promptGen.stop')} onPress={stop} />
     ) : !current ? (
-      <PrimaryButton icon="refresh" label={t('promptGen.retry')} onPress={() => run()} styles={styles} />
+      <Button icon="refresh" label={t('promptGen.retry')} onPress={() => run()} />
     ) : (
       <View style={styles.footerRow}>
-        <SecondaryButton icon="refresh" label={t('promptGen.another')} onPress={() => run()} styles={styles} />
+        <Button variant="secondary" icon="refresh" label={t('promptGen.another')} onPress={() => run()} />
         <View style={{ flex: 1 }}>
-          <PrimaryButton
+          <Button
             icon="checkmark"
             label={hasCurrent ? t('promptGen.replace') : t('promptGen.apply')}
             onPress={apply}
             disabled={!current?.prompt.trim()}
-            styles={styles}
           />
         </View>
       </View>
     )
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={close}>
-      <View style={styles.root}>
-        <View style={styles.header}>
-          <Pressable onPress={phase === 'result' ? backToCompose : close} hitSlop={10} style={styles.headerSide}>
-            <Text style={styles.headerButton}>{phase === 'result' ? t('promptGen.back') : t('common.cancel')}</Text>
+    <PageSheet
+      visible={visible}
+      onClose={close}
+      title={t('promptGen.title')}
+      left={
+        <Pressable onPress={phase === 'result' ? backToCompose : close} hitSlop={10}>
+          <Text style={styles.headerButton}>{phase === 'result' ? t('promptGen.back') : t('common.cancel')}</Text>
+        </Pressable>
+      }
+      right={
+        phase === 'result' ? (
+          <Pressable onPress={close} hitSlop={10}>
+            <Text style={styles.headerButton}>{t('common.close')}</Text>
           </Pressable>
-          <Text style={styles.title}>{t('promptGen.title')}</Text>
-          <View style={[styles.headerSide, { alignItems: 'flex-end' }]}>
-            {phase === 'result' ? (
-              <Pressable onPress={close} hitSlop={10}>
-                <Text style={styles.headerButton}>{t('common.close')}</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-
-        <KeyboardAwareScrollView
-          bottomOffset={24}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={[styles.content, column]}
-        >
-          {phase === 'compose' ? composeView : resultView}
-        </KeyboardAwareScrollView>
-
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-          <View style={column}>{footer}</View>
-        </View>
-      </View>
-    </Modal>
-  )
-}
-
-type Styles = ReturnType<typeof createStyles>
-type ButtonProps = {
-  icon: React.ComponentProps<typeof Ionicons>['name']
-  label: string
-  onPress: () => void
-  disabled?: boolean
-  styles: Styles
-}
-
-function PrimaryButton({ icon, label, onPress, disabled, styles }: ButtonProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }, disabled && { opacity: 0.4 }]}
+        ) : null
+      }
     >
-      <Ionicons name={icon} size={18} color="#fff" />
-      <Text style={styles.primaryText}>{label}</Text>
-    </Pressable>
-  )
-}
+      <KeyboardAwareScrollView
+        bottomOffset={24}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.content, column]}
+      >
+        {phase === 'compose' ? composeView : resultView}
+      </KeyboardAwareScrollView>
 
-function SecondaryButton({ icon, label, onPress, styles }: ButtonProps) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}>
-      <Ionicons name={icon} size={17} color={styles.secondaryText.color} />
-      <Text style={styles.secondaryText}>{label}</Text>
-    </Pressable>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+        <View style={column}>{footer}</View>
+      </View>
+    </PageSheet>
   )
 }
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.surface },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingTop: 18,
-      paddingBottom: 12,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
-    },
-    headerSide: { minWidth: 80 },
     headerButton: { color: colors.textMuted, fontSize: 16 },
-    title: { color: colors.text, fontSize: 17, fontWeight: '600' },
     content: { padding: 20, paddingBottom: 32 },
     wideColumn: { width: '100%', maxWidth: 720, alignSelf: 'center' },
     block: { marginBottom: 20 },
@@ -598,25 +555,4 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.surface,
     },
     footerRow: { flexDirection: 'row', gap: 10 },
-    primary: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      height: 50,
-      borderRadius: 14,
-      backgroundColor: colors.accent,
-    },
-    primaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-    secondary: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      height: 50,
-      paddingHorizontal: 18,
-      borderRadius: 14,
-      backgroundColor: colors.surfaceRaised,
-    },
-    secondaryText: { color: colors.text, fontSize: 16, fontWeight: '500' },
   })

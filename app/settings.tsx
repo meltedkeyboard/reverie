@@ -4,11 +4,11 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { testConnection } from '@/api/llm'
+import { Button } from '@/components/Button'
 import { Field } from '@/components/Field'
-import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
+import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { Segmented } from '@/components/Segmented'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
@@ -24,8 +24,7 @@ type Status = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok' | 'error'; t
 export default function SettingsScreen() {
   const db = useSQLiteContext()
   const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const headerHeight = useHeaderHeight()
+  const padding = useScreenPadding('form')
   const colors = useColors()
   const { preference, setPreference } = useTheme()
   const styles = useStyles(createStyles)
@@ -131,7 +130,7 @@ export default function SettingsScreen() {
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
-          contentContainerStyle={{ paddingTop: headerHeight + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }}
+          contentContainerStyle={padding}
         >
           <Text style={styles.section}>{t('settings.appearance')}</Text>
           <View style={styles.card}>
@@ -194,20 +193,13 @@ export default function SettingsScreen() {
                 </View>
               ) : null}
 
-              <Pressable
+              <Button
+                variant="soft"
+                icon="pulse-outline"
+                label={t('settings.testConnection')}
                 onPress={onTest}
-                disabled={status.kind === 'testing'}
-                style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
-              >
-                {status.kind === 'testing' ? (
-                  <ActivityIndicator color={colors.accent} />
-                ) : (
-                  <>
-                    <Ionicons name="pulse-outline" size={18} color={colors.accent} />
-                    <Text style={styles.actionButtonText}>{t('settings.testConnection')}</Text>
-                  </>
-                )}
-              </Pressable>
+                loading={status.kind === 'testing'}
+              />
 
               {status.kind === 'ok' || status.kind === 'error' ? (
                 <View style={styles.status}>
@@ -332,16 +324,6 @@ const createStyles = (colors: Colors) =>
     },
     chipActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
     chipText: { color: colors.textMuted, fontSize: 13 },
-    actionButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      height: 46,
-      borderRadius: 12,
-      backgroundColor: colors.accentSoft,
-    },
-    actionButtonText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

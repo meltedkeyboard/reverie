@@ -2,11 +2,11 @@ import { Link, useRouter, useFocusEffect } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
-import { GlassSurface } from '@/components/Glass'
-import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
+import { EmptyState, ListSeparator } from '@/components/EmptyState'
+import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
@@ -15,14 +15,12 @@ import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { fonts, useStyles, type Colors } from '@/theme'
 
 export default function CharactersScreen() {
   const db = useSQLiteContext()
   const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const headerHeight = useHeaderHeight()
-  const colors = useColors()
+  const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const isWideWeb = useIsWideWeb()
@@ -69,8 +67,8 @@ export default function CharactersScreen() {
       <FlatList
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
-        contentContainerStyle={{ paddingTop: headerHeight + 16, paddingBottom: insets.bottom + 24, paddingHorizontal: 16, flexGrow: 1 }}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        contentContainerStyle={padding}
+        ItemSeparatorComponent={ListSeparator}
         ListHeaderComponent={
           !serverSet && characters ? (
             <Pressable onPress={() => router.push('/settings')} style={styles.notice}>
@@ -81,19 +79,17 @@ export default function CharactersScreen() {
         }
         ListEmptyComponent={
           characters ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>{t('characters.emptyTitle')}</Text>
-              <Text style={styles.emptyText}>{t('characters.emptyText')}</Text>
-              <Link href="/character/new" asChild>
-                <Link.AppleZoom>
-                  <Pressable>
-                    <GlassSurface interactive tintColor={colors.accent} style={styles.emptyButton} fallbackStyle={{ backgroundColor: colors.accent }}>
-                      <Text style={styles.emptyButtonText}>{t('characters.createCharacter')}</Text>
-                    </GlassSurface>
-                  </Pressable>
-                </Link.AppleZoom>
-              </Link>
-            </View>
+            <EmptyState
+              title={t('characters.emptyTitle')}
+              text={t('characters.emptyText')}
+              action={
+                <Link href="/character/new" asChild>
+                  <Link.AppleZoom>
+                    <Button variant="glass" label={t('characters.createCharacter')} style={styles.emptyButton} />
+                  </Link.AppleZoom>
+                </Link>
+              }
+            />
           ) : null
         }
         renderItem={({ item: character }) => (
@@ -139,9 +135,5 @@ const createStyles = (colors: Colors) =>
   },
   noticeTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 3 },
   noticeText: { color: colors.textMuted, fontSize: 14, lineHeight: 19 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80, paddingHorizontal: 24 },
-  emptyTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 22, marginBottom: 8 },
-  emptyText: { color: colors.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 21, marginBottom: 20 },
-  emptyButton: { borderRadius: 16, minWidth: 200, paddingHorizontal: 28, paddingVertical: 15, alignItems: 'center' },
-  emptyButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  emptyButton: { minWidth: 200 },
 })

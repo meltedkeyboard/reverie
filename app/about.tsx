@@ -3,9 +3,8 @@ import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
+import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useShake } from '@/hooks/useShake'
@@ -18,8 +17,7 @@ const version = Constants.expoConfig?.version ?? '1.0.0'
 export default function AboutScreen() {
   const router = useRouter()
   const db = useSQLiteContext()
-  const insets = useSafeAreaInsets()
-  const headerHeight = useHeaderHeight()
+  const padding = useScreenPadding('form')
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
 
@@ -34,7 +32,7 @@ export default function AboutScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: headerHeight + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }}
+        contentContainerStyle={padding}
       >
         <View style={styles.mark}>
           <Text style={styles.markGlyph}>R</Text>

@@ -1,14 +1,13 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Avatar } from '@/components/Avatar'
+import { Button } from '@/components/Button'
 import { Field } from '@/components/Field'
-import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
+import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { ParamSlider } from '@/components/ParamSlider'
 import { PromptGenModal, type GeneratedCharacter } from '@/components/PromptGenModal'
@@ -26,8 +25,7 @@ export default function CharacterEditorScreen() {
   const isNew = id === 'new'
   const db = useSQLiteContext()
   const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const headerHeight = useHeaderHeight()
+  const padding = useScreenPadding('form')
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
@@ -146,7 +144,7 @@ export default function CharacterEditorScreen() {
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
-          contentContainerStyle={{ paddingTop: headerHeight + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }}
+          contentContainerStyle={padding}
         >
           <View style={styles.avatarBlock}>
             <Pressable onPress={onPickAvatar} style={({ pressed }) => pressed && { opacity: 0.8 }}>
@@ -226,15 +224,13 @@ export default function CharacterEditorScreen() {
               </Pressable>
             ) : null}
           </View>
-          <Pressable
+          <Button
+            variant="soft"
+            icon="sparkles"
+            label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
             onPress={() => setShowPromptGen(true)}
-            style={({ pressed }) => [styles.aiButton, pressed && { opacity: 0.7 }]}
-          >
-            <Ionicons name="sparkles" size={16} color={colors.accent} />
-            <Text style={styles.aiButtonText}>
-              {systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
-            </Text>
-          </Pressable>
+            style={{ marginBottom: 10 }}
+          />
           <Field
             hint={t('editor.systemPromptHint')}
             value={systemPrompt}
@@ -299,17 +295,6 @@ const createStyles = (colors: Colors) =>
       marginRight: 4,
     },
     systemPromptLabel: { color: colors.textMuted, fontSize: 13 },
-    aiButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      paddingVertical: 12,
-      marginBottom: 10,
-      borderRadius: 14,
-      backgroundColor: colors.accentSoft,
-    },
-    aiButtonText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
     hint: { color: colors.textFaint, fontSize: 12, marginTop: -4, marginBottom: 4, marginHorizontal: 4 },
     delete: { alignItems: 'center', marginTop: 32, paddingVertical: 14 },
     deleteText: { color: colors.danger, fontSize: 16 },

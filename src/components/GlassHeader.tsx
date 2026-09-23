@@ -21,6 +21,16 @@ export function useHeaderHeight() {
   return useSafeAreaInsets().top + HEADER_ROW_HEIGHT
 }
 
+// Content padding for a screen that scrolls under the header: a list of cards, or a
+// form, which gets a little more air at both ends.
+export function useScreenPadding(kind: 'list' | 'form') {
+  const insets = useSafeAreaInsets()
+  const top = insets.top + HEADER_ROW_HEIGHT
+  return kind === 'list'
+    ? { paddingTop: top + 16, paddingBottom: insets.bottom + 24, paddingHorizontal: 16, flexGrow: 1 }
+    : { paddingTop: top + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }
+}
+
 export function GlassHeader({ left, right, children, floating }: Props) {
   const insets = useSafeAreaInsets()
   const { colors, scheme } = useTheme()

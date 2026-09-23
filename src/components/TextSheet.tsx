@@ -1,9 +1,11 @@
 import { useRef } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
 import { fonts, useStyles, type Colors } from '@/theme'
+
+import { PageSheet } from './PageSheet'
 
 type Props = { text: string | null; onClose: () => void }
 
@@ -16,44 +18,27 @@ export function TextSheet({ text, onClose }: Props) {
   if (text !== null) shown.current = text
 
   return (
-    <Modal
+    <PageSheet
       visible={text !== null}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      allowSwipeDismissal
-      onRequestClose={onClose}
+      onClose={onClose}
+      title={t('textSheet.title')}
+      right={
+        <Pressable onPress={onClose} hitSlop={10}>
+          <Text style={styles.done}>{t('textSheet.done')}</Text>
+        </Pressable>
+      }
     >
-      <View style={styles.root}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{t('textSheet.title')}</Text>
-          <Pressable onPress={onClose} hitSlop={10}>
-            <Text style={styles.done}>{t('textSheet.done')}</Text>
-          </Pressable>
-        </View>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 24 }}>
-          <Text selectable style={styles.text}>
-            {shown.current}
-          </Text>
-        </ScrollView>
-      </View>
-    </Modal>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 24 }}>
+        <Text selectable style={styles.text}>
+          {shown.current}
+        </Text>
+      </ScrollView>
+    </PageSheet>
   )
 }
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  title: { color: colors.text, fontSize: 17, fontWeight: '600' },
-  done: { color: colors.accent, fontSize: 17, fontWeight: '600' },
-  text: { color: colors.text, fontFamily: fonts.prose, fontSize: 17, lineHeight: 27 },
-})
+    done: { color: colors.accent, fontSize: 17, fontWeight: '600' },
+    text: { color: colors.text, fontFamily: fonts.prose, fontSize: 17, lineHeight: 27 },
+  })
