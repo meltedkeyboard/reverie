@@ -8,8 +8,8 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { testConnection } from '@/api/llm'
 import { Button } from '@/components/Button'
 import { Field } from '@/components/Field'
-import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
-import { IconButton } from '@/components/IconButton'
+import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
+import { Group } from '@/components/Group'
 import { Segmented } from '@/components/Segmented'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { useTranslation, type LocalePreference } from '@/i18n'
@@ -17,7 +17,7 @@ import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
-import { fonts, useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
+import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
 
 type Status = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok' | 'error'; text: string }
 
@@ -133,17 +133,17 @@ export default function SettingsScreen() {
           contentContainerStyle={padding}
         >
           <Text style={styles.section}>{t('settings.appearance')}</Text>
-          <View style={styles.card}>
+          <Group>
             <View style={styles.cardPad}>
               <Text style={styles.label}>{t('settings.appearance')}</Text>
               <Segmented options={THEME_OPTIONS} value={preference} onChange={setPreference} />
               <Text style={[styles.label, { marginTop: 18 }]}>{t('settings.language')}</Text>
               <Segmented options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
             </View>
-          </View>
+          </Group>
 
           <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.server')}</Text>
-          <View style={styles.card}>
+          <Group>
             <View style={styles.cardPad}>
               <Field
                 label={t('settings.baseUrlLabel')}
@@ -208,11 +208,11 @@ export default function SettingsScreen() {
                 </View>
               ) : null}
             </View>
-          </View>
+          </Group>
 
           <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.backupTitle')}</Text>
           <Text style={styles.note}>{t('settings.backupNote')}</Text>
-          <View style={styles.card}>
+          <Group>
             <Row
               icon="share-outline"
               title={t('settings.exportJson')}
@@ -226,18 +226,17 @@ export default function SettingsScreen() {
               onPress={onImport}
               loading={importing}
               disabled={importing}
-              last
             />
-          </View>
+          </Group>
 
           <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.aboutTitle')}</Text>
-          <View style={styles.card}>
-            <Row icon="information-circle-outline" title={t('settings.aboutReverie')} onPress={() => router.push('/about')} chevron last />
-          </View>
+          <Group>
+            <Row icon="information-circle-outline" title={t('settings.aboutReverie')} onPress={() => router.push('/about')} chevron />
+          </Group>
 
           <Text style={[styles.section, { color: colors.danger, marginTop: 32 }]}>{t('settings.dangerZone')}</Text>
           <Text style={styles.note}>{t('settings.dangerNote')}</Text>
-          <View style={[styles.card, styles.dangerCard]}>
+          <Group style={styles.dangerCard}>
             <Row
               icon="trash-outline"
               title={t('settings.wipeAll')}
@@ -245,14 +244,13 @@ export default function SettingsScreen() {
               loading={wiping}
               disabled={wiping}
               tint={colors.danger}
-              last
             />
-          </View>
+          </Group>
         </KeyboardAwareScrollView>
       ) : null}
 
-      <GlassHeader left={<IconButton name="chevron-back" size={26} onPress={() => router.back()} />}>
-        <Text style={styles.title}>{t('settings.title')}</Text>
+      <GlassHeader left={<BackButton />}>
+        <HeaderTitle>{t('settings.title')}</HeaderTitle>
       </GlassHeader>
     </View>
   )
@@ -266,7 +264,6 @@ function Row({
   disabled,
   chevron,
   tint,
-  last,
 }: {
   icon: React.ComponentProps<typeof Ionicons>['name']
   title: string
@@ -275,7 +272,6 @@ function Row({
   disabled?: boolean
   chevron?: boolean
   tint?: string
-  last?: boolean
 }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -284,7 +280,7 @@ function Row({
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [styles.row, last && { borderBottomWidth: 0 }, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
     >
       <Ionicons name={icon} size={19} color={color} style={{ width: 24 }} />
       <Text style={[styles.rowLabel, { color }]}>{title}</Text>
@@ -300,15 +296,7 @@ function Row({
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
     section: { color: colors.textMuted, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8, marginLeft: 4 },
-    card: {
-      borderRadius: 16,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      overflow: 'hidden',
-    },
     dangerCard: { borderColor: colors.dangerBorder },
     cardPad: { padding: 16 },
     label: { color: colors.textMuted, fontSize: 13, marginBottom: 8 },
@@ -324,15 +312,7 @@ const createStyles = (colors: Colors) =>
     },
     chipActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
     chipText: { color: colors.textMuted, fontSize: 13 },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
-    },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
     rowLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
     status: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14 },
     dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },

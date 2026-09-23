@@ -7,8 +7,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { Avatar } from '@/components/Avatar'
 import { Button } from '@/components/Button'
 import { Field } from '@/components/Field'
-import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
-import { IconButton } from '@/components/IconButton'
+import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
 import { ParamSlider } from '@/components/ParamSlider'
 import { PromptGenModal, type GeneratedCharacter } from '@/components/PromptGenModal'
 import { Segmented } from '@/components/Segmented'
@@ -261,16 +260,14 @@ export default function CharacterEditorScreen() {
       ) : null}
 
       <GlassHeader
-        left={<IconButton name={isNew ? 'close' : 'chevron-back'} size={isNew ? 24 : 26} onPress={() => router.back()} />}
+        left={<BackButton close={isNew} />}
         right={
           <Pressable onPress={onSave} disabled={!canSave} hitSlop={8} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
             <Text style={[styles.save, !canSave && { color: colors.textFaint }]}>{t('common.save')}</Text>
           </Pressable>
         }
       >
-        <Text style={styles.title} numberOfLines={1}>
-          {isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')}
-        </Text>
+        <HeaderTitle>{isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')}</HeaderTitle>
       </GlassHeader>
     </View>
   )
@@ -279,7 +276,6 @@ export default function CharacterEditorScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
     save: { color: colors.accent, fontSize: 16, fontWeight: '600' },
     avatarBlock: { alignItems: 'center', marginBottom: 28, gap: 12 },
     avatarActions: { flexDirection: 'row', gap: 20 },

@@ -1,10 +1,13 @@
 import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
-import { StyleSheet, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { HEADER_ROW_HEIGHT, useStyles, useTheme, type Colors } from '@/theme'
+import { fonts, HEADER_ROW_HEIGHT, useStyles, useTheme, type Colors } from '@/theme'
+
+import { IconButton } from './IconButton'
 
 type Props = {
   left?: React.ReactNode
@@ -29,6 +32,21 @@ export function useScreenPadding(kind: 'list' | 'form') {
   return kind === 'list'
     ? { paddingTop: top + 16, paddingBottom: insets.bottom + 24, paddingHorizontal: 16, flexGrow: 1 }
     : { paddingTop: top + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }
+}
+
+export function HeaderTitle({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(createStyles)
+  return (
+    <Text style={styles.title} numberOfLines={1}>
+      {children}
+    </Text>
+  )
+}
+
+// Goes back; a screen presented modally closes with a cross instead.
+export function BackButton({ close }: { close?: boolean }) {
+  const router = useRouter()
+  return <IconButton name={close ? 'close' : 'chevron-back'} size={close ? 24 : 26} onPress={() => router.back()} />
 }
 
 export function GlassHeader({ left, right, children, floating }: Props) {
@@ -68,6 +86,7 @@ export function GlassHeader({ left, right, children, floating }: Props) {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
+    title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
     root: {
     position: 'absolute',
     top: 0,

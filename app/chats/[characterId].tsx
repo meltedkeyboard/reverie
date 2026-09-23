@@ -7,7 +7,7 @@ import { Avatar } from '@/components/Avatar'
 import { Button } from '@/components/Button'
 import { ChatCard } from '@/components/ChatCard'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
-import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
+import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { getCharacter, type Character } from '@/db/characters'
 import { deleteChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
@@ -88,7 +88,7 @@ export default function CharacterChatsScreen() {
         )}
       />
       <GlassHeader
-        left={<IconButton name="chevron-back" size={26} onPress={() => router.back()} />}
+        left={<BackButton />}
         right={
           character ? (
             <>

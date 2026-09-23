@@ -4,8 +4,9 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
-import { IconButton } from '@/components/IconButton'
+import { AppMark } from '@/components/AppMark'
+import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
+import { Group } from '@/components/Group'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useShake } from '@/hooks/useShake'
 import { useTranslation } from '@/i18n'
@@ -31,37 +32,33 @@ export default function AboutScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={padding}
-      >
-        <View style={styles.mark}>
-          <Text style={styles.markGlyph}>R</Text>
-        </View>
+      <ScrollView contentContainerStyle={padding}>
+        <AppMark style={{ marginBottom: 16 }} />
         <Text style={styles.name}>Reverie</Text>
         <Text style={styles.version}>{t('about.version', { version })}</Text>
 
         <Text style={styles.tagline}>{t('about.tagline')}</Text>
 
-        <View style={styles.card}>
+        <Group>
           <Row title={t('about.dataTitle')} text={t('about.dataText')} />
           <Row title={t('about.serverTitle')} text={t('about.serverText')} />
-          <Row title={t('about.backupsTitle')} text={t('about.backupsText')} last />
-        </View>
+          <Row title={t('about.backupsTitle')} text={t('about.backupsText')} />
+        </Group>
 
         <Text style={styles.shakeHint}>{t('about.shakeHint')}</Text>
       </ScrollView>
 
-      <GlassHeader left={<IconButton name="chevron-back" size={26} onPress={() => router.back()} />}>
-        <Text style={styles.title}>{t('settings.aboutTitle')}</Text>
+      <GlassHeader left={<BackButton />}>
+        <HeaderTitle>{t('settings.aboutTitle')}</HeaderTitle>
       </GlassHeader>
     </View>
   )
 }
 
-function Row({ title, text, last }: { title: string; text: string; last?: boolean }) {
+function Row({ title, text }: { title: string; text: string }) {
   const styles = useStyles(createStyles)
   return (
-    <View style={[styles.row, last && { borderBottomWidth: 0 }]}>
+    <View style={styles.row}>
       <Text style={styles.rowTitle}>{title}</Text>
       <Text style={styles.rowText}>{text}</Text>
     </View>
@@ -71,20 +68,6 @@ function Row({ title, text, last }: { title: string; text: string; last?: boolea
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
-  mark: {
-    alignSelf: 'center',
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  markGlyph: { color: colors.accent, fontFamily: fonts.prose, fontSize: 32, fontWeight: '600' },
   name: { color: colors.text, fontFamily: fonts.prose, fontSize: 24, fontWeight: '600', textAlign: 'center' },
   version: { color: colors.textFaint, fontSize: 13, textAlign: 'center', marginTop: 4, marginBottom: 20 },
   tagline: {
@@ -95,19 +78,7 @@ const createStyles = (colors: Colors) =>
     marginBottom: 32,
     marginHorizontal: 8,
   },
-  card: {
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  row: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
+  row: { paddingHorizontal: 16, paddingVertical: 14 },
   rowTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 4 },
   rowText: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   shakeHint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 24 },

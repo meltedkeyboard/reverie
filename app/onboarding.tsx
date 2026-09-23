@@ -4,12 +4,13 @@ import { useEffect, useRef } from 'react'
 import { AccessibilityInfo, Animated, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { AppMark } from '@/components/AppMark'
 import { Button } from '@/components/Button'
 import { SFIcon } from '@/components/SFIcon'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 type Feature = {
   icon: Parameters<typeof SFIcon>[0]['name']
@@ -81,9 +82,7 @@ export default function OnboardingScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: appear, transform: [{ translateY: rise }] }}>
-          <View style={styles.mark}>
-            <Text style={styles.markGlyph}>R</Text>
-          </View>
+          <AppMark style={{ marginBottom: 20 }} />
           <Text style={styles.title} accessibilityRole="header">
             {t('onboarding.welcomeTitle')}
           </Text>
@@ -115,19 +114,6 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     content: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingHorizontal: 32, paddingBottom: 24 },
-    mark: {
-      alignSelf: 'center',
-      width: 72,
-      height: 72,
-      borderRadius: 20,
-      backgroundColor: colors.accentSoft,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 20,
-    },
-    markGlyph: { color: colors.accent, fontFamily: fonts.prose, fontSize: 32, fontWeight: '600' },
     title: {
       color: colors.text,
       fontSize: 34,
