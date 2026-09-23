@@ -26,6 +26,7 @@ import { fonts, useStyles, useTheme, type Colors } from '@/theme'
 
 import { Button } from './Button'
 import { PageSheet } from './PageSheet'
+import { Pager } from './Pager'
 import { Segmented } from './Segmented'
 
 export type GeneratedCharacter = { prompt: string; greeting: string | null }
@@ -343,19 +344,12 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
       <View style={styles.metaRow}>
         <Text style={styles.metaText}>{status}</Text>
         {versions.length > 1 && !busy ? (
-          <View style={styles.versionNav}>
-            <Pressable onPress={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0} hitSlop={8}>
-              <Ionicons name="chevron-back" size={18} color={index === 0 ? colors.textFaint : colors.text} />
-            </Pressable>
-            <Text style={styles.metaText}>{t('promptGen.version', { n: index + 1, total: versions.length })}</Text>
-            <Pressable
-              onPress={() => setIndex((i) => Math.min(versions.length - 1, i + 1))}
-              disabled={index === versions.length - 1}
-              hitSlop={8}
-            >
-              <Ionicons name="chevron-forward" size={18} color={index === versions.length - 1 ? colors.textFaint : colors.text} />
-            </Pressable>
-          </View>
+          <Pager
+            index={index}
+            count={versions.length}
+            onChange={setIndex}
+            label={t('promptGen.version', { n: index + 1, total: versions.length })}
+          />
         ) : null}
       </View>
 
@@ -502,7 +496,6 @@ const createStyles = (colors: Colors) =>
       marginHorizontal: 4,
     },
     metaText: { color: colors.textMuted, fontSize: 13 },
-    versionNav: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     card: {
       backgroundColor: colors.bg,
       borderWidth: 1,

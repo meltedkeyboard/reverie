@@ -15,6 +15,7 @@ import { CHAT_MAX_WIDTH, fonts, useColors, useStyles, type Colors } from '@/them
 
 import { IconButton } from './IconButton'
 import { NativeMenu } from './NativeMenu'
+import { Pager } from './Pager'
 import { SFIcon } from './SFIcon'
 import { TypingIndicator } from './TypingIndicator'
 
@@ -194,27 +195,13 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant }: Acti
         </NativeMenu>
       ) : null}
       {count > 1 ? (
-        <View style={styles.pager}>
-          <IconButton
-            name="chevron-back"
-            size={16}
-            color={colors.textMuted}
-            disabled={locked || message.variant === 0}
-            onPress={() => onSelectVariant(message.id, message.variant - 1)}
-            style={styles.pagerButton}
-          />
-          <Text style={styles.pagerText}>
-            {message.variant + 1} / {count}
-          </Text>
-          <IconButton
-            name="chevron-forward"
-            size={16}
-            color={colors.textMuted}
-            disabled={locked || message.variant === count - 1}
-            onPress={() => onSelectVariant(message.id, message.variant + 1)}
-            style={styles.pagerButton}
-          />
-        </View>
+        <Pager
+          index={message.variant}
+          count={count}
+          disabled={locked}
+          onChange={(variant) => onSelectVariant(message.id, variant)}
+          style={{ marginLeft: 6 }}
+        />
       ) : null}
     </View>
   )
@@ -335,7 +322,4 @@ const createStyles = (colors: Colors) =>
   bar: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginLeft: -10 },
   barUser: { marginLeft: 0, marginRight: -8 },
   barButton: { width: 36, height: 32, alignItems: 'center', justifyContent: 'center' },
-  pager: { flexDirection: 'row', alignItems: 'center', marginLeft: 6 },
-  pagerButton: { width: 28, height: 32 },
-  pagerText: { color: colors.textMuted, fontSize: 13, fontVariant: ['tabular-nums'], minWidth: 34, textAlign: 'center' },
 })
