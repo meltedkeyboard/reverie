@@ -82,7 +82,7 @@ export default function OnboardingScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: appear, transform: [{ translateY: rise }] }}>
-          <AppMark style={{ marginBottom: 20 }} />
+          <AppMark size={96} style={{ marginBottom: 24 }} />
           <Text style={styles.title} accessibilityRole="header">
             {t('onboarding.welcomeTitle')}
           </Text>

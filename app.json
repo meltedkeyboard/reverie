@@ -4,8 +4,9 @@
     "slug": "reverie",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
     "scheme": "reverie",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#0F0F12",
     "ios": {
       "supportsTablet": false,
@@ -15,13 +16,19 @@
           "NSAllowsArbitraryLoads": true
         },
         "NSLocalNetworkUsageDescription": "Reverie подключается к серверу модели в вашей локальной сети."
+      },
+      "icon": {
+        "light": "./assets/images/icon.png",
+        "dark": "./assets/images/icon-dark.png",
+        "tinted": "./assets/images/icon-tinted.png"
       }
     },
     "web": {
       "bundler": "metro",
       "output": "single",
       "lang": "ru",
-      "themeColor": "#0F0F12"
+      "themeColor": "#0F0F12",
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -29,7 +36,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F0F12"
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120,
+          "backgroundColor": "#F5F5F7",
+          "dark": {
+            "image": "./assets/images/splash-icon-dark.png",
+            "backgroundColor": "#0F0F12"
+          }
         }
       ],
       [
@@ -45,7 +58,11 @@
       "typedRoutes": false
     },
     "android": {
-      "package": "com.example.reverie"
+      "package": "com.example.reverie",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#F5F5F7"
+      }
     }
   }
 }

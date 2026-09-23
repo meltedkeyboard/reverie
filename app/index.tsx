@@ -3,6 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { AppMark } from '@/components/AppMark'
 import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
@@ -56,6 +57,7 @@ export default function CharactersScreen() {
   if (isWideWeb) {
     return (
       <View style={styles.wideWelcome}>
+        <AppMark size={88} style={{ marginBottom: 20 }} />
         <Text style={styles.wideWelcomeTitle}>{t('characters.title')}</Text>
         <Text style={styles.wideWelcomeText}>{t('characters.wideWelcomeText')}</Text>
       </View>

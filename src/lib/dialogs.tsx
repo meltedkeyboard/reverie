@@ -11,7 +11,6 @@ export function showSheet(title: string | undefined, actions: SheetAction[]) {
       options: [...actions.map((action) => action.label), t('common.cancel')],
       destructiveButtonIndex: destructive >= 0 ? destructive : undefined,
       cancelButtonIndex: actions.length,
-      userInterfaceStyle: 'dark',
     },
     (index) => actions[index]?.onSelect()
   )
@@ -33,9 +32,7 @@ export function promptText({ title, message, initial, confirmLabel, onSubmit }: 
       { text: confirmLabel, onPress: (text?: string) => onSubmit(text ?? '') },
     ],
     'plain-text',
-    initial,
-    'default',
-    { userInterfaceStyle: 'dark' }
+    initial
   )
 }
 

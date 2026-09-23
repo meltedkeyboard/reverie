@@ -3,9 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light dark" />
     <title>%WEB_TITLE%</title>
-    <!-- Overrides the default Expo template so the page is dark before the bundle loads. -->
+    <!-- The SVG follows the system theme on its own; Expo builds the .ico from web.favicon
+         for browsers without SVG icons. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Overrides the default Expo template so the page has the theme's background before the bundle loads. -->
     <style id="expo-reset">
       html,
       body {
@@ -15,7 +20,12 @@
       body {
         margin: 0;
         overflow: hidden;
-        background-color: #0f0f12;
+        background-color: #f5f5f7;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #0f0f12;
+        }
       }
       #root {
         display: flex;

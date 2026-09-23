@@ -1,29 +1,28 @@
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Image } from 'expo-image'
+import { StyleSheet, type ImageStyle, type StyleProp } from 'react-native'
 
-import { fonts, useStyles, type Colors } from '@/theme'
+import { useStyles, useTheme, type Colors } from '@/theme'
 
-// The "R" tile standing in for the app icon on the welcome and about screens.
-export function AppMark({ style }: { style?: StyleProp<ViewStyle> }) {
+const ICONS = {
+  light: require('../../assets/images/icon.png'),
+  dark: require('../../assets/images/icon-dark.png'),
+}
+
+// The app icon as it looks on the home screen, in the app's current theme. Its
+// background is the screen's own, so a hairline keeps its outline visible.
+export function AppMark({ size = 72, style }: { size?: number; style?: StyleProp<ImageStyle> }) {
+  const { scheme } = useTheme()
   const styles = useStyles(createStyles)
   return (
-    <View style={[styles.mark, style]}>
-      <Text style={styles.glyph}>R</Text>
-    </View>
+    <Image
+      source={ICONS[scheme]}
+      accessibilityIgnoresInvertColors
+      style={[styles.mark, { width: size, height: size, borderRadius: size * 0.2237 }, style]}
+    />
   )
 }
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    mark: {
-      alignSelf: 'center',
-      width: 72,
-      height: 72,
-      borderRadius: 20,
-      backgroundColor: colors.accentSoft,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    glyph: { color: colors.accent, fontFamily: fonts.prose, fontSize: 32, fontWeight: '600' },
+    mark: { alignSelf: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   })

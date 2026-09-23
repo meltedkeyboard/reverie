@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo } from 'react'
-import { useColorScheme } from 'react-native'
+import { createContext, useContext, useEffect, useMemo } from 'react'
+import { Appearance, Platform, useColorScheme } from 'react-native'
 
 export type Scheme = 'light' | 'dark'
 export type ThemePreference = Scheme | 'system'
@@ -101,6 +101,11 @@ export function ThemeContextProvider({
 }) {
   const systemScheme = useColorScheme()
   const scheme: Scheme = preference === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : preference
+  // Alerts, action sheets and the keyboard follow the window rather than the app, so
+  // a theme picked in the app is passed down to it; 'system' gives it back to iOS.
+  useEffect(() => {
+    if (Platform.OS !== 'web') Appearance.setColorScheme(preference === 'system' ? 'unspecified' : preference)
+  }, [preference])
   const value = useMemo(
     () => ({ colors: palettes[scheme], scheme, preference, setPreference }),
     [scheme, preference, setPreference]
