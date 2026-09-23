@@ -32,6 +32,7 @@ import { SFIcon } from '@/components/SFIcon'
 import { TextSheet } from '@/components/TextSheet'
 import { getCharacter, type Character } from '@/db/characters'
 import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
+import { newMessage } from '@/db/messages'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
 import { confirm, promptText, showMessage } from '@/lib/dialogs'
@@ -250,17 +251,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
       draft === null
         ? null
         : {
-            id: -1,
-            chatId,
-            role: 'assistant',
-            content: draft,
-            image: null,
-            imageWidth: null,
-            imageHeight: null,
-            variants: [draft],
-            variant: 0,
-            thoughts: [null],
-            createdAt: 0,
+            ...newMessage(-1, chatId, 'assistant', draft, {}, 0),
             streaming: true,
             reasoning: reasoning ?? undefined,
             reasoningMs,

@@ -28,15 +28,17 @@ export type CharacterPreview = Character & {
 
 export const DEFAULT_SAMPLING = { temperature: 0.8, maxTokens: 800, topP: 0.95 } as const
 
-const COLUMNS = `
-  c.id, c.name, c.avatar, c.system_prompt AS systemPrompt, c.greeting,
-  c.temperature, c.max_tokens AS maxTokens, c.top_p AS topP, c.reply_limit AS replyLimit,
-  c.thinking, c.created_at AS createdAt
+// Unqualified so the backup can select them too; in listCharacters the subqueries
+// qualify their own columns, so these still refer to the outer characters row.
+export const CHARACTER_COLUMNS = `
+  id, name, avatar, system_prompt AS systemPrompt, greeting,
+  temperature, max_tokens AS maxTokens, top_p AS topP, reply_limit AS replyLimit,
+  thinking, created_at AS createdAt
 `
 
 export function listCharacters(db: SQLiteDatabase) {
   return db.getAllAsync<CharacterPreview>(`
-    SELECT ${COLUMNS},
+    SELECT ${CHARACTER_COLUMNS},
       (SELECT ${PREVIEW} FROM messages m JOIN chats ch ON ch.id = m.chat_id
         WHERE ch.character_id = c.id ORDER BY m.id DESC LIMIT 1) AS lastMessage,
       COALESCE(
@@ -51,11 +53,13 @@ export function listCharacters(db: SQLiteDatabase) {
 }
 
 export function getCharacter(db: SQLiteDatabase, id: number) {
-  return db.getFirstAsync<Character>(`SELECT ${COLUMNS} FROM characters c WHERE c.id = ?`, id)
+  return db.getFirstAsync<Character>(`SELECT ${CHARACTER_COLUMNS} FROM characters c WHERE c.id = ?`, id)
 }
 
-export async function saveCharacter(db: SQLiteDatabase, id: number | null, fields: CharacterFields) {
-  const values = [
+const FIELD_COLUMNS = 'name, avatar, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking'
+
+function fieldValues(fields: CharacterFields) {
+  return [
     fields.name.trim(),
     fields.avatar,
     fields.systemPrompt,
@@ -66,19 +70,23 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
     fields.replyLimit,
     fields.thinking,
   ]
-  if (id === null) {
-    const res = await db.runAsync(
-      `INSERT INTO characters (name, avatar, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [...values, Date.now()]
-    )
-    return res.lastInsertRowId
-  }
+}
+
+export async function insertCharacter(db: SQLiteDatabase, fields: CharacterFields, createdAt = Date.now()) {
+  const res = await db.runAsync(
+    `INSERT INTO characters (${FIELD_COLUMNS}, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [...fieldValues(fields), createdAt]
+  )
+  return res.lastInsertRowId
+}
+
+export async function saveCharacter(db: SQLiteDatabase, id: number | null, fields: CharacterFields) {
+  if (id === null) return insertCharacter(db, fields)
   await db.runAsync(
     `UPDATE characters
      SET name = ?, avatar = ?, system_prompt = ?, greeting = ?, temperature = ?, max_tokens = ?, top_p = ?, reply_limit = ?, thinking = ?
      WHERE id = ?`,
-    [...values, id]
+    [...fieldValues(fields), id]
   )
   return id
 }

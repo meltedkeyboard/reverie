@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
+import { CHARACTER_COLUMNS, insertCharacter, type ThinkingMode } from '@/db/characters'
+import { MESSAGE_COLUMNS } from '@/db/messages'
 import { loadSettings, saveSettings } from '@/db/settings'
 import { t } from '@/i18n'
 import { pickJsonFile } from '@/lib/pickJson'
@@ -18,7 +20,7 @@ type BackupCharacter = {
   maxTokens: number
   topP: number
   replyLimit: number | null
-  thinking?: string
+  thinking?: ThinkingMode
   createdAt: number
 }
 
@@ -49,18 +51,12 @@ type Backup = {
 
 export async function exportBackup(db: SQLiteDatabase) {
   const characters = await db.getAllAsync<{ id: number; avatar: string | null }>(
-    `SELECT id, name, avatar, system_prompt AS systemPrompt, greeting, temperature,
-            max_tokens AS maxTokens, top_p AS topP, reply_limit AS replyLimit, thinking, created_at AS createdAt
-     FROM characters ORDER BY id`
+    `SELECT ${CHARACTER_COLUMNS} FROM characters ORDER BY id`
   )
   const chats = await db.getAllAsync(
     'SELECT id, character_id AS characterId, title, created_at AS createdAt FROM chats ORDER BY id'
   )
-  const messages = await db.getAllAsync(
-    `SELECT id, chat_id AS chatId, role, content, image, image_width AS imageWidth,
-            image_height AS imageHeight, variants, variant, thoughts, created_at AS createdAt
-     FROM messages ORDER BY id`
-  )
+  const messages = await db.getAllAsync(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`)
   const { baseUrl, model } = await loadSettings(db)
 
   const avatars: Record<string, string> = {}
@@ -107,23 +103,13 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
           avatarNames.set(character.avatar, avatar)
         }
       }
-      const res = await db.runAsync(
-        `INSERT INTO characters (name, avatar, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          character.name,
-          avatar,
-          character.systemPrompt,
-          character.greeting,
-          character.temperature,
-          character.maxTokens,
-          character.topP,
-          character.replyLimit ?? null,
-          character.thinking ?? 'auto',
-          character.createdAt,
-        ]
+      // Backups from before a column existed leave it out.
+      const id = await insertCharacter(
+        db,
+        { ...character, avatar, replyLimit: character.replyLimit ?? null, thinking: character.thinking ?? 'auto' },
+        character.createdAt
       )
-      characterIds.set(character.id, res.lastInsertRowId)
+      characterIds.set(character.id, id)
     }
 
     for (const chat of dump.chats ?? []) {

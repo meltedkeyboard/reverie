@@ -10,10 +10,15 @@ import {
   addVariant,
   deleteMessage,
   listMessages,
+  newMessage,
   selectVariant as storeVariant,
   updateMessage,
+  withContent,
+  withNewVariant,
+  withVariant,
   type Message,
   type MessageImage,
+  type NewMessageExtra,
   type Role,
   type Thought,
 } from '@/db/messages'
@@ -50,7 +55,7 @@ export function regenerateTargetAt(history: Message[], index: number): Regenerat
 // nothing of it is left once the screen lets it go.
 type MessageStore = {
   list(): Promise<Message[]>
-  add(role: Role, content: string, extra?: { image?: MessageImage | null; thought?: Thought | null }): Promise<Message>
+  add(role: Role, content: string, extra?: NewMessageExtra): Promise<Message>
   update(message: Message, content: string): Promise<Message>
   addVariant(message: Message, content: string, thought: Thought | null): Promise<Message>
   select(message: Message, variant: number): Promise<Message>
@@ -72,32 +77,10 @@ function memoryStore(chatId: number): MessageStore {
   let nextId = 1
   return {
     list: async () => [],
-    add: async (role, content, { image = null, thought = null } = {}) => ({
-      id: nextId++,
-      chatId,
-      role,
-      content,
-      image: image?.base64 ?? null,
-      imageWidth: image?.width ?? null,
-      imageHeight: image?.height ?? null,
-      variants: [content],
-      variant: 0,
-      thoughts: [thought],
-      createdAt: Date.now(),
-    }),
-    update: async (message, content) => ({
-      ...message,
-      content,
-      variants: message.variants.map((text, i) => (i === message.variant ? content : text)),
-    }),
-    addVariant: async (message, content, thought) => ({
-      ...message,
-      content,
-      variants: [...message.variants, content],
-      variant: message.variants.length,
-      thoughts: [...message.thoughts, thought],
-    }),
-    select: async (message, variant) => ({ ...message, content: message.variants[variant], variant }),
+    add: async (role, content, extra) => newMessage(nextId++, chatId, role, content, extra),
+    update: async (message, content) => withContent(message, content),
+    addVariant: async (message, content, thought) => withNewVariant(message, content, thought),
+    select: async (message, variant) => withVariant(message, variant),
     remove: async () => {},
   }
 }

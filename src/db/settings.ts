@@ -14,6 +14,24 @@ export const DEFAULT_SETTINGS: ServerSettings = {
 
 const KEYS = { baseUrl: 'base_url', apiKey: 'api_key', model: 'model' } as const
 
+export async function getSetting(db: SQLiteDatabase, key: string) {
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', key)
+  return row?.value ?? null
+}
+
+export async function setSetting(db: SQLiteDatabase, key: string, value: string) {
+  await db.runAsync(
+    'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    [key, value]
+  )
+}
+
+// A stored value that must be one of a few; anything else, or nothing, is 'system'.
+async function getChoice<T extends string>(db: SQLiteDatabase, key: string, allowed: readonly T[]) {
+  const value = await getSetting(db, key)
+  return allowed.includes(value as T) ? (value as T) : 'system'
+}
+
 export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> {
   const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM app_settings')
   const stored = new Map(rows.map((r) => [r.key, r.value]))
@@ -33,10 +51,7 @@ export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
   const next = saveQueue.then(() =>
     db.withTransactionAsync(async () => {
       for (const field of Object.keys(KEYS) as (keyof typeof KEYS)[]) {
-        await db.runAsync(
-          'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-          [KEYS[field], settings[field]]
-        )
+        await setSetting(db, KEYS[field], settings[field])
       }
     })
   )
@@ -46,28 +61,20 @@ export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
 
 const THEME_KEY = 'theme_preference'
 
-export async function loadThemePreference(db: SQLiteDatabase): Promise<'system' | 'light' | 'dark'> {
-  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', THEME_KEY)
-  return row?.value === 'light' || row?.value === 'dark' ? row.value : 'system'
+export function loadThemePreference(db: SQLiteDatabase) {
+  return getChoice(db, THEME_KEY, ['light', 'dark'] as const)
 }
 
-export async function saveThemePreference(db: SQLiteDatabase, preference: 'system' | 'light' | 'dark') {
-  await db.runAsync(
-    'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-    [THEME_KEY, preference]
-  )
+export function saveThemePreference(db: SQLiteDatabase, preference: 'system' | 'light' | 'dark') {
+  return setSetting(db, THEME_KEY, preference)
 }
 
 const LOCALE_KEY = 'locale_preference'
 
-export async function loadLocalePreference(db: SQLiteDatabase): Promise<'system' | 'ru' | 'en'> {
-  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', LOCALE_KEY)
-  return row?.value === 'ru' || row?.value === 'en' ? row.value : 'system'
+export function loadLocalePreference(db: SQLiteDatabase) {
+  return getChoice(db, LOCALE_KEY, ['ru', 'en'] as const)
 }
 
-export async function saveLocalePreference(db: SQLiteDatabase, preference: 'system' | 'ru' | 'en') {
-  await db.runAsync(
-    'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-    [LOCALE_KEY, preference]
-  )
+export function saveLocalePreference(db: SQLiteDatabase, preference: 'system' | 'ru' | 'en') {
+  return setSetting(db, LOCALE_KEY, preference)
 }
