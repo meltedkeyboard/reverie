@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
 import { t } from '@/i18n'
-import { fonts, useColors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 export type SheetAction = {
   label: string
@@ -89,8 +89,7 @@ export function showMessage(title: string, message: string) {
 }
 
 export function DialogHost() {
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const dialog = useSyncExternalStore(
     subscribe,
     () => current,
@@ -120,7 +119,7 @@ export function DialogHost() {
 
 function DialogCard({ dialog }: { dialog: Dialog }) {
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const [text, setText] = useState(dialog.input?.initial ?? '')
 
   const select = (action: DialogAction) => {
@@ -162,7 +161,7 @@ function DialogCard({ dialog }: { dialog: Dialog }) {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   root: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.55)', padding: 24 },
   card: {

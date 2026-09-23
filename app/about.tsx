@@ -1,7 +1,7 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -11,7 +11,7 @@ import { setOnboardingComplete } from '@/db/onboarding'
 import { useShake } from '@/hooks/useShake'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
-import { fonts, useColors } from '@/theme'
+import { fonts, useStyles, type Colors } from '@/theme'
 
 const version = Constants.expoConfig?.version ?? '1.0.0'
 
@@ -20,8 +20,7 @@ export default function AboutScreen() {
   const db = useSQLiteContext()
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
 
   const restartOnboarding = useCallback(async () => {
@@ -62,8 +61,7 @@ export default function AboutScreen() {
 }
 
 function Row({ title, text, last }: { title: string; text: string; last?: boolean }) {
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   return (
     <View style={[styles.row, last && { borderBottomWidth: 0 }]}>
       <Text style={styles.rowTitle}>{title}</Text>
@@ -72,7 +70,7 @@ function Row({ title, text, last }: { title: string; text: string; last?: boolea
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },

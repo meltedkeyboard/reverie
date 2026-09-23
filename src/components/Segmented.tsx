@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
 
 import * as Haptics from '@/lib/haptics'
-import { useColors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 const PAD = 3
 const SPRING = { damping: 22, stiffness: 260, mass: 0.9 }
@@ -16,8 +16,7 @@ type Props<T extends string> = {
 }
 
 export function Segmented<T extends string>({ options, value, onChange, style }: Props<T>) {
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const index = Math.max(0, options.findIndex((opt) => opt.value === value))
   // Where the thumb is, in segments; fractional while it slides between two of them.
   const pos = useSharedValue(index)
@@ -54,14 +53,14 @@ export function Segmented<T extends string>({ options, value, onChange, style }:
 // The label color follows the thumb as it passes over, rather than flipping on tap.
 function Label({ label, index, pos, active }: { label: string; index: number; pos: SharedValue<number>; active: boolean }) {
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const colorStyle = useAnimatedStyle(() => ({
     color: interpolateColor(Math.min(1, Math.abs(pos.value - index)), [0, 1], [colors.accent, colors.textMuted]),
   }))
   return <Animated.Text style={[styles.text, active && styles.textActive, colorStyle]}>{label}</Animated.Text>
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
     segment: { flexDirection: 'row', backgroundColor: colors.surfaceRaised, borderRadius: 10, padding: PAD },
     thumb: {

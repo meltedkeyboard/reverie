@@ -1,6 +1,6 @@
 import { Link, useRouter, useFocusEffect } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -16,7 +16,7 @@ import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
 import { removeAvatar } from '@/lib/avatars'
 import { confirm, showSheet } from '@/lib/dialogs'
-import { fonts, useColors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharactersScreen() {
   const db = useSQLiteContext()
@@ -24,7 +24,7 @@ export default function CharactersScreen() {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const isWideWeb = useIsWideWeb()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
@@ -147,7 +147,7 @@ export default function CharactersScreen() {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   title: { color: colors.text, fontFamily: fonts.prose, fontSize: 24, fontWeight: '600' },
@@ -157,7 +157,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
   notice: {
     backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.35)',
+    borderColor: colors.accentBorder,
     borderRadius: 16,
     padding: 14,
     marginBottom: 14,

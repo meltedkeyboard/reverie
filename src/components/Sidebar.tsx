@@ -1,6 +1,6 @@
 import { Link, usePathname, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { deleteCharacter, listCharacters, type CharacterPreview } from '@/db/characters'
@@ -9,7 +9,7 @@ import { useTranslation } from '@/i18n'
 import { confirm, showSheet } from '@/lib/dialogs'
 import { plainPreview } from '@/lib/roleplay'
 import { removeAvatar } from '@/lib/avatars'
-import { fonts, useColors } from '@/theme'
+import { fonts, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { IconButton } from './IconButton'
@@ -22,8 +22,7 @@ export function Sidebar() {
   const db = useSQLiteContext()
   const router = useRouter()
   const pathname = usePathname()
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
 
@@ -125,7 +124,7 @@ export function Sidebar() {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
     root: { width: 320, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border, backgroundColor: colors.surface },
     header: {

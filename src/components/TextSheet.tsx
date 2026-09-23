@@ -1,16 +1,15 @@
-import { useMemo, useRef } from 'react'
+import { useRef } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
-import { fonts, useColors } from '@/theme'
+import { fonts, useStyles, type Colors } from '@/theme'
 
 type Props = { text: string | null; onClose: () => void }
 
 export function TextSheet({ text, onClose }: Props) {
   const insets = useSafeAreaInsets()
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
   // Keeps the text on screen while the sheet slides away after text turns null.
   const shown = useRef('')
@@ -41,7 +40,7 @@ export function TextSheet({ text, onClose }: Props) {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
   header: {

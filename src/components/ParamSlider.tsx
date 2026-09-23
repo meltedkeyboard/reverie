@@ -1,8 +1,7 @@
 import Slider from '@react-native-community/slider'
-import { useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
-import { useColors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 type Props = {
   label: string
@@ -18,7 +17,7 @@ type Props = {
 
 export function ParamSlider({ label, value, min, max, step, digits = 0, formatValue, onChange }: Props) {
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
@@ -40,7 +39,7 @@ export function ParamSlider({ label, value, min, max, step, digits = 0, formatVa
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   wrap: { marginBottom: 10 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 4 },

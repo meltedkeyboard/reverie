@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { AccessibilityInfo, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -9,7 +9,7 @@ import { SFIcon } from '@/components/SFIcon'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
-import { fonts, useColors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 type Feature = {
   icon: Parameters<typeof SFIcon>[0]['name']
@@ -52,7 +52,7 @@ export default function OnboardingScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const appear = useRef(new Animated.Value(0)).current
   const rise = useRef(new Animated.Value(12)).current
@@ -120,7 +120,7 @@ export default function OnboardingScreen() {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     content: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingHorizontal: 32, paddingBottom: 24 },

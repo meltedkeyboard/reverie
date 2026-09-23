@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -18,7 +18,7 @@ import { useTranslation } from '@/i18n'
 import { pickAvatar, persistAvatar, removeAvatar } from '@/lib/avatars'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { plural } from '@/lib/format'
-import { fonts, useColors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharacterEditorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -28,7 +28,7 @@ export default function CharacterEditorScreen() {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
 
   const THINKING_OPTIONS: { value: ThinkingMode; label: string }[] = [
@@ -279,7 +279,7 @@ export default function CharacterEditorScreen() {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },

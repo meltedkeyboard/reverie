@@ -1,10 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import type { ComponentProps } from 'react'
-import { useMemo } from 'react'
 import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
 
 import { glassEffect, liquidGlass } from '@/lib/nativeUI'
-import { useTheme } from '@/theme'
+import { useStyles, useTheme, type Colors } from '@/theme'
 
 import { IconButton } from './IconButton'
 
@@ -53,7 +52,7 @@ type ButtonProps = {
 // iOS 26 it is the plain icon button.
 export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, children }: ButtonProps) {
   const { colors } = useTheme()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   if (!liquidGlass) {
     return (
       <IconButton name={icon} size={iconSize} onPress={onPress} disabled={disabled}>
@@ -75,7 +74,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ch
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
     circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   })

@@ -11,7 +11,7 @@ import * as Haptics from '@/lib/haptics'
 import { imageDataUrl } from '@/lib/images'
 import { messageActions, type MessageAction } from '@/lib/messageActions'
 import { splitRoleplay } from '@/lib/roleplay'
-import { CHAT_MAX_WIDTH, fonts, useColors } from '@/theme'
+import { CHAT_MAX_WIDTH, fonts, useColors, useStyles, type Colors } from '@/theme'
 
 import { IconButton } from './IconButton'
 import { NativeMenu } from './NativeMenu'
@@ -37,8 +37,7 @@ const SELECTABLE = Platform.OS === 'web'
 const LONG_PRESS_MS = 350
 
 function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, onOpenImage }: Props) {
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const isUser = message.role === 'user'
   const spans = useMemo(() => (isUser ? [] : splitRoleplay(message.content)), [isUser, message.content])
   const actions = useMemo(
@@ -122,7 +121,7 @@ type ActionBarProps = {
 // for the user's own message. Everything else goes into the ellipsis menu.
 function ActionBar({ message, actions, locked, onAction, onSelectVariant }: ActionBarProps) {
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const [copied, setCopied] = useState(false)
   // Each press bumps its counter, which plays the symbol animation once.
   const [copies, setCopies] = useState(0)
@@ -235,7 +234,7 @@ type ThoughtProps = {
 // header stays, and a tap unfolds the whole reasoning either way.
 function ThoughtBlock({ text, ms }: ThoughtProps) {
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [seconds, setSeconds] = useState(0)
@@ -289,8 +288,7 @@ const PICTURE_MAX = { width: 240, height: 300 }
 type PictureProps = { message: RowMessage; onOpen: (uri: string) => void; onLongPress: () => void }
 
 function Picture({ message, onOpen, onLongPress }: PictureProps) {
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const uri = useMemo(() => imageDataUrl(message.image ?? ''), [message.image])
   const width = message.imageWidth || PICTURE_MAX.width
   const height = message.imageHeight || PICTURE_MAX.width
@@ -306,7 +304,7 @@ function Picture({ message, onOpen, onLongPress }: PictureProps) {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   // maxWidth is a no-op on any phone-width screen; it only kicks in once the desktop
   // pane is wide enough that a full-bleed bubble would otherwise be hard to read.

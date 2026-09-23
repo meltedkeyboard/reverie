@@ -1,7 +1,6 @@
-import { useMemo } from 'react'
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
 
-import { useTheme } from '@/theme'
+import { useStyles, useTheme, type Colors } from '@/theme'
 
 type Props = TextInputProps & {
   label?: string
@@ -10,7 +9,7 @@ type Props = TextInputProps & {
 
 export function Field({ label, hint, style, multiline, ...input }: Props) {
   const { colors, scheme } = useTheme()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   return (
     <View style={styles.wrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
@@ -27,7 +26,7 @@ export function Field({ label, hint, style, multiline, ...input }: Props) {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   wrap: { marginBottom: 20 },
   label: { color: colors.textMuted, fontSize: 13, marginBottom: 8, marginLeft: 4 },

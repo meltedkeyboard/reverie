@@ -1,6 +1,6 @@
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -12,7 +12,7 @@ import { getCharacter, type Character } from '@/db/characters'
 import { deleteChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
 import { useTranslation } from '@/i18n'
 import { confirm, promptText, showSheet } from '@/lib/dialogs'
-import { fonts, useColors } from '@/theme'
+import { fonts, useStyles, type Colors } from '@/theme'
 
 export default function CharacterChatsScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>()
@@ -20,8 +20,7 @@ export default function CharacterChatsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [character, setCharacter] = useState<Character | null>(null)
   const [chats, setChats] = useState<ChatPreview[] | null>(null)
@@ -127,7 +126,7 @@ export default function CharacterChatsScreen() {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   who: { flexDirection: 'row', alignItems: 'center', gap: 10 },

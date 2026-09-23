@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -22,7 +22,7 @@ import {
   type PromptGenInput,
   type PromptLength,
 } from '@/lib/promptGen'
-import { fonts, useTheme } from '@/theme'
+import { fonts, useStyles, useTheme, type Colors } from '@/theme'
 
 export type GeneratedCharacter = { prompt: string; greeting: string | null }
 
@@ -46,7 +46,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
   const db = useSQLiteContext()
   const insets = useSafeAreaInsets()
   const { colors, scheme } = useTheme()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const wide = useIsWideWeb()
 
@@ -484,7 +484,7 @@ function SecondaryButton({ icon, label, onPress, styles }: ButtonProps) {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.surface },
     header: {

@@ -1,11 +1,10 @@
-import { useMemo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { CharacterPreview } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { plural } from '@/lib/format'
 import { plainPreview } from '@/lib/roleplay'
-import { useColors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { IconButton } from './IconButton'
@@ -18,7 +17,7 @@ type Props = {
 
 export function CharacterCard({ character, onOpen, onMenu }: Props) {
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const preview = plainPreview(character.lastMessage ?? character.systemPrompt) || t('characterCard.noDescription')
   const chats = character.chatCount
@@ -49,7 +48,7 @@ export function CharacterCard({ character, onOpen, onMenu }: Props) {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   card: {
     flexDirection: 'row',

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -16,7 +16,7 @@ import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
 import * as Haptics from '@/lib/haptics'
-import { fonts, useColors, useTheme, type ThemePreference } from '@/theme'
+import { fonts, useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
 
 type Status = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok' | 'error'; text: string }
 
@@ -27,7 +27,7 @@ export default function SettingsScreen() {
   const headerHeight = useHeaderHeight()
   const colors = useColors()
   const { preference, setPreference } = useTheme()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
 
   const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
@@ -285,7 +285,7 @@ function Row({
   last?: boolean
 }) {
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const color = tint ?? colors.accent
   return (
     <Pressable
@@ -304,7 +304,7 @@ function Row({
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
@@ -316,7 +316,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
       borderColor: colors.border,
       overflow: 'hidden',
     },
-    dangerCard: { borderColor: 'rgba(240, 97, 109, 0.35)' },
+    dangerCard: { borderColor: colors.dangerBorder },
     cardPad: { padding: 16 },
     label: { color: colors.textMuted, fontSize: 13, marginBottom: 8 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -6, marginBottom: 16 },

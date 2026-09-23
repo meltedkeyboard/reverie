@@ -1,11 +1,10 @@
 import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { HEADER_ROW_HEIGHT, useTheme } from '@/theme'
+import { HEADER_ROW_HEIGHT, useStyles, useTheme, type Colors } from '@/theme'
 
 type Props = {
   left?: React.ReactNode
@@ -25,7 +24,7 @@ export function useHeaderHeight() {
 export function GlassHeader({ left, right, children, floating }: Props) {
   const insets = useSafeAreaInsets()
   const { colors, scheme } = useTheme()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const row = (
     <View style={styles.row} pointerEvents="box-none">
       {left}
@@ -57,7 +56,7 @@ export function GlassHeader({ left, right, children, floating }: Props) {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
     root: {
     position: 'absolute',

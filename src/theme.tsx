@@ -19,7 +19,10 @@ export type Colors = {
   textFaint: string
   accent: string
   accentSoft: string
+  accentBorder: string
   danger: string
+  dangerSoft: string
+  dangerBorder: string
   success: string
 }
 
@@ -35,7 +38,10 @@ const darkColors: Colors = {
   textFaint: 'rgba(255, 255, 255, 0.4)',
   accent: '#8B5CF6',
   accentSoft: 'rgba(139, 92, 246, 0.16)',
+  accentBorder: 'rgba(139, 92, 246, 0.35)',
   danger: '#F0616D',
+  dangerSoft: 'rgba(240, 97, 109, 0.1)',
+  dangerBorder: 'rgba(240, 97, 109, 0.3)',
   success: '#5FCB8B',
 }
 
@@ -51,7 +57,10 @@ const lightColors: Colors = {
   textFaint: 'rgba(0, 0, 0, 0.38)',
   accent: '#7C3AED',
   accentSoft: 'rgba(124, 58, 237, 0.12)',
+  accentBorder: 'rgba(124, 58, 237, 0.3)',
   danger: '#D6394A',
+  dangerSoft: 'rgba(214, 57, 74, 0.08)',
+  dangerBorder: 'rgba(214, 57, 74, 0.3)',
   success: '#2F9A5C',
 }
 
@@ -105,10 +114,6 @@ function useThemeContext() {
   return ctx
 }
 
-// The one hook screens and components use to read the live palette. Because
-// StyleSheet.create bakes in whatever values it's given at call time, callers must build
-// their `styles` inside the component (typically `useMemo(() => StyleSheet.create(...), [colors])`)
-// rather than at module scope, or a theme switch won't repaint them.
 export function useColors() {
   return useThemeContext().colors
 }
@@ -117,6 +122,18 @@ export function useTheme() {
   return useThemeContext()
 }
 
-export function hairlineStyle(c: Colors) {
-  return { borderWidth: 1, borderColor: c.border } as const
+// StyleSheet.create bakes in the colors it is given, so styles are built per palette.
+// There are only two palettes, so each factory's result is kept for each of them and
+// every instance of a component shares it instead of building its own.
+const styleCache = new WeakMap<object, WeakMap<Colors, unknown>>()
+
+export function useStyles<T>(factory: (c: Colors) => T): T {
+  const colors = useColors()
+  let byPalette = styleCache.get(factory)
+  if (!byPalette) {
+    byPalette = new WeakMap()
+    styleCache.set(factory, byPalette)
+  }
+  if (!byPalette.has(colors)) byPalette.set(colors, factory(colors))
+  return byPalette.get(colors) as T
 }

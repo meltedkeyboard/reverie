@@ -33,7 +33,7 @@ import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { imageDataUrl, pickMessageImage } from '@/lib/images'
 import { liquidGlass } from '@/lib/nativeUI'
-import { CHAT_MAX_WIDTH, useTheme } from '@/theme'
+import { CHAT_MAX_WIDTH, useStyles, useTheme, type Colors } from '@/theme'
 
 type Props = {
   height: SharedValue<number>
@@ -66,7 +66,7 @@ export function Composer({
 }: Props) {
   const insets = useSafeAreaInsets()
   const { colors, scheme } = useTheme()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [text, setText] = useState('')
   const textRef = useRef(text)
@@ -238,7 +238,7 @@ const ICONS = {
   continue: { sf: 'forward.fill', fallback: 'play-forward' },
 } as const
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   accessory: { alignItems: 'center' },

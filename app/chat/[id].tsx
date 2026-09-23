@@ -39,7 +39,7 @@ import { formatWhen } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
 import type { MessageAction } from '@/lib/messageActions'
 import { liquidGlass } from '@/lib/nativeUI'
-import { fonts, useColors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 // How far above the newest message the list has to be before the jump button shows up.
 const JUMP_THRESHOLD = 240
@@ -146,7 +146,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const {
     messages,
@@ -529,8 +529,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
 }
 
 function Intro({ character, chat, hint }: { character: Character; chat: Chat; hint?: string }) {
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { locale } = useTranslation()
   return (
     <View style={styles.intro}>
@@ -543,7 +542,7 @@ function Intro({ character, chat, hint }: { character: Character; chat: Chat; hi
 
 function PrivateIntro({ hint }: { hint?: string }) {
   const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
+  const styles = useStyles(createStyles)
   const { t } = useTranslation()
   return (
     <View style={styles.intro}>
@@ -556,7 +555,7 @@ function PrivateIntro({ hint }: { hint?: string }) {
   )
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   whoPress: { alignSelf: 'flex-start', maxWidth: '100%' },
@@ -608,9 +607,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
     marginVertical: 8,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: 'rgba(240, 97, 109, 0.1)',
+    backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: 'rgba(240, 97, 109, 0.3)',
+    borderColor: colors.dangerBorder,
   },
   errorText: { color: colors.text, fontSize: 14, lineHeight: 20 },
   retry: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.surfaceRaised },
