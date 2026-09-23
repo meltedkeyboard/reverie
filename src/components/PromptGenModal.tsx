@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { ChatTurn } from '@/api/llm'
 import { loadSettings } from '@/db/settings'
+import { useAbortable } from '@/hooks/useAbortable'
+import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
 import { errorMessage } from '@/lib/errors'
@@ -70,14 +72,14 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
   const [activity, setActivity] = useState<Activity | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  const [, setTick] = useState(0)
   // A multiline TextInput doesn't grow with its text on web, so the height is set by hand.
   const [heights, setHeights] = useState<Partial<Record<'prompt' | 'greeting', number>>>({})
-  const abortRef = useRef<AbortController | null>(null)
+  const task = useAbortable()
   const versionCount = useRef(0)
 
   const hasCurrent = currentPrompt.trim().length > 0
   const busy = activity !== null
+  const thinkingSecs = useElapsedSeconds(Boolean(activity?.thinking), activity?.since)
   const current = live ?? versions[index] ?? null
 
   // Opening the sheet on a character that already has a prompt most likely means
@@ -86,14 +88,6 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
     if (visible && phase === 'compose' && !description) setMode(hasCurrent ? 'improve' : 'new')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
-
-  useEffect(() => {
-    if (!activity?.thinking) return
-    const timer = setInterval(() => setTick((n) => n + 1), 1000)
-    return () => clearInterval(timer)
-  }, [activity?.thinking])
-
-  useEffect(() => () => abortRef.current?.abort(), [])
 
   // A fixed height never lets the measured content shrink, so it is dropped whenever
   // another, possibly shorter version is shown.
@@ -126,9 +120,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
   }
 
   const run = async (revision?: { draft: string; note: string }) => {
-    abortRef.current?.abort()
-    const ctrl = new AbortController()
-    abortRef.current = ctrl
+    const ctrl = task.start()
     setPhase('result')
     setError(null)
 
@@ -154,8 +146,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
         setError(errorMessage(err))
       }
     } finally {
-      if (abortRef.current === ctrl) {
-        abortRef.current = null
+      if (task.finish(ctrl)) {
         setActivity(null)
         setLive(null)
       }
@@ -172,7 +163,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
     setVersions((prev) => prev.map((v, i) => (i === index ? { ...v, ...patch } : v)))
   }
 
-  const stop = () => abortRef.current?.abort()
+  const stop = task.stop
 
   const revise = (text: string) => {
     if (!current || busy || !text.trim()) return
@@ -205,10 +196,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
   const words = current ? countWords(current.prompt) : 0
   const status = (() => {
-    if (activity?.thinking) {
-      const secs = Math.floor((Date.now() - activity.since) / 1000)
-      return t('promptGen.thinking', { secs })
-    }
+    if (activity?.thinking) return t('promptGen.thinking', { secs: thinkingSecs })
     if (activity) return activity.target === 'prompt' ? t('promptGen.writingPrompt') : t('promptGen.writingGreeting')
     if (!current) return ''
     return `${words} ${plural(words, locale, ['слово', 'слова', 'слов'], ['word', 'words'])}`

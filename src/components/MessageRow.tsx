@@ -5,6 +5,7 @@ import { memo, useEffect, useMemo, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { Message } from '@/db/messages'
+import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { useTranslation } from '@/i18n'
 import { showSheet } from '@/lib/dialogs'
 import * as Haptics from '@/lib/haptics'
@@ -224,15 +225,8 @@ function ThoughtBlock({ text, ms }: ThoughtProps) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const [seconds, setSeconds] = useState(0)
   const live = ms === null
-
-  useEffect(() => {
-    if (!live) return
-    const start = Date.now()
-    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000)
-    return () => clearInterval(timer)
-  }, [live])
+  const seconds = useElapsedSeconds(live)
 
   const shown = live ? seconds : Math.max(1, Math.round(ms / 1000))
   const tail = text.length > THINKING_TAIL ? `...${text.slice(-THINKING_TAIL).trimStart()}` : text

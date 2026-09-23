@@ -23,6 +23,7 @@ import {
   type Thought,
 } from '@/db/messages'
 import { loadSettings } from '@/db/settings'
+import { useAbortable } from '@/hooks/useAbortable'
 import { t } from '@/i18n'
 import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
@@ -114,7 +115,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
   const messagesRef = useRef<Message[]>([])
   const characterRef = useRef(character)
   characterRef.current = character
-  const abortRef = useRef<AbortController | null>(null)
+  const task = useAbortable()
   const discarded = useRef(new WeakSet<AbortController>())
   const titleRef = useRef(chat.title)
   const namingRef = useRef(false)
@@ -162,8 +163,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
       alive = false
       // A reply still streaming finishes into the store it was started for, but the
       // screen already belongs to the other one.
-      abortRef.current?.abort()
-      abortRef.current = null
+      task.reset()
       lastRequest.current = null
       setMessages([])
       setLoaded(false)
@@ -178,8 +178,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
 
   const generate = useCallback(
     async (history: Message[], replacing: Message | null = null, guidance?: string) => {
-      const ctrl = new AbortController()
-      abortRef.current = ctrl
+      const ctrl = task.start()
       setReplacingId(replacing?.id ?? null)
       setError(null)
       setPhase('waiting')
@@ -268,8 +267,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
             autoName().catch(() => {})
           }
         }
-        if (abortRef.current === ctrl) {
-          abortRef.current = null
+        if (task.finish(ctrl)) {
           setDraft(null)
           setReasoning(null)
           setReasoningMs(null)
@@ -283,7 +281,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
 
   const send = useCallback(
     async (text: string, image: MessageImage | null) => {
-      if (abortRef.current) return
+      if (task.current()) return
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
       const sent = await store.add('user', text, { image })
       lastRequest.current = { id: sent.id }
@@ -296,7 +294,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
 
   const regenerate = useCallback(
     async (id: number, guidance?: string) => {
-      if (abortRef.current) return
+      if (task.current()) return
       const history = messagesRef.current
       const target = regenerateTargetAt(history, history.findIndex((m) => m.id === id))
       if (!target) return
@@ -310,7 +308,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
   // scene or unfolds its last reply. The reply is a new message, so the previous one
   // stays as it was.
   const proceed = useCallback(async () => {
-    if (abortRef.current || !messagesRef.current.length) return
+    if (task.current() || !messagesRef.current.length) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     lastRequest.current = 'continue'
     await generate(messagesRef.current, null, CONTINUE_NOTE)
@@ -338,7 +336,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
     [store, replaceMessage]
   )
 
-  const stop = useCallback(() => abortRef.current?.abort(), [])
+  const stop = task.stop
 
   const editMessage = useCallback(
     async (id: number, content: string) => {
@@ -359,11 +357,11 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
 
   // The chat is about to be deleted, so the partial reply must not be written into it.
   const discard = useCallback(() => {
-    const running = abortRef.current
+    const running = task.current()
     if (!running) return
     discarded.current.add(running)
     running.abort()
-  }, [])
+  }, [task])
 
   return {
     messages,
