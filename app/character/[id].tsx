@@ -6,7 +6,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { Avatar } from '@/components/Avatar'
 import { Button } from '@/components/Button'
-import { Field } from '@/components/Field'
+import { Field, FieldHint } from '@/components/Field'
 import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
 import { ParamSlider } from '@/components/ParamSlider'
 import { PromptGenModal, type GeneratedCharacter } from '@/components/PromptGenModal'
@@ -192,7 +192,7 @@ export default function CharacterEditorScreen() {
 
           <Text style={styles.section}>{t('editor.thinkingSection')}</Text>
           <Segmented options={THINKING_OPTIONS} value={thinking} onChange={setThinking} style={{ marginBottom: 8 }} />
-          <Text style={styles.hint}>{t('editor.thinkingHint')}</Text>
+          <FieldHint style={styles.hint}>{t('editor.thinkingHint')}</FieldHint>
 
           <Text style={styles.section}>{t('editor.replyLengthSection')}</Text>
           <ParamSlider
@@ -204,7 +204,7 @@ export default function CharacterEditorScreen() {
             formatValue={(v) => (v === 0 ? t('editor.unlimited') : `${v} ${plural(v, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`)}
             onChange={(v) => setReplyLimit(v === 0 ? null : v)}
           />
-          <Text style={styles.hint}>{t('editor.replyLengthHint')}</Text>
+          <FieldHint style={styles.hint}>{t('editor.replyLengthHint')}</FieldHint>
 
           <Field
             label={t('editor.greetingLabel')}
@@ -291,7 +291,7 @@ const createStyles = (colors: Colors) =>
       marginRight: 4,
     },
     systemPromptLabel: { color: colors.textMuted, fontSize: 13 },
-    hint: { color: colors.textFaint, fontSize: 12, marginTop: -4, marginBottom: 4, marginHorizontal: 4 },
+    hint: { marginTop: -4, marginBottom: 4, marginRight: 4 },
     delete: { alignItems: 'center', marginTop: 32, paddingVertical: 14 },
     deleteText: { color: colors.danger, fontSize: 16 },
   })

@@ -22,9 +22,10 @@ import {
   type PromptGenInput,
   type PromptLength,
 } from '@/lib/promptGen'
-import { fonts, useStyles, useTheme, type Colors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 import { Button } from './Button'
+import { FieldHint, FieldLabel, useInputColors } from './Field'
 import { PageSheet } from './PageSheet'
 import { Pager } from './Pager'
 import { Segmented } from './Segmented'
@@ -50,8 +51,9 @@ const TWEAK_KEYS = ['promptGen.tweakShorter', 'promptGen.tweakLonger', 'promptGe
 export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, onClose, onApply }: Props) {
   const db = useSQLiteContext()
   const insets = useSafeAreaInsets()
-  const { colors, scheme } = useTheme()
+  const colors = useColors()
   const styles = useStyles(createStyles)
+  const inputColors = useInputColors()
   const { t, locale } = useTranslation()
   const wide = useIsWideWeb()
 
@@ -240,31 +242,27 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
         </View>
       ) : null}
 
-      <Text style={styles.label}>
-        {effectiveMode === 'improve' ? t('promptGen.changesLabel') : t('promptGen.descriptionLabel')}
-      </Text>
+      <FieldLabel>{effectiveMode === 'improve' ? t('promptGen.changesLabel') : t('promptGen.descriptionLabel')}</FieldLabel>
       <TextInput
         value={description}
         onChangeText={setDescription}
         placeholder={effectiveMode === 'improve' ? t('promptGen.changesPlaceholder') : t('promptGen.placeholder')}
-        placeholderTextColor={colors.textFaint}
-        selectionColor={colors.accent}
-        keyboardAppearance={scheme}
+        {...inputColors}
         multiline
         style={[styles.input, effectiveMode === 'improve' && { minHeight: 96 }]}
       />
-      <Text style={styles.hint}>
+      <FieldHint style={{ marginBottom: 20 }}>
         {effectiveMode === 'improve' ? t('promptGen.improveHint') : t('promptGen.hint')}
-      </Text>
+      </FieldHint>
 
       {effectiveMode === 'new' && !description.trim() ? (
         <View style={styles.block}>
-          <Text style={styles.label}>{t('promptGen.ideas')}</Text>
+          <FieldLabel>{t('promptGen.ideas')}</FieldLabel>
           <View style={styles.chips}>{IDEA_KEYS.map((key) => chip(t(`${key}.title`), () => setDescription(t(key)), key))}</View>
         </View>
       ) : null}
 
-      <Text style={styles.label}>{t('promptGen.lengthLabel')}</Text>
+      <FieldLabel>{t('promptGen.lengthLabel')}</FieldLabel>
       <View style={styles.block}>
         <Segmented<PromptLength>
           value={length}
@@ -277,7 +275,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
         />
       </View>
 
-      <Text style={styles.label}>{t('promptGen.formatLabel')}</Text>
+      <FieldLabel>{t('promptGen.formatLabel')}</FieldLabel>
       <View style={styles.block}>
         <Segmented<PromptFormat>
           value={format}
@@ -326,8 +324,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
             onChangeText={(v) => editCurrent({ [target]: v })}
             multiline
             scrollEnabled={false}
-            selectionColor={colors.accent}
-            keyboardAppearance={scheme}
+            {...inputColors}
             onContentSizeChange={(e) => {
               const h = Math.ceil(e.nativeEvent.contentSize.height)
               setHeights((prev) => (prev[target] === h ? prev : { ...prev, [target]: h }))
@@ -364,16 +361,14 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
       {current && !busy ? (
         <View style={styles.block}>
-          <Text style={styles.label}>{t('promptGen.reviseLabel')}</Text>
+          <FieldLabel>{t('promptGen.reviseLabel')}</FieldLabel>
           <View style={styles.chips}>{TWEAK_KEYS.map((key) => chip(t(key), () => revise(t(`${key}.note`)), key))}</View>
           <View style={styles.noteRow}>
             <TextInput
               value={note}
               onChangeText={setNote}
               placeholder={t('promptGen.revisePlaceholder')}
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.accent}
-              keyboardAppearance={scheme}
+              {...inputColors}
               multiline
               style={styles.noteInput}
             />
@@ -455,8 +450,6 @@ const createStyles = (colors: Colors) =>
     content: { padding: 20, paddingBottom: 32 },
     wideColumn: { width: '100%', maxWidth: 720, alignSelf: 'center' },
     block: { marginBottom: 20 },
-    label: { color: colors.textMuted, fontSize: 13, marginBottom: 8, marginLeft: 4 },
-    hint: { color: colors.textFaint, fontSize: 12, lineHeight: 17, marginTop: 6, marginLeft: 4, marginBottom: 20 },
     input: {
       backgroundColor: colors.surfaceRaised,
       borderWidth: 1,

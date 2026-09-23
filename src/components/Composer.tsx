@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AttachButton, type AttachSource } from './AttachButton'
 import { GlassSurface } from './Glass'
+import { useInputColors } from './Field'
 import { IconButton } from './IconButton'
 import { SFIcon } from './SFIcon'
 import type { MessageImage } from '@/db/messages'
@@ -67,6 +68,7 @@ export function Composer({
 }: Props) {
   const insets = useSafeAreaInsets()
   const { colors, scheme } = useTheme()
+  const inputColors = useInputColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [text, setText] = useState('')
@@ -173,10 +175,8 @@ export function Composer({
             onChangeText={setText}
             onKeyPress={Platform.OS === 'web' ? onKeyPress : undefined}
             placeholder={t('chat.messagePlaceholder')}
-            placeholderTextColor={colors.textFaint}
+            {...inputColors}
             multiline
-            keyboardAppearance={scheme}
-            selectionColor={colors.accent}
             style={styles.input}
           />
           <Pressable

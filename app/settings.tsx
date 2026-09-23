@@ -7,7 +7,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { testConnection } from '@/api/llm'
 import { Button } from '@/components/Button'
-import { Field } from '@/components/Field'
+import { Field, FieldLabel } from '@/components/Field'
 import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
 import { Group } from '@/components/Group'
 import { Segmented } from '@/components/Segmented'
@@ -135,9 +135,9 @@ export default function SettingsScreen() {
           <Text style={styles.section}>{t('settings.appearance')}</Text>
           <Group>
             <View style={styles.cardPad}>
-              <Text style={styles.label}>{t('settings.appearance')}</Text>
+              <FieldLabel>{t('settings.appearance')}</FieldLabel>
               <Segmented options={THEME_OPTIONS} value={preference} onChange={setPreference} />
-              <Text style={[styles.label, { marginTop: 18 }]}>{t('settings.language')}</Text>
+              <FieldLabel style={{ marginTop: 18 }}>{t('settings.language')}</FieldLabel>
               <Segmented options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
             </View>
           </Group>
@@ -299,7 +299,6 @@ const createStyles = (colors: Colors) =>
     section: { color: colors.textMuted, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8, marginLeft: 4 },
     dangerCard: { borderColor: colors.dangerBorder },
     cardPad: { padding: 16 },
-    label: { color: colors.textMuted, fontSize: 13, marginBottom: 8 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -6, marginBottom: 16 },
     chip: {
       maxWidth: '100%',

@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
+import { useInputColors } from '@/components/Field'
 import { t } from '@/i18n'
 import type { Confirmation, SheetAction, TextPrompt } from '@/lib/dialogs.types'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
@@ -98,6 +99,7 @@ export function DialogHost() {
 
 function DialogCard({ dialog }: { dialog: Dialog }) {
   const colors = useColors()
+  const inputColors = useInputColors()
   const styles = useStyles(createStyles)
   const [text, setText] = useState(dialog.input?.initial ?? '')
 
@@ -117,7 +119,7 @@ function DialogCard({ dialog }: { dialog: Dialog }) {
           onSubmitEditing={() => select(dialog.actions[0])}
           autoFocus
           selectTextOnFocus
-          selectionColor={colors.accent}
+          {...inputColors}
           style={styles.input}
         />
       ) : null}
