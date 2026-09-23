@@ -1,12 +1,11 @@
-import { BlurView } from 'expo-blur'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { fonts, HEADER_ROW_HEIGHT, useStyles, useTheme, type Colors } from '@/theme'
+import { fonts, HEADER_ROW_HEIGHT, useStyles, type Colors } from '@/theme'
 
+import { BlurBar, EdgeFade } from './BarChrome'
 import { IconButton } from './IconButton'
 
 type Props = {
@@ -51,7 +50,6 @@ export function BackButton({ close }: { close?: boolean }) {
 
 export function GlassHeader({ left, right, children, floating }: Props) {
   const insets = useSafeAreaInsets()
-  const { colors, scheme } = useTheme()
   const styles = useStyles(createStyles)
   const row = (
     <View style={styles.row} pointerEvents="box-none">
@@ -66,21 +64,16 @@ export function GlassHeader({ left, right, children, floating }: Props) {
   if (floating && liquidGlass) {
     return (
       <View style={[styles.floating, { paddingTop: insets.top }]} pointerEvents="box-none">
-        <LinearGradient
-          colors={[colors.bg, `rgba(${colors.bgRgb}, 0.8)`, `rgba(${colors.bgRgb}, 0)`]}
-          locations={[0, 0.55, 1]}
-          style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]}
-          pointerEvents="none"
-        />
+        <EdgeFade edge="top" style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} />
         {row}
       </View>
     )
   }
 
   return (
-    <BlurView tint={scheme} intensity={55} style={[styles.root, { paddingTop: insets.top }]}>
+    <BlurBar edge="top" style={[styles.root, { paddingTop: insets.top }]}>
       {row}
-    </BlurView>
+    </BlurBar>
   )
 }
 
@@ -93,9 +86,6 @@ const createStyles = (colors: Colors) =>
     left: 0,
     right: 0,
     zIndex: 10,
-    backgroundColor: `rgba(${colors.bgRgb}, 0.55)`,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
   },
   floating: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   fade: { position: 'absolute', top: 0, left: 0, right: 0 },

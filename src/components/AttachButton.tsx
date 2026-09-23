@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { Platform, Pressable, StyleSheet } from 'react-native'
+import { Platform, Pressable } from 'react-native'
 
 import { useTranslation } from '@/i18n'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { useColors } from '@/theme'
 
-import { GlassSurface } from './Glass'
+import { GlassSurface, useGlassStyles } from './Glass'
 import { NativeMenu } from './NativeMenu'
 
 export type AttachSource = 'library' | 'camera'
@@ -16,7 +16,7 @@ type Props = {
 
 export function AttachButton({ disabled, onPick }: Props) {
   const colors = useColors()
-  const styles = useStyles(createStyles)
+  const styles = useGlassStyles()
   const { t } = useTranslation()
   const circle = (
     <GlassSurface style={styles.circle} fallbackStyle={styles.solid}>
@@ -51,10 +51,3 @@ export function AttachButton({ disabled, onPick }: Props) {
     </NativeMenu>
   )
 }
-
-// The same 44 pt as the message field next to it.
-const createStyles = (colors: Colors) =>
-  StyleSheet.create({
-  circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-})

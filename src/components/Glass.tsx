@@ -74,7 +74,14 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ch
   )
 }
 
+// The 44 pt circle of the glass controls, and what a glass surface falls back to
+// without Liquid Glass: the plain surface with a hairline.
+export function useGlassStyles() {
+  return useStyles(createStyles)
+}
+
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   })

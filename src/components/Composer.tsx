@@ -1,7 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { BlurView } from 'expo-blur'
 import { Image } from 'expo-image'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Platform,
@@ -25,7 +23,8 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AttachButton, type AttachSource } from './AttachButton'
-import { GlassSurface } from './Glass'
+import { BlurBar, EdgeFade } from './BarChrome'
+import { GlassSurface, useGlassStyles } from './Glass'
 import { useInputColors } from './Field'
 import { IconButton } from './IconButton'
 import { SFIcon } from './SFIcon'
@@ -35,7 +34,7 @@ import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import { imageDataUrl, pickMessageImage } from '@/lib/images'
 import { liquidGlass } from '@/lib/nativeUI'
-import { CHAT_MAX_WIDTH, useStyles, useTheme, type Colors } from '@/theme'
+import { CHAT_MAX_WIDTH, useColors, useStyles, type Colors } from '@/theme'
 
 type Props = {
   height: SharedValue<number>
@@ -67,8 +66,9 @@ export function Composer({
   onHeightChange,
 }: Props) {
   const insets = useSafeAreaInsets()
-  const { colors, scheme } = useTheme()
+  const colors = useColors()
   const inputColors = useInputColors()
+  const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [text, setText] = useState('')
@@ -152,7 +152,7 @@ export function Composer({
   const row = (
     <View style={styles.row}>
       {editing ? null : <AttachButton disabled={picking} onPick={attach} />}
-      <GlassSurface style={styles.field} fallbackStyle={styles.fieldSolid}>
+      <GlassSurface style={styles.field} fallbackStyle={glass.solid}>
         {editing ? (
           <View style={styles.banner}>
             <Ionicons name="create-outline" size={15} color={colors.accent} />
@@ -214,18 +214,13 @@ export function Composer({
         // Glass controls float over the messages; the fade keeps text scrolling
         // underneath from clashing with them.
         <View style={[styles.floatingBar, { paddingBottom: insets.bottom + 8 }]} onLayout={measure} pointerEvents="box-none">
-          <LinearGradient
-            colors={[`rgba(${colors.bgRgb}, 0)`, `rgba(${colors.bgRgb}, 0.85)`, colors.bg]}
-            locations={[0, 0.45, 1]}
-            style={styles.fade}
-            pointerEvents="none"
-          />
+          <EdgeFade edge="bottom" style={styles.fade} />
           {row}
         </View>
       ) : (
-        <BlurView tint={scheme} intensity={55} style={[styles.bar, { paddingBottom: insets.bottom + 8 }]} onLayout={measure}>
+        <BlurBar edge="bottom" style={[styles.bar, { paddingBottom: insets.bottom + 8 }]} onLayout={measure}>
           {row}
-        </BlurView>
+        </BlurBar>
       )}
     </KeyboardStickyView>
   )
@@ -243,13 +238,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   accessory: { alignItems: 'center' },
-  bar: {
-    paddingTop: 8,
-    paddingHorizontal: 10,
-    backgroundColor: `rgba(${colors.bgRgb}, 0.55)`,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
+  bar: { paddingTop: 8, paddingHorizontal: 10 },
   floatingBar: { paddingTop: 8, paddingHorizontal: 10 },
   fade: { position: 'absolute', top: -28, left: 0, right: 0, bottom: 0 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingTop: 2 },
@@ -259,7 +248,6 @@ const createStyles = (colors: Colors) =>
   // on phone widths.
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
   field: { flex: 1, borderRadius: 22, padding: 4 },
-  fieldSolid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   attachment: { alignSelf: 'flex-start', margin: 6, marginBottom: 2 },
   thumb: { width: 72, height: 72, borderRadius: 14 },
   thumbRemove: {
