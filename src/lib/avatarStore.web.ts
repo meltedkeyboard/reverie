@@ -1,4 +1,5 @@
 import { t } from '@/i18n'
+import { imageDataUrl } from '@/lib/images'
 
 // expo-file-system has no web implementation, so in the browser the avatars are
 // kept in localStorage as data URLs. The database still stores only the name.
@@ -12,15 +13,18 @@ export function avatarUri(name: string): string | null {
   }
 }
 
-export async function persistAvatar(tempUri: string) {
-  const name = `${Date.now()}.jpg`
-  const dataUrl = await readAsDataUrl(tempUri)
+function store(name: string, dataUrl: string) {
   try {
     localStorage.setItem(PREFIX + name, dataUrl)
   } catch {
     // localStorage is capped at a few megabytes and gives no way to ask for more.
     throw new Error(t('avatarStore.noSpace'))
   }
+}
+
+export async function persistAvatar(tempUri: string) {
+  const name = `${Date.now()}.jpg`
+  store(name, await readAsDataUrl(tempUri))
   return name
 }
 
@@ -38,11 +42,7 @@ export async function readAvatarBase64(name: string) {
 }
 
 export async function writeAvatarBase64(name: string, base64: string) {
-  try {
-    localStorage.setItem(PREFIX + name, `data:image/jpeg;base64,${base64}`)
-  } catch {
-    throw new Error(t('avatarStore.noSpace'))
-  }
+  store(name, imageDataUrl(base64))
 }
 
 export function removeAllAvatars() {
