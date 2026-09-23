@@ -21,7 +21,7 @@ export function Wordmark({ width, optical = false, style }: Props) {
   const height = (width * VIEW.height) / VIEW.width
   return (
     <Image
-      source={require('../../assets/images/wordmark.png')}
+      source={require('../../assets/brand/wordmark.svg')}
       accessibilityRole="image"
       accessibilityLabel="Reverie"
       style={[

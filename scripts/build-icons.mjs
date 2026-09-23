@@ -1,4 +1,4 @@
-// Renders every app icon, splash, favicon and the wordmark images from the SVGs in
+// Renders every app icon, splash, favicon and the link preview from the SVGs in
 // assets/brand. Run after changing them: npm run icons
 import { Resvg } from '@resvg/resvg-js'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -88,5 +88,4 @@ writeFileSync('public/favicon.svg', favicon())
 console.log('public/favicon.svg')
 png(light, 'public/apple-touch-icon.png', 180)
 
-png(wordmark, 'assets/images/wordmark.png', 1200)
 png(ogImage(), 'public/og-image.png', 1200)
