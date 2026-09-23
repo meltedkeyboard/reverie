@@ -8,14 +8,13 @@ import { CharacterCard } from '@/components/CharacterCard'
 import { GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
-import { deleteCharacter, listCharacters, type CharacterPreview } from '@/db/characters'
-import { createChat, pruneUntouchedChats } from '@/db/chats'
+import { listCharacters, type CharacterPreview } from '@/db/characters'
+import { pruneUntouchedChats } from '@/db/chats'
 import { isOnboardingComplete } from '@/db/onboarding'
 import { loadSettings } from '@/db/settings'
+import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
-import { removeAvatar } from '@/lib/avatars'
-import { confirm, showSheet } from '@/lib/dialogs'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharactersScreen() {
@@ -50,6 +49,8 @@ export default function CharactersScreen() {
     }, [reload, onboarded])
   )
 
+  const { openMenu } = useCharacterActions(reload)
+
   if (!onboarded) return <View style={styles.screen} />
 
   // The character list already lives in the sidebar on wide web, so the root route
@@ -61,32 +62,6 @@ export default function CharactersScreen() {
         <Text style={styles.wideWelcomeText}>{t('characters.wideWelcomeText')}</Text>
       </View>
     )
-  }
-
-  const startChat = async (character: CharacterPreview) => {
-    router.push(`/chat/${await createChat(db, character)}`)
-  }
-
-  const openMenu = (character: CharacterPreview) => {
-    showSheet(character.name, [
-      { label: t('characters.newChat'), onSelect: () => startChat(character) },
-      { label: t('characters.edit'), onSelect: () => router.push(`/character/${character.id}`) },
-      { label: t('characters.delete'), destructive: true, onSelect: () => confirmDelete(character) },
-    ])
-  }
-
-  const confirmDelete = (character: CharacterPreview) => {
-    confirm({
-      title: t('characters.deleteConfirmTitle'),
-      message: t('characters.deleteConfirmMessage', { name: character.name }),
-      confirmLabel: t('characters.delete'),
-      destructive: true,
-      onConfirm: async () => {
-        await deleteCharacter(db, character.id)
-        if (character.avatar) removeAvatar(character.avatar)
-        reload()
-      },
-    })
   }
 
   return (

@@ -2,29 +2,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
 import { t } from '@/i18n'
+import type { Confirmation, SheetAction, TextPrompt } from '@/lib/dialogs.types'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
-
-export type SheetAction = {
-  label: string
-  destructive?: boolean
-  onSelect: () => void
-}
-
-export type Confirmation = {
-  title: string
-  message?: string
-  confirmLabel: string
-  destructive?: boolean
-  onConfirm: () => void
-}
-
-export type TextPrompt = {
-  title: string
-  message?: string
-  initial?: string
-  confirmLabel: string
-  onSubmit: (text: string) => void
-}
 
 // Actions get the text of the input field; dialogs without one pass an empty string.
 type DialogAction = {

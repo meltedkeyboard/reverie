@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { CharacterPreview } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { plural } from '@/lib/format'
-import { plainPreview } from '@/lib/roleplay'
+import { characterPreview } from '@/lib/roleplay'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
@@ -18,8 +18,8 @@ type Props = {
 export function CharacterCard({ character, onOpen, onMenu }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
-  const { t, locale } = useTranslation()
-  const preview = plainPreview(character.lastMessage ?? character.systemPrompt) || t('characterCard.noDescription')
+  const { locale } = useTranslation()
+  const preview = characterPreview(character)
   const chats = character.chatCount
   return (
     <Pressable

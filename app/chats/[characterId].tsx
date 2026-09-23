@@ -11,7 +11,8 @@ import { IconButton } from '@/components/IconButton'
 import { getCharacter, type Character } from '@/db/characters'
 import { deleteChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
 import { useTranslation } from '@/i18n'
-import { confirm, promptText, showSheet } from '@/lib/dialogs'
+import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
+import { showSheet } from '@/lib/dialogs'
 import { fonts, useStyles, type Colors } from '@/theme'
 
 export default function CharacterChatsScreen() {
@@ -47,28 +48,16 @@ export default function CharacterChatsScreen() {
   }
 
   const promptRename = (chat: ChatPreview) => {
-    promptText({
-      title: t('chat.renameChatTitle'),
-      message: t('chat.renameChatMessage'),
-      initial: chat.title ?? '',
-      confirmLabel: t('common.save'),
-      onSubmit: async (text) => {
-        await setChatTitle(db, chat.id, text)
-        reload()
-      },
+    promptRenameChat(chat.title, async (text) => {
+      await setChatTitle(db, chat.id, text)
+      reload()
     })
   }
 
   const confirmDelete = (chat: ChatPreview) => {
-    confirm({
-      title: t('chat.deleteChatTitle'),
-      message: t('chat.deleteChatMessage'),
-      confirmLabel: t('common.delete'),
-      destructive: true,
-      onConfirm: async () => {
-        await deleteChat(db, chat.id)
-        reload()
-      },
+    confirmDeleteChat(async () => {
+      await deleteChat(db, chat.id)
+      reload()
     })
   }
 

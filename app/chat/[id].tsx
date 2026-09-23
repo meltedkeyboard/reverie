@@ -35,7 +35,8 @@ import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { newMessage } from '@/db/messages'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
-import { confirm, promptText, showMessage } from '@/lib/dialogs'
+import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
+import { promptText, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import { formatWhen } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
@@ -329,28 +330,14 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   )
 
   const confirmDelete = () => {
-    confirm({
-      title: t('chat.deleteChatTitle'),
-      message: t('chat.deleteChatMessage'),
-      confirmLabel: t('common.delete'),
-      destructive: true,
-      onConfirm: async () => {
-        discard()
-        await deleteChat(db, chatId)
-        router.back()
-      },
+    confirmDeleteChat(async () => {
+      discard()
+      await deleteChat(db, chatId)
+      router.back()
     })
   }
 
-  const promptRename = () => {
-    promptText({
-      title: t('chat.renameChatTitle'),
-      message: t('chat.renameChatMessage'),
-      initial: title ?? '',
-      confirmLabel: t('common.save'),
-      onSubmit: (text) => rename(text),
-    })
-  }
+  const promptRename = () => promptRenameChat(title, rename)
 
   const suggestName = async () => {
     try {

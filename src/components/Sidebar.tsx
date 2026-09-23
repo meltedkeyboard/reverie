@@ -3,12 +3,11 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { deleteCharacter, listCharacters, type CharacterPreview } from '@/db/characters'
-import { createChat, pruneUntouchedChats } from '@/db/chats'
+import { listCharacters, type CharacterPreview } from '@/db/characters'
+import { pruneUntouchedChats } from '@/db/chats'
+import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useTranslation } from '@/i18n'
-import { confirm, showSheet } from '@/lib/dialogs'
-import { plainPreview } from '@/lib/roleplay'
-import { removeAvatar } from '@/lib/avatars'
+import { characterPreview } from '@/lib/roleplay'
 import { fonts, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
@@ -46,32 +45,7 @@ export function Sidebar() {
     if (match) setActiveId(Number(match[2]))
   }, [pathname])
 
-  const startChat = async (character: CharacterPreview) => {
-    setActiveId(character.id)
-    router.push(`/chat/${await createChat(db, character)}`)
-  }
-
-  const openMenu = (character: CharacterPreview) => {
-    showSheet(character.name, [
-      { label: t('characters.newChat'), onSelect: () => startChat(character) },
-      { label: t('characters.edit'), onSelect: () => router.push(`/character/${character.id}`) },
-      { label: t('characters.delete'), destructive: true, onSelect: () => confirmDelete(character) },
-    ])
-  }
-
-  const confirmDelete = (character: CharacterPreview) => {
-    confirm({
-      title: t('characters.deleteConfirmTitle'),
-      message: t('characters.deleteConfirmMessage', { name: character.name }),
-      confirmLabel: t('characters.delete'),
-      destructive: true,
-      onConfirm: async () => {
-        await deleteCharacter(db, character.id)
-        if (character.avatar) removeAvatar(character.avatar)
-        reload()
-      },
-    })
-  }
+  const { openMenu } = useCharacterActions(reload, (character) => setActiveId(character.id))
 
   return (
     <View style={styles.root}>
@@ -90,7 +64,6 @@ export function Sidebar() {
         contentContainerStyle={{ padding: 8, paddingBottom: 16 }}
         renderItem={({ item: character }) => {
           const active = character.id === activeId
-          const preview = plainPreview(character.lastMessage ?? character.systemPrompt) || t('characterCard.noDescription')
           return (
             <Pressable
               onPress={() => {
@@ -106,7 +79,7 @@ export function Sidebar() {
                   {character.name}
                 </Text>
                 <Text style={styles.preview} numberOfLines={1}>
-                  {preview}
+                  {characterPreview(character)}
                 </Text>
               </View>
             </Pressable>

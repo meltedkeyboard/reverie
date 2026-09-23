@@ -1,3 +1,5 @@
+import { t } from '@/i18n'
+
 export type Span = { text: string; action: boolean }
 
 export function splitRoleplay(text: string) {
@@ -21,4 +23,10 @@ export function splitRoleplay(text: string) {
 
 export function plainPreview(text: string) {
   return text.replace(/\*+/g, '').replace(/\s+/g, ' ').trim()
+}
+
+// The line under a character's name in the lists: the latest message, or its prompt
+// before there is any chat.
+export function characterPreview(character: { lastMessage: string | null; systemPrompt: string }) {
+  return plainPreview(character.lastMessage ?? character.systemPrompt) || t('characterCard.noDescription')
 }
