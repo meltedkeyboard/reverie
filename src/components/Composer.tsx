@@ -31,6 +31,7 @@ import { SFIcon } from './SFIcon'
 import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
+import { errorMessage } from '@/lib/errors'
 import { imageDataUrl, pickMessageImage } from '@/lib/images'
 import { liquidGlass } from '@/lib/nativeUI'
 import { CHAT_MAX_WIDTH, useStyles, useTheme, type Colors } from '@/theme'
@@ -126,7 +127,7 @@ export function Composer({
       const picked = await pickMessageImage(source)
       if (picked) setImage(picked)
     } catch (err) {
-      showMessage(t('composer.attachFailedTitle'), err instanceof Error ? err.message : String(err))
+      showMessage(t('composer.attachFailedTitle'), errorMessage(err))
     } finally {
       setPicking(false)
     }

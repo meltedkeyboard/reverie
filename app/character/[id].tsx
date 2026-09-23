@@ -17,6 +17,7 @@ import { DEFAULT_SAMPLING, deleteCharacter, getCharacter, saveCharacter, type Th
 import { useTranslation } from '@/i18n'
 import { pickAvatar, persistAvatar, removeAvatar } from '@/lib/avatars'
 import { confirm, showMessage } from '@/lib/dialogs'
+import { errorMessage } from '@/lib/errors'
 import { plural } from '@/lib/format'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
@@ -105,7 +106,7 @@ export default function CharacterEditorScreen() {
       router.back()
     } catch (err) {
       setSaving(false)
-      showMessage(t('editor.saveFailedTitle'), err instanceof Error ? err.message : String(err))
+      showMessage(t('editor.saveFailedTitle'), errorMessage(err))
     }
   }
 

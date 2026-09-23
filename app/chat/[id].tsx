@@ -35,6 +35,7 @@ import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
 import { confirm, promptText, showMessage } from '@/lib/dialogs'
+import { errorMessage } from '@/lib/errors'
 import { formatWhen } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
 import type { MessageAction } from '@/lib/messageActions'
@@ -364,7 +365,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     try {
       if (!(await autoName())) showMessage(t('chat.titleNotFoundTitle'), t('chat.titleNotFoundMessage'))
     } catch (err) {
-      showMessage(t('chat.titleFailedTitle'), err instanceof Error ? err.message : String(err))
+      showMessage(t('chat.titleFailedTitle'), errorMessage(err))
     }
   }
 

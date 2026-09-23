@@ -19,6 +19,7 @@ import {
 } from '@/db/messages'
 import { loadSettings } from '@/db/settings'
 import { t } from '@/i18n'
+import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
 import { imageDataUrl } from '@/lib/images'
 import { suggestTitle } from '@/lib/titles'
@@ -258,7 +259,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
           if (!frame) frame = requestAnimationFrame(flush)
         }
       } catch (err) {
-        if (!ctrl.signal.aborted) setError(err instanceof Error ? err.message : String(err))
+        if (!ctrl.signal.aborted) setError(errorMessage(err))
       } finally {
         // An empty reply otherwise vanishes silently, as if the tap did nothing.
         if (!text.trim() && !ctrl.signal.aborted) {

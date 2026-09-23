@@ -15,6 +15,7 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } fro
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
+import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
 import { fonts, useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
 
@@ -74,7 +75,7 @@ export default function SettingsScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (err) {
       setModels([])
-      setStatus({ kind: 'error', text: err instanceof Error ? err.message : String(err) })
+      setStatus({ kind: 'error', text: errorMessage(err) })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
     }
   }
@@ -84,7 +85,7 @@ export default function SettingsScreen() {
     try {
       await exportBackup(db)
     } catch (err) {
-      showMessage(t('settings.exportFailedTitle'), err instanceof Error ? err.message : String(err))
+      showMessage(t('settings.exportFailedTitle'), errorMessage(err))
     } finally {
       setExporting(false)
     }
@@ -96,7 +97,7 @@ export default function SettingsScreen() {
       const result = await importBackup(db)
       if (result) showMessage(t('settings.importDoneTitle'), t('settings.importDoneMessage', { count: result.characters }))
     } catch (err) {
-      showMessage(t('settings.importFailedTitle'), err instanceof Error ? err.message : String(err))
+      showMessage(t('settings.importFailedTitle'), errorMessage(err))
     } finally {
       setImporting(false)
     }
@@ -115,7 +116,7 @@ export default function SettingsScreen() {
           setCfg(DEFAULT_SETTINGS)
           router.dismissTo('/')
         } catch (err) {
-          showMessage(t('settings.wipeFailedTitle'), err instanceof Error ? err.message : String(err))
+          showMessage(t('settings.wipeFailedTitle'), errorMessage(err))
         } finally {
           setWiping(false)
         }

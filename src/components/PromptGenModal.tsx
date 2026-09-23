@@ -10,6 +10,7 @@ import { Segmented } from '@/components/Segmented'
 import { loadSettings } from '@/db/settings'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
+import { errorMessage } from '@/lib/errors'
 import { plural } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
 import {
@@ -144,7 +145,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
           })
         }
       } else {
-        setError(err instanceof Error ? err.message : String(err))
+        setError(errorMessage(err))
       }
     } finally {
       if (abortRef.current === ctrl) {

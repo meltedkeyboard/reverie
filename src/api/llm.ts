@@ -2,8 +2,9 @@ import { fetch } from 'expo/fetch'
 import { Platform } from 'react-native'
 
 import type { ThinkingMode } from '@/db/characters'
-import type { ServerSettings } from '@/db/settings'
+import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/settings'
 import { t } from '@/i18n'
+import { errorMessage } from '@/lib/errors'
 
 export const CONTEXT_WINDOW = 20
 
@@ -52,29 +53,40 @@ async function readServerError(res: Awaited<ReturnType<typeof fetch>>) {
 // In a browser a request blocked by the same-origin policy looks exactly like an
 // unreachable host, and a server started without CORS is the usual reason.
 function unreachable(err: unknown) {
-  const detail = err instanceof Error ? err.message : String(err)
+  const detail = errorMessage(err)
   const hint = Platform.OS === 'web' ? t('llm.corsHint') : ''
   return new Error(t('llm.unreachable', { detail, hint }))
+}
+
+class TimeoutError extends Error {}
+
+// A GET that gives up after ms, with the body read inside the same deadline.
+async function getJsonWithTimeout(cfg: ServerSettings, url: string, ms: number) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
+  try {
+    const res = await fetch(url, { headers: requestHeaders(cfg), signal: ctrl.signal })
+    if (!res.ok) throw await readServerError(res)
+    return await res.json()
+  } catch (err) {
+    throw ctrl.signal.aborted ? new TimeoutError() : err
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export async function testConnection(cfg: ServerSettings) {
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) throw new Error(t('llm.setBaseUrl'))
 
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 8000)
   try {
-    const res = await fetch(`${base}/v1/models`, { headers: requestHeaders(cfg), signal: ctrl.signal })
-    if (!res.ok) throw await readServerError(res)
-    const body = await res.json()
+    const body = await getJsonWithTimeout(cfg, `${base}/v1/models`, 8000)
     const models: string[] = Array.isArray(body?.data) ? body.data.map((m: { id: string }) => m.id) : []
     return models
   } catch (err) {
-    if (ctrl.signal.aborted) throw new Error(t('llm.timeout'))
+    if (err instanceof TimeoutError) throw new Error(t('llm.timeout'))
     if (err instanceof ServerError) throw err
     throw unreachable(err)
-  } finally {
-    clearTimeout(timer)
   }
 }
 
@@ -94,17 +106,8 @@ type ServerKind = { kind: 'lmstudio'; models: NativeModel[] } | { kind: 'ollama'
 const serverKinds = new Map<string, { at: number; server: ServerKind }>()
 const SERVER_KIND_TTL = 60_000
 
-async function probeJson(cfg: ServerSettings, url: string) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 3000)
-  try {
-    const res = await fetch(url, { headers: requestHeaders(cfg), signal: ctrl.signal })
-    return res.ok ? await res.json() : null
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
-  }
+function probeJson(cfg: ServerSettings, url: string) {
+  return getJsonWithTimeout(cfg, url, 3000).catch(() => null)
 }
 
 async function detectServer(cfg: ServerSettings, base: string) {
@@ -135,10 +138,8 @@ async function reasoningFields(cfg: ServerSettings, base: string, mode: Thinking
   if (server.kind === 'ollama') return mode === 'off' ? { ...kwargs, reasoning_effort: 'none' } : kwargs
   if (server.kind === 'other') return kwargs
 
-  const models = server.models
-
   const name = cfg.model.trim()
-  const llms = models.filter((m) => m.type === 'llm')
+  const llms = server.models.filter((m) => m.type === 'llm')
   // With no exact match LM Studio answers with whatever model is loaded.
   const model =
     llms.find((m) => m.key === name || m.loaded_instances?.some((i) => i.id === name)) ??
@@ -162,7 +163,7 @@ async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: 
       headers: requestHeaders(cfg),
       signal,
       body: JSON.stringify({
-        model: cfg.model.trim() || 'local-model',
+        model: cfg.model.trim() || DEFAULT_SETTINGS.model,
         messages: req.messages,
         stream,
         temperature: req.temperature,
