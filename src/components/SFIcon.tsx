@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { useEffect, type ComponentProps } from 'react'
+import { useEffect, useRef, type ComponentProps } from 'react'
 import { View, type ColorValue } from 'react-native'
 
 import { swiftUI } from '@/lib/nativeUI'
@@ -19,6 +19,8 @@ type Props = {
   trigger?: number | string
   // An indefinite effect (breathe, pulse) runs while this is true.
   active?: boolean
+  // Swapping `name` plays the system Replace transition instead of a hard cut.
+  animateChange?: boolean
 }
 
 // The system symbol animations of iOS 17 and 18 are drawn by SwiftUI itself, so they
@@ -29,10 +31,14 @@ function FallbackIcon({ fallback, size, color }: Props) {
   return <Ionicons name={fallback} size={size} color={color} />
 }
 
-function NativeIcon({ name, size, color, effect, trigger, active }: Props) {
+function NativeIcon({ name, size, color, effect, trigger, active, animateChange }: Props) {
   const { scheme } = useTheme()
   const { Host, Image, useNativeState } = swiftUI!.ui
-  const { symbolEffect } = swiftUI!.modifiers
+  const { symbolEffect, animation, Animation } = swiftUI!.modifiers
+  // A symbol image that changes inside an animated transaction gets the Replace effect
+  // from SwiftUI; the animation modifier needs a value that changes along with the name.
+  const swaps = useRef({ name, count: 0 })
+  if (swaps.current.name !== name) swaps.current = { name, count: swaps.current.count + 1 }
   const fired = useNativeState<number | string>(trigger ?? 0)
   const running = useNativeState(!!active)
 
@@ -46,6 +52,7 @@ function NativeIcon({ name, size, color, effect, trigger, active }: Props) {
   const modifiers = effect
     ? [symbolEffect(effect, active === undefined ? { value: fired } : { isActive: running })]
     : []
+  if (animateChange) modifiers.push(animation(Animation.spring({ response: 0.35, dampingFraction: 0.7 }), swaps.current.count))
   // The box is a little wider than the glyph: some symbols overhang their nominal size.
   const box = Math.round(size * 1.3)
   return (

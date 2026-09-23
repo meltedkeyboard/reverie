@@ -12,6 +12,7 @@ import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { ParamSlider } from '@/components/ParamSlider'
 import { PromptGenModal, type GeneratedCharacter } from '@/components/PromptGenModal'
+import { Segmented } from '@/components/Segmented'
 import { DEFAULT_SAMPLING, deleteCharacter, getCharacter, saveCharacter, type ThinkingMode } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { pickAvatar, persistAvatar, removeAvatar } from '@/lib/avatars'
@@ -192,17 +193,7 @@ export default function CharacterEditorScreen() {
           />
 
           <Text style={styles.section}>{t('editor.thinkingSection')}</Text>
-          <View style={styles.segment}>
-            {THINKING_OPTIONS.map((opt) => (
-              <Pressable
-                key={opt.value}
-                onPress={() => setThinking(opt.value)}
-                style={[styles.segmentItem, thinking === opt.value && styles.segmentItemActive]}
-              >
-                <Text style={[styles.segmentText, thinking === opt.value && styles.segmentTextActive]}>{opt.label}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <Segmented options={THINKING_OPTIONS} value={thinking} onChange={setThinking} style={{ marginBottom: 8 }} />
           <Text style={styles.hint}>{t('editor.thinkingHint')}</Text>
 
           <Text style={styles.section}>{t('editor.replyLengthSection')}</Text>
@@ -319,17 +310,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
     },
     aiButtonText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
     hint: { color: colors.textFaint, fontSize: 12, marginTop: -4, marginBottom: 4, marginHorizontal: 4 },
-    segment: {
-      flexDirection: 'row',
-      backgroundColor: colors.surfaceRaised,
-      borderRadius: 10,
-      padding: 3,
-      marginBottom: 8,
-    },
-    segmentItem: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-    segmentItemActive: { backgroundColor: colors.accentSoft },
-    segmentText: { color: colors.textMuted, fontSize: 13 },
-    segmentTextActive: { color: colors.accent, fontWeight: '600' },
     delete: { alignItems: 'center', marginTop: 32, paddingVertical: 14 },
     deleteText: { color: colors.danger, fontSize: 16 },
   })

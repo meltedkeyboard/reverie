@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useMemo, useState } from 'react'
@@ -11,10 +10,12 @@ import { testConnection } from '@/api/llm'
 import { Field } from '@/components/Field'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
+import { Segmented } from '@/components/Segmented'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
+import * as Haptics from '@/lib/haptics'
 import { fonts, useColors, useTheme, type ThemePreference } from '@/theme'
 
 type Status = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok' | 'error'; text: string }
@@ -264,32 +265,6 @@ export default function SettingsScreen() {
   )
 }
 
-function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[]
-  value: T
-  onChange: (value: T) => void
-}) {
-  const colors = useColors()
-  const styles = useMemo(() => createStyles(colors), [colors])
-  return (
-    <View style={styles.segment}>
-      {options.map((opt) => (
-        <Pressable
-          key={opt.value}
-          onPress={() => onChange(opt.value)}
-          style={[styles.segmentItem, value === opt.value && styles.segmentItemActive]}
-        >
-          <Text style={[styles.segmentText, value === opt.value && styles.segmentTextActive]}>{opt.label}</Text>
-        </Pressable>
-      ))}
-    </View>
-  )
-}
-
 function Row({
   icon,
   title,
@@ -344,11 +319,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
     dangerCard: { borderColor: 'rgba(240, 97, 109, 0.35)' },
     cardPad: { padding: 16 },
     label: { color: colors.textMuted, fontSize: 13, marginBottom: 8 },
-    segment: { flexDirection: 'row', backgroundColor: colors.surfaceRaised, borderRadius: 10, padding: 3 },
-    segmentItem: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-    segmentItemActive: { backgroundColor: colors.accentSoft },
-    segmentText: { color: colors.textMuted, fontSize: 13 },
-    segmentTextActive: { color: colors.accent, fontWeight: '600' },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -6, marginBottom: 16 },
     chip: {
       maxWidth: '100%',

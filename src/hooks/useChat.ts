@@ -1,9 +1,9 @@
-import * as Haptics from 'expo-haptics'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import type { SQLiteDatabase } from 'expo-sqlite'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { CONTEXT_WINDOW, streamChat, type ChatTurn, type ContentPart } from '@/api/llm'
-import type { Character } from '@/db/characters'
+import { DEFAULT_SAMPLING, type Character } from '@/db/characters'
 import { setChatTitle, type Chat } from '@/db/chats'
 import {
   addMessage,
@@ -14,10 +14,12 @@ import {
   updateMessage,
   type Message,
   type MessageImage,
+  type Role,
   type Thought,
 } from '@/db/messages'
 import { loadSettings } from '@/db/settings'
 import { t } from '@/i18n'
+import * as Haptics from '@/lib/haptics'
 import { imageDataUrl } from '@/lib/images'
 import { suggestTitle } from '@/lib/titles'
 
@@ -43,9 +45,74 @@ export function regenerateTargetAt(history: Message[], index: number): Regenerat
   return next.role === 'assistant' ? { context: history.slice(0, index + 1), replacing: next } : null
 }
 
-export function useChat(chat: Chat, character: Character) {
+// Where the conversation lives: the database, or for a private chat only memory, so
+// nothing of it is left once the screen lets it go.
+type MessageStore = {
+  list(): Promise<Message[]>
+  add(role: Role, content: string, extra?: { image?: MessageImage | null; thought?: Thought | null }): Promise<Message>
+  update(message: Message, content: string): Promise<Message>
+  addVariant(message: Message, content: string, thought: Thought | null): Promise<Message>
+  select(message: Message, variant: number): Promise<Message>
+  remove(id: number): Promise<void>
+}
+
+function dbStore(db: SQLiteDatabase, chatId: number): MessageStore {
+  return {
+    list: () => listMessages(db, chatId),
+    add: (role, content, extra) => addMessage(db, chatId, role, content, extra),
+    update: (message, content) => updateMessage(db, message, content),
+    addVariant: (message, content, thought) => addVariant(db, message, content, thought),
+    select: (message, variant) => storeVariant(db, message, variant),
+    remove: (id) => deleteMessage(db, id),
+  }
+}
+
+function memoryStore(chatId: number): MessageStore {
+  let nextId = 1
+  return {
+    list: async () => [],
+    add: async (role, content, { image = null, thought = null } = {}) => ({
+      id: nextId++,
+      chatId,
+      role,
+      content,
+      image: image?.base64 ?? null,
+      imageWidth: image?.width ?? null,
+      imageHeight: image?.height ?? null,
+      variants: [content],
+      variant: 0,
+      thoughts: [thought],
+      createdAt: Date.now(),
+    }),
+    update: async (message, content) => ({
+      ...message,
+      content,
+      variants: message.variants.map((text, i) => (i === message.variant ? content : text)),
+    }),
+    addVariant: async (message, content, thought) => ({
+      ...message,
+      content,
+      variants: [...message.variants, content],
+      variant: message.variants.length,
+      thoughts: [...message.thoughts, thought],
+    }),
+    select: async (message, variant) => ({ ...message, content: message.variants[variant], variant }),
+    remove: async () => {},
+  }
+}
+
+// A private chat talks to the bare model: no character, no greeting, no reply limit.
+const PRIVATE_PROMPT =
+  'You are a plain AI assistant. Answer directly and concisely, in a neutral, matter-of-fact tone, without roleplay, persona, emotions or small talk. Reply in the language of the user.'
+
+export function useChat(chat: Chat, character: Character, { ephemeral = false } = {}) {
   const chatId = chat.id
   const db = useSQLiteContext()
+  // Switching between the real and the private chat swaps the store in place, so the
+  // screen around it stays mounted and can animate the change.
+  const store = useMemo(() => (ephemeral ? memoryStore(chatId) : dbStore(db, chatId)), [ephemeral, db, chatId])
+  const storeRef = useRef(store)
+  storeRef.current = store
   const [messages, setMessagesState] = useState<Message[]>([])
   const [loaded, setLoaded] = useState(false)
   const [draft, setDraft] = useState<string | null>(null)
@@ -102,16 +169,28 @@ export function useChat(chat: Chat, character: Character) {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const rows = await listMessages(db, chatId)
+      const rows = await store.list()
       if (!alive) return
       setMessages(rows)
       setLoaded(true)
     })()
     return () => {
       alive = false
+      // A reply still streaming finishes into the store it was started for, but the
+      // screen already belongs to the other one.
       abortRef.current?.abort()
+      abortRef.current = null
+      lastRequest.current = null
+      setMessages([])
+      setLoaded(false)
+      setDraft(null)
+      setReasoning(null)
+      setReasoningMs(null)
+      setPhase('idle')
+      setReplacingId(null)
+      setError(null)
     }
-  }, [db, chatId, setMessages])
+  }, [store, setMessages])
 
   const generate = useCallback(
     async (history: Message[], replacing: Message | null = null, guidance?: string) => {
@@ -124,7 +203,9 @@ export function useChat(chat: Chat, character: Character) {
       setReasoning(null)
       setReasoningMs(null)
 
-      const target = characterRef.current
+      const target = ephemeral
+        ? { ...DEFAULT_SAMPLING, systemPrompt: PRIVATE_PROMPT, replyLimit: null, thinking: 'auto' as const }
+        : characterRef.current
       let text = ''
       let thought = ''
       let thinkingSince = 0
@@ -133,6 +214,7 @@ export function useChat(chat: Chat, character: Character) {
       // Chunks arrive faster than the screen refreshes, so renders are batched per frame.
       const flush = () => {
         frame = 0
+        if (storeRef.current !== store) return
         setDraft(text.trimStart())
         if (thought) setReasoning(thought.trim())
       }
@@ -187,16 +269,18 @@ export function useChat(chat: Chat, character: Character) {
         const keptThought: Thought | null = thought.trim()
           ? { text: thought.trim(), ms: thinkingMs ?? Date.now() - thinkingSince }
           : null
+        const current = () => storeRef.current === store
         if (reply && replacing) {
-          const updated = await addVariant(db, replacing, reply, keptThought)
-          setMessages(messagesRef.current.map((m) => (m.id === updated.id ? updated : m)))
+          const updated = await store.addVariant(replacing, reply, keptThought)
+          if (current()) setMessages(messagesRef.current.map((m) => (m.id === updated.id ? updated : m)))
         } else if (reply) {
-          const added = await addMessage(db, chatId, 'assistant', reply, { thought: keptThought })
+          const added = await store.add('assistant', reply, { thought: keptThought })
+          if (!current()) return
           const next = [...messagesRef.current, added]
           setMessages(next)
           // The first answer is where a chat gets its name. A failure here is not worth
           // an error card: the user can always ask for a title from the menu.
-          if (!titleRef.current && next.filter((m) => m.role === 'user').length === 1) {
+          if (!ephemeral && !titleRef.current && next.filter((m) => m.role === 'user').length === 1) {
             autoName().catch(() => {})
           }
         }
@@ -210,20 +294,20 @@ export function useChat(chat: Chat, character: Character) {
         }
       }
     },
-    [db, chatId, setMessages, autoName]
+    [db, store, ephemeral, setMessages, autoName]
   )
 
   const send = useCallback(
     async (text: string, image: MessageImage | null) => {
       if (abortRef.current) return
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-      const sent = await addMessage(db, chatId, 'user', text, { image })
+      const sent = await store.add('user', text, { image })
       lastRequest.current = { id: sent.id }
       const history = [...messagesRef.current, sent]
       setMessages(history)
       await generate(history)
     },
-    [db, chatId, generate, setMessages]
+    [store, generate, setMessages]
   )
 
   const regenerate = useCallback(
@@ -265,9 +349,9 @@ export function useChat(chat: Chat, character: Character) {
       const target = messagesRef.current.find((m) => m.id === id)
       if (!target || variant < 0 || variant >= target.variants.length || variant === target.variant) return
       Haptics.selectionAsync()
-      replaceMessage(await storeVariant(db, target, variant))
+      replaceMessage(await store.select(target, variant))
     },
-    [db, replaceMessage]
+    [store, replaceMessage]
   )
 
   const stop = useCallback(() => abortRef.current?.abort(), [])
@@ -275,18 +359,18 @@ export function useChat(chat: Chat, character: Character) {
   const editMessage = useCallback(
     async (id: number, content: string) => {
       const target = messagesRef.current.find((m) => m.id === id)
-      if (target) replaceMessage(await updateMessage(db, target, content))
+      if (target) replaceMessage(await store.update(target, content))
     },
-    [db, replaceMessage]
+    [store, replaceMessage]
   )
 
   const removeMessage = useCallback(
     async (id: number) => {
-      await deleteMessage(db, id)
+      await store.remove(id)
       setMessages(messagesRef.current.filter((m) => m.id !== id))
       setError(null)
     },
-    [db, setMessages]
+    [store, setMessages]
   )
 
   // The chat is about to be deleted, so the partial reply must not be written into it.
@@ -303,7 +387,7 @@ export function useChat(chat: Chat, character: Character) {
     draft,
     phase,
     error,
-    title,
+    title: ephemeral ? null : title,
     naming,
     replacingId,
     reasoning,

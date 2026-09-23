@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import * as Haptics from 'expo-haptics'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
@@ -7,10 +6,12 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { ChatTurn } from '@/api/llm'
+import { Segmented } from '@/components/Segmented'
 import { loadSettings } from '@/db/settings'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
 import { plural } from '@/lib/format'
+import * as Haptics from '@/lib/haptics'
 import {
   buildGreetingMessages,
   buildPromptMessages,
@@ -208,20 +209,6 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
   const column = wide ? styles.wideColumn : null
 
-  const segment = <T extends string>(value: T, options: { value: T; label: string }[], onChange: (v: T) => void) => (
-    <View style={styles.segment}>
-      {options.map((opt) => (
-        <Pressable
-          key={opt.value}
-          onPress={() => onChange(opt.value)}
-          style={[styles.segmentItem, value === opt.value && styles.segmentItemActive]}
-        >
-          <Text style={[styles.segmentText, value === opt.value && styles.segmentTextActive]}>{opt.label}</Text>
-        </Pressable>
-      ))}
-    </View>
-  )
-
   const chip = (label: string, onPress: () => void, key?: string) => (
     <Pressable
       key={key ?? label}
@@ -237,14 +224,14 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
     <>
       {hasCurrent ? (
         <View style={styles.block}>
-          {segment<Mode>(
-            mode,
-            [
+          <Segmented<Mode>
+            value={mode}
+            options={[
               { value: 'improve', label: t('promptGen.modeImprove') },
               { value: 'new', label: t('promptGen.modeNew') },
-            ],
-            setMode
-          )}
+            ]}
+            onChange={setMode}
+          />
         </View>
       ) : null}
 
@@ -274,27 +261,27 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
       <Text style={styles.label}>{t('promptGen.lengthLabel')}</Text>
       <View style={styles.block}>
-        {segment<PromptLength>(
-          length,
-          [
+        <Segmented<PromptLength>
+          value={length}
+          options={[
             { value: 'short', label: t('promptGen.lengthShort') },
             { value: 'medium', label: t('promptGen.lengthMedium') },
             { value: 'long', label: t('promptGen.lengthLong') },
-          ],
-          setLength
-        )}
+          ]}
+          onChange={setLength}
+        />
       </View>
 
       <Text style={styles.label}>{t('promptGen.formatLabel')}</Text>
       <View style={styles.block}>
-        {segment<PromptFormat>(
-          format,
-          [
+        <Segmented<PromptFormat>
+          value={format}
+          options={[
             { value: 'prose', label: t('promptGen.formatProse') },
             { value: 'sections', label: t('promptGen.formatSections') },
-          ],
-          setFormat
-        )}
+          ]}
+          onChange={setFormat}
+        />
       </View>
 
       <View style={styles.toggleRow}>
@@ -537,11 +524,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       backgroundColor: colors.accentSoft,
     },
     chipText: { color: colors.accent, fontSize: 14 },
-    segment: { flexDirection: 'row', backgroundColor: colors.surfaceRaised, borderRadius: 10, padding: 3 },
-    segmentItem: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-    segmentItemActive: { backgroundColor: colors.accentSoft },
-    segmentText: { color: colors.textMuted, fontSize: 13 },
-    segmentTextActive: { color: colors.accent, fontWeight: '600' },
     toggleRow: {
       flexDirection: 'row',
       alignItems: 'center',

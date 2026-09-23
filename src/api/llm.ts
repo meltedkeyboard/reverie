@@ -78,10 +78,83 @@ export async function testConnection(cfg: ServerSettings) {
   }
 }
 
+type ReasoningOption = 'off' | 'on' | 'low' | 'medium' | 'high'
+
+type NativeModel = {
+  type: string
+  key: string
+  loaded_instances?: { id: string }[]
+  capabilities?: { reasoning?: { allowed_options: ReasoningOption[]; default: ReasoningOption } }
+}
+
+// Each server switches thinking its own way, so which one this is gets looked up once.
+// LM Studio's native model list also says per model which reasoning settings it accepts.
+type ServerKind = { kind: 'lmstudio'; models: NativeModel[] } | { kind: 'ollama' } | { kind: 'other' }
+
+const serverKinds = new Map<string, { at: number; server: ServerKind }>()
+const SERVER_KIND_TTL = 60_000
+
+async function probeJson(cfg: ServerSettings, url: string) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 3000)
+  try {
+    const res = await fetch(url, { headers: requestHeaders(cfg), signal: ctrl.signal })
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function detectServer(cfg: ServerSettings, base: string) {
+  const cached = serverKinds.get(base)
+  if (cached && Date.now() - cached.at < SERVER_KIND_TTL) return cached.server
+
+  let server: ServerKind = { kind: 'other' }
+  const lmstudio = await probeJson(cfg, `${base}/api/v1/models`)
+  if (Array.isArray(lmstudio?.models)) {
+    server = { kind: 'lmstudio', models: lmstudio.models }
+  } else {
+    const ollama = await probeJson(cfg, `${base}/api/version`)
+    if (typeof ollama?.version === 'string') server = { kind: 'ollama' }
+  }
+  serverKinds.set(base, { at: Date.now(), server })
+  return server
+}
+
+// llama.cpp and vLLM switch thinking with chat_template_kwargs. LM Studio and Ollama
+// ignore it and take reasoning_effort instead, where "none" is off and any other
+// effort is on. LM Studio rejects a setting the model doesn't allow, so it is checked
+// against the model first.
+async function reasoningFields(cfg: ServerSettings, base: string, mode: ThinkingMode) {
+  if (mode === 'auto') return {}
+  const kwargs = { chat_template_kwargs: { enable_thinking: mode === 'on' } }
+  const server = await detectServer(cfg, base)
+  // Ollama's reasoning models think by default, so only "off" needs its own field.
+  if (server.kind === 'ollama') return mode === 'off' ? { ...kwargs, reasoning_effort: 'none' } : kwargs
+  if (server.kind === 'other') return kwargs
+
+  const models = server.models
+
+  const name = cfg.model.trim()
+  const llms = models.filter((m) => m.type === 'llm')
+  // With no exact match LM Studio answers with whatever model is loaded.
+  const model =
+    llms.find((m) => m.key === name || m.loaded_instances?.some((i) => i.id === name)) ??
+    llms.find((m) => m.loaded_instances?.length)
+  const allowed = model?.capabilities?.reasoning?.allowed_options ?? []
+
+  if (mode === 'off') return allowed.includes('off') ? { reasoning_effort: 'none' } : {}
+  if (allowed.includes('on') || allowed.includes('medium')) return { reasoning_effort: 'medium' }
+  return {}
+}
+
 async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: boolean, signal?: AbortSignal) {
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) throw new Error(t('llm.baseUrlMissing'))
 
+  const reasoning = await reasoningFields(cfg, base, req.thinking)
   let res
   try {
     res = await fetch(`${base}/v1/chat/completions`, {
@@ -95,9 +168,7 @@ async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: 
         temperature: req.temperature,
         max_tokens: req.maxTokens,
         top_p: req.topP,
-        // Understood by llama.cpp/LM Studio/vLLM for models with a switchable chat
-        // template (e.g. Qwen3); other servers ignore an unknown field.
-        ...(req.thinking !== 'auto' && { chat_template_kwargs: { enable_thinking: req.thinking === 'on' } }),
+        ...reasoning,
       }),
     })
   } catch (err) {

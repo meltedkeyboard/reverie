@@ -1,5 +1,4 @@
 import Constants from 'expo-constants'
-import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useMemo } from 'react'
@@ -11,6 +10,7 @@ import { IconButton } from '@/components/IconButton'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useShake } from '@/hooks/useShake'
 import { useTranslation } from '@/i18n'
+import * as Haptics from '@/lib/haptics'
 import { fonts, useColors } from '@/theme'
 
 const version = Constants.expoConfig?.version ?? '1.0.0'

@@ -90,7 +90,7 @@
   "editor.maxTokens": "Max tokens",
   "editor.topP": "Top-P",
   "editor.thinkingSection": "Thinking mode",
-  "editor.thinkingHint": "\"Same as server\" adds nothing to the request — the model thinks or not according to what's set up in LM Studio. \"On\" and \"Off\" override this for this character (supported by models like Qwen3).",
+  "editor.thinkingHint": "\"Same as server\" adds nothing to the request — the model thinks or not according to what's set up in LM Studio. \"On\" and \"Off\" override this for this character if the loaded model lets thinking be switched (LM Studio lists this per model).",
   "editor.replyLengthSection": "Reply length",
   "editor.paragraphLimit": "Paragraph limit",
   "editor.unlimited": "Unlimited",
@@ -184,6 +184,8 @@
   "chat.retry": "Retry",
   "chat.namingInProgress": "Coming up with a title...",
   "chat.emptyHint": "Write the first message",
+  "chat.privateTitle": "Private chat",
+  "chat.privateHint": "No character, no history. Tap the eye again and this conversation is gone.",
   "chat.emptyReply": "The model returned an empty response",
   "composer.attachFailedTitle": "Couldn't attach photo",
 

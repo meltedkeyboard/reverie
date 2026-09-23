@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useMemo, useRef } from 'react'
@@ -9,6 +8,7 @@ import { GlassSurface } from '@/components/Glass'
 import { SFIcon } from '@/components/SFIcon'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useTranslation } from '@/i18n'
+import * as Haptics from '@/lib/haptics'
 import { fonts, useColors } from '@/theme'
 
 type Feature = {
