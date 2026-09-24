@@ -9,11 +9,11 @@ import { ChatCard } from '@/components/ChatCard'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
 import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
+import type { MenuItem } from '@/components/NativeMenu'
 import { getCharacter, type Character } from '@/db/characters'
 import { deleteChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
-import { showSheet } from '@/lib/dialogs'
 import { fonts, useStyles, type Colors } from '@/theme'
 
 export default function CharacterChatsScreen() {
@@ -40,12 +40,10 @@ export default function CharacterChatsScreen() {
     }, [reload])
   )
 
-  const openMenu = (chat: ChatPreview) => {
-    showSheet(chat.title ?? undefined, [
-      { label: t('chat.menuRename'), onSelect: () => promptRename(chat) },
-      { label: t('chat.menuDeleteChat'), destructive: true, onSelect: () => confirmDelete(chat) },
-    ])
-  }
+  const menuItems = (chat: ChatPreview): MenuItem[] => [
+    { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: () => promptRename(chat) },
+    { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(chat) },
+  ]
 
   const promptRename = (chat: ChatPreview) => {
     promptRenameChat(chat.title, async (text) => {
@@ -84,7 +82,7 @@ export default function CharacterChatsScreen() {
           ) : null
         }
         renderItem={({ item: chat }) => (
-          <ChatCard chat={chat} onOpen={() => router.push(`/chat/${chat.id}`)} onMenu={() => openMenu(chat)} />
+          <ChatCard chat={chat} onOpen={() => router.push(`/chat/${chat.id}`)} menu={menuItems(chat)} />
         )}
       />
       <GlassHeader

@@ -46,7 +46,7 @@ export default function CharactersScreen() {
     }, [db, router, reload])
   )
 
-  const { openMenu } = useCharacterActions(reload)
+  const { menuItems } = useCharacterActions(reload)
 
   if (!onboarded) return <View style={styles.screen} />
 
@@ -95,7 +95,7 @@ export default function CharactersScreen() {
           <CharacterCard
             character={character}
             onOpen={() => router.push(`/chats/${character.id}`)}
-            onMenu={() => openMenu(character)}
+            menu={menuItems(character)}
           />
         )}
       />

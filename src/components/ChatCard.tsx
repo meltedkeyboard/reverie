@@ -7,14 +7,15 @@ import { plainPreview } from '@/lib/roleplay'
 import { useStyles, type Colors } from '@/theme'
 
 import { ListCard } from './ListCard'
+import type { MenuItem } from './NativeMenu'
 
 type Props = {
   chat: ChatPreview
   onOpen: () => void
-  onMenu: () => void
+  menu: MenuItem[]
 }
 
-export function ChatCard({ chat, onOpen, onMenu }: Props) {
+export function ChatCard({ chat, onOpen, menu }: Props) {
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const preview = plainPreview(chat.lastMessage ?? '') || t('chatCard.emptyChat')
@@ -22,7 +23,7 @@ export function ChatCard({ chat, onOpen, onMenu }: Props) {
   const when = formatWhen(chat.lastActivity, locale)
   const messages = `${count} ${plural(count, locale, ['сообщение', 'сообщения', 'сообщений'], ['message', 'messages'])}`
   return (
-    <ListCard onOpen={onOpen} onMenu={onMenu}>
+    <ListCard onOpen={onOpen} menu={menu} menuTitle={chat.title ?? undefined}>
       <View style={styles.body}>
         <Text style={styles.heading} numberOfLines={1}>
           {chat.title ?? when}

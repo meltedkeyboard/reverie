@@ -5,6 +5,7 @@ import { deleteCharacter, type CharacterPreview } from '@/db/characters'
 import { createChat } from '@/db/chats'
 import { useTranslation } from '@/i18n'
 import { removeAvatar } from '@/lib/avatars'
+import type { MenuItem } from '@/components/NativeMenu'
 import { confirm, showSheet } from '@/lib/dialogs'
 
 // What a character in a list can do: start a chat, be edited or deleted. Shared by the
@@ -34,13 +35,13 @@ export function useCharacterActions(reload: () => void, onStart?: (character: Ch
     })
   }
 
-  const openMenu = (character: CharacterPreview) => {
-    showSheet(character.name, [
-      { label: t('characters.newChat'), onSelect: () => startChat(character) },
-      { label: t('characters.edit'), onSelect: () => router.push(`/character/${character.id}`) },
-      { label: t('characters.delete'), destructive: true, onSelect: () => confirmDelete(character) },
-    ])
-  }
+  const menuItems = (character: CharacterPreview): MenuItem[] => [
+    { label: t('characters.newChat'), systemImage: 'plus.bubble', onSelect: () => startChat(character) },
+    { label: t('characters.edit'), systemImage: 'pencil', onSelect: () => router.push(`/character/${character.id}`) },
+    { label: t('characters.delete'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(character) },
+  ]
 
-  return { openMenu }
+  const openMenu = (character: CharacterPreview) => showSheet(character.name, menuItems(character))
+
+  return { openMenu, menuItems }
 }
