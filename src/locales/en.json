@@ -80,7 +80,12 @@
   "onboarding.slide4.title": "It all stays with you",
   "onboarding.slide4.text": "Chats and avatars stay on this device only.",
   "onboarding.welcomeTitle": "Welcome",
-  "onboarding.getStarted": "Continue",
+  "onboarding.getStarted": "Get Started",
+  "onboarding.serverTitle": "Connect a model",
+  "onboarding.serverText": "Enter the address of your LM Studio, Ollama or llama.cpp server — characters will reply through it.",
+  "onboarding.serverLater": "You can change all of this later in settings.",
+  "onboarding.done": "Done",
+  "onboarding.skip": "Skip",
 
   "editor.thinkingAuto": "Same as server",
   "editor.thinkingOn": "On",

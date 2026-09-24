@@ -80,7 +80,12 @@
   "onboarding.slide4.title": "Всё остаётся у вас",
   "onboarding.slide4.text": "Переписки и аватары хранятся только на этом устройстве.",
   "onboarding.welcomeTitle": "Добро пожаловать",
-  "onboarding.getStarted": "Продолжить",
+  "onboarding.getStarted": "Начать",
+  "onboarding.serverTitle": "Подключите модель",
+  "onboarding.serverText": "Укажите адрес сервера с LM Studio, Ollama или llama.cpp — персонажи будут отвечать через него.",
+  "onboarding.serverLater": "Всё это можно поменять потом в настройках.",
+  "onboarding.done": "Готово",
+  "onboarding.skip": "Пропустить",
 
   "editor.thinkingAuto": "Как на сервере",
   "editor.thinkingOn": "Включено",

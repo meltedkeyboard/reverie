@@ -216,17 +216,13 @@ export default function SettingsScreen() {
 
               <Button
                 variant="soft"
-                icon="pulse-outline"
                 label={t('settings.testConnection')}
                 onPress={onTest}
                 loading={status.kind === 'testing'}
               />
 
               {status.kind === 'ok' || status.kind === 'error' ? (
-                <View style={styles.status}>
-                  <View style={[styles.dot, { backgroundColor: status.kind === 'ok' ? colors.success : colors.danger }]} />
-                  <Text style={styles.statusText}>{status.text}</Text>
-                </View>
+                <Text style={styles.statusText}>{status.text}</Text>
               ) : null}
             </View>
           </Group>
@@ -336,8 +332,6 @@ const createStyles = (colors: Colors) =>
     rowLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
     switchLabel: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
-    status: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14 },
-    dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
-    statusText: { flex: 1, color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+    statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 14 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 10, marginLeft: 4 },
   })

@@ -10,6 +10,7 @@ import { EmptyState, ListSeparator } from '@/components/EmptyState'
 import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { HomePattern } from '@/components/HomePattern'
 import { IconButton } from '@/components/IconButton'
+import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { getLastChat, pruneUntouchedChats, type LastChat } from '@/db/chats'
 import { isContinueEnabled, isContinueHidden, setContinueHidden } from '@/db/continue'
@@ -18,13 +19,14 @@ import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
-import { fonts, useStyles, type Colors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharactersScreen() {
   const db = useSQLiteContext()
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
+  const colors = useColors()
   const { t } = useTranslation()
   const isWideWeb = useIsWideWeb()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
@@ -82,9 +84,20 @@ export default function CharactersScreen() {
         ItemSeparatorComponent={ListSeparator}
         ListHeaderComponent={
           !serverSet && characters ? (
-            <Pressable onPress={() => router.push('/settings')} style={styles.notice}>
-              <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
-              <Text style={styles.noticeText}>{t('characters.serverNotSetText')}</Text>
+            // A row like the "finish setting up" one in iOS Settings: a glyph on a
+            // colored tile, the text, and a chevron to where it is fixed.
+            <Pressable
+              onPress={() => router.push('/settings')}
+              style={({ pressed }) => [styles.notice, pressed && { opacity: 0.6 }]}
+            >
+              <View style={styles.noticeTile}>
+                <SFIcon name="server.rack" fallback="server" size={15} color="#FFFFFF" />
+              </View>
+              <View style={styles.noticeBody}>
+                <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
+                <Text style={styles.noticeText}>{t('characters.serverNotSetText')}</Text>
+              </View>
+              <SFIcon name="chevron.right" fallback="chevron-forward" size={14} color={colors.textFaint} />
             </Pressable>
           ) : null
         }
@@ -146,14 +159,29 @@ const createStyles = (colors: Colors) =>
   wideWelcomeTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 26, marginBottom: 10 },
   wideWelcomeText: { color: colors.textMuted, fontSize: 15, textAlign: 'center', maxWidth: 360, lineHeight: 21 },
   notice: {
-    backgroundColor: colors.accentSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.accentBorder,
-    borderRadius: 16,
-    padding: 14,
+    borderColor: colors.border,
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingLeft: 14,
+    paddingRight: 12,
     marginBottom: 14,
   },
-  noticeTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 3 },
+  noticeTile: {
+    width: 30,
+    height: 30,
+    borderRadius: 7,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+  },
+  noticeBody: { flex: 1 },
+  noticeTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 2 },
   noticeText: { color: colors.textMuted, fontSize: 14, lineHeight: 19 },
   emptyButton: { minWidth: 200 },
 })
