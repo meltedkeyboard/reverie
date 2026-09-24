@@ -1,6 +1,6 @@
 import { Link, useRouter, useFocusEffect } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { Button } from '@/components/Button'
@@ -28,23 +28,22 @@ export default function CharactersScreen() {
   const [serverSet, setServerSet] = useState(true)
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
 
-  useEffect(() => {
-    isOnboardingComplete(db).then((done) => {
-      setOnboarded(done)
-      if (!done) router.replace('/onboarding')
-    })
-  }, [db, router])
-
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
     setCharacters(await listCharacters(db))
     setServerSet(Boolean((await loadSettings(db)).baseUrl.trim()))
   }, [db])
 
+  // Checked on every focus, not once on mount: wiping all data from Settings clears the
+  // flag and dismisses back to this already-mounted screen.
   useFocusEffect(
     useCallback(() => {
-      if (onboarded) reload()
-    }, [reload, onboarded])
+      isOnboardingComplete(db).then((done) => {
+        setOnboarded(done)
+        if (done) reload()
+        else router.replace('/onboarding')
+      })
+    }, [db, router, reload])
   )
 
   const { openMenu } = useCharacterActions(reload)
