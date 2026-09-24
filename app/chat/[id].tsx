@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
   type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -46,6 +47,8 @@ import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 // How far above the newest message the list has to be before the jump button shows up.
 const JUMP_THRESHOLD = 240
+// How far back the user has to scroll before a streaming reply stops following its tail.
+const HOLD_THRESHOLD = 24
 
 export default function ChatScreen() {
   // /chat/new?character=ID creates the chat on arrival. A button can then be a plain
@@ -186,6 +189,11 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   const [selecting, setSelecting] = useState<string | null>(null)
   const [viewing, setViewing] = useState<string | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
+  const [scrolledBack, setScrolledBack] = useState(false)
+  const [listHeight, setListHeight] = useState(0)
+  const [draftHeight, setDraftHeight] = useState(0)
+  // Set by the jump button while a reply streams: the user asked to watch it come in.
+  const [followTail, setFollowTail] = useState(false)
   const keyboard = useReanimatedKeyboardAnimation()
 
   // Entering private mode is animated: the conversation fades out, the store is swapped
@@ -271,14 +279,38 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     listRef.current?.scrollToOffset({ offset: -restInset.current, animated: true })
   }, [])
 
+  const jumpToNewest = () => {
+    if (draft !== null) setFollowTail(true)
+    scrollToNewest()
+  }
+
+  useEffect(() => {
+    if (draft === null) setFollowTail(false)
+  }, [draft])
+
   const onContentInsetChange = useCallback((inset: { top: number }) => {
     restInset.current = inset.top
   }, [])
 
   // The list is inverted, so the offset grows as the user scrolls back in time.
   const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setAwayFromEnd(event.nativeEvent.contentOffset.y + restInset.current > JUMP_THRESHOLD)
+    const back = event.nativeEvent.contentOffset.y + restInset.current
+    setAwayFromEnd(back > JUMP_THRESHOLD)
+    setScrolledBack(back > HOLD_THRESHOLD)
   }, [])
+
+  const onDraftLayout = useCallback((event: LayoutChangeEvent) => {
+    setDraftHeight(event.nativeEvent.layout.height)
+  }, [])
+
+  // A streaming reply follows its tail only while all of it fits between the header and
+  // the composer. Once its start reaches the header, or the user has scrolled back, the
+  // row above it is held in place and the reply grows off the bottom of the screen
+  // instead of dragging the text being read along with it.
+  const draftIndex = rows.findIndex((row) => row.streaming)
+  const room = listHeight - restInset.current - headerHeight - 20
+  const holdPosition =
+    draftIndex !== -1 && !followTail && (scrolledBack || (listHeight > 0 && draftHeight > room))
 
   const renderScroll = useCallback(
     (props: ScrollViewProps) => (
@@ -316,17 +348,20 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   )
 
   const renderRow = useCallback(
-    ({ item: row }: ListRenderItemInfo<RowMessage>) => (
-      <MessageRow
-        message={row}
-        canRegenerate={regenerable.has(row.id)}
-        locked={locked}
-        onAction={onAction}
-        onSelectVariant={selectVariant}
-        onOpenImage={setViewing}
-      />
-    ),
-    [regenerable, locked, onAction, selectVariant]
+    ({ item: row }: ListRenderItemInfo<RowMessage>) => {
+      const content = (
+        <MessageRow
+          message={row}
+          canRegenerate={regenerable.has(row.id)}
+          locked={locked}
+          onAction={onAction}
+          onSelectVariant={selectVariant}
+          onOpenImage={setViewing}
+        />
+      )
+      return row.streaming ? <View onLayout={onDraftLayout}>{content}</View> : content
+    },
+    [regenerable, locked, onAction, selectVariant, onDraftLayout]
   )
 
   const confirmDelete = () => {
@@ -377,6 +412,9 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
           renderItem={renderRow}
           renderScrollComponent={renderScroll}
           onScroll={onScroll}
+          onScrollBeginDrag={() => setFollowTail(false)}
+          onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
+          maintainVisibleContentPosition={holdPosition ? { minIndexForVisible: draftIndex + 1 } : undefined}
           scrollEventThrottle={32}
           ListHeaderComponent={errorCard}
           ListFooterComponent={
@@ -473,9 +511,9 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
           awayFromEnd ? (
             <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(160)} style={styles.jumpSlot}>
               {liquidGlass ? (
-                <GlassButton icon="arrow-down" onPress={scrollToNewest} />
+                <GlassButton icon="arrow-down" onPress={jumpToNewest} />
               ) : (
-                <Pressable onPress={scrollToNewest} hitSlop={8} style={({ pressed }) => [styles.jump, pressed && { opacity: 0.7 }]}>
+                <Pressable onPress={jumpToNewest} hitSlop={8} style={({ pressed }) => [styles.jump, pressed && { opacity: 0.7 }]}>
                   <Ionicons name="arrow-down" size={18} color={colors.text} />
                 </Pressable>
               )}
