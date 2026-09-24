@@ -1,5 +1,5 @@
-// Renders every app icon, splash, favicon and the link preview from the SVGs in
-// assets/brand. Run after changing them: npm run icons
+// Renders every app icon, splash, favicon, the link preview and the home screen
+// pattern from the SVGs in assets/brand. Run after changing them: npm run icons
 import { Resvg } from '@resvg/resvg-js'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
@@ -89,3 +89,12 @@ console.log('public/favicon.svg')
 png(light, 'public/apple-touch-icon.png', 180)
 
 png(ogImage(), 'public/og-image.png', 1200)
+
+// The home screen's background tile, at every density the app picks from.
+for (const theme of ['light', 'dark']) {
+  const tile = readFileSync(`${BRAND}/pattern-${theme}.svg`, 'utf8')
+  for (const scale of [1, 2, 3]) {
+    const suffix = scale === 1 ? '' : `@${scale}x`
+    png(tile, `assets/images/pattern-${theme}${suffix}.png`, 131 * scale)
+  }
+}

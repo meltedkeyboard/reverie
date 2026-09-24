@@ -8,6 +8,7 @@ import { CharacterCard } from '@/components/CharacterCard'
 import { CONTINUE_BUTTON_SPACE, ContinueButton } from '@/components/ContinueButton'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
 import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
+import { HomePattern } from '@/components/HomePattern'
 import { IconButton } from '@/components/IconButton'
 import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { getLastChat, pruneUntouchedChats, type LastChat } from '@/db/chats'
@@ -73,6 +74,7 @@ export default function CharactersScreen() {
 
   return (
     <View style={styles.screen}>
+      <HomePattern />
       <FlatList
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
