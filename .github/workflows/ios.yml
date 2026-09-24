@@ -1,7 +1,7 @@
 # Builds an unsigned Reverie.ipa to be signed on the way to the phone with a personal
 # Apple ID (Sideloadly, AltStore). Started by hand from the Actions tab, or by pushing
 # a v* tag, which also attaches the .ipa to a GitHub release.
-name: iOS build
+name: iOS build 
 
 on:
   workflow_dispatch:
