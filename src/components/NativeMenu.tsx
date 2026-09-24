@@ -2,7 +2,7 @@ import { useState, type ComponentProps, type ReactNode } from 'react'
 import { Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
 
 import { showSheet } from '@/lib/dialogs'
-import { swiftUI } from '@/lib/nativeUI'
+import { liquidGlass, swiftUI } from '@/lib/nativeUI'
 import { useTheme } from '@/theme'
 
 export type MenuItem = {
@@ -18,14 +18,21 @@ type Props = {
   children: ReactNode
   style?: StyleProp<ViewStyle>
   disabled?: boolean
+  // Corner radius of a Liquid Glass background for the children. When the menu can draw
+  // it (see nativeMenuGlass), the glass is the menu's label and the menu morphs out of
+  // it; the caller then must not draw its own glass.
+  glassRadius?: number
 }
+
+// Whether NativeMenu draws the glass behind its children itself when given glassRadius.
+export const nativeMenuGlass = swiftUI !== null && liquidGlass
 
 type SymbolName = NonNullable<ComponentProps<NonNullable<typeof swiftUI>['ui']['Image']>['systemName']>
 
 // The trigger is drawn by React Native, so it matches the rest of the screen exactly.
-// On iOS an invisible SwiftUI menu covers it and takes the tap, which makes the system
-// menu grow out of the trigger. Elsewhere the tap opens the action sheet.
-export function NativeMenu({ items, children, style, disabled = false }: Props) {
+// On iOS it is hosted inside the label of a SwiftUI menu, which makes the system menu
+// grow out of the trigger itself. Elsewhere the tap opens the action sheet.
+export function NativeMenu({ items, children, style, disabled = false, glassRadius }: Props) {
   const { scheme } = useTheme()
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -47,33 +54,62 @@ export function NativeMenu({ items, children, style, disabled = false }: Props) 
     setSize((prev) => (prev?.width === width && prev.height === height ? prev : { width, height }))
   }
 
-  const { Host, Menu, Button, Text } = swiftUI.ui
+  const { Host, Menu, Button } = swiftUI.ui
   const m = swiftUI.modifiers
+  const buttons = items.map((item) => (
+    <Button
+      key={item.label}
+      label={item.label}
+      systemImage={item.systemImage as SymbolName}
+      role={item.destructive ? 'destructive' : undefined}
+      onPress={item.onSelect}
+    />
+  ))
+
+  const { Group, RNHostView } = swiftUI.ui
+  const glass = glassRadius !== undefined && liquidGlass
+  const shape = glass ? m.shapes.roundedRectangle({ cornerRadius: glassRadius }) : m.shapes.rectangle()
+  // The children go inside the menu's label, so the menu grows out of them and they morph
+  // into it together with the glass. A hidden copy stays in the React Native layout and
+  // gives the label its size, so the trigger keeps its flex sizing and text truncation.
   return (
     <View style={style} onLayout={onLayout}>
-      {children}
+      <View style={styles.hidden} pointerEvents="none">
+        {children}
+      </View>
       {size ? (
         // A transform moves the composer above the keyboard, but SwiftUI keeps seeing
         // the untransformed frame under the keyboard and would shift its content up.
         <Host style={StyleSheet.absoluteFill} ignoreSafeArea="all" colorScheme={scheme}>
           <Menu
             modifiers={[m.disabled(disabled)]}
-            // An empty text only gives the label its size and draws nothing, so there is
-            // nothing for the menu to tint; contentShape makes the whole area tappable.
-            label={<Text modifiers={[m.frame(size), m.contentShape(m.shapes.rectangle())]}> </Text>}
+            label={
+              <Group
+                modifiers={[
+                  m.frame(size),
+                  m.contentShape(shape),
+                  ...(glass
+                    ? [m.glassEffect({ glass: { variant: 'regular' }, shape: 'roundedRectangle', cornerRadius: glassRadius })]
+                    : []),
+                ]}
+              >
+                <RNHostView>
+                  <View style={styles.hosted} pointerEvents="none">
+                    {children}
+                  </View>
+                </RNHostView>
+              </Group>
+            }
           >
-            {items.map((item) => (
-              <Button
-                key={item.label}
-                label={item.label}
-                systemImage={item.systemImage as SymbolName}
-                role={item.destructive ? 'destructive' : undefined}
-                onPress={item.onSelect}
-              />
-            ))}
+            {buttons}
           </Menu>
         </Host>
       ) : null}
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  hidden: { opacity: 0 },
+  hosted: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+})

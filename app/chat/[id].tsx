@@ -27,7 +27,7 @@ import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { ImageViewer } from '@/components/ImageViewer'
 import { MessageRow, type RowMessage } from '@/components/MessageRow'
-import { NativeMenu, type MenuItem } from '@/components/NativeMenu'
+import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { SFIcon } from '@/components/SFIcon'
 import { TextSheet } from '@/components/TextSheet'
 import { getCharacter, type Character } from '@/db/characters'
@@ -427,9 +427,10 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
       >
         {/* Liquid Glass renders wrongly under a parent with opacity below 1 and snaps
             back when it reaches 1, so the pill itself stays put and only its content
-            fades. */}
-        <NativeMenu items={chatMenu} disabled={privateMode} style={styles.whoPress}>
-          <GlassSurface style={[styles.who, liquidGlass && styles.whoPill]}>
+            fades. When the menu can, it draws the pill's glass itself, so the menu
+            morphs out of the pill. */}
+        <NativeMenu items={chatMenu} disabled={privateMode} style={styles.whoPress} glassRadius={22}>
+          <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
             <Animated.View style={[styles.whoContent, contentStyle]}>
               {privateMode ? (
                 <>
@@ -459,7 +460,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
                 </>
               )}
             </Animated.View>
-          </GlassSurface>
+          </PillSurface>
         </NativeMenu>
       </GlassHeader>
 
@@ -533,6 +534,8 @@ function PrivateIntro({ hint }: { hint?: string }) {
     </View>
   )
 }
+
+const PillSurface = nativeMenuGlass ? View : GlassSurface
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({

@@ -192,7 +192,8 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant }: Acti
       ) : null}
       {menu.length ? (
         <NativeMenu items={menu} style={styles.barButton}>
-          <SFIcon name="ellipsis" fallback="ellipsis-horizontal" size={15} color={colors.textFaint} />
+          {/* A plain glyph: a SwiftUI symbol inside the menu's label gets the accent tint. */}
+          <Ionicons name="ellipsis-horizontal" size={17} color={colors.textFaint} />
         </NativeMenu>
       ) : null}
       {count > 1 ? (
