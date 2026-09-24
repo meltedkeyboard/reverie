@@ -2,22 +2,33 @@ import { Accelerometer } from 'expo-sensors'
 import { useEffect, useRef } from 'react'
 import { Platform } from 'react-native'
 
+// A deliberate shake: JOLTS separate peaks past THRESHOLD total g-force, all
+// within WINDOW_MS. A single flick of the wrist or setting the phone down won't do it.
 const THRESHOLD = 2.2
+const JOLTS = 2
+const WINDOW_MS = 1200
 const COOLDOWN_MS = 1500
 
-// Fires once per shake: a jolt past THRESHOLD total g-force, followed by a cooldown so
-// a single toss doesn't fire the callback several times in a row.
+// Fires once per shake, followed by a cooldown so one shake doesn't fire it twice.
 // No-op on web: expo-sensors' Accelerometer isn't available there.
 export function useShake(onShake: () => void, enabled: boolean) {
   const lastFired = useRef(0)
 
   useEffect(() => {
     if (!enabled || Platform.OS === 'web') return
-    Accelerometer.setUpdateInterval(100)
+    let jolts: number[] = []
+    let above = false
+    Accelerometer.setUpdateInterval(50)
     const sub = Accelerometer.addListener(({ x, y, z }) => {
       const force = Math.sqrt(x * x + y * y + z * z)
       const now = Date.now()
-      if (force > THRESHOLD && now - lastFired.current > COOLDOWN_MS) {
+      // Count only the moment a peak crosses the threshold, so one long jolt is one jolt.
+      const crossed = force > THRESHOLD && !above
+      above = force > THRESHOLD
+      if (!crossed || now - lastFired.current < COOLDOWN_MS) return
+      jolts = [...jolts.filter((t) => now - t < WINDOW_MS), now]
+      if (jolts.length >= JOLTS) {
+        jolts = []
         lastFired.current = now
         onShake()
       }
