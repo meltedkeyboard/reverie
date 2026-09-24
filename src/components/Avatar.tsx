@@ -11,11 +11,13 @@ type Props = {
   file?: string | null
   uri?: string | null
   size: number
+  // Square corners, for an avatar that fills the edge of a card clipping it.
+  square?: boolean
 }
 
-export function Avatar({ name, file, uri, size }: Props) {
+export function Avatar({ name, file, uri, size, square = false }: Props) {
   const source = uri ?? (file ? avatarUri(file) : null)
-  const box = { width: size, height: size, borderRadius: size / 2, overflow: 'hidden' as const }
+  const box = { width: size, height: size, borderRadius: square ? 0 : size / 2, overflow: 'hidden' as const }
 
   if (source) {
     return <Image source={{ uri: source }} style={box} contentFit="cover" transition={150} />
