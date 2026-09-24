@@ -5,11 +5,13 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
+import { CONTINUE_BUTTON_SPACE, ContinueButton } from '@/components/ContinueButton'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
 import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { IconButton } from '@/components/IconButton'
 import { listCharacters, type CharacterPreview } from '@/db/characters'
-import { pruneUntouchedChats } from '@/db/chats'
+import { getLastChat, pruneUntouchedChats, type LastChat } from '@/db/chats'
+import { isContinueEnabled, isContinueHidden, setContinueHidden } from '@/db/continue'
 import { isOnboardingComplete } from '@/db/onboarding'
 import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
@@ -27,12 +29,20 @@ export default function CharactersScreen() {
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
   const [serverSet, setServerSet] = useState(true)
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
+  const [lastChat, setLastChat] = useState<LastChat | null>(null)
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
     setCharacters(await listCharacters(db))
     setServerSet(Boolean((await loadSettings(db)).baseUrl.trim()))
+    const showContinue = (await isContinueEnabled(db)) && !(await isContinueHidden(db))
+    setLastChat(showContinue ? await getLastChat(db) : null)
   }, [db])
+
+  const hideContinue = () => {
+    setLastChat(null)
+    setContinueHidden(db, true)
+  }
 
   // Checked on every focus, not once on mount: wiping all data from Settings clears the
   // flag and dismisses back to this already-mounted screen.
@@ -66,7 +76,7 @@ export default function CharactersScreen() {
       <FlatList
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
-        contentContainerStyle={padding}
+        contentContainerStyle={[padding, lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE }]}
         ItemSeparatorComponent={ListSeparator}
         ListHeaderComponent={
           !serverSet && characters ? (
@@ -99,6 +109,15 @@ export default function CharactersScreen() {
           />
         )}
       />
+      {lastChat ? (
+        <ContinueButton
+          // A fresh button for another chat, so a swipe in progress does not carry over.
+          key={lastChat.id}
+          chat={lastChat}
+          onOpen={() => router.push(`/chat/${lastChat.id}`)}
+          onDismiss={hideContinue}
+        />
+      ) : null}
       <GlassHeader
         right={
           <>

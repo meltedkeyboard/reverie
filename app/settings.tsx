@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { testConnection } from '@/api/llm'
@@ -11,6 +11,7 @@ import { Field, FieldLabel } from '@/components/Field'
 import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
 import { Group } from '@/components/Group'
 import { Segmented } from '@/components/Segmented'
+import { isContinueEnabled, setContinueEnabled } from '@/db/continue'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
@@ -48,6 +49,16 @@ export default function SettingsScreen() {
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const [wiping, setWiping] = useState(false)
+  const [continueButton, setContinueButton] = useState(true)
+
+  useEffect(() => {
+    isContinueEnabled(db).then(setContinueButton)
+  }, [db])
+
+  const toggleContinueButton = (enabled: boolean) => {
+    setContinueButton(enabled)
+    setContinueEnabled(db, enabled)
+  }
 
   useEffect(() => {
     loadSettings(db).then((stored) => {
@@ -139,6 +150,16 @@ export default function SettingsScreen() {
               <Segmented options={THEME_OPTIONS} value={preference} onChange={setPreference} />
               <FieldLabel style={{ marginTop: 18 }}>{t('settings.language')}</FieldLabel>
               <Segmented options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
+            </View>
+          </Group>
+
+          <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.homeScreen')}</Text>
+          <Text style={styles.note}>{t('settings.continueButtonNote')}</Text>
+          <Group>
+            <View style={styles.switchRow}>
+              <Ionicons name="play-circle-outline" size={19} color={colors.accent} style={{ width: 24 }} />
+              <Text style={styles.switchLabel}>{t('settings.continueButton')}</Text>
+              <Switch value={continueButton} onValueChange={toggleContinueButton} trackColor={{ true: colors.accent }} />
             </View>
           </Group>
 
@@ -313,6 +334,8 @@ const createStyles = (colors: Colors) =>
     chipText: { color: colors.textMuted, fontSize: 13 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
     rowLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
+    switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
+    switchLabel: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
     status: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14 },
     dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
     statusText: { flex: 1, color: colors.textMuted, fontSize: 14, lineHeight: 20 },

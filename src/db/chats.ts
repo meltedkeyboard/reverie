@@ -69,3 +69,23 @@ export async function pruneUntouchedChats(db: SQLiteDatabase) {
       AND (SELECT COUNT(*) FROM messages m WHERE m.chat_id = chats.id) <= 1
   `)
 }
+
+export type LastChat = {
+  id: number
+  title: string | null
+  lastActivity: number
+  characterName: string
+  characterAvatar: string | null
+}
+
+// The chat the user wrote in most recently, for the home screen's continue button.
+export function getLastChat(db: SQLiteDatabase) {
+  return db.getFirstAsync<LastChat>(`
+    SELECT ch.id, ch.title, c.name AS characterName, c.avatar AS characterAvatar,
+      (SELECT MAX(m.created_at) FROM messages m WHERE m.chat_id = ch.id) AS lastActivity
+    FROM chats ch JOIN characters c ON c.id = ch.character_id
+    WHERE EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.role = 'user')
+    ORDER BY lastActivity DESC, ch.id DESC
+    LIMIT 1
+  `)
+}

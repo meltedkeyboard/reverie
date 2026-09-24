@@ -33,6 +33,7 @@ import { SFIcon } from '@/components/SFIcon'
 import { TextSheet } from '@/components/TextSheet'
 import { getCharacter, type Character } from '@/db/characters'
 import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
+import { setContinueHidden } from '@/db/continue'
 import { newMessage } from '@/db/messages'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
@@ -78,8 +79,11 @@ export default function ChatScreen() {
         }
         const chat = await getChat(db, chatId)
         const character = chat && (await getCharacter(db, chat.characterId))
-        if (chat && character) setLoaded({ chat, character })
-        else router.back()
+        if (chat && character) {
+          setLoaded({ chat, character })
+          // A continue button swiped away on the home screen comes back once a chat opens.
+          setContinueHidden(db, false)
+        } else router.back()
       })()
     }, [db, id, characterParam, router])
   )
