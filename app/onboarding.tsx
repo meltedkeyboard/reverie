@@ -103,7 +103,9 @@ export default function OnboardingScreen() {
         </Animated.View>
       </ScrollView>
 
-      <Animated.View style={[styles.footer, { paddingBottom: insets.bottom + 16, opacity: appear }]}>
+      {/* Only a transform here: a fading ancestor leaves the Liquid Glass effect unrendered
+          until the app comes back from the background. */}
+      <Animated.View style={[styles.footer, { paddingBottom: insets.bottom + 16, transform: [{ translateY: rise }] }]}>
         <Button variant="glass" label={t('onboarding.getStarted')} onPress={finish} />
       </Animated.View>
     </View>
