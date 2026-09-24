@@ -9,3 +9,12 @@ export async function saveJson(fileName: string, contents: string) {
   // The blob has to outlive the click, otherwise the download never starts.
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
+
+export async function saveImage(uri: string) {
+  const link = document.createElement('a')
+  link.href = uri
+  link.download = `image-${Date.now()}.jpg`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}

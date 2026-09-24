@@ -15,6 +15,7 @@ import { splitRoleplay } from '@/lib/roleplay'
 import { CHAT_MAX_WIDTH, fonts, useColors, useStyles, type Colors } from '@/theme'
 
 import { IconButton } from './IconButton'
+import { ImageLink } from './ImageLink'
 import { NativeMenu } from './NativeMenu'
 import { Pager } from './Pager'
 import { SFIcon } from './SFIcon'
@@ -30,7 +31,6 @@ type Props = {
   locked: boolean
   onAction: (message: RowMessage, action: MessageAction) => void
   onSelectVariant: (id: number, variant: number) => void
-  onOpenImage: (uri: string) => void
 }
 
 // On iOS a long press opens the message menu, which would fight with native text
@@ -38,7 +38,7 @@ type Props = {
 const SELECTABLE = Platform.OS === 'web'
 const LONG_PRESS_MS = 350
 
-function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, onOpenImage }: Props) {
+function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant }: Props) {
   const styles = useStyles(createStyles)
   const isUser = message.role === 'user'
   const spans = useMemo(() => (isUser ? [] : splitRoleplay(message.content)), [isUser, message.content])
@@ -69,7 +69,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   if (isUser) {
     return (
       <View style={styles.userRow}>
-        {message.image ? <Picture message={message} onOpen={onOpenImage} onLongPress={openSheet} /> : null}
+        {message.image ? <Picture message={message} onLongPress={openSheet} /> : null}
         {message.content ? (
           <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS} style={styles.bubble}>
             <Text selectable={SELECTABLE} style={styles.userText}>
@@ -267,22 +267,22 @@ function ThoughtBlock({ text, ms }: ThoughtProps) {
 
 const PICTURE_MAX = { width: 240, height: 300 }
 
-type PictureProps = { message: RowMessage; onOpen: (uri: string) => void; onLongPress: () => void }
+type PictureProps = { message: RowMessage; onLongPress: () => void }
 
-function Picture({ message, onOpen, onLongPress }: PictureProps) {
+function Picture({ message, onLongPress }: PictureProps) {
   const styles = useStyles(createStyles)
   const uri = useMemo(() => imageDataUrl(message.image ?? ''), [message.image])
   const width = message.imageWidth || PICTURE_MAX.width
   const height = message.imageHeight || PICTURE_MAX.width
   const scale = Math.min(PICTURE_MAX.width / width, PICTURE_MAX.height / height)
   return (
-    <Pressable onPress={() => onOpen(uri)} onLongPress={onLongPress} delayLongPress={LONG_PRESS_MS}>
+    <ImageLink uri={uri} aspect={width / height} onLongPress={onLongPress} delayLongPress={LONG_PRESS_MS}>
       <Image
         source={{ uri }}
         style={[styles.picture, { width: width * scale, height: height * scale }]}
         contentFit="cover"
       />
-    </Pressable>
+    </ImageLink>
   )
 }
 

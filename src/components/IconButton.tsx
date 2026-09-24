@@ -11,16 +11,19 @@ type Props = {
   color?: string
   style?: StyleProp<ViewStyle>
   disabled?: boolean
+  accessibilityLabel?: string
   // Replaces the Ionicons glyph, e.g. with an animated SF Symbol.
   children?: React.ReactNode
 }
 
-export function IconButton({ name, onPress, size = 22, color, style, disabled, children }: Props) {
+export function IconButton({ name, onPress, size = 22, color, style, disabled, accessibilityLabel, children }: Props) {
   const colors = useColors()
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       hitSlop={8}
       style={({ pressed }) => [
         { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },

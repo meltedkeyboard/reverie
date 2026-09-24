@@ -143,7 +143,7 @@ export function ContinueButton({ chat, onOpen, onDismiss }: Props) {
       <GestureDetector gesture={Gesture.Exclusive(pan, tap)}>
         <Animated.View style={capsule} accessibilityRole="button" accessibilityLabel={t('continue.accessibility')}>
           <GlassSurface interactive tintColor={colors.accent} style={styles.pill} fallbackStyle={styles.solid}>
-            <Avatar name={chat.characterName} file={chat.characterAvatar} size={HEIGHT - 16} />
+            <Avatar name={chat.characterName} file={chat.characterAvatar} size={HEIGHT - 16} viewable={false} />
             <View style={styles.text}>
               <Text style={styles.name} numberOfLines={1}>
                 {chat.characterName}

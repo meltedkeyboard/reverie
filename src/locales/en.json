@@ -234,6 +234,7 @@
 
   "images.cameraPermission": "No camera access. Enable it in iOS settings.",
   "images.readFailed": "Couldn't read the image",
+  "images.save": "Save photo",
 
   "avatarStore.noSpace": "The browser has no room left for the avatar.",
 

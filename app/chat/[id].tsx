@@ -26,7 +26,6 @@ import { Avatar } from '@/components/Avatar'
 import { Composer } from '@/components/Composer'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
-import { ImageViewer } from '@/components/ImageViewer'
 import { MessageRow, type RowMessage } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { SFIcon } from '@/components/SFIcon'
@@ -191,7 +190,6 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   const restInset = useRef(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [selecting, setSelecting] = useState<string | null>(null)
-  const [viewing, setViewing] = useState<string | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
   const [scrolledBack, setScrolledBack] = useState(false)
   const [listHeight, setListHeight] = useState(0)
@@ -237,7 +235,6 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   useEffect(() => {
     setEditingRow(null)
     setSelecting(null)
-    setViewing(null)
   }, [privateMode])
 
   // The empty-chat intro stays centered in the space left between the header and the
@@ -360,7 +357,6 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
           locked={locked}
           onAction={onAction}
           onSelectVariant={selectVariant}
-          onOpenImage={setViewing}
         />
       )
       return row.streaming ? <View onLayout={onDraftLayout}>{content}</View> : content
@@ -485,7 +481,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
                 </>
               ) : (
                 <>
-                  <Avatar name={character.name} file={character.avatar} size={34} />
+                  <Avatar name={character.name} file={character.avatar} size={34} viewable={false} />
                   <View style={styles.whoText}>
                     <View style={styles.nameRow}>
                       <Text style={styles.name} numberOfLines={1}>
@@ -545,7 +541,6 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
       />
 
       <TextSheet text={selecting} onClose={() => setSelecting(null)} />
-      <ImageViewer uri={viewing} onClose={() => setViewing(null)} />
     </View>
   )
 }

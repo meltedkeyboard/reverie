@@ -4,6 +4,8 @@ import { Text, View } from 'react-native'
 import { avatarUri } from '@/lib/avatars'
 import { fonts } from '@/theme'
 
+import { ImageLink } from './ImageLink'
+
 const TINTS = ['#3B2F5C', '#2F4A5C', '#5C3B47', '#365C48', '#5C4F2F', '#40406B']
 
 type Props = {
@@ -13,14 +15,23 @@ type Props = {
   size: number
   // Square corners, for an avatar that fills the edge of a card clipping it.
   square?: boolean
+  // A tap opens the photo full screen. Off where the avatar sits inside a control
+  // that owns the tap itself, like a menu trigger or a swipeable button.
+  viewable?: boolean
 }
 
-export function Avatar({ name, file, uri, size, square = false }: Props) {
+export function Avatar({ name, file, uri, size, square = false, viewable = true }: Props) {
   const source = uri ?? (file ? avatarUri(file) : null)
   const box = { width: size, height: size, borderRadius: square ? 0 : size / 2, overflow: 'hidden' as const }
 
   if (source) {
-    return <Image source={{ uri: source }} style={box} contentFit="cover" transition={150} />
+    const image = <Image source={{ uri: source }} style={box} contentFit="cover" transition={150} />
+    if (!viewable) return image
+    return (
+      <ImageLink uri={source} accessibilityLabel={name}>
+        {image}
+      </ImageLink>
+    )
   }
 
   const tint = TINTS[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % TINTS.length]

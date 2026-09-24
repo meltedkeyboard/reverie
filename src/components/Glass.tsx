@@ -44,18 +44,19 @@ type ButtonProps = {
   // Optional because a Link with asChild injects its own onPress.
   onPress?: () => void
   disabled?: boolean
+  accessibilityLabel?: string
   // Replaces the Ionicons glyph, e.g. with an animated SF Symbol.
   children?: React.ReactNode
 }
 
 // A round Liquid Glass button of the same 44 pt as the other glass controls; outside
 // iOS 26 it is the plain icon button.
-export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, children }: ButtonProps) {
+export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, accessibilityLabel, children }: ButtonProps) {
   const { colors } = useTheme()
   const styles = useStyles(createStyles)
   if (!liquidGlass) {
     return (
-      <IconButton name={icon} size={iconSize} onPress={onPress} disabled={disabled}>
+      <IconButton name={icon} size={iconSize} onPress={onPress} disabled={disabled} accessibilityLabel={accessibilityLabel}>
         {children}
       </IconButton>
     )
@@ -64,6 +65,8 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ch
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       hitSlop={6}
       style={({ pressed }) => pressed && { transform: [{ scale: 0.94 }] }}
     >

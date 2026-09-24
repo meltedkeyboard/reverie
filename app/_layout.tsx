@@ -81,7 +81,12 @@ function AppShell() {
     [colors, scheme]
   )
 
-  const stack = <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+  const stack = (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      {/* On iOS the viewer zooms out of the tapped picture; elsewhere it fades in. */}
+      <Stack.Screen name="viewer" options={Platform.OS === 'ios' ? undefined : { animation: 'fade' }} />
+    </Stack>
+  )
 
   return (
     <>

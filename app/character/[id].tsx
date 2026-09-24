@@ -146,9 +146,14 @@ export default function CharacterEditorScreen() {
           contentContainerStyle={padding}
         >
           <View style={styles.avatarBlock}>
-            <Pressable onPress={onPickAvatar} style={({ pressed }) => pressed && { opacity: 0.8 }}>
+            {/* With a photo the tap opens it; without one it picks a photo. */}
+            {hasPhoto ? (
               <Avatar name={name} file={avatar} uri={pickedUri} size={96} />
-            </Pressable>
+            ) : (
+              <Pressable onPress={onPickAvatar} style={({ pressed }) => pressed && { opacity: 0.8 }}>
+                <Avatar name={name} file={avatar} uri={pickedUri} size={96} />
+              </Pressable>
+            )}
             <View style={styles.avatarActions}>
               <Pressable onPress={onPickAvatar} hitSlop={8}>
                 <Text style={styles.link}>{hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')}</Text>
