@@ -14,9 +14,18 @@ export type CharacterFields = {
   replyLimit: number | null
   // 'auto' leaves thinking mode to the server's own setting; 'on'/'off' override it.
   thinking: ThinkingMode
+  // File name of the picture behind the character's chats, like an avatar's.
+  background: string | null
+  backgroundEffect: BackgroundEffect
+  // 0 to 1: how far the picture is blurred or dimmed.
+  backgroundIntensity: number
+  // 0 to 1: how see-through the user's message bubbles are over the picture.
+  backgroundBubbleTransparency: number
 }
 
 export type ThinkingMode = 'auto' | 'on' | 'off'
+
+export type BackgroundEffect = 'blur' | 'dim'
 
 export type Character = CharacterFields & { id: number; createdAt: number }
 
@@ -33,7 +42,9 @@ export const DEFAULT_SAMPLING = { temperature: 0.8, maxTokens: 800, topP: 0.95 }
 export const CHARACTER_COLUMNS = `
   id, name, avatar, system_prompt AS systemPrompt, greeting,
   temperature, max_tokens AS maxTokens, top_p AS topP, reply_limit AS replyLimit,
-  thinking, created_at AS createdAt
+  thinking, background, background_effect AS backgroundEffect,
+  background_intensity AS backgroundIntensity,
+  background_bubble_transparency AS backgroundBubbleTransparency, created_at AS createdAt
 `
 
 export function listCharacters(db: SQLiteDatabase) {
@@ -48,15 +59,25 @@ export function listCharacters(db: SQLiteDatabase) {
       ) AS lastActivity,
       (SELECT COUNT(*) FROM chats ch WHERE ch.character_id = c.id) AS chatCount
     FROM characters c
-    ORDER BY lastActivity DESC, c.id DESC
+    ORDER BY c.sort_order DESC, c.id DESC
   `)
+}
+
+// Saves the order the user dragged the characters into; ids run from the top down.
+export function setCharacterOrder(db: SQLiteDatabase, ids: number[]) {
+  return db.withTransactionAsync(async () => {
+    for (const [index, id] of ids.entries()) {
+      await db.runAsync('UPDATE characters SET sort_order = ? WHERE id = ?', [ids.length - index, id])
+    }
+  })
 }
 
 export function getCharacter(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Character>(`SELECT ${CHARACTER_COLUMNS} FROM characters c WHERE c.id = ?`, id)
 }
 
-const FIELD_COLUMNS = 'name, avatar, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking'
+const FIELD_COLUMNS =
+  'name, avatar, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_effect, background_intensity, background_bubble_transparency'
 
 function fieldValues(fields: CharacterFields) {
   return [
@@ -69,12 +90,16 @@ function fieldValues(fields: CharacterFields) {
     fields.topP,
     fields.replyLimit,
     fields.thinking,
+    fields.background,
+    fields.backgroundEffect,
+    fields.backgroundIntensity,
+    fields.backgroundBubbleTransparency,
   ]
 }
 
 export async function insertCharacter(db: SQLiteDatabase, fields: CharacterFields, createdAt = Date.now()) {
   const res = await db.runAsync(
-    `INSERT INTO characters (${FIELD_COLUMNS}, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO characters (${FIELD_COLUMNS}, created_at) VALUES (${FIELD_COLUMNS.split(',').map(() => '?')}, ?)`,
     [...fieldValues(fields), createdAt]
   )
   return res.lastInsertRowId
@@ -84,7 +109,9 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
   if (id === null) return insertCharacter(db, fields)
   await db.runAsync(
     `UPDATE characters
-     SET name = ?, avatar = ?, system_prompt = ?, greeting = ?, temperature = ?, max_tokens = ?, top_p = ?, reply_limit = ?, thinking = ?
+     SET name = ?, avatar = ?, system_prompt = ?, greeting = ?, temperature = ?, max_tokens = ?, top_p = ?, reply_limit = ?, thinking = ?,
+         background = ?, background_effect = ?, background_intensity = ?,
+         background_bubble_transparency = ?
      WHERE id = ?`,
     [...fieldValues(fields), id]
   )
@@ -92,15 +119,23 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
 }
 
 // Copies the character together with all of its chats and messages. The copy gets its
-// own avatar file (already written by the caller), so deleting one never breaks the other.
-export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: string, avatar: string | null) {
+// own avatar and background files (already written by the caller), so deleting one never
+// breaks the other.
+export async function duplicateCharacter(
+  db: SQLiteDatabase,
+  id: number,
+  name: string,
+  avatar: string | null,
+  background: string | null
+) {
   let characterId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
       `INSERT INTO characters (${FIELD_COLUMNS}, created_at)
-       SELECT ?, ?, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, ?
+       SELECT ?, ?, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking,
+         ?, background_effect, background_intensity, background_bubble_transparency, ?
        FROM characters WHERE id = ?`,
-      [name, avatar, Date.now(), id]
+      [name, avatar, background, Date.now(), id]
     )
     characterId = res.lastInsertRowId
     const chats = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE character_id = ? ORDER BY id', id)
@@ -110,8 +145,8 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
         [characterId, chat.id]
       )
       await db.runAsync(
-        `INSERT INTO messages (chat_id, role, content, image, image_width, image_height, variants, variant, thoughts, created_at)
-         SELECT ?, role, content, image, image_width, image_height, variants, variant, thoughts, created_at
+        `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, created_at)
+         SELECT ?, role, content, images, variants, variant, thoughts, created_at
          FROM messages WHERE chat_id = ? ORDER BY id`,
         [copy.lastInsertRowId, chat.id]
       )

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,7 +23,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { AttachButton, type AttachSource } from './AttachButton'
+import { AttachButton } from './AttachButton'
 import { BlurBar, EdgeFade } from './BarChrome'
 import { GlassSurface, useGlassStyles } from './Glass'
 import { useInputColors } from './Field'
@@ -32,7 +33,7 @@ import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
-import { imageDataUrl, pickMessageImage } from '@/lib/images'
+import { imageDataUrl, pickMessageImages, type ImageSource } from '@/lib/images'
 import { liquidGlass } from '@/lib/nativeUI'
 import { CHAT_MAX_WIDTH, useColors, useStyles, type Colors } from '@/theme'
 
@@ -42,7 +43,7 @@ type Props = {
   editing: { id: number; text: string } | null
   // Floats centered above the bar and follows it with the keyboard.
   accessory?: React.ReactNode
-  onSend: (text: string, image: MessageImage | null) => void
+  onSend: (text: string, images: MessageImage[]) => void
   onStop: () => void
   // Lets the model take the next turn when nothing is typed; absent when it has nothing to go on.
   onContinue?: () => void
@@ -76,9 +77,9 @@ export function Composer({
   textRef.current = text
   const stash = useRef('')
   const inputRef = useRef<TextInput>(null)
-  const [image, setImage] = useState<MessageImage | null>(null)
+  const [images, setImages] = useState<MessageImage[]>([])
   const [picking, setPicking] = useState(false)
-  const imageUri = useMemo(() => (image ? imageDataUrl(image.base64) : null), [image])
+  const imageUris = useMemo(() => images.map((image) => imageDataUrl(image.base64)), [images])
 
   useEffect(() => {
     if (!editing) return
@@ -95,7 +96,7 @@ export function Composer({
       : 'idle'
     : generating
       ? 'stop'
-      : value || image
+      : value || images.length
         ? 'send'
         : onContinue
           ? 'continue'
@@ -117,17 +118,17 @@ export function Composer({
     if (mode === 'continue') return onContinue?.()
     if (mode === 'save') return onSubmitEdit(value)
     if (mode === 'send') {
-      onSend(value, image)
+      onSend(value, images)
       setText('')
-      setImage(null)
+      setImages([])
     }
   }
 
-  const attach = async (source: AttachSource) => {
+  const attach = async (source: ImageSource) => {
     setPicking(true)
     try {
-      const picked = await pickMessageImage(source)
-      if (picked) setImage(picked)
+      const picked = await pickMessageImages(source)
+      if (picked.length) setImages((current) => [...current, ...picked])
     } catch (err) {
       showMessage(t('composer.attachFailedTitle'), errorMessage(err))
     } finally {
@@ -160,13 +161,21 @@ export function Composer({
             <IconButton name="close" size={18} color={colors.textMuted} onPress={onCancelEdit} style={styles.bannerClose} />
           </View>
         ) : null}
-        {imageUri && !editing ? (
-          <View style={styles.attachment}>
-            <Image source={{ uri: imageUri }} style={styles.thumb} contentFit="cover" />
-            <Pressable onPress={() => setImage(null)} hitSlop={8} style={styles.thumbRemove}>
-              <Ionicons name="close" size={13} color="#FFFFFF" />
-            </Pressable>
-          </View>
+        {images.length && !editing ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {imageUris.map((uri, index) => (
+              <View key={index} style={styles.attachment}>
+                <Image source={{ uri }} style={styles.thumb} contentFit="cover" />
+                <Pressable
+                  onPress={() => setImages((current) => current.filter((_, i) => i !== index))}
+                  hitSlop={8}
+                  style={styles.thumbRemove}
+                >
+                  <Ionicons name="close" size={13} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
         ) : null}
         <View style={styles.inputRow}>
           <TextInput
@@ -248,7 +257,7 @@ const createStyles = (colors: Colors) =>
   // on phone widths.
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
   field: { flex: 1, borderRadius: 22, padding: 4 },
-  attachment: { alignSelf: 'flex-start', margin: 6, marginBottom: 2 },
+  attachment: { margin: 6, marginBottom: 2, marginRight: 4 },
   thumb: { width: 72, height: 72, borderRadius: 14 },
   thumbRemove: {
     position: 'absolute',

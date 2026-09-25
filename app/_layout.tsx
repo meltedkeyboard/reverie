@@ -9,6 +9,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { AppLock } from '@/components/AppLock'
 import { Sidebar } from '@/components/Sidebar'
 import { StartupBoundary } from '@/components/StartupBoundary'
+import { isHapticsEnabled } from '@/db/haptics'
 import { migrate } from '@/db/schema'
 import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
 import { useIsWideWeb } from '@/hooks/useResponsive'
@@ -38,6 +39,7 @@ function ThemedApp() {
   const [localePreference, setLocalePreferenceState] = useState<LocalePreference>('system')
 
   useEffect(() => {
+    isHapticsEnabled(db)
     loadThemePreference(db).then(setPreferenceState)
     loadLocalePreference(db).then(setLocalePreferenceState)
   }, [db])
@@ -94,6 +96,7 @@ function AppShell() {
   const stack = (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="viewer" options={{ animation: 'fade' }} />
+      <Stack.Screen name="background" options={{ animation: 'fade' }} />
     </Stack>
   )
 

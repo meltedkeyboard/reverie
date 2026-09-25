@@ -26,6 +26,16 @@ export async function setSetting(db: SQLiteDatabase, key: string, value: string)
   )
 }
 
+// An on/off switch kept as '1' or '0'; nothing stored yet means defaultOn.
+export async function getFlag(db: SQLiteDatabase, key: string, defaultOn: boolean) {
+  const value = await getSetting(db, key)
+  return value === null ? defaultOn : value === '1'
+}
+
+export function setFlag(db: SQLiteDatabase, key: string, on: boolean) {
+  return setSetting(db, key, on ? '1' : '0')
+}
+
 // A stored value that must be one of a few; anything else, or nothing, is 'system'.
 async function getChoice<T extends string>(db: SQLiteDatabase, key: string, allowed: readonly T[]) {
   const value = await getSetting(db, key)

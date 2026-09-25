@@ -1,0 +1,113 @@
+# Codebase map
+
+Where things live and how they connect. For setup and features see the [README](../README.md).
+
+Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict). Path alias `@/*` points to `src/`.
+
+## Find it fast
+
+| I want to change... | Go to |
+|---|---|
+| A request to the model, SSE parsing, thinking mode | `src/api/llm.ts` |
+| How many messages are sent as context | `CONTEXT_WINDOW` in `src/api/llm.ts` |
+| Send / regenerate / variants / edit / delete logic | `src/hooks/useChat.ts` |
+| Which actions a message has in its menu | `src/lib/messageActions.ts`, rendered in `src/components/MessageRow.tsx` |
+| A DB column or a new table | new entry at the end of `MIGRATIONS` in `src/db/schema.ts`, then the matching `src/db/*.ts` file |
+| Backup format | `src/lib/backup.ts` (`BACKUP_VERSION`, currently 6) |
+| Auto chat title | `src/lib/titles.ts` |
+| System prompt / greeting generator | `src/lib/promptGen.ts` and `src/components/PromptGenModal.tsx` |
+| Colors, fonts, light/dark | `src/theme.tsx` |
+| UI strings | `src/locales/en.json`, `src/locales/ru.json`; lookup in `src/i18n.tsx` |
+| iOS permission texts | `app.json` plugins (English) and `permissions/ru.json` (Russian) |
+| Web-only behavior | files with a `.web.ts(x)` suffix |
+| Brand assets and generated icons | `assets/brand/`, `scripts/build-icons.mjs` |
+| CI build | `.github/workflows/ios.yml`, `build-ipa.sh` |
+
+## Screens (`app/`)
+
+File-based routes (expo-router). `_layout.tsx` is the root: it wires providers in this order:
+`GestureHandlerRootView` > `StartupBoundary` > `KeyboardProvider` > `SQLiteProvider` (runs `migrate`) > locale and theme contexts > `AppLock` > `AppShell` (stack navigator, plus `Sidebar` on wide web).
+
+| Route | File | Purpose |
+|---|---|---|
+| `/` | `index.tsx` | Character list, reorder, "Continue" capsule |
+| `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character |
+| `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen) |
+| `/character/:id` | `character/[id].tsx` | Character editor: prompt, greeting, sampling, thinking mode, background |
+| `/background` | `background.tsx` | Background picker, effect and intensity |
+| `/settings` | `settings.tsx` | Server, theme, language, lock, haptics, private chat button, backup |
+| `/onboarding` | `onboarding.tsx` | First-run pages, including server setup |
+| `/viewer` | `viewer.tsx` | Full-screen image |
+| `/about` | `about.tsx` | About page |
+
+Some data cannot go through route params (file URIs, callbacks, very long data URLs), so two tiny module-level slots carry it between screens: `src/lib/backgroundDraft.ts` and `src/lib/viewer.ts`.
+
+## Data flow of a chat
+
+1. `chat/[id].tsx` loads the chat and character, then mounts `useChat`.
+2. `useChat` builds the request: system prompt from the character, the last `CONTEXT_WINDOW` messages using the selected variants, images as `image_url` parts.
+3. `streamChat` (`src/api/llm.ts`) yields `StreamPart`s: reply text and reasoning. `useChat` updates state per chunk and writes to the DB through `src/db/messages.ts`.
+4. `regenerateTargetAt` decides what a regenerate replaces and which history the model sees.
+5. After the first reply `autoName` calls `suggestTitle` and stores the title with `setChatTitle`.
+
+A private chat uses an in-memory `MessageStore` inside `useChat` instead of the DB, so nothing is left after leaving the screen. The header button is toggled by `src/db/privateChat.ts`.
+
+## `src/db` - persistence
+
+Everything goes through `expo-sqlite`. Schema versioning is `PRAGMA user_version` plus the ordered `MIGRATIONS` array in `schema.ts`. Never edit an existing entry, only append.
+
+| File | Contents |
+|---|---|
+| `schema.ts` | Migrations: `characters`, `chats`, `messages`, `app_settings` |
+| `characters.ts` | Character CRUD, duplicate, ordering, `DEFAULT_SAMPLING`, `CHARACTER_COLUMNS` |
+| `chats.ts` | Chat CRUD, duplicate, ordering, `pruneUntouchedChats`, `getLastChat` |
+| `messages.ts` | Message CRUD, variants (`withNewVariant`, `withVariant`), images and thoughts as JSON columns |
+| `settings.ts` | Key/value helpers (`getSetting`, `getFlag`), server settings, theme and locale preference |
+| `appLock.ts`, `continue.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts` | One feature flag each, stored as `'1'`/`'0'` in `app_settings` via `getFlag`/`setFlag` |
+
+Flags that many call sites need synchronously keep an in-memory copy: `src/lib/hapticsState.ts`, `isAppLockEnabledCached`.
+
+## `src/lib` - logic without UI
+
+| Group | Files |
+|---|---|
+| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, copy), `avatarStore.ts` / `.web.ts` (file or `localStorage` storage) |
+| Backup | `backup.ts` (export, import, wipe), `download.ts` / `.web.ts` (save JSON or image), `pickJson.ts` / `.web.ts` |
+| Dialogs | `dialogs.tsx` (native alerts and sheets), `dialogs.web.tsx` (DOM implementation), `dialogs.types.ts`, `chatDialogs.ts` |
+| Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
+| AI helpers | `promptGen.ts`, `titles.ts` |
+| Platform | `haptics.ts` / `.web.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts` |
+| Message menu | `messageActions.ts` |
+
+## `src/hooks`
+
+| Hook | Purpose |
+|---|---|
+| `useChat` | Conversation state, streaming, variants, editing |
+| `useCharacterActions` | Duplicate / delete / export actions for a character |
+| `useConnectionTest` | "Test connection" button state |
+| `useReorder` | Drag-to-reorder lists (`react-native-reorderable-list`) |
+| `useStoredFlag` | React state bound to an `app_settings` flag |
+| `useAbortable` | `AbortController` tied to component lifetime |
+| `useElapsedSeconds`, `useShake`, `useResponsive` | Timer, shake animation, wide-web check |
+
+## `src/components`
+
+- **Chat:** `MessageRow`, `Composer`, `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet on iOS).
+- **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton`, `EmptyState`, `Sidebar` (wide web).
+- **Forms:** `Field`, `Group`, `ToggleRow`, `Segmented`, `ChipGroup`, `ParamSlider`, `FormScreenHeader`, `PromptGenModal`.
+- **Chrome and glass:** `Glass`, `GlassHeader`, `BarChrome`, `NativeMenu`, `PageSheet`, `IconButton`, `Button`, `SFIcon`.
+- **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `ImageLink`, `HomePattern`, `Wordmark`.
+- **`motifs/`:** small brand decorations (`Shard*`, `Star*`, `Divider`, `Eyebrow`, `FieldRow`).
+
+## Platform split
+
+`Foo.ts` is the native implementation and `Foo.web.ts` the browser one, resolved by Metro. Pairs: `avatarStore`, `download`, `dialogs`, `haptics`, `pickJson`. Keep their exported signatures identical.
+
+## Conventions
+
+- Screens stay thin: data access in `src/db`, logic in `src/lib` or hooks.
+- Strings always go through `t('key')`; add the key to both locale files.
+- New setting flag: new `src/db/<name>.ts` with `getFlag`/`setFlag`, a row in `settings.tsx`, strings in both locales.
+- New column: append a migration, extend the `*_COLUMNS` constant and the type, and bump `BACKUP_VERSION` in `backup.ts` if the backup should carry it (older backups must still import).
+- Check types with `npm run typecheck`.

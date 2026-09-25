@@ -1,6 +1,8 @@
 import { toByteArray } from 'base64-js'
 import { Directory, File, Paths } from 'expo-file-system'
 
+import { newAvatarName } from '@/lib/images'
+
 // Only the file name goes into the database. The absolute path of the app
 // container changes between installs and updates, so it is resolved on read.
 const avatarDir = new Directory(Paths.document, 'avatars')
@@ -15,7 +17,7 @@ export function avatarUri(name: string): string | null {
 
 export async function persistAvatar(tempUri: string) {
   avatarDir.create({ intermediates: true, idempotent: true })
-  const name = `${Date.now()}.jpg`
+  const name = newAvatarName()
   await new File(tempUri).copy(avatarFile(name))
   return name
 }

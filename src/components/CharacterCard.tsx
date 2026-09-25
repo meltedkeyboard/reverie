@@ -13,16 +13,17 @@ import type { MenuItem } from './NativeMenu'
 type Props = {
   character: CharacterPreview
   onOpen: () => void
+  onDelete: () => void
   menu: MenuItem[]
 }
 
-export function CharacterCard({ character, onOpen, menu }: Props) {
+export function CharacterCard({ character, onOpen, onDelete, menu }: Props) {
   const styles = useStyles(createStyles)
   const { locale } = useTranslation()
   const preview = characterPreview(character)
   const chats = character.chatCount
   return (
-    <ListCard onOpen={onOpen} menu={menu} menuTitle={character.name} style={styles.card}>
+    <ListCard onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.card}>
       <Avatar name={character.name} file={character.avatar} size={AVATAR} square />
       <View style={styles.body}>
         <View style={styles.nameRow}>

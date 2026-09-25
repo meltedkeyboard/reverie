@@ -12,10 +12,11 @@ import type { MenuItem } from './NativeMenu'
 type Props = {
   chat: ChatPreview
   onOpen: () => void
+  onDelete: () => void
   menu: MenuItem[]
 }
 
-export function ChatCard({ chat, onOpen, menu }: Props) {
+export function ChatCard({ chat, onOpen, onDelete, menu }: Props) {
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const preview = plainPreview(chat.lastMessage ?? '') || t('chatCard.emptyChat')
@@ -23,7 +24,7 @@ export function ChatCard({ chat, onOpen, menu }: Props) {
   const when = formatWhen(chat.lastActivity, locale)
   const messages = `${count} ${plural(count, locale, ['сообщение', 'сообщения', 'сообщений'], ['message', 'messages'])}`
   return (
-    <ListCard onOpen={onOpen} menu={menu} menuTitle={chat.title ?? undefined}>
+    <ListCard onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={chat.title ?? undefined}>
       <View style={styles.body}>
         <Text style={styles.heading} numberOfLines={1}>
           {chat.title ?? when}

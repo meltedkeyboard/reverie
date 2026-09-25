@@ -7,6 +7,8 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Message } from '@/db/messages'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { useTranslation } from '@/i18n'
+import type { MessageImage } from '@/db/messages'
+import { withAlpha } from '@/lib/color'
 import { showSheet } from '@/lib/dialogs'
 import * as Haptics from '@/lib/haptics'
 import { imageDataUrl } from '@/lib/images'
@@ -31,6 +33,8 @@ type Props = {
   locked: boolean
   onAction: (message: RowMessage, action: MessageAction) => void
   onSelectVariant: (id: number, variant: number) => void
+  // How much of the user's bubble color shows: below 1 over a chat background.
+  bubbleOpacity?: number
 }
 
 // On iOS a long press opens the message menu, which would fight with native text
@@ -38,8 +42,9 @@ type Props = {
 const SELECTABLE = Platform.OS === 'web'
 const LONG_PRESS_MS = 350
 
-function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant }: Props) {
+function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1 }: Props) {
   const styles = useStyles(createStyles)
+  const colors = useColors()
   const isUser = message.role === 'user'
   const spans = useMemo(() => (isUser ? [] : splitRoleplay(message.content)), [isUser, message.content])
   const actions = useMemo(
@@ -69,9 +74,13 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   if (isUser) {
     return (
       <View style={styles.userRow}>
-        {message.image ? <Picture message={message} onLongPress={openSheet} /> : null}
+        {message.images.map((image, index) => (
+          <Picture key={index} image={image} onLongPress={openSheet} />
+        ))}
         {message.content ? (
-          <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS} style={styles.bubble}>
+          <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS}
+            style={[styles.bubble, bubbleOpacity < 1 && { backgroundColor: withAlpha(colors.bubble, bubbleOpacity) }]}
+          >
             <Text selectable={SELECTABLE} style={styles.userText}>
               {message.content}
             </Text>
@@ -267,13 +276,13 @@ function ThoughtBlock({ text, ms }: ThoughtProps) {
 
 const PICTURE_MAX = { width: 240, height: 300 }
 
-type PictureProps = { message: RowMessage; onLongPress: () => void }
+type PictureProps = { image: MessageImage; onLongPress: () => void }
 
-function Picture({ message, onLongPress }: PictureProps) {
+function Picture({ image, onLongPress }: PictureProps) {
   const styles = useStyles(createStyles)
-  const uri = useMemo(() => imageDataUrl(message.image ?? ''), [message.image])
-  const width = message.imageWidth || PICTURE_MAX.width
-  const height = message.imageHeight || PICTURE_MAX.width
+  const uri = useMemo(() => imageDataUrl(image.base64), [image.base64])
+  const width = image.width || PICTURE_MAX.width
+  const height = image.height || PICTURE_MAX.width
   const scale = Math.min(PICTURE_MAX.width / width, PICTURE_MAX.height / height)
   return (
     <ImageLink uri={uri} aspect={width / height} onLongPress={onLongPress} delayLongPress={LONG_PRESS_MS}>

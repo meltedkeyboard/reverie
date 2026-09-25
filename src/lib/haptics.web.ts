@@ -1,5 +1,7 @@
 import { ImpactFeedbackStyle, NotificationFeedbackType } from 'expo-haptics'
 
+import { isHapticsOn } from '@/lib/hapticsState'
+
 export { ImpactFeedbackStyle, NotificationFeedbackType }
 
 // expo-haptics does nothing in a browser. Android browsers have the Vibration API;
@@ -22,7 +24,7 @@ function tick() {
 
 // A pattern alternates vibration and pause in ms, like navigator.vibrate takes it.
 function play(pattern: number[]) {
-  if (typeof document === 'undefined') return
+  if (typeof document === 'undefined' || !isHapticsOn()) return
   try {
     if (canVibrate) {
       navigator.vibrate(pattern)

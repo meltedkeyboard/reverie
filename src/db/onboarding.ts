@@ -1,13 +1,13 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { getSetting, setSetting } from '@/db/settings'
+import { getFlag, setFlag } from '@/db/settings'
 
 const KEY = 'onboarding_completed'
 
-export async function isOnboardingComplete(db: SQLiteDatabase) {
-  return (await getSetting(db, KEY)) === '1'
+export function isOnboardingComplete(db: SQLiteDatabase) {
+  return getFlag(db, KEY, false)
 }
 
 export function setOnboardingComplete(db: SQLiteDatabase, done: boolean) {
-  return setSetting(db, KEY, done ? '1' : '0')
+  return setFlag(db, KEY, done)
 }

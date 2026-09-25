@@ -13,7 +13,7 @@ export async function suggestTitle(cfg: ServerSettings, characterName: string, m
   const transcript = messages
     .slice(-8)
     .map((m) => {
-      const text = m.content.trim().slice(0, 600) || (m.image ? '[фото]' : '')
+      const text = m.content.trim().slice(0, 600) || (m.images.length ? '[фото]' : '')
       return `${m.role === 'user' ? 'Пользователь' : characterName}: ${text}`
     })
     .join('\n\n')

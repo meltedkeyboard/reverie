@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { CHARACTER_COLUMNS, insertCharacter, type ThinkingMode } from '@/db/characters'
+import { CHARACTER_COLUMNS, insertCharacter, type BackgroundEffect, type ThinkingMode } from '@/db/characters'
 import { MESSAGE_COLUMNS } from '@/db/messages'
 import { loadSettings, saveSettings } from '@/db/settings'
 import { t } from '@/i18n'
@@ -21,6 +21,11 @@ type BackupCharacter = {
   topP: number
   replyLimit: number | null
   thinking?: ThinkingMode
+  // Backups from before chat backgrounds leave these out.
+  background?: string | null
+  backgroundEffect?: BackgroundEffect
+  backgroundIntensity?: number
+  backgroundBubbleTransparency?: number
   createdAt: number
 }
 
@@ -31,9 +36,11 @@ type BackupMessage = {
   chatId: number
   role: string
   content: string
-  image: string | null
-  imageWidth: number | null
-  imageHeight: number | null
+  images?: string | null
+  // Backups from before a message could have several pictures hold one.
+  image?: string | null
+  imageWidth?: number | null
+  imageHeight?: number | null
   variants: string | null
   variant: number
   thoughts: string | null
@@ -49,21 +56,28 @@ type Backup = {
   settings?: { baseUrl?: string; model?: string }
 }
 
+function backupImages(message: BackupMessage) {
+  if (message.images) return message.images
+  if (!message.image) return null
+  return JSON.stringify([{ base64: message.image, width: message.imageWidth, height: message.imageHeight }])
+}
+
 export async function exportBackup(db: SQLiteDatabase) {
-  const characters = await db.getAllAsync<{ id: number; avatar: string | null }>(
-    `SELECT ${CHARACTER_COLUMNS} FROM characters ORDER BY id`
+  const characters = await db.getAllAsync<{ id: number; avatar: string | null; background: string | null }>(
+    `SELECT ${CHARACTER_COLUMNS} FROM characters ORDER BY sort_order, id`
   )
   const chats = await db.getAllAsync(
-    'SELECT id, character_id AS characterId, title, created_at AS createdAt FROM chats ORDER BY id'
+    'SELECT id, character_id AS characterId, title, created_at AS createdAt FROM chats ORDER BY sort_order, id'
   )
   const messages = await db.getAllAsync(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`)
   const { baseUrl, model } = await loadSettings(db)
 
   const avatars: Record<string, string> = {}
-  for (const character of characters) {
-    if (!character.avatar) continue
-    const base64 = await readAvatarBase64(character.avatar)
-    if (base64) avatars[character.avatar] = base64
+  // Backgrounds travel in the same map as the avatars: both are just pictures by name.
+  for (const name of characters.flatMap((character) => [character.avatar, character.background])) {
+    if (!name) continue
+    const base64 = await readAvatarBase64(name)
+    if (base64) avatars[name] = base64
   }
 
   // The API key is left out on purpose: the file usually ends up in iCloud Drive.
@@ -93,20 +107,31 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
   const avatarNames = new Map<string, string>()
 
   await db.withTransactionAsync(async () => {
-    for (const character of dump.characters) {
-      let avatar: string | null = null
-      if (character.avatar && dump.avatars[character.avatar]) {
-        avatar = avatarNames.get(character.avatar) ?? null
-        if (!avatar) {
-          avatar = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
-          await writeAvatarBase64(avatar, dump.avatars[character.avatar])
-          avatarNames.set(character.avatar, avatar)
-        }
+    const importImage = async (name: string | null | undefined) => {
+      if (!name || !dump.avatars[name]) return null
+      let stored = avatarNames.get(name) ?? null
+      if (!stored) {
+        stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
+        await writeAvatarBase64(stored, dump.avatars[name])
+        avatarNames.set(name, stored)
       }
+      return stored
+    }
+
+    for (const character of dump.characters) {
       // Backups from before a column existed leave it out.
       const id = await insertCharacter(
         db,
-        { ...character, avatar, replyLimit: character.replyLimit ?? null, thinking: character.thinking ?? 'auto' },
+        {
+          ...character,
+          avatar: await importImage(character.avatar),
+          replyLimit: character.replyLimit ?? null,
+          thinking: character.thinking ?? 'auto',
+          background: await importImage(character.background),
+          backgroundEffect: character.backgroundEffect ?? 'blur',
+          backgroundIntensity: character.backgroundIntensity ?? 0.5,
+          backgroundBubbleTransparency: character.backgroundBubbleTransparency ?? 0.3,
+        },
         character.createdAt
       )
       characterIds.set(character.id, id)
@@ -127,15 +152,13 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
       const chatId = chatIds.get(message.chatId)
       if (!chatId) continue
       await db.runAsync(
-        `INSERT INTO messages (chat_id, role, content, image, image_width, image_height, variants, variant, thoughts, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           chatId,
           message.role,
           message.content,
-          message.image,
-          message.imageWidth,
-          message.imageHeight,
+          backupImages(message),
           message.variants ?? null,
           message.variant ?? 0,
           message.thoughts ?? null,

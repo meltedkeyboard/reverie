@@ -1,7 +1,9 @@
 import { Link, useRouter, useFocusEffect } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useState } from 'react'
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+
+import ReorderableList from 'react-native-reorderable-list'
 
 import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
@@ -13,12 +15,13 @@ import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { HomePattern } from '@/components/HomePattern'
 import { Star } from '@/components/motifs/Star'
 import { SFIcon } from '@/components/SFIcon'
-import { listCharacters, type CharacterPreview } from '@/db/characters'
+import { listCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
 import { getLastChat, pruneUntouchedChats, type LastChat } from '@/db/chats'
 import { isContinueEnabled, isContinueHidden, setContinueHidden } from '@/db/continue'
 import { isOnboardingComplete } from '@/db/onboarding'
 import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
+import { useReorder } from '@/hooks/useReorder'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
@@ -61,7 +64,8 @@ export default function CharactersScreen() {
     }, [db, router, reload])
   )
 
-  const { menuItems } = useCharacterActions(reload)
+  const { menuItems, confirmDelete } = useCharacterActions(reload)
+  const reorder = useReorder(characters, setCharacters, (ids) => setCharacterOrder(db, ids))
 
   if (!onboarded) return <View style={styles.screen} />
 
@@ -79,9 +83,10 @@ export default function CharactersScreen() {
   return (
     <View style={styles.screen}>
       <HomePattern />
-      <FlatList
+      <ReorderableList
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
+        {...reorder}
         contentContainerStyle={[
           padding,
           lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE },
@@ -127,6 +132,7 @@ export default function CharactersScreen() {
           <CharacterCard
             character={character}
             onOpen={() => router.push(`/chats/${character.id}`)}
+            onDelete={() => confirmDelete(character)}
             menu={menuItems(character)}
           />
         )}

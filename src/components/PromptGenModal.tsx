@@ -32,9 +32,10 @@ import { Eyebrow } from './motifs/Eyebrow'
 import { FieldRow } from './motifs/FieldRow'
 import { ShardButton } from './motifs/ShardButton'
 import { ShardChip } from './motifs/ShardChip'
-import { StarToggle } from './motifs/StarToggle'
+import { ChipGroup } from './ChipGroup'
 import { PageSheet } from './PageSheet'
 import { Pager } from './Pager'
+import { ToggleRow } from './ToggleRow'
 
 export type GeneratedCharacter = { prompt: string; greeting: string | null }
 
@@ -212,26 +213,18 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
     <ShardChip key={key ?? label} label={label} active={false} onPress={() => !busy && onPress()} />
   )
 
-  const choices = <T extends string>(value: T, options: { value: T; label: string }[], onChange: (v: T) => void) => (
-    <View style={styles.chips}>
-      {options.map((o) => (
-        <ShardChip key={o.value} label={o.label} active={value === o.value} onPress={() => onChange(o.value)} />
-      ))}
-    </View>
-  )
-
   const composeView = (
     <>
       {hasCurrent ? (
         <View style={styles.block}>
-          {choices<Mode>(
-            mode,
-            [
+          <ChipGroup
+            options={[
               { value: 'improve', label: t('promptGen.modeImprove') },
               { value: 'new', label: t('promptGen.modeNew') },
-            ],
-            setMode
-          )}
+            ]}
+            value={mode}
+            onChange={setMode}
+          />
         </View>
       ) : null}
 
@@ -259,40 +252,37 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
       <Eyebrow label={t('promptGen.lengthLabel')} color={colors.accent} />
       <View style={styles.block}>
-        {choices<PromptLength>(
-          length,
-          [
+        <ChipGroup
+          options={[
             { value: 'short', label: t('promptGen.lengthShort') },
             { value: 'medium', label: t('promptGen.lengthMedium') },
             { value: 'long', label: t('promptGen.lengthLong') },
-          ],
-          setLength
-        )}
+          ]}
+          value={length}
+          onChange={setLength}
+        />
       </View>
 
       <Eyebrow label={t('promptGen.formatLabel')} color={colors.accent} />
       <View style={styles.block}>
-        {choices<PromptFormat>(
-          format,
-          [
+        <ChipGroup
+          options={[
             { value: 'prose', label: t('promptGen.formatProse') },
             { value: 'sections', label: t('promptGen.formatSections') },
-          ],
-          setFormat
-        )}
+          ]}
+          value={format}
+          onChange={setFormat}
+        />
       </View>
 
       <Divider />
 
-      <View style={styles.toggleRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.toggleTitle}>{t('promptGen.withGreeting')}</Text>
-          <Text style={styles.toggleHint}>
-            {currentGreeting.trim() ? t('promptGen.withGreetingReplace') : t('promptGen.withGreetingHint')}
-          </Text>
-        </View>
-        <StarToggle value={withGreeting} onValueChange={setWithGreeting} />
-      </View>
+      <ToggleRow
+        label={t('promptGen.withGreeting')}
+        note={currentGreeting.trim() ? t('promptGen.withGreetingReplace') : t('promptGen.withGreetingHint')}
+        value={withGreeting}
+        onValueChange={setWithGreeting}
+      />
     </>
   )
 
@@ -444,9 +434,6 @@ const createStyles = (colors: Colors) =>
     wideColumn: { width: '100%', maxWidth: 720, alignSelf: 'center' },
     block: { marginBottom: 20 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-    toggleTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
-    toggleHint: { color: colors.textMuted, fontSize: 13, marginTop: 2, lineHeight: 18 },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -4,7 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { deleteCharacter, duplicateCharacter, type CharacterPreview } from '@/db/characters'
 import { createChat } from '@/db/chats'
 import { useTranslation } from '@/i18n'
-import { readAvatarBase64, removeAvatar, writeAvatarBase64 } from '@/lib/avatars'
+import { copyStoredImage, removeCharacterImages } from '@/lib/avatars'
 import type { MenuItem } from '@/components/NativeMenu'
 import { confirm, showSheet } from '@/lib/dialogs'
 
@@ -29,22 +29,16 @@ export function useCharacterActions(reload: () => void, onStart?: (character: Ch
       destructive: true,
       onConfirm: async () => {
         await deleteCharacter(db, character.id)
-        if (character.avatar) removeAvatar(character.avatar)
+        removeCharacterImages(character)
         reload()
       },
     })
   }
 
   const duplicate = async (character: CharacterPreview) => {
-    let avatar: string | null = null
-    if (character.avatar) {
-      const base64 = await readAvatarBase64(character.avatar)
-      if (base64) {
-        avatar = `${Date.now()}.jpg`
-        await writeAvatarBase64(avatar, base64)
-      }
-    }
-    await duplicateCharacter(db, character.id, `${character.name} (${t('characters.copySuffix')})`, avatar)
+    const avatar = await copyStoredImage(character.avatar)
+    const background = await copyStoredImage(character.background)
+    await duplicateCharacter(db, character.id, `${character.name} (${t('characters.copySuffix')})`, avatar, background)
     reload()
   }
 
@@ -57,5 +51,5 @@ export function useCharacterActions(reload: () => void, onStart?: (character: Ch
 
   const openMenu = (character: CharacterPreview) => showSheet(character.name, menuItems(character))
 
-  return { openMenu, menuItems }
+  return { openMenu, menuItems, confirmDelete }
 }

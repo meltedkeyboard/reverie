@@ -1,24 +1,24 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { getSetting, setSetting } from '@/db/settings'
+import { getFlag, setFlag } from '@/db/settings'
 
 // The home screen's button back into the last chat. It is on unless turned off in
 // Settings; a swipe hides it only until the user opens a chat again.
 const ENABLED_KEY = 'continue_button'
 const HIDDEN_KEY = 'continue_hidden'
 
-export async function isContinueEnabled(db: SQLiteDatabase) {
-  return (await getSetting(db, ENABLED_KEY)) !== '0'
+export function isContinueEnabled(db: SQLiteDatabase) {
+  return getFlag(db, ENABLED_KEY, true)
 }
 
 export function setContinueEnabled(db: SQLiteDatabase, enabled: boolean) {
-  return setSetting(db, ENABLED_KEY, enabled ? '1' : '0')
+  return setFlag(db, ENABLED_KEY, enabled)
 }
 
-export async function isContinueHidden(db: SQLiteDatabase) {
-  return (await getSetting(db, HIDDEN_KEY)) === '1'
+export function isContinueHidden(db: SQLiteDatabase) {
+  return getFlag(db, HIDDEN_KEY, false)
 }
 
 export function setContinueHidden(db: SQLiteDatabase, hidden: boolean) {
-  return setSetting(db, HIDDEN_KEY, hidden ? '1' : '0')
+  return setFlag(db, HIDDEN_KEY, hidden)
 }

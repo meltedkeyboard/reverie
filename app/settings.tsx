@@ -1,39 +1,36 @@
-import { Stack, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
-import { testConnection } from '@/api/llm'
-import { EdgeFade } from '@/components/BarChrome'
-import { useHeaderHeight, useScreenPadding } from '@/components/GlassHeader'
+import { ChipGroup } from '@/components/ChipGroup'
+import { FormScreenHeader } from '@/components/FormScreenHeader'
+import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
 import { FieldRow } from '@/components/motifs/FieldRow'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
-import { Shard } from '@/components/motifs/Shard'
 import { ShardButton } from '@/components/motifs/ShardButton'
 import { ShardChip } from '@/components/motifs/ShardChip'
 import { Star } from '@/components/motifs/Star'
-import { StarToggle } from '@/components/motifs/StarToggle'
+import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isContinueEnabled, setContinueEnabled } from '@/db/continue'
+import { isHapticsEnabled, setHapticsEnabled } from '@/db/haptics'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
+import { useConnectionTest } from '@/hooks/useConnectionTest'
+import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
-import * as Haptics from '@/lib/haptics'
-import { fonts, useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
-
-type Status = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok' | 'error'; text: string }
+import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
 
 export default function SettingsScreen() {
   const db = useSQLiteContext()
   const router = useRouter()
-  const headerHeight = useHeaderHeight()
-  const titleMaxWidth = useWindowDimensions().width - 160
   const padding = useScreenPadding('form')
   const colors = useColors()
   const { preference, setPreference } = useTheme()
@@ -53,38 +50,14 @@ export default function SettingsScreen() {
 
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
-  const [status, setStatus] = useState<Status>({ kind: 'idle' })
-  const [models, setModels] = useState<string[]>([])
+  const { status, models, test } = useConnectionTest()
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const [wiping, setWiping] = useState(false)
-  const [continueButton, setContinueButton] = useState(true)
-
-  useEffect(() => {
-    isContinueEnabled(db).then(setContinueButton)
-  }, [db])
-
-  const toggleContinueButton = (enabled: boolean) => {
-    setContinueButton(enabled)
-    setContinueEnabled(db, enabled)
-  }
-
-  const [privateButton, setPrivateButton] = useState(true)
-
-  useEffect(() => {
-    isPrivateChatEnabled(db).then(setPrivateButton)
-  }, [db])
-
-  const togglePrivateButton = (enabled: boolean) => {
-    setPrivateButton(enabled)
-    setPrivateChatEnabled(db, enabled)
-  }
-
-  const [appLock, setAppLock] = useState(false)
-
-  useEffect(() => {
-    isAppLockEnabled(db).then(setAppLock)
-  }, [db])
+  const [continueButton, toggleContinueButton] = useStoredFlag(isContinueEnabled, setContinueEnabled, true)
+  const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
+  const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
+  const [appLock, setAppLock] = useStoredFlag(isAppLockEnabled, setAppLockEnabled, false)
 
   const toggleAppLock = async (enabled: boolean) => {
     if (enabled) {
@@ -97,7 +70,6 @@ export default function SettingsScreen() {
       if (!result.success) return
     }
     setAppLock(enabled)
-    setAppLockEnabled(db, enabled)
   }
 
   useEffect(() => {
@@ -112,23 +84,6 @@ export default function SettingsScreen() {
   }, [db, cfg, loaded])
 
   const update = (patch: Partial<ServerSettings>) => setCfg((prev) => ({ ...prev, ...patch }))
-
-  const onTest = async () => {
-    setStatus({ kind: 'testing' })
-    try {
-      const found = await testConnection(cfg)
-      setModels(found)
-      setStatus({
-        kind: 'ok',
-        text: found.length ? t('settings.connectedWithModels', { count: found.length }) : t('settings.connected'),
-      })
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    } catch (err) {
-      setModels([])
-      setStatus({ kind: 'error', text: errorMessage(err) })
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-    }
-  }
 
   const onExport = async () => {
     setExporting(true)
@@ -185,58 +140,52 @@ export default function SettingsScreen() {
           contentContainerStyle={padding}
         >
           <Eyebrow label={t('settings.appearance')} color={colors.accent} />
-          <View style={styles.chipsRow}>
-            {THEME_OPTIONS.map((opt) => (
-              <ShardChip key={opt.value} label={opt.label} active={preference === opt.value} onPress={() => setPreference(opt.value)} />
-            ))}
-          </View>
+          <ChipGroup style={styles.chips} options={THEME_OPTIONS} value={preference} onChange={setPreference} />
 
           <Eyebrow label={t('settings.language')} color={colors.accent} />
-          <View style={styles.chipsRow}>
-            {LANGUAGE_OPTIONS.map((opt) => (
-              <ShardChip
-                key={opt.value}
-                label={opt.label}
-                active={localePreference === opt.value}
-                onPress={() => setLocalePreference(opt.value)}
-              />
-            ))}
-          </View>
+          <ChipGroup style={styles.chips} options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
 
           <Divider />
 
           <Eyebrow label={t('settings.homeScreen')} color={colors.accent} />
-          <Pressable style={styles.toggleRow} onPress={() => toggleContinueButton(!continueButton)}>
-            <View style={styles.toggleBody}>
-              <Text style={styles.rowLabel}>{t('settings.continueButton')}</Text>
-              <Text style={styles.note}>{t('settings.continueButtonNote')}</Text>
-            </View>
-            <StarToggle value={continueButton} onValueChange={toggleContinueButton} />
-          </Pressable>
+          <ToggleRow
+            label={t('settings.continueButton')}
+            note={t('settings.continueButtonNote')}
+            value={continueButton}
+            onValueChange={toggleContinueButton}
+          />
 
           <Divider />
 
           <Eyebrow label={t('settings.chats')} color={colors.accent} />
-          <Pressable style={styles.toggleRow} onPress={() => togglePrivateButton(!privateButton)}>
-            <View style={styles.toggleBody}>
-              <Text style={styles.rowLabel}>{t('settings.privateButton')}</Text>
-              <Text style={styles.note}>{t('settings.privateButtonNote')}</Text>
-            </View>
-            <StarToggle value={privateButton} onValueChange={togglePrivateButton} />
-          </Pressable>
+          <ToggleRow
+            label={t('settings.privateButton')}
+            note={t('settings.privateButtonNote')}
+            value={privateButton}
+            onValueChange={togglePrivateButton}
+          />
+
+          <Divider />
+
+          <Eyebrow label={t('settings.feedback')} color={colors.accent} />
+          <ToggleRow
+            label={t('settings.haptics')}
+            note={t('settings.hapticsNote')}
+            value={haptics}
+            onValueChange={toggleHaptics}
+          />
 
           <Divider />
 
           {Platform.OS !== 'web' ? (
             <>
               <Eyebrow label={t('settings.security')} color={colors.accent} />
-              <Pressable style={styles.toggleRow} onPress={() => toggleAppLock(!appLock)}>
-                <View style={styles.toggleBody}>
-                  <Text style={styles.rowLabel}>{t('settings.requireFaceId')}</Text>
-                  <Text style={styles.note}>{t('settings.requireFaceIdNote')}</Text>
-                </View>
-                <StarToggle value={appLock} onValueChange={toggleAppLock} />
-              </Pressable>
+              <ToggleRow
+                label={t('settings.requireFaceId')}
+                note={t('settings.requireFaceIdNote')}
+                value={appLock}
+                onValueChange={toggleAppLock}
+              />
 
               <Divider />
             </>
@@ -283,7 +232,7 @@ export default function SettingsScreen() {
             </View>
           ) : null}
 
-          <ShardButton label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} style={styles.testButton} />
+          <ShardButton label={t('settings.testConnection')} onPress={() => test(cfg)} loading={status.kind === 'testing'} style={styles.testButton} />
 
           {status.kind === 'ok' || status.kind === 'error' ? <Text style={styles.statusText}>{status.text}</Text> : null}
 
@@ -326,22 +275,7 @@ export default function SettingsScreen() {
         </KeyboardAwareScrollView>
       ) : null}
 
-      <EdgeFade edge="top" style={{ pointerEvents: "none", height: headerHeight + 28, position: 'absolute', top: 0, left: 0, right: 0 }} />
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTransparent: true,
-          headerShadowVisible: false,
-          headerBackButtonDisplayMode: 'minimal',
-          headerTitleAlign: 'left',
-          headerTitle: () => (
-            <View style={[styles.titleRow, { maxWidth: titleMaxWidth }]}>
-              <Star size={22} color={colors.danger} rotation={-14} style={styles.titleStar} />
-              <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{t('settings.title')}</Text>
-            </View>
-          ),
-        }}
-      />
+      <FormScreenHeader title={t('settings.title')} />
     </View>
   )
 }
@@ -349,13 +283,9 @@ export default function SettingsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 0, flexShrink: 1 },
-    titleStar: { marginTop: 2 },
-    title: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
+    chips: { marginBottom: 26 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 26 },
     modelChips: { marginTop: -6 },
-    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-    toggleBody: { flex: 1 },
     rowLabel: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 14 },
     testButton: { alignSelf: 'flex-start', marginTop: 4 },

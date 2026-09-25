@@ -83,6 +83,56 @@ const MIGRATIONS = [
   `
     ALTER TABLE characters ADD COLUMN thinking TEXT NOT NULL DEFAULT 'auto';
   `,
+  // A hand-made order for characters and chats, highest first. What was on screen keeps
+  // its place (the newest activity on top); a trigger puts every new row above the rest.
+  `
+    ALTER TABLE characters ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE chats ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+
+    WITH ranked AS (
+      SELECT c.id AS id, ROW_NUMBER() OVER (ORDER BY COALESCE(
+        (SELECT m.created_at FROM messages m JOIN chats ch ON ch.id = m.chat_id
+          WHERE ch.character_id = c.id ORDER BY m.id DESC LIMIT 1), c.created_at), c.id) AS r
+      FROM characters c
+    )
+    UPDATE characters SET sort_order = (SELECT r FROM ranked WHERE ranked.id = characters.id);
+
+    WITH ranked AS (
+      SELECT ch.id AS id, ROW_NUMBER() OVER (ORDER BY COALESCE(
+        (SELECT m.created_at FROM messages m WHERE m.chat_id = ch.id ORDER BY m.id DESC LIMIT 1), ch.created_at), ch.id) AS r
+      FROM chats ch
+    )
+    UPDATE chats SET sort_order = (SELECT r FROM ranked WHERE ranked.id = chats.id);
+
+    CREATE TRIGGER characters_new_on_top AFTER INSERT ON characters BEGIN
+      UPDATE characters SET sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM characters) WHERE id = NEW.id;
+    END;
+    CREATE TRIGGER chats_new_on_top AFTER INSERT ON chats BEGIN
+      UPDATE chats SET sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM chats) WHERE id = NEW.id;
+    END;
+  `,
+  // A message can carry several pictures: one JSON array of {base64, width, height} in
+  // place of the three columns that held a single one.
+  `
+    ALTER TABLE messages ADD COLUMN images TEXT;
+    UPDATE messages
+      SET images = json_array(json_object('base64', image, 'width', image_width, 'height', image_height))
+      WHERE image IS NOT NULL;
+    ALTER TABLE messages DROP COLUMN image;
+    ALTER TABLE messages DROP COLUMN image_width;
+    ALTER TABLE messages DROP COLUMN image_height;
+  `,
+  // A picture behind a character's chats, with how it is softened so the text stays
+  // readable: 'blur' or 'dim', and how strongly (0 to 1). The file is kept like an avatar.
+  `
+    ALTER TABLE characters ADD COLUMN background TEXT;
+    ALTER TABLE characters ADD COLUMN background_effect TEXT NOT NULL DEFAULT 'blur';
+    ALTER TABLE characters ADD COLUMN background_intensity REAL NOT NULL DEFAULT 0.5;
+  `,
+  // How see-through the user's message bubbles are over that picture (0 is solid).
+  `
+    ALTER TABLE characters ADD COLUMN background_bubble_transparency REAL NOT NULL DEFAULT 0.3;
+  `,
 ]
 
 export async function migrate(db: SQLiteDatabase) {

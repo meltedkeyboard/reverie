@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   Animated,
@@ -15,7 +15,6 @@ import {
 import { KeyboardAwareScrollView, useKeyboardState } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { testConnection } from '@/api/llm'
 import { Button } from '@/components/Button'
 import { Field } from '@/components/Field'
 import { Group } from '@/components/Group'
@@ -23,8 +22,8 @@ import { SFIcon } from '@/components/SFIcon'
 import { Wordmark } from '@/components/Wordmark'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
+import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useTranslation } from '@/i18n'
-import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
 import { useColors, useStyles, type Colors } from '@/theme'
 
@@ -62,8 +61,6 @@ const FEATURES: Feature[] = [
   },
 ]
 
-type Status = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok' | 'error'; text: string }
-
 // A welcome sheet in the manner of Apple's own apps: what the app does, on one screen,
 // then the server to talk to, which can be left for later. The content settles in once,
 // and the second page turns in from the right like the next page of a pager.
@@ -80,8 +77,7 @@ export default function OnboardingScreen() {
   const turn = useRef(new Animated.Value(0)).current
   const [onServer, setOnServer] = useState(false)
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
-  const [status, setStatus] = useState<Status>({ kind: 'idle' })
-  const [models, setModels] = useState<string[]>([])
+  const { status, models, test, reset: resetStatus } = useConnectionTest()
   const welcomeScroll = useFitScroll()
   const serverScroll = useFitScroll()
 
@@ -112,26 +108,13 @@ export default function OnboardingScreen() {
 
   const update = (patch: Partial<ServerSettings>) => {
     setCfg((prev) => ({ ...prev, ...patch }))
-    if (patch.baseUrl !== undefined || patch.apiKey !== undefined) setStatus({ kind: 'idle' })
+    if (patch.baseUrl !== undefined || patch.apiKey !== undefined) resetStatus()
   }
 
   const onTest = async () => {
-    setStatus({ kind: 'testing' })
-    try {
-      const found = await testConnection(cfg)
-      setModels(found)
-      // A single model on the server is the one to talk to.
-      if (found.length === 1) update({ model: found[0] })
-      setStatus({
-        kind: 'ok',
-        text: found.length ? t('settings.connectedWithModels', { count: found.length }) : t('settings.connected'),
-      })
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    } catch (err) {
-      setModels([])
-      setStatus({ kind: 'error', text: errorMessage(err) })
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-    }
+    const found = await test(cfg)
+    // A single model on the server is the one to talk to.
+    if (found.length === 1) update({ model: found[0] })
   }
 
   const finish = async (saveServer: boolean) => {

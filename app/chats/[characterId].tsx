@@ -1,7 +1,9 @@
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useState } from 'react'
-import { FlatList, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
+
+import ReorderableList from 'react-native-reorderable-list'
 
 import { Avatar } from '@/components/Avatar'
 import { Button } from '@/components/Button'
@@ -12,7 +14,8 @@ import { IconButton } from '@/components/IconButton'
 import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import type { MenuItem } from '@/components/NativeMenu'
 import { getCharacter, type Character } from '@/db/characters'
-import { deleteChat, duplicateChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
+import { deleteChat, duplicateChat, listChats, pruneUntouchedChats, setChatOrder, setChatTitle, type ChatPreview } from '@/db/chats'
+import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { fonts, useStyles, type Colors } from '@/theme'
@@ -40,6 +43,8 @@ export default function CharacterChatsScreen() {
       reload()
     }, [reload])
   )
+
+  const reorder = useReorder(chats, setChats, (ids) => setChatOrder(db, ids))
 
   const menuItems = (chat: ChatPreview): MenuItem[] => [
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: () => promptRename(chat) },
@@ -69,9 +74,10 @@ export default function CharacterChatsScreen() {
 
   return (
     <View style={styles.screen}>
-      <FlatList
+      <ReorderableList
         data={chats ?? []}
         keyExtractor={(c) => String(c.id)}
+        {...reorder}
         contentContainerStyle={padding}
         ItemSeparatorComponent={ListSeparator}
         ListEmptyComponent={
@@ -90,7 +96,12 @@ export default function CharacterChatsScreen() {
           ) : null
         }
         renderItem={({ item: chat }) => (
-          <ChatCard chat={chat} onOpen={() => router.push(`/chat/${chat.id}`)} menu={menuItems(chat)} />
+          <ChatCard
+            chat={chat}
+            onOpen={() => router.push(`/chat/${chat.id}`)}
+            onDelete={() => confirmDelete(chat)}
+            menu={menuItems(chat)}
+          />
         )}
       />
       <GlassHeader

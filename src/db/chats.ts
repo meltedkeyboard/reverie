@@ -12,7 +12,7 @@ export type ChatPreview = Chat & {
 }
 
 // A message that is only a picture has empty text, so the list shows a label instead.
-export const PREVIEW = "CASE WHEN m.content = '' AND m.image IS NOT NULL THEN 'Фото' ELSE m.content END"
+export const PREVIEW = "CASE WHEN m.content = '' AND m.images IS NOT NULL THEN 'Фото' ELSE m.content END"
 
 const COLUMNS = 'ch.id, ch.character_id AS characterId, ch.title, ch.created_at AS createdAt'
 
@@ -27,9 +27,18 @@ export function listChats(db: SQLiteDatabase, characterId: number) {
        (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ch.id) AS messageCount
      FROM chats ch
      WHERE ch.character_id = ?
-     ORDER BY lastActivity DESC, ch.id DESC`,
+     ORDER BY ch.sort_order DESC, ch.id DESC`,
     characterId
   )
+}
+
+// Saves the order the user dragged a character's chats into; ids run from the top down.
+export function setChatOrder(db: SQLiteDatabase, ids: number[]) {
+  return db.withTransactionAsync(async () => {
+    for (const [index, id] of ids.entries()) {
+      await db.runAsync('UPDATE chats SET sort_order = ? WHERE id = ?', [ids.length - index, id])
+    }
+  })
 }
 
 export function getChat(db: SQLiteDatabase, id: number) {
@@ -66,8 +75,8 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
     )
     chatId = res.lastInsertRowId
     await db.runAsync(
-      `INSERT INTO messages (chat_id, role, content, image, image_width, image_height, variants, variant, thoughts, created_at)
-       SELECT ?, role, content, image, image_width, image_height, variants, variant, thoughts, created_at
+      `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, created_at)
+       SELECT ?, role, content, images, variants, variant, thoughts, created_at
        FROM messages WHERE chat_id = ? ORDER BY id`,
       [chatId, id]
     )

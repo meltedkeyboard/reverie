@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/Avatar'
+import { ChatBackground } from '@/components/ChatBackground'
 import { Composer } from '@/components/Composer'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
@@ -39,6 +40,7 @@ import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { promptText, showMessage } from '@/lib/dialogs'
+import { avatarUri } from '@/lib/avatars'
 import { errorMessage } from '@/lib/errors'
 import { formatWhen } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
@@ -157,7 +159,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   const headerHeight = useHeaderHeight()
   const colors = useColors()
   const styles = useStyles(createStyles)
-  const { t, locale } = useTranslation()
+  const { t } = useTranslation()
   const [privateEnabled, setPrivateEnabled] = useState(true)
   useEffect(() => {
     isPrivateChatEnabled(db).then(setPrivateEnabled)
@@ -353,6 +355,8 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     [regenerate, removeMessage]
   )
 
+  // Over a chat background the user's bubbles can be made see-through.
+  const bubbleOpacity = character.background ? 1 - character.backgroundBubbleTransparency : 1
   const renderRow = useCallback(
     ({ item: row }: ListRenderItemInfo<RowMessage>) => {
       const content = (
@@ -362,11 +366,12 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
           locked={locked}
           onAction={onAction}
           onSelectVariant={selectVariant}
+          bubbleOpacity={bubbleOpacity}
         />
       )
       return row.streaming ? <View onLayout={onDraftLayout}>{content}</View> : content
     },
-    [regenerable, locked, onAction, selectVariant, onDraftLayout]
+    [regenerable, locked, onAction, selectVariant, onDraftLayout, bubbleOpacity]
   )
 
   const confirmDelete = () => {
@@ -407,6 +412,13 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
 
   return (
     <View style={styles.screen}>
+      {character.background ? (
+        <ChatBackground
+          uri={avatarUri(character.background) ?? ''}
+          effect={character.backgroundEffect}
+          intensity={character.backgroundIntensity}
+        />
+      ) : null}
       <Animated.View style={[StyleSheet.absoluteFill, contentStyle]}>
         <FlatList
           ref={listRef}

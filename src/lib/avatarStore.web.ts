@@ -1,5 +1,5 @@
 import { t } from '@/i18n'
-import { imageDataUrl } from '@/lib/images'
+import { imageDataUrl, newAvatarName } from '@/lib/images'
 
 // expo-file-system has no web implementation, so in the browser the avatars are
 // kept in localStorage as data URLs. The database still stores only the name.
@@ -23,7 +23,7 @@ function store(name: string, dataUrl: string) {
 }
 
 export async function persistAvatar(tempUri: string) {
-  const name = `${Date.now()}.jpg`
+  const name = newAvatarName()
   store(name, await readAsDataUrl(tempUri))
   return name
 }

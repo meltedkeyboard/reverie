@@ -1,23 +1,28 @@
+import { BlurView } from 'expo-blur'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { AppState, Platform, StyleSheet, Text, View } from 'react-native'
+import { Animated, AppState, Platform, StyleSheet, Text, View } from 'react-native'
 
 import { ShardButton } from '@/components/motifs/ShardButton'
 import { Star } from '@/components/motifs/Star'
-import { isAppLockEnabled } from '@/db/appLock'
+import { isAppLockEnabled, isAppLockEnabledCached } from '@/db/appLock'
 import { useTranslation } from '@/i18n'
-import { fonts, useColors } from '@/theme'
+import { fonts, useColors, useTheme } from '@/theme'
 
 // Covers the app with a lock screen until Face ID (or the passcode) succeeds — on launch
-// and after the app has been in the background. Native only.
+// and after the app has been in the background. It also blurs the app in the app
+// switcher while the lock is on. Native only.
 export function AppLock({ children }: { children: ReactNode }) {
   const db = useSQLiteContext()
   const colors = useColors()
+  const { scheme } = useTheme()
   const { t } = useTranslation()
   const [locked, setLocked] = useState(Platform.OS !== 'web')
+  const [shielded, setShielded] = useState(false)
   const [checked, setChecked] = useState(Platform.OS === 'web')
   const busy = useRef(false)
+  const shieldOpacity = useRef(new Animated.Value(0)).current
 
   const unlock = useCallback(async () => {
     if (busy.current) return
@@ -44,6 +49,19 @@ export function AppLock({ children }: { children: ReactNode }) {
     // Only 'background': the Face ID prompt itself makes the app 'inactive'.
     let wasBackground = false
     const sub = AppState.addEventListener('change', async (state) => {
+      // Hide the content before iOS snapshots it for the app switcher.
+      if (state !== 'active') {
+        if (isAppLockEnabledCached()) {
+          shieldOpacity.stopAnimation()
+          shieldOpacity.setValue(1)
+          setShielded(true)
+        }
+      } else {
+        // Dissolve the blur on the way back in.
+        Animated.timing(shieldOpacity, { toValue: 0, duration: 175, useNativeDriver: true }).start(({ finished }) => {
+          if (finished) setShielded(false)
+        })
+      }
       if (state === 'background') wasBackground = true
       else if (state === 'active' && wasBackground) {
         wasBackground = false
@@ -54,13 +72,18 @@ export function AppLock({ children }: { children: ReactNode }) {
       }
     })
     return () => sub.remove()
-  }, [db, unlock])
+  }, [db, unlock, shieldOpacity])
 
   if (!checked) return <View style={[styles.cover, { backgroundColor: colors.bg }]} />
 
   return (
     <>
       {children}
+      {shielded && !locked ? (
+        <Animated.View pointerEvents="none" style={[styles.cover, { opacity: shieldOpacity }]}>
+          <BlurView tint={scheme} intensity={100} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+      ) : null}
       {locked ? (
         <View style={[styles.cover, { backgroundColor: colors.bg }]}>
           <Star size={40} color={colors.accent} rotation={-14} />

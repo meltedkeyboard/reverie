@@ -280,10 +280,10 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
   )
 
   const send = useCallback(
-    async (text: string, image: MessageImage | null) => {
+    async (text: string, images: MessageImage[]) => {
       if (task.current()) return
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-      const sent = await store.add('user', text, { image })
+      const sent = await store.add('user', text, { images })
       lastRequest.current = { id: sent.id }
       const history = [...messagesRef.current, sent]
       setMessages(history)
@@ -426,8 +426,11 @@ function requestTurns(system: string, turns: ChatTurn[], guidance: string | unde
 }
 
 function toTurn(m: Message): ChatTurn {
-  if (!m.image) return { role: m.role, content: m.content }
-  const parts: ContentPart[] = [{ type: 'image_url', image_url: { url: imageDataUrl(m.image) } }]
+  if (!m.images.length) return { role: m.role, content: m.content }
+  const parts: ContentPart[] = m.images.map((image) => ({
+    type: 'image_url',
+    image_url: { url: imageDataUrl(image.base64) },
+  }))
   if (m.content.trim()) parts.push({ type: 'text', text: m.content })
   return { role: m.role, content: parts }
 }

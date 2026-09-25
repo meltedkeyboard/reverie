@@ -2,7 +2,7 @@
   "expo": {
     "name": "Reverie",
     "slug": "reverie",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "reverie",
@@ -15,7 +15,9 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
-        "NSLocalNetworkUsageDescription": "Reverie подключается к серверу модели в вашей локальной сети."
+        "NSLocalNetworkUsageDescription": "Reverie connects to your model server on your local network.",
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true
       },
       "icon": {
         "light": "./assets/images/icon.png",
@@ -48,18 +50,21 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Reverie использует фото для аватаров персонажей и сообщений.",
-          "cameraPermission": "Reverie использует камеру, чтобы отправить снимок в чат."
+          "photosPermission": "Reverie uses your photos for character avatars and messages.",
+          "cameraPermission": "Reverie uses the camera to send a photo in chat."
         }
       ],
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Reverie использует Face ID, чтобы защитить ваши чаты."
+          "faceIDPermission": "Reverie uses Face ID to protect your chats."
         }
       ],
       "expo-font"
     ],
+    "locales": {
+      "ru": "./permissions/ru.json"
+    },
     "experiments": {
       "typedRoutes": false
     },

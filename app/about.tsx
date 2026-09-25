@@ -1,10 +1,10 @@
-import { Stack, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback } from 'react'
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { EdgeFade } from '@/components/BarChrome'
-import { useHeaderHeight, useScreenPadding } from '@/components/GlassHeader'
+import { FormScreenHeader } from '@/components/FormScreenHeader'
+import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
 import { Star } from '@/components/motifs/Star'
@@ -13,7 +13,7 @@ import { setOnboardingComplete } from '@/db/onboarding'
 import { useShake } from '@/hooks/useShake'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 import pkg from '../package.json'
 
 const { version } = pkg
@@ -22,8 +22,6 @@ export default function AboutScreen() {
   const router = useRouter()
   const db = useSQLiteContext()
   const padding = useScreenPadding('form')
-  const headerHeight = useHeaderHeight()
-  const titleMaxWidth = useWindowDimensions().width - 160
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -66,22 +64,7 @@ export default function AboutScreen() {
         </View>
       </ScrollView>
 
-      <EdgeFade edge="top" style={{ pointerEvents: 'none', height: headerHeight + 28, position: 'absolute', top: 0, left: 0, right: 0 }} />
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTransparent: true,
-          headerShadowVisible: false,
-          headerBackButtonDisplayMode: 'minimal',
-          headerTitleAlign: 'left',
-          headerTitle: () => (
-            <View style={[styles.titleRow, { maxWidth: titleMaxWidth }]}>
-              <Star size={22} color={colors.danger} rotation={-14} style={styles.titleStar} />
-              <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{t('settings.aboutTitle')}</Text>
-            </View>
-          ),
-        }}
-      />
+      <FormScreenHeader title={t('settings.aboutTitle')} />
     </View>
   )
 }
@@ -89,9 +72,6 @@ export default function AboutScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
-  titleStar: { marginTop: 2 },
-  title: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
   wordmark: { alignSelf: 'center', marginTop: 8 },
   version: { color: colors.textFaint, fontSize: 13, textAlign: 'center', marginTop: 12, marginBottom: 20 },
   tagline: {

@@ -12,9 +12,7 @@ export type Message = {
   chatId: number
   role: Role
   content: string
-  image: string | null
-  imageWidth: number | null
-  imageHeight: number | null
+  images: MessageImage[]
   // Every version of the text, the selected one is variants[variant] and equals content.
   variants: string[]
   variant: number
@@ -23,12 +21,15 @@ export type Message = {
   createdAt: number
 }
 
-type Row = Omit<Message, 'variants' | 'thoughts'> & { variants: string | null; thoughts: string | null }
+type Row = Omit<Message, 'variants' | 'thoughts' | 'images'> & {
+  images: string | null
+  variants: string | null
+  thoughts: string | null
+}
 
-export const MESSAGE_COLUMNS = `id, chat_id AS chatId, role, content, image, image_width AS imageWidth,
-  image_height AS imageHeight, variants, variant, thoughts, created_at AS createdAt`
+export const MESSAGE_COLUMNS = `id, chat_id AS chatId, role, content, images, variants, variant, thoughts, created_at AS createdAt`
 
-export type NewMessageExtra = { image?: MessageImage | null; thought?: Thought | null }
+export type NewMessageExtra = { images?: MessageImage[]; thought?: Thought | null }
 
 // How a message changes is kept apart from where it is stored, so the database and a
 // private chat's in-memory store can't drift apart.
@@ -37,7 +38,7 @@ export function newMessage(
   chatId: number,
   role: Role,
   content: string,
-  { image = null, thought = null }: NewMessageExtra = {},
+  { images = [], thought = null }: NewMessageExtra = {},
   createdAt = Date.now()
 ): Message {
   return {
@@ -45,9 +46,7 @@ export function newMessage(
     chatId,
     role,
     content,
-    image: image?.base64 ?? null,
-    imageWidth: image?.width ?? null,
-    imageHeight: image?.height ?? null,
+    images,
     variants: [content],
     variant: 0,
     thoughts: [thought],
@@ -78,7 +77,13 @@ export function withVariant(message: Message, variant: number): Message {
 function fromRow(row: Row): Message {
   const variants: string[] = row.variants ? JSON.parse(row.variants) : [row.content]
   const thoughts: (Thought | null)[] = row.thoughts ? JSON.parse(row.thoughts) : []
-  return { ...row, variants, thoughts: variants.map((_, i) => thoughts[i] ?? null) }
+  const images: MessageImage[] = row.images ? JSON.parse(row.images) : []
+  return { ...row, images, variants, thoughts: variants.map((_, i) => thoughts[i] ?? null) }
+}
+
+// A message without pictures keeps the column empty.
+function packImages(images: MessageImage[]) {
+  return images.length ? JSON.stringify(images) : null
 }
 
 // A message with a single version keeps the column empty instead of a one-item array.
@@ -98,15 +103,13 @@ export async function listMessages(db: SQLiteDatabase, chatId: number) {
 export async function addMessage(db: SQLiteDatabase, chatId: number, role: Role, content: string, extra?: NewMessageExtra) {
   const message = newMessage(0, chatId, role, content, extra)
   const res = await db.runAsync(
-    `INSERT INTO messages (chat_id, role, content, image, image_width, image_height, thoughts, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO messages (chat_id, role, content, images, thoughts, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
     [
       chatId,
       role,
       content,
-      message.image,
-      message.imageWidth,
-      message.imageHeight,
+      packImages(message.images),
       packThoughts(message.thoughts),
       message.createdAt,
     ]

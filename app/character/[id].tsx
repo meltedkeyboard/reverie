@@ -1,35 +1,43 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { Avatar } from '@/components/Avatar'
-import { EdgeFade } from '@/components/BarChrome'
-import { useHeaderHeight, useScreenPadding } from '@/components/GlassHeader'
+import { ChatBackground } from '@/components/ChatBackground'
+import { ImageSourceMenu } from '@/components/ImageSourceMenu'
+import { ChipGroup } from '@/components/ChipGroup'
+import { FormScreenHeader } from '@/components/FormScreenHeader'
+import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
 import { FieldRow } from '@/components/motifs/FieldRow'
 import { ShardButton } from '@/components/motifs/ShardButton'
-import { ShardChip } from '@/components/motifs/ShardChip'
-import { Star } from '@/components/motifs/Star'
 import { ParamSlider } from '@/components/ParamSlider'
 import { PromptGenModal, type GeneratedCharacter } from '@/components/PromptGenModal'
-import { DEFAULT_SAMPLING, deleteCharacter, getCharacter, saveCharacter, type ThinkingMode } from '@/db/characters'
+import {
+  DEFAULT_SAMPLING,
+  deleteCharacter,
+  getCharacter,
+  saveCharacter,
+  type BackgroundEffect,
+  type ThinkingMode,
+} from '@/db/characters'
 import { useTranslation } from '@/i18n'
-import { pickAvatar, persistAvatar, removeAvatar } from '@/lib/avatars'
+import { avatarUri, persistAvatar, pickAvatar, pickBackground, removeAvatar, removeCharacterImages } from '@/lib/avatars'
+import { setBackgroundDraft } from '@/lib/backgroundDraft'
+import type { ImageSource } from '@/lib/images'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import { plural } from '@/lib/format'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharacterEditorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const isNew = id === 'new'
   const db = useSQLiteContext()
   const router = useRouter()
-  const headerHeight = useHeaderHeight()
-  const titleMaxWidth = useWindowDimensions().width - 160
   const padding = useScreenPadding('form')
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -53,11 +61,17 @@ export default function CharacterEditorScreen() {
   const [topP, setTopP] = useState<number>(DEFAULT_SAMPLING.topP)
   const [replyLimit, setReplyLimit] = useState<number | null>(null)
   const [thinking, setThinking] = useState<ThinkingMode>('auto')
+  const [background, setBackground] = useState<string | null>(null)
+  const [bgPickedUri, setBgPickedUri] = useState<string | null>(null)
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>('blur')
+  const [bgIntensity, setBgIntensity] = useState(0.5)
+  const [bgBubbleTransparency, setBgBubbleTransparency] = useState(0.3)
   const [showPromptGen, setShowPromptGen] = useState(false)
   // What the prompt and greeting were before the last AI result replaced them, until
   // the user edits the prompt by hand.
   const [beforeGen, setBeforeGen] = useState<{ prompt: string; greeting: string } | null>(null)
   const storedAvatar = useRef<string | null>(null)
+  const storedBackground = useRef<string | null>(null)
 
   useEffect(() => {
     if (isNew) return
@@ -72,16 +86,25 @@ export default function CharacterEditorScreen() {
       setTopP(found.topP)
       setReplyLimit(found.replyLimit)
       setThinking(found.thinking)
+      setBackground(found.background)
+      setBgEffect(found.backgroundEffect)
+      setBgIntensity(found.backgroundIntensity)
+      setBgBubbleTransparency(found.backgroundBubbleTransparency)
       storedAvatar.current = found.avatar
+      storedBackground.current = found.background
       setReady(true)
     })
   }, [db, id, isNew, router])
 
   const canSave = ready && !saving && name.trim().length > 0
 
-  const onPickAvatar = async () => {
-    const uri = await pickAvatar()
-    if (uri) setPickedUri(uri)
+  const onPickAvatar = async (source: ImageSource) => {
+    try {
+      const uri = await pickAvatar(source)
+      if (uri) setPickedUri(uri)
+    } catch (err) {
+      showMessage(t('editor.avatarFailedTitle'), errorMessage(err))
+    }
   }
 
   const onClearAvatar = () => {
@@ -89,11 +112,47 @@ export default function CharacterEditorScreen() {
     setAvatar(null)
   }
 
+  // The picture now behind the chat: a fresh pick, else the one already stored.
+  const backgroundUri = bgPickedUri ?? (background ? avatarUri(background) : null)
+
+  // The effect is tried out on its own screen; what it returns is kept until Save.
+  const openBackground = (uri: string, fresh: boolean) => {
+    setBackgroundDraft({
+      uri,
+      characterName: name.trim(),
+      effect: bgEffect,
+      intensity: bgIntensity,
+      bubbleTransparency: bgBubbleTransparency,
+      onDone: (result) => {
+        if (fresh) setBgPickedUri(uri)
+        setBgEffect(result.effect)
+        setBgIntensity(result.intensity)
+        setBgBubbleTransparency(result.bubbleTransparency)
+      },
+    })
+    router.push('/background')
+  }
+
+  const onPickBackground = async (source: ImageSource) => {
+    try {
+      const uri = await pickBackground(source)
+      if (uri) openBackground(uri, true)
+    } catch (err) {
+      showMessage(t('background.failedTitle'), errorMessage(err))
+    }
+  }
+
+  const onClearBackground = () => {
+    setBgPickedUri(null)
+    setBackground(null)
+  }
+
   const onSave = async () => {
     if (!canSave) return
     setSaving(true)
     try {
       const nextAvatar = pickedUri ? await persistAvatar(pickedUri) : avatar
+      const nextBackground = bgPickedUri ? await persistAvatar(bgPickedUri) : background
       await saveCharacter(db, isNew ? null : Number(id), {
         name,
         avatar: nextAvatar,
@@ -104,8 +163,13 @@ export default function CharacterEditorScreen() {
         topP,
         replyLimit,
         thinking,
+        background: nextBackground,
+        backgroundEffect: bgEffect,
+        backgroundIntensity: bgIntensity,
+        backgroundBubbleTransparency: bgBubbleTransparency,
       })
       if (storedAvatar.current && storedAvatar.current !== nextAvatar) removeAvatar(storedAvatar.current)
+      if (storedBackground.current && storedBackground.current !== nextBackground) removeAvatar(storedBackground.current)
       router.back()
     } catch (err) {
       setSaving(false)
@@ -121,7 +185,7 @@ export default function CharacterEditorScreen() {
       destructive: true,
       onConfirm: async () => {
         await deleteCharacter(db, Number(id))
-        if (storedAvatar.current) removeAvatar(storedAvatar.current)
+        removeCharacterImages({ avatar: storedAvatar.current, background: storedBackground.current })
         router.dismissTo('/')
       },
     })
@@ -156,14 +220,14 @@ export default function CharacterEditorScreen() {
             {hasPhoto ? (
               <Avatar name={name} file={avatar} uri={pickedUri} size={96} />
             ) : (
-              <Pressable onPress={onPickAvatar} style={({ pressed }) => pressed && { opacity: 0.8 }}>
+              <ImageSourceMenu onPick={onPickAvatar}>
                 <Avatar name={name} file={avatar} uri={pickedUri} size={96} />
-              </Pressable>
+              </ImageSourceMenu>
             )}
             <View style={styles.avatarActions}>
-              <Pressable onPress={onPickAvatar} hitSlop={8}>
+              <ImageSourceMenu onPick={onPickAvatar}>
                 <Text style={styles.link}>{hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')}</Text>
-              </Pressable>
+              </ImageSourceMenu>
               {hasPhoto ? (
                 <Pressable onPress={onClearAvatar} hitSlop={8}>
                   <Text style={styles.linkMuted}>{t('editor.removePhoto')}</Text>
@@ -171,6 +235,30 @@ export default function CharacterEditorScreen() {
               ) : null}
             </View>
           </View>
+
+          <Eyebrow label={t('background.title')} color={colors.accent} />
+          <View style={styles.backgroundRow}>
+            <View style={styles.backgroundThumb}>
+              {backgroundUri ? <ChatBackground uri={backgroundUri} effect={bgEffect} intensity={bgIntensity} /> : null}
+            </View>
+            <View style={styles.backgroundActions}>
+              <ImageSourceMenu onPick={onPickBackground}>
+                <Text style={styles.link}>{backgroundUri ? t('background.change') : t('background.choose')}</Text>
+              </ImageSourceMenu>
+              {backgroundUri ? (
+                <>
+                  <Pressable onPress={() => openBackground(backgroundUri, false)} hitSlop={8}>
+                    <Text style={styles.link}>{t('background.adjust')}</Text>
+                  </Pressable>
+                  <Pressable onPress={onClearBackground} hitSlop={8}>
+                    <Text style={styles.linkMuted}>{t('background.remove')}</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
+          </View>
+
+          <Divider />
 
           <FieldRow
             label={t('editor.nameLabel')}
@@ -206,11 +294,7 @@ export default function CharacterEditorScreen() {
           <Divider />
 
           <Eyebrow label={t('editor.thinkingSection')} color={colors.accent} />
-          <View style={styles.chipsRow}>
-            {THINKING_OPTIONS.map((opt) => (
-              <ShardChip key={opt.value} label={opt.label} active={thinking === opt.value} onPress={() => setThinking(opt.value)} />
-            ))}
-          </View>
+          <ChipGroup style={styles.chips} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
           <Text style={styles.note}>{t('editor.thinkingHint')}</Text>
 
           <Divider />
@@ -283,22 +367,7 @@ export default function CharacterEditorScreen() {
         </KeyboardAwareScrollView>
       ) : null}
 
-      <EdgeFade edge="top" style={{ pointerEvents: 'none', height: headerHeight + 28, position: 'absolute', top: 0, left: 0, right: 0 }} />
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTransparent: true,
-          headerShadowVisible: false,
-          headerBackButtonDisplayMode: 'minimal',
-          headerTitleAlign: 'left',
-          headerTitle: () => (
-            <View style={[styles.titleRow, { maxWidth: titleMaxWidth }]}>
-              <Star size={22} color={colors.danger} rotation={-14} style={styles.titleStar} />
-              <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')}</Text>
-            </View>
-          ),
-        }}
-      />
+      <FormScreenHeader title={isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')} />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button icon="checkmark" disabled={!canSave} onPress={onSave} />
       </Stack.Toolbar>
@@ -309,14 +378,20 @@ export default function CharacterEditorScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
-    titleStar: { marginTop: 2 },
-    title: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
+    chips: { marginBottom: 14 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
     aiButton: { alignSelf: 'flex-start', marginBottom: 18 },
     avatarBlock: { alignItems: 'center', marginBottom: 28, gap: 12 },
     avatarActions: { flexDirection: 'row', gap: 20 },
+    backgroundRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 4 },
+    backgroundThumb: {
+      width: 72,
+      height: 96,
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceRaised,
+    },
+    backgroundActions: { flex: 1, gap: 12, alignItems: 'flex-start' },
     link: { color: colors.accent, fontSize: 15 },
     linkMuted: { color: colors.textMuted, fontSize: 15 },
     systemPromptHeader: {

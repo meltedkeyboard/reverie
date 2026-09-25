@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
 
 import * as Haptics from '@/lib/haptics'
+import { liquidGlass } from '@/lib/nativeUI'
 import { useColors, useStyles, type Colors } from '@/theme'
+
+import { GlassSurface } from './Glass'
 
 const PAD = 3
 const SPRING = { damping: 22, stiffness: 260, mass: 0.9 }
@@ -12,10 +15,12 @@ type Props<T extends string> = {
   options: { value: T; label: string }[]
   value: T
   onChange: (value: T) => void
+  // Draws the track as Liquid Glass, for a control that floats over a picture.
+  glass?: boolean
   style?: StyleProp<ViewStyle>
 }
 
-export function Segmented<T extends string>({ options, value, onChange, style }: Props<T>) {
+export function Segmented<T extends string>({ options, value, onChange, glass = false, style }: Props<T>) {
   const styles = useStyles(createStyles)
   const index = Math.max(0, options.findIndex((opt) => opt.value === value))
   // Where the thumb is, in segments; fractional while it slides between two of them.
@@ -38,14 +43,28 @@ export function Segmented<T extends string>({ options, value, onChange, style }:
     onChange(next)
   }
 
-  return (
-    <View style={[styles.segment, style]} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+  const items = (
+    <>
       {itemWidth ? <Animated.View style={[styles.thumb, thumbStyle]} /> : null}
       {options.map((opt, i) => (
         <Pressable key={opt.value} onPress={() => select(opt.value)} style={styles.item}>
           <Label label={opt.label} index={i} pos={pos} active={i === index} />
         </Pressable>
       ))}
+    </>
+  )
+  const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)
+
+  if (glass && liquidGlass) {
+    return (
+      <GlassSurface interactive style={[styles.segment, styles.segmentGlass, style]} onLayout={onLayout}>
+        {items}
+      </GlassSurface>
+    )
+  }
+  return (
+    <View style={[styles.segment, style]} onLayout={onLayout}>
+      {items}
     </View>
   )
 }
@@ -63,6 +82,8 @@ function Label({ label, index, pos, active }: { label: string; index: number; po
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     segment: { flexDirection: 'row', backgroundColor: colors.surfaceRaised, borderRadius: 10, padding: PAD },
+    // The plain track's fill is dropped, the glass is the track.
+    segmentGlass: { backgroundColor: undefined, borderRadius: 22 },
     thumb: {
       position: 'absolute',
       top: PAD,
