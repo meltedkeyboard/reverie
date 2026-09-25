@@ -56,6 +56,25 @@ export async function setChatTitle(db: SQLiteDatabase, id: number, title: string
   return value
 }
 
+// Copies the chat with all its messages, variants and thoughts; timestamps are kept.
+export async function duplicateChat(db: SQLiteDatabase, id: number, title: string | null) {
+  let chatId = 0
+  await db.withTransactionAsync(async () => {
+    const res = await db.runAsync(
+      'INSERT INTO chats (character_id, title, created_at) SELECT character_id, ?, created_at FROM chats WHERE id = ?',
+      [title, id]
+    )
+    chatId = res.lastInsertRowId
+    await db.runAsync(
+      `INSERT INTO messages (chat_id, role, content, image, image_width, image_height, variants, variant, thoughts, created_at)
+       SELECT ?, role, content, image, image_width, image_height, variants, variant, thoughts, created_at
+       FROM messages WHERE chat_id = ? ORDER BY id`,
+      [chatId, id]
+    )
+  })
+  return chatId
+}
+
 export async function deleteChat(db: SQLiteDatabase, id: number) {
   await db.runAsync('DELETE FROM chats WHERE id = ?', id)
 }

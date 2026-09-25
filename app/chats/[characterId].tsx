@@ -7,11 +7,12 @@ import { Avatar } from '@/components/Avatar'
 import { Button } from '@/components/Button'
 import { ChatCard } from '@/components/ChatCard'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
-import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHeader'
+import { GlassGroup } from '@/components/Glass'
 import { IconButton } from '@/components/IconButton'
+import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import type { MenuItem } from '@/components/NativeMenu'
 import { getCharacter, type Character } from '@/db/characters'
-import { deleteChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
+import { deleteChat, duplicateChat, listChats, pruneUntouchedChats, setChatTitle, type ChatPreview } from '@/db/chats'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { fonts, useStyles, type Colors } from '@/theme'
@@ -42,8 +43,15 @@ export default function CharacterChatsScreen() {
 
   const menuItems = (chat: ChatPreview): MenuItem[] => [
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: () => promptRename(chat) },
+    { label: t('chat.menuDuplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(chat) },
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(chat) },
   ]
+
+  const duplicate = async (chat: ChatPreview) => {
+    const title = chat.title ? `${chat.title} (${t('characters.copySuffix')})` : null
+    await duplicateChat(db, chat.id, title)
+    reload()
+  }
 
   const promptRename = (chat: ChatPreview) => {
     promptRenameChat(chat.title, async (text) => {
@@ -86,27 +94,30 @@ export default function CharacterChatsScreen() {
         )}
       />
       <GlassHeader
-        left={<BackButton />}
+        floating
+        left={
+          <GlassGroup>
+            <BackButton />
+            {character ? <Avatar name={character.name} file={character.avatar} size={34} /> : null}
+          </GlassGroup>
+        }
         right={
           character ? (
-            <>
+            <GlassGroup>
               <IconButton name="options-outline" onPress={() => router.push(`/character/${character.id}`)} />
               <Link href={`/chat/new?character=${character.id}`} asChild>
                 <Link.AppleZoom>
                   <IconButton name="add" size={26} />
                 </Link.AppleZoom>
               </Link>
-            </>
+            </GlassGroup>
           ) : null
         }
       >
         {character ? (
-          <View style={styles.who}>
-            <Avatar name={character.name} file={character.avatar} size={34} />
-            <Text style={styles.name} numberOfLines={1}>
-              {character.name}
-            </Text>
-          </View>
+          <Text style={styles.name} numberOfLines={1}>
+            {character.name}
+          </Text>
         ) : null}
       </GlassHeader>
     </View>
@@ -116,7 +127,6 @@ export default function CharacterChatsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  who: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
   emptyButton: { minWidth: 200 },
 })

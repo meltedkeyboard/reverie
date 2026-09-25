@@ -1,5 +1,5 @@
 import { Image } from 'expo-image'
-import { Link, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -25,8 +25,7 @@ export default function ViewerScreen() {
   // Dismissing the share sheet rejects on some platforms; there is nothing to report.
   const save = () => image && saveImage(image.uri).catch(() => {})
 
-  // The zoom lands on the picture's own frame, not the whole screen, so it grows
-  // without stretching.
+  // The picture's own frame, so it is never stretched.
   const width = image ? Math.min(window.width, window.height * image.aspect) : 0
   const frame = { width, height: image ? width / image.aspect : 0 }
 
@@ -34,11 +33,9 @@ export default function ViewerScreen() {
     <View style={styles.screen}>
       <Pressable style={styles.stage} onPress={close}>
         {image ? (
-          <Link.AppleZoomTarget>
-            <View style={frame}>
-              <Image source={{ uri: image.uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
-            </View>
-          </Link.AppleZoomTarget>
+          <View style={frame}>
+            <Image source={{ uri: image.uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+          </View>
         ) : null}
       </Pressable>
       <View style={[styles.bar, { top: insets.top + 4 }]} pointerEvents="box-none">

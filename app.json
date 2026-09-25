@@ -2,7 +2,7 @@
   "expo": {
     "name": "Reverie",
     "slug": "reverie",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "reverie",
@@ -10,7 +10,7 @@
     "backgroundColor": "#0F0F12",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.example.reverie",
+      "bundleIdentifier": "reverie.app",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -52,13 +52,19 @@
           "cameraPermission": "Reverie использует камеру, чтобы отправить снимок в чат."
         }
       ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Reverie использует Face ID, чтобы защитить ваши чаты."
+        }
+      ],
       "expo-font"
     ],
     "experiments": {
       "typedRoutes": false
     },
     "android": {
-      "package": "com.example.reverie",
+      "package": "reverie.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#F5F5F7"

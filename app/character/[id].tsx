@@ -1,16 +1,20 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { Avatar } from '@/components/Avatar'
-import { Button } from '@/components/Button'
-import { Field, FieldHint } from '@/components/Field'
-import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
+import { EdgeFade } from '@/components/BarChrome'
+import { useHeaderHeight, useScreenPadding } from '@/components/GlassHeader'
+import { Divider } from '@/components/motifs/Divider'
+import { Eyebrow } from '@/components/motifs/Eyebrow'
+import { FieldRow } from '@/components/motifs/FieldRow'
+import { ShardButton } from '@/components/motifs/ShardButton'
+import { ShardChip } from '@/components/motifs/ShardChip'
+import { Star } from '@/components/motifs/Star'
 import { ParamSlider } from '@/components/ParamSlider'
 import { PromptGenModal, type GeneratedCharacter } from '@/components/PromptGenModal'
-import { Segmented } from '@/components/Segmented'
 import { DEFAULT_SAMPLING, deleteCharacter, getCharacter, saveCharacter, type ThinkingMode } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { pickAvatar, persistAvatar, removeAvatar } from '@/lib/avatars'
@@ -24,6 +28,8 @@ export default function CharacterEditorScreen() {
   const isNew = id === 'new'
   const db = useSQLiteContext()
   const router = useRouter()
+  const headerHeight = useHeaderHeight()
+  const titleMaxWidth = useWindowDimensions().width - 160
   const padding = useScreenPadding('form')
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -166,7 +172,7 @@ export default function CharacterEditorScreen() {
             </View>
           </View>
 
-          <Field
+          <FieldRow
             label={t('editor.nameLabel')}
             value={name}
             onChangeText={setName}
@@ -174,7 +180,9 @@ export default function CharacterEditorScreen() {
             autoCapitalize="sentences"
           />
 
-          <Text style={styles.section}>{t('editor.genParamsSection')}</Text>
+          <Divider />
+
+          <Eyebrow label={t('editor.genParamsSection')} color={colors.accent} />
           <ParamSlider
             label={t('editor.temperature')}
             value={temperature}
@@ -195,11 +203,19 @@ export default function CharacterEditorScreen() {
             onChange={(v) => setTopP(Math.round(v * 100) / 100)}
           />
 
-          <Text style={styles.section}>{t('editor.thinkingSection')}</Text>
-          <Segmented options={THINKING_OPTIONS} value={thinking} onChange={setThinking} style={{ marginBottom: 8 }} />
-          <FieldHint style={styles.hint}>{t('editor.thinkingHint')}</FieldHint>
+          <Divider />
 
-          <Text style={styles.section}>{t('editor.replyLengthSection')}</Text>
+          <Eyebrow label={t('editor.thinkingSection')} color={colors.accent} />
+          <View style={styles.chipsRow}>
+            {THINKING_OPTIONS.map((opt) => (
+              <ShardChip key={opt.value} label={opt.label} active={thinking === opt.value} onPress={() => setThinking(opt.value)} />
+            ))}
+          </View>
+          <Text style={styles.note}>{t('editor.thinkingHint')}</Text>
+
+          <Divider />
+
+          <Eyebrow label={t('editor.replyLengthSection')} color={colors.accent} />
           <ParamSlider
             label={t('editor.paragraphLimit')}
             value={replyLimit ?? 0}
@@ -209,10 +225,12 @@ export default function CharacterEditorScreen() {
             formatValue={(v) => (v === 0 ? t('editor.unlimited') : `${v} ${plural(v, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`)}
             onChange={(v) => setReplyLimit(v === 0 ? null : v)}
           />
-          <FieldHint style={styles.hint}>{t('editor.replyLengthHint')}</FieldHint>
+          <Text style={styles.note}>{t('editor.replyLengthHint')}</Text>
 
-          <Field
-            label={t('editor.greetingLabel')}
+          <Divider />
+
+          <Eyebrow label={t('editor.greetingLabel')} color={colors.accent} />
+          <FieldRow
             hint={t('editor.greetingHint')}
             value={greeting}
             onChangeText={setGreeting}
@@ -220,22 +238,22 @@ export default function CharacterEditorScreen() {
             multiline
           />
 
+          <Divider />
+
           <View style={styles.systemPromptHeader}>
-            <Text style={styles.systemPromptLabel}>{t('editor.systemPromptLabel')}</Text>
+            <Eyebrow label={t('editor.systemPromptLabel')} color={colors.accent} />
             {beforeGen ? (
               <Pressable onPress={undoGenerated} hitSlop={8}>
                 <Text style={styles.linkMuted}>{t('editor.undoGenerated')}</Text>
               </Pressable>
             ) : null}
           </View>
-          <Button
-            variant="soft"
-            icon="sparkles"
+          <ShardButton
             label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
             onPress={() => setShowPromptGen(true)}
-            style={{ marginBottom: 10 }}
+            style={styles.aiButton}
           />
-          <Field
+          <FieldRow
             hint={t('editor.systemPromptHint')}
             value={systemPrompt}
             onChangeText={(v) => {
@@ -244,7 +262,7 @@ export default function CharacterEditorScreen() {
             }}
             placeholder={t('editor.systemPromptPlaceholder')}
             multiline
-            style={{ minHeight: 180 }}
+            minHeight={180}
           />
 
           <PromptGenModal
@@ -257,23 +275,33 @@ export default function CharacterEditorScreen() {
           />
 
           {!isNew ? (
-            <Pressable onPress={confirmDelete} style={({ pressed }) => [styles.delete, pressed && { opacity: 0.6 }]}>
-              <Text style={styles.deleteText}>{t('editor.deleteCharacter')}</Text>
-            </Pressable>
+            <>
+              <Divider />
+              <ShardButton label={t('editor.deleteCharacter')} onPress={confirmDelete} color={colors.danger} />
+            </>
           ) : null}
         </KeyboardAwareScrollView>
       ) : null}
 
-      <GlassHeader
-        left={<BackButton close={isNew} />}
-        right={
-          <Pressable onPress={onSave} disabled={!canSave} hitSlop={8} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
-            <Text style={[styles.save, !canSave && { color: colors.textFaint }]}>{t('common.save')}</Text>
-          </Pressable>
-        }
-      >
-        <HeaderTitle>{isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')}</HeaderTitle>
-      </GlassHeader>
+      <EdgeFade edge="top" style={{ pointerEvents: 'none', height: headerHeight + 28, position: 'absolute', top: 0, left: 0, right: 0 }} />
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerBackButtonDisplayMode: 'minimal',
+          headerTitleAlign: 'left',
+          headerTitle: () => (
+            <View style={[styles.titleRow, { maxWidth: titleMaxWidth }]}>
+              <Star size={22} color={colors.danger} rotation={-14} style={styles.titleStar} />
+              <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')}</Text>
+            </View>
+          ),
+        }}
+      />
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button icon="checkmark" disabled={!canSave} onPress={onSave} />
+      </Stack.Toolbar>
     </View>
   )
 }
@@ -281,22 +309,19 @@ export default function CharacterEditorScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    save: { color: colors.accent, fontSize: 16, fontWeight: '600' },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+    titleStar: { marginTop: 2 },
+    title: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
+    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+    aiButton: { alignSelf: 'flex-start', marginBottom: 18 },
     avatarBlock: { alignItems: 'center', marginBottom: 28, gap: 12 },
     avatarActions: { flexDirection: 'row', gap: 20 },
     link: { color: colors.accent, fontSize: 15 },
     linkMuted: { color: colors.textMuted, fontSize: 15 },
-    section: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, marginTop: 8, marginBottom: 12 },
     systemPromptHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 8,
-      marginLeft: 4,
-      marginRight: 4,
     },
-    systemPromptLabel: { color: colors.textMuted, fontSize: 13 },
-    hint: { marginTop: -4, marginBottom: 4, marginRight: 4 },
-    delete: { alignItems: 'center', marginTop: 32, paddingVertical: 14 },
-    deleteText: { color: colors.danger, fontSize: 16 },
   })

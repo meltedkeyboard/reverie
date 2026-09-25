@@ -1,6 +1,6 @@
 {
   "name": "reverie",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "postinstall": "node scripts/build-icons.mjs"
   },
   "dependencies": {
     "@expo/ui": "~57.0.19",
@@ -29,6 +30,7 @@
     "expo-image-picker": "~57.0.19",
     "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.10",
+    "expo-local-authentication": "~57.0.3",
     "expo-router": "~57.0.22",
     "expo-sensors": "~57.0.3",
     "expo-sharing": "~57.0.21",
@@ -43,6 +45,7 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.2",
     "react-native-worklets": "0.10.1"
   },

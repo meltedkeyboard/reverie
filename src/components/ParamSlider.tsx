@@ -31,7 +31,7 @@ export function ParamSlider({ label, value, min, max, step, digits = 0, formatVa
         step={step}
         onValueChange={onChange}
         minimumTrackTintColor={colors.accent}
-        maximumTrackTintColor="rgba(255, 255, 255, 0.14)"
+        maximumTrackTintColor={colors.borderStrong}
         thumbTintColor="#FFFFFF"
         style={styles.slider}
       />
@@ -42,8 +42,8 @@ export function ParamSlider({ label, value, min, max, step, digits = 0, formatVa
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   wrap: { marginBottom: 10 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 4 },
-  label: { color: colors.textMuted, fontSize: 13 },
+  row: { flexDirection: 'row', justifyContent: 'space-between' },
+  label: { color: colors.textFaint, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   value: { color: colors.text, fontSize: 13, fontVariant: ['tabular-nums'] },
-  slider: { height: 36, marginHorizontal: -2 },
+  slider: { height: 36, marginHorizontal: 14 },
 })

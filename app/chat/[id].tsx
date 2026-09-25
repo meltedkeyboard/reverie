@@ -34,6 +34,7 @@ import { getCharacter, type Character } from '@/db/characters'
 import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { setContinueHidden } from '@/db/continue'
 import { newMessage } from '@/db/messages'
+import { isPrivateChatEnabled } from '@/db/privateChat'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
@@ -157,6 +158,10 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
+  const [privateEnabled, setPrivateEnabled] = useState(true)
+  useEffect(() => {
+    isPrivateChatEnabled(db).then(setPrivateEnabled)
+  }, [db])
   const {
     messages,
     loaded,
@@ -443,15 +448,17 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
         }
         right={
           <View style={styles.headerActions}>
-            <GlassButton icon={privateTarget ? 'eye-off' : 'eye-off-outline'} onPress={onTogglePrivate}>
-              <SFIcon
-                name={privateTarget ? 'eye.slash.fill' : 'eye.slash'}
-                fallback={privateTarget ? 'eye-off' : 'eye-off-outline'}
-                size={20}
-                color={colors.text}
-                animateChange={privateTarget}
-              />
-            </GlassButton>
+            {privateEnabled || privateTarget ? (
+              <GlassButton icon={privateTarget ? 'eye-off' : 'eye-off-outline'} onPress={onTogglePrivate}>
+                <SFIcon
+                  name={privateTarget ? 'eye.slash.fill' : 'eye.slash'}
+                  fallback={privateTarget ? 'eye-off' : 'eye-off-outline'}
+                  size={20}
+                  color={colors.text}
+                  animateChange={privateTarget}
+                />
+              </GlassButton>
+            ) : null}
             {/* Stays in the row while hidden, so the eye button next to it does not jump. */}
             <Animated.View style={createStyle} pointerEvents={privateTarget ? 'none' : 'auto'}>
               <Link href={`/chat/new?character=${character.id}`} asChild>

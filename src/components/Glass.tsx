@@ -77,6 +77,17 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
   )
 }
 
+// Several icon buttons in one Liquid Glass capsule, the way iOS 26 groups bar items;
+// outside iOS 26 they are just the plain icon buttons side by side.
+export function GlassGroup({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(createStyles)
+  return (
+    <GlassSurface interactive style={styles.group}>
+      {children}
+    </GlassSurface>
+  )
+}
+
 // The 44 pt circle of the glass controls, and what a glass surface falls back to
 // without Liquid Glass: the plain surface with a hairline.
 export function useGlassStyles() {
@@ -85,6 +96,7 @@ export function useGlassStyles() {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
+    group: { height: 44, borderRadius: 22, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center' },
     circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   })

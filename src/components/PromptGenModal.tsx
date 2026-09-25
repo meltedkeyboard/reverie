@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -26,11 +26,15 @@ import {
 } from '@/lib/promptGen'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
-import { Button } from './Button'
-import { FieldHint, FieldLabel, useInputColors } from './Field'
+import { useInputColors } from './Field'
+import { Divider } from './motifs/Divider'
+import { Eyebrow } from './motifs/Eyebrow'
+import { FieldRow } from './motifs/FieldRow'
+import { ShardButton } from './motifs/ShardButton'
+import { ShardChip } from './motifs/ShardChip'
+import { StarToggle } from './motifs/StarToggle'
 import { PageSheet } from './PageSheet'
 import { Pager } from './Pager'
-import { Segmented } from './Segmented'
 
 export type GeneratedCharacter = { prompt: string; greeting: string | null }
 
@@ -205,75 +209,80 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
   const column = wide ? styles.wideColumn : null
 
   const chip = (label: string, onPress: () => void, key?: string) => (
-    <Pressable
-      key={key ?? label}
-      onPress={onPress}
-      disabled={busy}
-      style={({ pressed }) => [styles.chip, pressed && { opacity: 0.6 }, busy && { opacity: 0.4 }]}
-    >
-      <Text style={styles.chipText}>{label}</Text>
-    </Pressable>
+    <ShardChip key={key ?? label} label={label} active={false} onPress={() => !busy && onPress()} />
+  )
+
+  const choices = <T extends string>(value: T, options: { value: T; label: string }[], onChange: (v: T) => void) => (
+    <View style={styles.chips}>
+      {options.map((o) => (
+        <ShardChip key={o.value} label={o.label} active={value === o.value} onPress={() => onChange(o.value)} />
+      ))}
+    </View>
   )
 
   const composeView = (
     <>
       {hasCurrent ? (
         <View style={styles.block}>
-          <Segmented<Mode>
-            value={mode}
-            options={[
+          {choices<Mode>(
+            mode,
+            [
               { value: 'improve', label: t('promptGen.modeImprove') },
               { value: 'new', label: t('promptGen.modeNew') },
-            ]}
-            onChange={setMode}
-          />
+            ],
+            setMode
+          )}
         </View>
       ) : null}
 
-      <FieldLabel>{effectiveMode === 'improve' ? t('promptGen.changesLabel') : t('promptGen.descriptionLabel')}</FieldLabel>
-      <TextInput
+      <Eyebrow
+        label={effectiveMode === 'improve' ? t('promptGen.changesLabel') : t('promptGen.descriptionLabel')}
+        color={colors.accent}
+      />
+      <FieldRow
         value={description}
         onChangeText={setDescription}
         placeholder={effectiveMode === 'improve' ? t('promptGen.changesPlaceholder') : t('promptGen.placeholder')}
-        {...inputColors}
+        hint={effectiveMode === 'improve' ? t('promptGen.improveHint') : t('promptGen.hint')}
         multiline
-        style={[styles.input, effectiveMode === 'improve' && { minHeight: 96 }]}
+        minHeight={effectiveMode === 'improve' ? 96 : 140}
       />
-      <FieldHint style={{ marginBottom: 20 }}>
-        {effectiveMode === 'improve' ? t('promptGen.improveHint') : t('promptGen.hint')}
-      </FieldHint>
 
       {effectiveMode === 'new' && !description.trim() ? (
         <View style={styles.block}>
-          <FieldLabel>{t('promptGen.ideas')}</FieldLabel>
+          <Eyebrow label={t('promptGen.ideas')} color={colors.accent} />
           <View style={styles.chips}>{IDEA_KEYS.map((key) => chip(t(`${key}.title`), () => setDescription(t(key)), key))}</View>
         </View>
       ) : null}
 
-      <FieldLabel>{t('promptGen.lengthLabel')}</FieldLabel>
+      <Divider />
+
+      <Eyebrow label={t('promptGen.lengthLabel')} color={colors.accent} />
       <View style={styles.block}>
-        <Segmented<PromptLength>
-          value={length}
-          options={[
+        {choices<PromptLength>(
+          length,
+          [
             { value: 'short', label: t('promptGen.lengthShort') },
             { value: 'medium', label: t('promptGen.lengthMedium') },
             { value: 'long', label: t('promptGen.lengthLong') },
-          ]}
-          onChange={setLength}
-        />
+          ],
+          setLength
+        )}
       </View>
 
-      <FieldLabel>{t('promptGen.formatLabel')}</FieldLabel>
+      <Eyebrow label={t('promptGen.formatLabel')} color={colors.accent} />
       <View style={styles.block}>
-        <Segmented<PromptFormat>
-          value={format}
-          options={[
+        {choices<PromptFormat>(
+          format,
+          [
             { value: 'prose', label: t('promptGen.formatProse') },
             { value: 'sections', label: t('promptGen.formatSections') },
-          ]}
-          onChange={setFormat}
-        />
+          ],
+          setFormat
+        )}
       </View>
+
+      <Divider />
 
       <View style={styles.toggleRow}>
         <View style={{ flex: 1 }}>
@@ -282,11 +291,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
             {currentGreeting.trim() ? t('promptGen.withGreetingReplace') : t('promptGen.withGreetingHint')}
           </Text>
         </View>
-        <Switch
-          value={withGreeting}
-          onValueChange={setWithGreeting}
-          trackColor={{ true: colors.accent, false: colors.textFaint }}
-        />
+        <StarToggle value={withGreeting} onValueChange={setWithGreeting} />
       </View>
     </>
   )
@@ -349,7 +354,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
       {current && !busy ? (
         <View style={styles.block}>
-          <FieldLabel>{t('promptGen.reviseLabel')}</FieldLabel>
+          <Eyebrow label={t('promptGen.reviseLabel')} color={colors.accent} />
           <View style={styles.chips}>{TWEAK_KEYS.map((key) => chip(t(key), () => revise(t(`${key}.note`)), key))}</View>
           <View style={styles.noteRow}>
             <TextInput
@@ -363,7 +368,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
             <Pressable
               onPress={() => revise(note)}
               disabled={!note.trim()}
-              style={[styles.sendButton, !note.trim() && { backgroundColor: colors.surfaceRaised }]}
+              style={[styles.sendButton, !note.trim() && { backgroundColor: colors.borderStrong }]}
             >
               <Ionicons name="arrow-up" size={18} color={note.trim() ? '#fff' : colors.textFaint} />
             </Pressable>
@@ -375,27 +380,27 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
   const footer =
     phase === 'compose' ? (
-      <Button
-        icon="sparkles"
+      <ShardButton
         label={effectiveMode === 'improve' ? t('promptGen.improve') : t('promptGen.generate')}
         onPress={() => run()}
         disabled={!canGenerate}
+        color={colors.accent}
       />
     ) : busy ? (
-      <Button variant="secondary" icon="stop" label={t('promptGen.stop')} onPress={stop} />
+      <ShardButton label={t('promptGen.stop')} onPress={stop} color={colors.danger} />
     ) : !current ? (
-      <Button icon="refresh" label={t('promptGen.retry')} onPress={() => run()} />
+      <ShardButton label={t('promptGen.retry')} onPress={() => run()} color={colors.accent} />
     ) : (
       <View style={styles.footerRow}>
-        <Button variant="secondary" icon="refresh" label={t('promptGen.another')} onPress={() => run()} />
-        <View style={{ flex: 1 }}>
-          <Button
-            icon="checkmark"
-            label={hasCurrent ? t('promptGen.replace') : t('promptGen.apply')}
-            onPress={apply}
-            disabled={!current?.prompt.trim()}
-          />
-        </View>
+        <ShardButton label={t('promptGen.another')} onPress={() => run()} style={{ flex: 1 }} />
+        <ShardButton
+          label={hasCurrent ? t('promptGen.replace') : t('promptGen.apply')}
+          onPress={apply}
+          disabled={!current?.prompt.trim()}
+          color={colors.accent}
+          flip
+          style={{ flex: 1 }}
+        />
       </View>
     )
 
@@ -438,36 +443,10 @@ const createStyles = (colors: Colors) =>
     content: { padding: 20, paddingBottom: 32 },
     wideColumn: { width: '100%', maxWidth: 720, alignSelf: 'center' },
     block: { marginBottom: 20 },
-    input: {
-      backgroundColor: colors.surfaceRaised,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      color: colors.text,
-      fontSize: 16,
-      padding: 14,
-      minHeight: 140,
-      textAlignVertical: 'top',
-    },
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    chip: {
-      paddingHorizontal: 12,
-      paddingVertical: 7,
-      borderRadius: 16,
-      backgroundColor: colors.accentSoft,
-    },
-    chipText: { color: colors.accent, fontSize: 14 },
-    toggleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      backgroundColor: colors.surfaceRaised,
-      borderRadius: 14,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-    },
-    toggleTitle: { color: colors.text, fontSize: 15 },
-    toggleHint: { color: colors.textFaint, fontSize: 12, marginTop: 2, lineHeight: 16 },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    toggleTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
+    toggleHint: { color: colors.textMuted, fontSize: 13, marginTop: 2, lineHeight: 18 },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -478,21 +457,19 @@ const createStyles = (colors: Colors) =>
     },
     metaText: { color: colors.textMuted, fontSize: 13 },
     card: {
-      backgroundColor: colors.bg,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.borderStrong,
       padding: 16,
       marginBottom: 16,
     },
     cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-    cardLabel: { color: colors.textFaint, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
+    cardLabel: { color: colors.accent, fontFamily: fonts.prose, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.1 },
     resultText: { color: colors.text, fontFamily: fonts.prose, fontSize: 16, lineHeight: 25 },
     resultPlaceholder: { color: colors.textFaint, fontStyle: 'italic' },
     resultInput: { padding: 0, textAlignVertical: 'top' },
     errorBox: {
-      backgroundColor: colors.surfaceRaised,
-      borderRadius: 14,
+      backgroundColor: colors.surface,
       padding: 14,
       marginBottom: 16,
       borderLeftWidth: 3,
@@ -502,10 +479,9 @@ const createStyles = (colors: Colors) =>
     noteRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 12 },
     noteInput: {
       flex: 1,
-      backgroundColor: colors.surfaceRaised,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 20,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.borderStrong,
       color: colors.text,
       fontSize: 15,
       paddingHorizontal: 14,
@@ -516,7 +492,6 @@ const createStyles = (colors: Colors) =>
     sendButton: {
       width: 40,
       height: 40,
-      borderRadius: 20,
       backgroundColor: colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
@@ -528,5 +503,5 @@ const createStyles = (colors: Colors) =>
       borderTopColor: colors.border,
       backgroundColor: colors.surface,
     },
-    footerRow: { flexDirection: 'row', gap: 10 },
+    footerRow: { flexDirection: 'row', gap: 14 },
   })

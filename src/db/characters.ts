@@ -91,6 +91,35 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
   return id
 }
 
+// Copies the character together with all of its chats and messages. The copy gets its
+// own avatar file (already written by the caller), so deleting one never breaks the other.
+export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: string, avatar: string | null) {
+  let characterId = 0
+  await db.withTransactionAsync(async () => {
+    const res = await db.runAsync(
+      `INSERT INTO characters (${FIELD_COLUMNS}, created_at)
+       SELECT ?, ?, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, ?
+       FROM characters WHERE id = ?`,
+      [name, avatar, Date.now(), id]
+    )
+    characterId = res.lastInsertRowId
+    const chats = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE character_id = ? ORDER BY id', id)
+    for (const chat of chats) {
+      const copy = await db.runAsync(
+        'INSERT INTO chats (character_id, title, created_at) SELECT ?, title, created_at FROM chats WHERE id = ?',
+        [characterId, chat.id]
+      )
+      await db.runAsync(
+        `INSERT INTO messages (chat_id, role, content, image, image_width, image_height, variants, variant, thoughts, created_at)
+         SELECT ?, role, content, image, image_width, image_height, variants, variant, thoughts, created_at
+         FROM messages WHERE chat_id = ? ORDER BY id`,
+        [copy.lastInsertRowId, chat.id]
+      )
+    }
+  })
+  return characterId
+}
+
 export async function deleteCharacter(db: SQLiteDatabase, id: number) {
   await db.runAsync('DELETE FROM characters WHERE id = ?', id)
 }

@@ -1,11 +1,12 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, type Theme } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 
+import { AppLock } from '@/components/AppLock'
 import { Sidebar } from '@/components/Sidebar'
 import { StartupBoundary } from '@/components/StartupBoundary'
 import { migrate } from '@/db/schema'
@@ -41,20 +42,29 @@ function ThemedApp() {
     loadLocalePreference(db).then(setLocalePreferenceState)
   }, [db])
 
-  const setPreference = (pref: ThemePreference) => {
-    setPreferenceState(pref)
-    saveThemePreference(db, pref)
-  }
+  // Stable, so the context values (and every header built from `t`) don't change per render.
+  const setPreference = useCallback(
+    (pref: ThemePreference) => {
+      setPreferenceState(pref)
+      saveThemePreference(db, pref)
+    },
+    [db]
+  )
 
-  const setLocalePreference = (pref: LocalePreference) => {
-    setLocalePreferenceState(pref)
-    saveLocalePreference(db, pref)
-  }
+  const setLocalePreference = useCallback(
+    (pref: LocalePreference) => {
+      setLocalePreferenceState(pref)
+      saveLocalePreference(db, pref)
+    },
+    [db]
+  )
 
   return (
     <LocaleContextProvider preference={localePreference} setPreference={setLocalePreference}>
       <ThemeContextProvider preference={preference} setPreference={setPreference}>
-        <AppShell />
+        <AppLock>
+          <AppShell />
+        </AppLock>
       </ThemeContextProvider>
     </LocaleContextProvider>
   )
@@ -83,8 +93,7 @@ function AppShell() {
 
   const stack = (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-      {/* On iOS the viewer zooms out of the tapped picture; elsewhere it fades in. */}
-      <Stack.Screen name="viewer" options={Platform.OS === 'ios' ? undefined : { animation: 'fade' }} />
+      <Stack.Screen name="viewer" options={{ animation: 'fade' }} />
     </Stack>
   )
 

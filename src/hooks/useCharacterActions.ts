@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 
-import { deleteCharacter, type CharacterPreview } from '@/db/characters'
+import { deleteCharacter, duplicateCharacter, type CharacterPreview } from '@/db/characters'
 import { createChat } from '@/db/chats'
 import { useTranslation } from '@/i18n'
-import { removeAvatar } from '@/lib/avatars'
+import { readAvatarBase64, removeAvatar, writeAvatarBase64 } from '@/lib/avatars'
 import type { MenuItem } from '@/components/NativeMenu'
 import { confirm, showSheet } from '@/lib/dialogs'
 
@@ -35,9 +35,23 @@ export function useCharacterActions(reload: () => void, onStart?: (character: Ch
     })
   }
 
+  const duplicate = async (character: CharacterPreview) => {
+    let avatar: string | null = null
+    if (character.avatar) {
+      const base64 = await readAvatarBase64(character.avatar)
+      if (base64) {
+        avatar = `${Date.now()}.jpg`
+        await writeAvatarBase64(avatar, base64)
+      }
+    }
+    await duplicateCharacter(db, character.id, `${character.name} (${t('characters.copySuffix')})`, avatar)
+    reload()
+  }
+
   const menuItems = (character: CharacterPreview): MenuItem[] => [
     { label: t('characters.newChat'), systemImage: 'plus.bubble', onSelect: () => startChat(character) },
     { label: t('characters.edit'), systemImage: 'pencil', onSelect: () => router.push(`/character/${character.id}`) },
+    { label: t('characters.duplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(character) },
     { label: t('characters.delete'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(character) },
   ]
 

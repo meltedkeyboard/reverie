@@ -4,3 +4,9 @@ dist/
 ios/
 android/
 *.log
+
+# Rendered from assets/brand by scripts/build-icons.mjs
+assets/images/
+public/favicon.svg
+public/apple-touch-icon.png
+public/og-image.png

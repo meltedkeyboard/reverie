@@ -69,7 +69,7 @@ export async function exportBackup(db: SQLiteDatabase) {
   // The API key is left out on purpose: the file usually ends up in iCloud Drive.
   const dump = { app: 'reverie', version: BACKUP_VERSION, exportedAt: new Date().toISOString(), settings: { baseUrl, model }, characters, chats, messages, avatars }
 
-  await saveJson(`reverie-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(dump))
+  return saveJson(`reverie-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(dump))
 }
 
 // Picks a JSON file and adds its characters, chats and messages as new rows alongside

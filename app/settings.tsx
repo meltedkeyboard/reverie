@@ -1,30 +1,39 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
-import { useRouter } from 'expo-router'
+import { Stack, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
+import * as LocalAuthentication from 'expo-local-authentication'
+import { Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { testConnection } from '@/api/llm'
-import { Button } from '@/components/Button'
-import { Field, FieldLabel } from '@/components/Field'
-import { BackButton, GlassHeader, HeaderTitle, useScreenPadding } from '@/components/GlassHeader'
-import { Group } from '@/components/Group'
-import { Segmented } from '@/components/Segmented'
+import { EdgeFade } from '@/components/BarChrome'
+import { useHeaderHeight, useScreenPadding } from '@/components/GlassHeader'
+import { Divider } from '@/components/motifs/Divider'
+import { FieldRow } from '@/components/motifs/FieldRow'
+import { Eyebrow } from '@/components/motifs/Eyebrow'
+import { Shard } from '@/components/motifs/Shard'
+import { ShardButton } from '@/components/motifs/ShardButton'
+import { ShardChip } from '@/components/motifs/ShardChip'
+import { Star } from '@/components/motifs/Star'
+import { StarToggle } from '@/components/motifs/StarToggle'
+import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isContinueEnabled, setContinueEnabled } from '@/db/continue'
+import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
-import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
+import { fonts, useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
 
 type Status = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok' | 'error'; text: string }
 
 export default function SettingsScreen() {
   const db = useSQLiteContext()
   const router = useRouter()
+  const headerHeight = useHeaderHeight()
+  const titleMaxWidth = useWindowDimensions().width - 160
   const padding = useScreenPadding('form')
   const colors = useColors()
   const { preference, setPreference } = useTheme()
@@ -60,6 +69,37 @@ export default function SettingsScreen() {
     setContinueEnabled(db, enabled)
   }
 
+  const [privateButton, setPrivateButton] = useState(true)
+
+  useEffect(() => {
+    isPrivateChatEnabled(db).then(setPrivateButton)
+  }, [db])
+
+  const togglePrivateButton = (enabled: boolean) => {
+    setPrivateButton(enabled)
+    setPrivateChatEnabled(db, enabled)
+  }
+
+  const [appLock, setAppLock] = useState(false)
+
+  useEffect(() => {
+    isAppLockEnabled(db).then(setAppLock)
+  }, [db])
+
+  const toggleAppLock = async (enabled: boolean) => {
+    if (enabled) {
+      // Verify it works before turning it on, so the app can't lock the user out.
+      if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) {
+        showMessage(t('settings.requireFaceId'), t('settings.faceIdUnavailable'))
+        return
+      }
+      const result = await LocalAuthentication.authenticateAsync({ promptMessage: t('lock.prompt') })
+      if (!result.success) return
+    }
+    setAppLock(enabled)
+    setAppLockEnabled(db, enabled)
+  }
+
   useEffect(() => {
     loadSettings(db).then((stored) => {
       setCfg(stored)
@@ -93,7 +133,8 @@ export default function SettingsScreen() {
   const onExport = async () => {
     setExporting(true)
     try {
-      await exportBackup(db)
+      const saved = await exportBackup(db)
+      if (saved) showMessage(t('settings.exportDoneTitle'), t('settings.exportDoneMessage', { name: saved.name, folder: saved.folder }))
     } catch (err) {
       showMessage(t('settings.exportFailedTitle'), errorMessage(err))
     } finally {
@@ -143,195 +184,186 @@ export default function SettingsScreen() {
           keyboardDismissMode="interactive"
           contentContainerStyle={padding}
         >
-          <Text style={styles.section}>{t('settings.appearance')}</Text>
-          <Group>
-            <View style={styles.cardPad}>
-              <FieldLabel>{t('settings.appearance')}</FieldLabel>
-              <Segmented options={THEME_OPTIONS} value={preference} onChange={setPreference} />
-              <FieldLabel style={{ marginTop: 18 }}>{t('settings.language')}</FieldLabel>
-              <Segmented options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
+          <Eyebrow label={t('settings.appearance')} color={colors.accent} />
+          <View style={styles.chipsRow}>
+            {THEME_OPTIONS.map((opt) => (
+              <ShardChip key={opt.value} label={opt.label} active={preference === opt.value} onPress={() => setPreference(opt.value)} />
+            ))}
+          </View>
+
+          <Eyebrow label={t('settings.language')} color={colors.accent} />
+          <View style={styles.chipsRow}>
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <ShardChip
+                key={opt.value}
+                label={opt.label}
+                active={localePreference === opt.value}
+                onPress={() => setLocalePreference(opt.value)}
+              />
+            ))}
+          </View>
+
+          <Divider />
+
+          <Eyebrow label={t('settings.homeScreen')} color={colors.accent} />
+          <Pressable style={styles.toggleRow} onPress={() => toggleContinueButton(!continueButton)}>
+            <View style={styles.toggleBody}>
+              <Text style={styles.rowLabel}>{t('settings.continueButton')}</Text>
+              <Text style={styles.note}>{t('settings.continueButtonNote')}</Text>
             </View>
-          </Group>
+            <StarToggle value={continueButton} onValueChange={toggleContinueButton} />
+          </Pressable>
 
-          <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.homeScreen')}</Text>
-          <Text style={styles.note}>{t('settings.continueButtonNote')}</Text>
-          <Group>
-            <View style={styles.switchRow}>
-              <Ionicons name="play-circle-outline" size={19} color={colors.accent} style={{ width: 24 }} />
-              <Text style={styles.switchLabel}>{t('settings.continueButton')}</Text>
-              <Switch value={continueButton} onValueChange={toggleContinueButton} trackColor={{ true: colors.accent }} />
+          <Divider />
+
+          <Eyebrow label={t('settings.chats')} color={colors.accent} />
+          <Pressable style={styles.toggleRow} onPress={() => togglePrivateButton(!privateButton)}>
+            <View style={styles.toggleBody}>
+              <Text style={styles.rowLabel}>{t('settings.privateButton')}</Text>
+              <Text style={styles.note}>{t('settings.privateButtonNote')}</Text>
             </View>
-          </Group>
+            <StarToggle value={privateButton} onValueChange={togglePrivateButton} />
+          </Pressable>
 
-          <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.server')}</Text>
-          <Group>
-            <View style={styles.cardPad}>
-              <Field
-                label={t('settings.baseUrlLabel')}
-                hint={t('settings.baseUrlHint')}
-                value={cfg.baseUrl}
-                onChangeText={(baseUrl) => update({ baseUrl })}
-                placeholder={t('settings.baseUrlPlaceholder')}
-                keyboardType="url"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Field
-                label={t('settings.apiKeyLabel')}
-                hint={t('settings.apiKeyHint')}
-                value={cfg.apiKey}
-                onChangeText={(apiKey) => update({ apiKey })}
-                placeholder={t('settings.apiKeyPlaceholder')}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Field
-                label={t('settings.modelLabel')}
-                value={cfg.model}
-                onChangeText={(model) => update({ model })}
-                placeholder={t('settings.modelPlaceholder')}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+          <Divider />
 
-              {models.length > 0 ? (
-                <View style={styles.chips}>
-                  {models.map((id) => {
-                    const active = id === cfg.model
-                    return (
-                      <Pressable
-                        key={id}
-                        onPress={() => update({ model: id })}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && { color: colors.accent }]} numberOfLines={1}>
-                          {id}
-                        </Text>
-                      </Pressable>
-                    )
-                  })}
+          {Platform.OS !== 'web' ? (
+            <>
+              <Eyebrow label={t('settings.security')} color={colors.accent} />
+              <Pressable style={styles.toggleRow} onPress={() => toggleAppLock(!appLock)}>
+                <View style={styles.toggleBody}>
+                  <Text style={styles.rowLabel}>{t('settings.requireFaceId')}</Text>
+                  <Text style={styles.note}>{t('settings.requireFaceIdNote')}</Text>
                 </View>
-              ) : null}
+                <StarToggle value={appLock} onValueChange={toggleAppLock} />
+              </Pressable>
 
-              <Button
-                variant="soft"
-                label={t('settings.testConnection')}
-                onPress={onTest}
-                loading={status.kind === 'testing'}
-              />
+              <Divider />
+            </>
+          ) : null}
 
-              {status.kind === 'ok' || status.kind === 'error' ? (
-                <Text style={styles.statusText}>{status.text}</Text>
-              ) : null}
+          <Eyebrow label={t('settings.server')} color={colors.accent} />
+          <FieldRow
+            star={false}
+            label={t('settings.baseUrlLabel')}
+            hint={t('settings.baseUrlHint')}
+            value={cfg.baseUrl}
+            onChangeText={(baseUrl) => update({ baseUrl })}
+            placeholder={t('settings.baseUrlPlaceholder')}
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <FieldRow
+            star={false}
+            label={t('settings.apiKeyLabel')}
+            hint={t('settings.apiKeyHint')}
+            value={cfg.apiKey}
+            onChangeText={(apiKey) => update({ apiKey })}
+            placeholder={t('settings.apiKeyPlaceholder')}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <FieldRow
+            star={false}
+            label={t('settings.modelLabel')}
+            value={cfg.model}
+            onChangeText={(model) => update({ model })}
+            placeholder={t('settings.modelPlaceholder')}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          {models.length > 0 ? (
+            <View style={[styles.chipsRow, styles.modelChips]}>
+              {models.map((id) => (
+                <ShardChip key={id} label={id} active={id === cfg.model} onPress={() => update({ model: id })} />
+              ))}
             </View>
-          </Group>
+          ) : null}
 
-          <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.backupTitle')}</Text>
+          <ShardButton label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} style={styles.testButton} />
+
+          {status.kind === 'ok' || status.kind === 'error' ? <Text style={styles.statusText}>{status.text}</Text> : null}
+
+          <Divider />
+
+          <Eyebrow label={t('settings.backupTitle')} color={colors.accent} />
           <Text style={styles.note}>{t('settings.backupNote')}</Text>
-          <Group>
-            <Row
-              icon="share-outline"
-              title={t('settings.exportJson')}
-              onPress={onExport}
-              loading={exporting}
-              disabled={exporting}
-            />
-            <Row
-              icon="download-outline"
-              title={t('settings.importJson')}
+          <View style={styles.buttonPairRow}>
+            <ShardButton label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting} style={styles.pairButton} />
+            <ShardButton
+              label={t('settings.importJson')}
               onPress={onImport}
               loading={importing}
               disabled={importing}
+              flip
+              style={styles.pairButton}
             />
-          </Group>
+          </View>
 
-          <Text style={[styles.section, { marginTop: 32 }]}>{t('settings.aboutTitle')}</Text>
-          <Group>
-            <Row icon="information-circle-outline" title={t('settings.aboutReverie')} onPress={() => router.push('/about')} chevron />
-          </Group>
+          <Divider />
 
-          <Text style={[styles.section, { color: colors.danger, marginTop: 32 }]}>{t('settings.dangerZone')}</Text>
+          <Eyebrow label={t('settings.aboutTitle')} color={colors.accent} />
+          <Pressable
+            onPress={() => router.push('/about')}
+            style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={[styles.rowLabel, styles.linkLabel]}>{t('settings.aboutReverie')}</Text>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+
+          <Divider />
+
+          <Eyebrow label={t('settings.dangerZone')} color={colors.danger} />
           <Text style={styles.note}>{t('settings.dangerNote')}</Text>
-          <Group style={styles.dangerCard}>
-            <Row
-              icon="trash-outline"
-              title={t('settings.wipeAll')}
-              onPress={onWipe}
-              loading={wiping}
-              disabled={wiping}
-              tint={colors.danger}
-            />
-          </Group>
+          <ShardButton label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
+
+          <View style={styles.footer}>
+            <Star size={14} color={colors.textFaint} filled={false} rotation={12} strokeWidth={70} />
+          </View>
         </KeyboardAwareScrollView>
       ) : null}
 
-      <GlassHeader left={<BackButton />}>
-        <HeaderTitle>{t('settings.title')}</HeaderTitle>
-      </GlassHeader>
+      <EdgeFade edge="top" style={{ pointerEvents: "none", height: headerHeight + 28, position: 'absolute', top: 0, left: 0, right: 0 }} />
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerBackButtonDisplayMode: 'minimal',
+          headerTitleAlign: 'left',
+          headerTitle: () => (
+            <View style={[styles.titleRow, { maxWidth: titleMaxWidth }]}>
+              <Star size={22} color={colors.danger} rotation={-14} style={styles.titleStar} />
+              <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{t('settings.title')}</Text>
+            </View>
+          ),
+        }}
+      />
     </View>
-  )
-}
-
-function Row({
-  icon,
-  title,
-  onPress,
-  loading,
-  disabled,
-  chevron,
-  tint,
-}: {
-  icon: React.ComponentProps<typeof Ionicons>['name']
-  title: string
-  onPress: () => void
-  loading?: boolean
-  disabled?: boolean
-  chevron?: boolean
-  tint?: string
-}) {
-  const colors = useColors()
-  const styles = useStyles(createStyles)
-  const color = tint ?? colors.accent
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
-    >
-      <Ionicons name={icon} size={19} color={color} style={{ width: 24 }} />
-      <Text style={[styles.rowLabel, { color }]}>{title}</Text>
-      {loading ? (
-        <ActivityIndicator color={color} />
-      ) : chevron ? (
-        <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
-      ) : null}
-    </Pressable>
   )
 }
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    section: { color: colors.textMuted, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8, marginLeft: 4 },
-    dangerCard: { borderColor: colors.dangerBorder },
-    cardPad: { padding: 16 },
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -6, marginBottom: 16 },
-    chip: {
-      maxWidth: '100%',
-      paddingVertical: 7,
-      paddingHorizontal: 12,
-      borderRadius: 14,
-      backgroundColor: colors.surfaceRaised,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    chipActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-    chipText: { color: colors.textMuted, fontSize: 13 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
-    rowLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
-    switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
-    switchLabel: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
-    statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 14 },
-    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 10, marginLeft: 4 },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 0, flexShrink: 1 },
+    titleStar: { marginTop: 2 },
+    title: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 26 },
+    modelChips: { marginTop: -6 },
+    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    toggleBody: { flex: 1 },
+    rowLabel: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
+    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 14 },
+    testButton: { alignSelf: 'flex-start', marginTop: 4 },
+    statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 14 },
+    buttonPairRow: { flexDirection: 'row', gap: 14 },
+    pairButton: { flex: 1 },
+    linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+    linkLabel: { marginBottom: 0 },
+    chevron: { color: colors.textFaint, fontSize: 20 },
+    footer: { alignItems: 'center', marginTop: 36 },
   })

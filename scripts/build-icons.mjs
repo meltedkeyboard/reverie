@@ -1,5 +1,6 @@
 // Renders every app icon, splash, favicon, the link preview and the home screen
-// pattern from the SVGs in assets/brand. Run after changing them: npm run icons
+// pattern from the SVGs in assets/brand. The output is not committed: it is rebuilt on
+// every npm install/ci, or by hand after changing the SVGs: npm run icons
 import { Resvg } from '@resvg/resvg-js'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
@@ -76,6 +77,7 @@ function png(svg, file, width = 1024) {
 }
 
 mkdirSync('assets/images', { recursive: true })
+mkdirSync('public', { recursive: true })
 png(light, 'assets/images/icon.png')
 png(dark, 'assets/images/icon-dark.png')
 png(tinted, 'assets/images/icon-tinted.png')

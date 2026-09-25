@@ -1,5 +1,5 @@
-import { Link, useRouter } from 'expo-router'
-import { Platform, Pressable } from 'react-native'
+import { useRouter } from 'expo-router'
+import { Pressable } from 'react-native'
 
 import { setViewerImage } from '@/lib/viewer'
 
@@ -13,19 +13,16 @@ type Props = {
   children: React.ReactNode
 }
 
-// A picture that opens full screen. On iOS the viewer zooms out of the picture itself
-// and shrinks back into it on the way out.
+// A picture that opens full screen in the viewer.
 export function ImageLink({ uri, aspect = 1, onLongPress, delayLongPress, accessibilityLabel, children }: Props) {
   const router = useRouter()
-  const open = () => setViewerImage({ uri, aspect })
   const push = () => {
-    open()
+    setViewerImage({ uri, aspect })
     router.push('/viewer')
   }
-  const pressable = (
+  return (
     <Pressable
-      // On iOS the Link around it navigates.
-      onPress={Platform.OS === 'ios' ? undefined : push}
+      onPress={push}
       onLongPress={onLongPress}
       delayLongPress={delayLongPress}
       accessibilityRole="imagebutton"
@@ -34,13 +31,5 @@ export function ImageLink({ uri, aspect = 1, onLongPress, delayLongPress, access
     >
       {children}
     </Pressable>
-  )
-  // On web a Link turns the Pressable into a real anchor whose click reloads the page,
-  // losing the picture kept in memory; the zoom exists only on iOS anyway.
-  if (Platform.OS !== 'ios') return pressable
-  return (
-    <Link href="/viewer" onPress={open} asChild>
-      <Link.AppleZoom>{pressable}</Link.AppleZoom>
-    </Link>
   )
 }

@@ -8,8 +8,8 @@ export type ServerSettings = {
 
 export const DEFAULT_SETTINGS: ServerSettings = {
   baseUrl: '',
-  apiKey: 'not-needed',
-  model: 'local-model',
+  apiKey: '',
+  model: '',
 }
 
 const KEYS = { baseUrl: 'base_url', apiKey: 'api_key', model: 'model' } as const

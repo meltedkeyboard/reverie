@@ -24,6 +24,9 @@ export type Colors = {
   dangerSoft: string
   dangerBorder: string
   success: string
+  // A stronger hairline than `border`, for outlines that need to read as a shape's
+  // edge (shard chips/buttons) rather than a faint divider.
+  borderStrong: string
 }
 
 const darkColors: Colors = {
@@ -43,6 +46,7 @@ const darkColors: Colors = {
   dangerSoft: 'rgba(240, 97, 109, 0.1)',
   dangerBorder: 'rgba(240, 97, 109, 0.3)',
   success: '#5FCB8B',
+  borderStrong: 'rgba(255, 255, 255, 0.14)',
 }
 
 const lightColors: Colors = {
@@ -62,6 +66,7 @@ const lightColors: Colors = {
   dangerSoft: 'rgba(214, 57, 74, 0.08)',
   dangerBorder: 'rgba(214, 57, 74, 0.3)',
   success: '#2F9A5C',
+  borderStrong: 'rgba(0, 0, 0, 0.14)',
 }
 
 const palettes: Record<Scheme, Colors> = { dark: darkColors, light: lightColors }

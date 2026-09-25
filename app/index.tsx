@@ -7,9 +7,11 @@ import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
 import { CONTINUE_BUTTON_SPACE, ContinueButton } from '@/components/ContinueButton'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
+import { GlassGroup } from '@/components/Glass'
+import { IconButton } from '@/components/IconButton'
 import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { HomePattern } from '@/components/HomePattern'
-import { IconButton } from '@/components/IconButton'
+import { Star } from '@/components/motifs/Star'
 import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { getLastChat, pruneUntouchedChats, type LastChat } from '@/db/chats'
@@ -80,26 +82,31 @@ export default function CharactersScreen() {
       <FlatList
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
-        contentContainerStyle={[padding, lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE }]}
+        contentContainerStyle={[
+          padding,
+          lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE },
+        ]}
         ItemSeparatorComponent={ListSeparator}
         ListHeaderComponent={
-          !serverSet && characters ? (
-            // A row like the "finish setting up" one in iOS Settings: a glyph on a
-            // colored tile, the text, and a chevron to where it is fixed.
-            <Pressable
-              onPress={() => router.push('/settings')}
-              style={({ pressed }) => [styles.notice, pressed && { opacity: 0.6 }]}
-            >
-              <View style={styles.noticeTile}>
-                <SFIcon name="server.rack" fallback="server" size={15} color="#FFFFFF" />
-              </View>
-              <View style={styles.noticeBody}>
-                <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
-                <Text style={styles.noticeText}>{t('characters.serverNotSetText')}</Text>
-              </View>
-              <SFIcon name="chevron.right" fallback="chevron-forward" size={14} color={colors.textFaint} />
-            </Pressable>
-          ) : null
+          <>
+            {!serverSet && characters ? (
+              // A row like the "finish setting up" one in iOS Settings: a glyph on a
+              // colored tile, the text, and a chevron to where it is fixed.
+              <Pressable
+                onPress={() => router.push('/settings')}
+                style={({ pressed }) => [styles.notice, pressed && { opacity: 0.6 }]}
+              >
+                <View style={styles.noticeTile}>
+                  <SFIcon name="server.rack" fallback="server" size={15} color="#FFFFFF" />
+                </View>
+                <View style={styles.noticeBody}>
+                  <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
+                  <Text style={styles.noticeText}>{t('characters.serverNotSetText')}</Text>
+                </View>
+                <SFIcon name="chevron.right" fallback="chevron-forward" size={14} color={colors.textFaint} />
+              </Pressable>
+            ) : null}
+          </>
         }
         ListEmptyComponent={
           characters ? (
@@ -124,6 +131,24 @@ export default function CharactersScreen() {
           />
         )}
       />
+      <GlassHeader
+        floating
+        right={
+          <GlassGroup>
+            <IconButton name="settings-outline" onPress={() => router.push('/settings')} />
+            <Link href="/character/new" asChild>
+              <Link.AppleZoom>
+                <IconButton name="add" size={26} />
+              </Link.AppleZoom>
+            </Link>
+          </GlassGroup>
+        }
+      >
+        <View style={styles.titleRow}>
+          <Star size={22} color={colors.danger} rotation={-14} style={styles.titleStar} />
+          <Text style={styles.title}>{t('characters.title')}</Text>
+        </View>
+      </GlassHeader>
       {lastChat ? (
         <ContinueButton
           // A fresh button for another chat, so a swipe in progress does not carry over.
@@ -133,20 +158,6 @@ export default function CharactersScreen() {
           onDismiss={hideContinue}
         />
       ) : null}
-      <GlassHeader
-        right={
-          <>
-            <IconButton name="settings-outline" onPress={() => router.push('/settings')} />
-            <Link href="/character/new" asChild>
-              <Link.AppleZoom>
-                <IconButton name="add" size={26} />
-              </Link.AppleZoom>
-            </Link>
-          </>
-        }
-      >
-        <Text style={styles.title}>{t('characters.title')}</Text>
-      </GlassHeader>
     </View>
   )
 }
@@ -154,7 +165,9 @@ export default function CharactersScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  title: { color: colors.text, fontFamily: fonts.prose, fontSize: 24, fontWeight: '600' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  titleStar: { marginTop: 2 },
+  title: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28 },
   wideWelcome: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, paddingHorizontal: 40 },
   wideWelcomeTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 26, marginBottom: 10 },
   wideWelcomeText: { color: colors.textMuted, fontSize: 15, textAlign: 'center', maxWidth: 360, lineHeight: 21 },
