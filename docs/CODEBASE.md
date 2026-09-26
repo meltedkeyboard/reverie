@@ -63,20 +63,21 @@ Everything goes through `expo-sqlite`. Schema versioning is `PRAGMA user_version
 | `chats.ts` | Chat CRUD, duplicate, ordering, `pruneUntouchedChats`, `getLastChat` |
 | `messages.ts` | Message CRUD, variants (`withNewVariant`, `withVariant`), images and thoughts as JSON columns |
 | `settings.ts` | Key/value helpers (`getSetting`, `getFlag`), server settings, theme and locale preference |
-| `appLock.ts`, `continue.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts` | One feature flag each, stored as `'1'`/`'0'` in `app_settings` via `getFlag`/`setFlag` |
+| `appLock.ts`, `confirmDelete.ts`, `continue.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts` | One feature flag each, stored as `'1'`/`'0'` in `app_settings` via `getFlag`/`setFlag` |
 
-Flags that many call sites need synchronously keep an in-memory copy: `src/lib/hapticsState.ts`, `isAppLockEnabledCached`.
+Flags that many call sites need synchronously keep an in-memory copy: `src/lib/hapticsState.ts`, `src/lib/confirmDelete.ts`, `isAppLockEnabledCached`.
 
 ## `src/lib` - logic without UI
 
 | Group | Files |
 |---|---|
-| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, copy), `avatarStore.ts` / `.web.ts` (file or `localStorage` storage) |
+| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, copy), `avatarStore.ts` / `.web.ts` (file or `localStorage` storage, avatars and backgrounds in separate folders) |
 | Backup | `backup.ts` (export, import, wipe), `download.ts` / `.web.ts` (save JSON or image), `pickJson.ts` / `.web.ts` |
 | Dialogs | `dialogs.tsx` (native alerts and sheets), `dialogs.web.tsx` (DOM implementation), `dialogs.types.ts`, `chatDialogs.ts` |
 | Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
 | AI helpers | `promptGen.ts`, `titles.ts` |
-| Platform | `haptics.ts` / `.web.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts` |
+| Platform | `haptics.ts` / `.web.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` / `.web.ts` (where the data lives, the "show in Files" toggle) |
+| App | `version.ts` (the version shown in About and onboarding), `confirmDelete.ts` (delete that asks unless turned off) |
 | Message menu | `messageActions.ts` |
 
 ## `src/hooks`
@@ -102,7 +103,7 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 
 ## Platform split
 
-`Foo.ts` is the native implementation and `Foo.web.ts` the browser one, resolved by Metro. Pairs: `avatarStore`, `download`, `dialogs`, `haptics`, `pickJson`. Keep their exported signatures identical.
+`Foo.ts` is the native implementation and `Foo.web.ts` the browser one, resolved by Metro. Pairs: `avatarStore`, `download`, `dialogs`, `haptics`, `pickJson`, `storage`. Keep their exported signatures identical.
 
 ## Conventions
 

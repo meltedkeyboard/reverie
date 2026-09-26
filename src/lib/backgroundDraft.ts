@@ -9,7 +9,13 @@ export type BackgroundDraft = {
   effect: BackgroundEffect
   intensity: number
   bubbleTransparency: number
-  onDone: (result: { effect: BackgroundEffect; intensity: number; bubbleTransparency: number }) => void
+  onDone: (result: {
+    effect: BackgroundEffect
+    intensity: number
+    bubbleTransparency: number
+    // The picture cut to what was framed; absent when it was left as it was.
+    uri?: string
+  }) => void
 }
 
 let pending: BackgroundDraft | null = null

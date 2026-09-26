@@ -25,6 +25,7 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } fro
 import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
+import { APP_VERSION } from '@/lib/version'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 type Feature = {
@@ -165,6 +166,10 @@ export default function OnboardingScreen() {
           <Animated.View style={footerStyle}>
             <Button variant="glass" label={t('onboarding.getStarted')} onPress={toServer} />
           </Animated.View>
+          {/* Tucked in a corner, to tell which build is installed without drawing the eye. */}
+          <Animated.Text style={[styles.version, { top: insets.top + 8, opacity: appear }]} pointerEvents="none">
+            v{APP_VERSION}
+          </Animated.Text>
         </View>
 
         <View style={{ width }} accessibilityElementsHidden={!onServer} importantForAccessibility={onServer ? 'auto' : 'no-hide-descendants'}>
@@ -284,6 +289,7 @@ const createStyles = (colors: Colors) =>
     pages: { flex: 1, flexDirection: 'row' },
     content: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingHorizontal: 32, paddingBottom: 24 },
     wordmark: { alignSelf: 'center', marginBottom: 28 },
+    version: { position: 'absolute', right: 20, color: colors.textFaint, fontSize: 12, fontVariant: ['tabular-nums'] },
     title: {
       color: colors.text,
       fontSize: 34,

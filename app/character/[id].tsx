@@ -1,14 +1,14 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { Avatar } from '@/components/Avatar'
 import { ChatBackground } from '@/components/ChatBackground'
 import { ImageSourceMenu } from '@/components/ImageSourceMenu'
 import { ChipGroup } from '@/components/ChipGroup'
-import { FormScreenHeader } from '@/components/FormScreenHeader'
+import { BarButton, DrawnFormScreenHeader, FormScreenHeader } from '@/components/FormScreenHeader'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
@@ -28,7 +28,8 @@ import { useTranslation } from '@/i18n'
 import { avatarUri, persistAvatar, pickAvatar, pickBackground, removeAvatar, removeCharacterImages } from '@/lib/avatars'
 import { setBackgroundDraft } from '@/lib/backgroundDraft'
 import type { ImageSource } from '@/lib/images'
-import { confirm, showMessage } from '@/lib/dialogs'
+import { confirmDeletion } from '@/lib/confirmDelete'
+import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import { plural } from '@/lib/format'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -113,7 +114,7 @@ export default function CharacterEditorScreen() {
   }
 
   // The picture now behind the chat: a fresh pick, else the one already stored.
-  const backgroundUri = bgPickedUri ?? (background ? avatarUri(background) : null)
+  const backgroundUri = bgPickedUri ?? (background ? avatarUri(background, 'backgrounds') : null)
 
   // The effect is tried out on its own screen; what it returns is kept until Save.
   const openBackground = (uri: string, fresh: boolean) => {
@@ -124,7 +125,8 @@ export default function CharacterEditorScreen() {
       intensity: bgIntensity,
       bubbleTransparency: bgBubbleTransparency,
       onDone: (result) => {
-        if (fresh) setBgPickedUri(uri)
+        if (result.uri) setBgPickedUri(result.uri)
+        else if (fresh) setBgPickedUri(uri)
         setBgEffect(result.effect)
         setBgIntensity(result.intensity)
         setBgBubbleTransparency(result.bubbleTransparency)
@@ -152,7 +154,7 @@ export default function CharacterEditorScreen() {
     setSaving(true)
     try {
       const nextAvatar = pickedUri ? await persistAvatar(pickedUri) : avatar
-      const nextBackground = bgPickedUri ? await persistAvatar(bgPickedUri) : background
+      const nextBackground = bgPickedUri ? await persistAvatar(bgPickedUri, 'backgrounds') : background
       await saveCharacter(db, isNew ? null : Number(id), {
         name,
         avatar: nextAvatar,
@@ -169,7 +171,7 @@ export default function CharacterEditorScreen() {
         backgroundBubbleTransparency: bgBubbleTransparency,
       })
       if (storedAvatar.current && storedAvatar.current !== nextAvatar) removeAvatar(storedAvatar.current)
-      if (storedBackground.current && storedBackground.current !== nextBackground) removeAvatar(storedBackground.current)
+      if (storedBackground.current && storedBackground.current !== nextBackground) removeAvatar(storedBackground.current, 'backgrounds')
       router.back()
     } catch (err) {
       setSaving(false)
@@ -178,7 +180,7 @@ export default function CharacterEditorScreen() {
   }
 
   const confirmDelete = () => {
-    confirm({
+    confirmDeletion({
       title: t('editor.deleteConfirmTitle'),
       message: t('editor.deleteConfirmMessage'),
       confirmLabel: t('common.delete'),
@@ -205,6 +207,7 @@ export default function CharacterEditorScreen() {
   }
 
   const hasPhoto = Boolean(pickedUri || avatar)
+  const title = isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')
 
   return (
     <View style={styles.screen}>
@@ -367,10 +370,29 @@ export default function CharacterEditorScreen() {
         </KeyboardAwareScrollView>
       ) : null}
 
-      <FormScreenHeader title={isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')} />
-      <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button icon="checkmark" disabled={!canSave} onPress={onSave} />
-      </Stack.Toolbar>
+      {/* Opened with a zoom from the character list, so on iOS the header is drawn here
+          rather than by the native bar; see DrawnFormScreenHeader. */}
+      {Platform.OS === 'ios' ? (
+        <DrawnFormScreenHeader
+          title={title}
+          right={
+            <BarButton
+              symbol="checkmark"
+              fallback="checkmark"
+              disabled={!canSave}
+              onPress={onSave}
+              accessibilityLabel={t('common.save')}
+            />
+          }
+        />
+      ) : (
+        <>
+          <FormScreenHeader title={title} />
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Button icon="checkmark" disabled={!canSave} onPress={onSave} />
+          </Stack.Toolbar>
+        </>
+      )}
     </View>
   )
 }

@@ -5,7 +5,11 @@ import { imageDataUrl, newAvatarName } from '@/lib/images'
 // kept in localStorage as data URLs. The database still stores only the name.
 const PREFIX = 'reverie.avatar.'
 
-export function avatarUri(name: string): string | null {
+// Avatars and backgrounds share one store here; `kind` only keeps the signature the same
+// as on native.
+export type ImageKind = 'avatars' | 'backgrounds'
+
+export function avatarUri(name: string, _kind: ImageKind = 'avatars'): string | null {
   try {
     return localStorage.getItem(PREFIX + name)
   } catch {
@@ -22,13 +26,13 @@ function store(name: string, dataUrl: string) {
   }
 }
 
-export async function persistAvatar(tempUri: string) {
+export async function persistAvatar(tempUri: string, _kind: ImageKind = 'avatars') {
   const name = newAvatarName()
   store(name, await readAsDataUrl(tempUri))
   return name
 }
 
-export function removeAvatar(name: string) {
+export function removeAvatar(name: string, _kind: ImageKind = 'avatars') {
   try {
     localStorage.removeItem(PREFIX + name)
   } catch {
@@ -36,12 +40,12 @@ export function removeAvatar(name: string) {
   }
 }
 
-export async function readAvatarBase64(name: string) {
+export async function readAvatarBase64(name: string, _kind: ImageKind = 'avatars') {
   const dataUrl = avatarUri(name)
   return dataUrl ? dataUrl.slice(dataUrl.indexOf(',') + 1) : null
 }
 
-export async function writeAvatarBase64(name: string, base64: string) {
+export async function writeAvatarBase64(name: string, base64: string, _kind: ImageKind = 'avatars') {
   store(name, imageDataUrl(base64))
 }
 

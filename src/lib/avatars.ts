@@ -3,10 +3,11 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 
 import { pickUris, requireCamera, resizedJpeg, newAvatarName, type ImageSource } from '@/lib/images'
-import { readAvatarBase64, removeAvatar, writeAvatarBase64 } from './avatarStore'
+import { readAvatarBase64, removeAvatar, writeAvatarBase64, type ImageKind } from './avatarStore'
 
-// Picking and resizing work the same everywhere; only storage differs per platform. The
-// store keeps a character's chat background as well, as one more picture under a name.
+// Picking and resizing work the same everywhere; only storage differs per platform. Avatars
+// and chat backgrounds are kept in separate folders.
+export type { ImageKind } from './avatarStore'
 export { avatarUri, persistAvatar, removeAvatar, readAvatarBase64, writeAvatarBase64, removeAllAvatars } from './avatarStore'
 
 const SIDE = 512
@@ -50,17 +51,17 @@ export async function pickBackground(source: ImageSource) {
 }
 
 // A stored picture under a new name, so a duplicated character owns its own file.
-export async function copyStoredImage(name: string | null) {
+export async function copyStoredImage(name: string | null, kind: ImageKind = 'avatars') {
   if (!name) return null
-  const base64 = await readAvatarBase64(name)
+  const base64 = await readAvatarBase64(name, kind)
   if (!base64) return null
   const copy = newAvatarName()
-  await writeAvatarBase64(copy, base64)
+  await writeAvatarBase64(copy, base64, kind)
   return copy
 }
 
 // Everything a character keeps in the image store.
 export function removeCharacterImages(character: { avatar: string | null; background: string | null }) {
   if (character.avatar) removeAvatar(character.avatar)
-  if (character.background) removeAvatar(character.background)
+  if (character.background) removeAvatar(character.background, 'backgrounds')
 }

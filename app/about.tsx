@@ -13,10 +13,8 @@ import { setOnboardingComplete } from '@/db/onboarding'
 import { useShake } from '@/hooks/useShake'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
+import { APP_VERSION } from '@/lib/version'
 import { useColors, useStyles, type Colors } from '@/theme'
-import pkg from '../package.json'
-
-const { version } = pkg
 
 export default function AboutScreen() {
   const router = useRouter()
@@ -38,7 +36,7 @@ export default function AboutScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={padding}>
         <Wordmark width={220} optical style={styles.wordmark} />
-        <Text style={styles.version}>{t('about.version', { version })}</Text>
+        <Text style={styles.version}>{t('about.version', { version: APP_VERSION })}</Text>
 
         <Text style={styles.tagline}>{t('about.tagline')}</Text>
 

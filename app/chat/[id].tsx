@@ -414,7 +414,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     <View style={styles.screen}>
       {character.background ? (
         <ChatBackground
-          uri={avatarUri(character.background) ?? ''}
+          uri={avatarUri(character.background, 'backgrounds') ?? ''}
           effect={character.backgroundEffect}
           intensity={character.backgroundIntensity}
         />

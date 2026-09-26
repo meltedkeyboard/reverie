@@ -6,7 +6,8 @@ import { createChat } from '@/db/chats'
 import { useTranslation } from '@/i18n'
 import { copyStoredImage, removeCharacterImages } from '@/lib/avatars'
 import type { MenuItem } from '@/components/NativeMenu'
-import { confirm, showSheet } from '@/lib/dialogs'
+import { confirmDeletion } from '@/lib/confirmDelete'
+import { showSheet } from '@/lib/dialogs'
 
 // What a character in a list can do: start a chat, be edited or deleted. Shared by the
 // home screen and the wide-web sidebar; reload re-lists them after a delete, and
@@ -22,7 +23,7 @@ export function useCharacterActions(reload: () => void, onStart?: (character: Ch
   }
 
   const confirmDelete = (character: CharacterPreview) => {
-    confirm({
+    confirmDeletion({
       title: t('characters.deleteConfirmTitle'),
       message: t('characters.deleteConfirmMessage', { name: character.name }),
       confirmLabel: t('characters.delete'),
@@ -37,7 +38,7 @@ export function useCharacterActions(reload: () => void, onStart?: (character: Ch
 
   const duplicate = async (character: CharacterPreview) => {
     const avatar = await copyStoredImage(character.avatar)
-    const background = await copyStoredImage(character.background)
+    const background = await copyStoredImage(character.background, 'backgrounds')
     await duplicateCharacter(db, character.id, `${character.name} (${t('characters.copySuffix')})`, avatar, background)
     reload()
   }

@@ -1,42 +1,54 @@
 import { toByteArray } from 'base64-js'
-import { Directory, File, Paths } from 'expo-file-system'
+import { Directory, File } from 'expo-file-system'
 
 import { newAvatarName } from '@/lib/images'
+import { dataDirectory } from '@/lib/storage'
+
+export type ImageKind = 'avatars' | 'backgrounds'
 
 // Only the file name goes into the database. The absolute path of the app
 // container changes between installs and updates, so it is resolved on read.
-const avatarDir = new Directory(Paths.document, 'avatars')
+const folder = (kind: ImageKind) => new Directory(dataDirectory, kind)
 
-function avatarFile(name: string) {
-  return new File(avatarDir, name)
+// Backgrounds used to be saved next to the avatars, so a name that isn't in its own
+// folder is looked for there.
+function imageFile(name: string, kind: ImageKind) {
+  const file = new File(folder(kind), name)
+  if (kind === 'backgrounds' && !file.exists) {
+    const legacy = new File(folder('avatars'), name)
+    if (legacy.exists) return legacy
+  }
+  return file
 }
 
-export function avatarUri(name: string): string | null {
-  return avatarFile(name).uri
+export function avatarUri(name: string, kind: ImageKind = 'avatars'): string | null {
+  return imageFile(name, kind).uri
 }
 
-export async function persistAvatar(tempUri: string) {
-  avatarDir.create({ intermediates: true, idempotent: true })
+export async function persistAvatar(tempUri: string, kind: ImageKind = 'avatars') {
+  folder(kind).create({ intermediates: true, idempotent: true })
   const name = newAvatarName()
-  await new File(tempUri).copy(avatarFile(name))
+  await new File(tempUri).copy(new File(folder(kind), name))
   return name
 }
 
-export function removeAvatar(name: string) {
-  const file = avatarFile(name)
+export function removeAvatar(name: string, kind: ImageKind = 'avatars') {
+  const file = imageFile(name, kind)
   if (file.exists) file.delete()
 }
 
-export async function readAvatarBase64(name: string) {
-  const file = avatarFile(name)
+export async function readAvatarBase64(name: string, kind: ImageKind = 'avatars') {
+  const file = imageFile(name, kind)
   return file.exists ? await file.base64() : null
 }
 
-export async function writeAvatarBase64(name: string, base64: string) {
-  avatarDir.create({ intermediates: true, idempotent: true })
-  avatarFile(name).write(toByteArray(base64))
+export async function writeAvatarBase64(name: string, base64: string, kind: ImageKind = 'avatars') {
+  folder(kind).create({ intermediates: true, idempotent: true })
+  new File(folder(kind), name).write(toByteArray(base64))
 }
 
 export function removeAllAvatars() {
-  if (avatarDir.exists) avatarDir.delete()
+  for (const kind of ['avatars', 'backgrounds'] as const) {
+    if (folder(kind).exists) folder(kind).delete()
+  }
 }

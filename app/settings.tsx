@@ -16,6 +16,7 @@ import { ShardChip } from '@/components/motifs/ShardChip'
 import { Star } from '@/components/motifs/Star'
 import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
+import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { isContinueEnabled, setContinueEnabled } from '@/db/continue'
 import { isHapticsEnabled, setHapticsEnabled } from '@/db/haptics'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
@@ -26,6 +27,7 @@ import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
+import { isShownInFiles, isStoragePending, setShownInFiles } from '@/lib/storage'
 import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
 
 export default function SettingsScreen() {
@@ -56,8 +58,18 @@ export default function SettingsScreen() {
   const [wiping, setWiping] = useState(false)
   const [continueButton, toggleContinueButton] = useStoredFlag(isContinueEnabled, setContinueEnabled, true)
   const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
+  const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
   const [appLock, setAppLock] = useStoredFlag(isAppLockEnabled, setAppLockEnabled, false)
+
+  const [showInFiles, setShowInFiles] = useState(isShownInFiles)
+
+  const toggleShowInFiles = (shown: boolean) => {
+    setShowInFiles(shown)
+    setShownInFiles(shown)
+    // The database can't move while it is open, so the files change place on the next launch.
+    if (isStoragePending()) showMessage(t('settings.showInFilesRestartTitle'), t('settings.showInFilesRestartMessage'))
+  }
 
   const toggleAppLock = async (enabled: boolean) => {
     if (enabled) {
@@ -164,6 +176,12 @@ export default function SettingsScreen() {
             value={privateButton}
             onValueChange={togglePrivateButton}
           />
+          <ToggleRow
+            label={t('settings.confirmDelete')}
+            note={t('settings.confirmDeleteNote')}
+            value={confirmDelete}
+            onValueChange={toggleConfirmDelete}
+          />
 
           <Divider />
 
@@ -185,6 +203,12 @@ export default function SettingsScreen() {
                 note={t('settings.requireFaceIdNote')}
                 value={appLock}
                 onValueChange={toggleAppLock}
+              />
+              <ToggleRow
+                label={t('settings.showInFiles')}
+                note={t('settings.showInFilesNote')}
+                value={showInFiles}
+                onValueChange={toggleShowInFiles}
               />
 
               <Divider />

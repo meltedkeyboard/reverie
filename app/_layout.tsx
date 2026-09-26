@@ -9,12 +9,14 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { AppLock } from '@/components/AppLock'
 import { Sidebar } from '@/components/Sidebar'
 import { StartupBoundary } from '@/components/StartupBoundary'
+import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { isHapticsEnabled } from '@/db/haptics'
 import { migrate } from '@/db/schema'
 import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { DialogHost } from '@/lib/dialogs'
+import { databaseDirectory } from '@/lib/storage'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
 
 export default function RootLayout() {
@@ -23,7 +25,7 @@ export default function RootLayout() {
       <StartupBoundary>
         <KeyboardProvider>
           <Suspense fallback={<View style={styles.root} />}>
-            <SQLiteProvider databaseName="reverie.db" onInit={migrate}>
+            <SQLiteProvider databaseName="reverie.db" directory={databaseDirectory} onInit={migrate}>
               <ThemedApp />
             </SQLiteProvider>
           </Suspense>
@@ -40,6 +42,7 @@ function ThemedApp() {
 
   useEffect(() => {
     isHapticsEnabled(db)
+    isConfirmDeleteEnabled(db)
     loadThemePreference(db).then(setPreferenceState)
     loadLocalePreference(db).then(setLocalePreferenceState)
   }, [db])

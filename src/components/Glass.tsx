@@ -70,8 +70,11 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
       hitSlop={6}
       style={({ pressed }) => pressed && { transform: [{ scale: 0.94 }] }}
     >
-      <GlassSurface interactive style={styles.circle}>
-        {children ?? <Ionicons name={icon} size={iconSize - 2} color={colors.text} />}
+      <GlassSurface interactive={!disabled} style={styles.circle}>
+        {/* Like a disabled bar button: the glass stays, only the glyph greys out. */}
+        <View style={disabled && styles.disabled}>
+          {children ?? <Ionicons name={icon} size={iconSize - 2} color={colors.text} />}
+        </View>
       </GlassSurface>
     </Pressable>
   )
@@ -99,4 +102,5 @@ const createStyles = (colors: Colors) =>
     group: { height: 44, borderRadius: 22, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center' },
     circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    disabled: { opacity: 0.35 },
   })

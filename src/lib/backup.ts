@@ -5,7 +5,7 @@ import { MESSAGE_COLUMNS } from '@/db/messages'
 import { loadSettings, saveSettings } from '@/db/settings'
 import { t } from '@/i18n'
 import { pickJsonFile } from '@/lib/pickJson'
-import { readAvatarBase64, removeAllAvatars, writeAvatarBase64 } from '@/lib/avatars'
+import { readAvatarBase64, removeAllAvatars, writeAvatarBase64, type ImageKind } from '@/lib/avatars'
 import { saveJson } from '@/lib/download'
 
 const BACKUP_VERSION = 6
@@ -74,10 +74,12 @@ export async function exportBackup(db: SQLiteDatabase) {
 
   const avatars: Record<string, string> = {}
   // Backgrounds travel in the same map as the avatars: both are just pictures by name.
-  for (const name of characters.flatMap((character) => [character.avatar, character.background])) {
-    if (!name) continue
-    const base64 = await readAvatarBase64(name)
-    if (base64) avatars[name] = base64
+  for (const character of characters) {
+    for (const [name, kind] of [[character.avatar, 'avatars'], [character.background, 'backgrounds']] as const) {
+      if (!name) continue
+      const base64 = await readAvatarBase64(name, kind)
+      if (base64) avatars[name] = base64
+    }
   }
 
   // The API key is left out on purpose: the file usually ends up in iCloud Drive.
@@ -107,12 +109,12 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
   const avatarNames = new Map<string, string>()
 
   await db.withTransactionAsync(async () => {
-    const importImage = async (name: string | null | undefined) => {
+    const importImage = async (name: string | null | undefined, kind: ImageKind = 'avatars') => {
       if (!name || !dump.avatars[name]) return null
       let stored = avatarNames.get(name) ?? null
       if (!stored) {
         stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
-        await writeAvatarBase64(stored, dump.avatars[name])
+        await writeAvatarBase64(stored, dump.avatars[name], kind)
         avatarNames.set(name, stored)
       }
       return stored
@@ -127,7 +129,7 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
           avatar: await importImage(character.avatar),
           replyLimit: character.replyLimit ?? null,
           thinking: character.thinking ?? 'auto',
-          background: await importImage(character.background),
+          background: await importImage(character.background, 'backgrounds'),
           backgroundEffect: character.backgroundEffect ?? 'blur',
           backgroundIntensity: character.backgroundIntensity ?? 0.5,
           backgroundBubbleTransparency: character.backgroundBubbleTransparency ?? 0.3,

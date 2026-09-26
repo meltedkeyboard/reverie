@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'rea
 import { useReorderableDrag } from 'react-native-reorderable-list'
 
 import { useTranslation } from '@/i18n'
+import { isConfirmDeleteOn } from '@/lib/confirmDelete'
 import { showSheet } from '@/lib/dialogs'
 import { swiftUI } from '@/lib/nativeUI'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -33,7 +34,7 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, children }:
   const drag = useReorderableDrag()
   const openSheet = () => showSheet(menuTitle, menu)
   return (
-    <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete}>
+    <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete} throwAway={!isConfirmDeleteOn()}>
       <Pressable
         onPress={onOpen}
         onLongPress={drag}
