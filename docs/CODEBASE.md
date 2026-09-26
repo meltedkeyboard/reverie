@@ -22,6 +22,9 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Colors, fonts, light/dark | `src/theme.tsx` |
 | UI strings | `src/locales/en.json`, `src/locales/ru.json`; lookup in `src/i18n.tsx` |
 | iOS permission texts | `app.json` plugins (English) and `permissions/ru.json` (Russian) |
+| Tab bar: tabs, icons, web fallback | `app/(tabs)/_layout.tsx` |
+| What search finds and in which order | `app/(tabs)/search/index.tsx` (`ORDER`, settings entries), queries in `src/db/search.ts` |
+| Opening a chat at a message / Settings at a section | `?message=ID` in `chat/[id].tsx` → `focusId` in `ConversationList`; `?section=` in `(tabs)/settings.tsx` |
 | Web-only behavior | files with a `.web.ts(x)` suffix |
 | Brand assets and generated icons | `assets/brand/`, `scripts/build-icons.mjs` |
 | CI build | `.github/workflows/ios.yml`, `build-ipa.sh` |
@@ -31,19 +34,33 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 File-based routes (expo-router). `_layout.tsx` is the root: it wires providers in this order:
 `GestureHandlerRootView` > `StartupBoundary` > `KeyboardProvider` > `SQLiteProvider` (runs `migrate`) > locale and theme contexts > `AppLock` > `AppShell` (stack navigator, plus `Sidebar` on wide web).
 
+The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users out (redirect to `/onboarding`) and renders `NativeTabs` from `expo-router/unstable-native-tabs`: the system tab bar, Liquid Glass on iOS 26, with Search as a separate `role="search"` tab. The web build of native tabs is a pill over the top of the page, so the web renders JS `Tabs` instead, with the bar hidden on wide web where the `Sidebar` leads everywhere. On iOS the tab screens set `disableAutomaticContentInsets` and pad themselves from `useSafeAreaInsets`, which inside a tab already includes the tab bar. Everything else is pushed on the root stack over the tabs.
+
 | Route | File | Purpose |
 |---|---|---|
-| `/` | `index.tsx` | Characters and Rooms tabs, reorder, "Continue" capsule |
+| `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice, "Continue" capsule |
+| `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder, "Continue" capsule |
+| `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, lock, haptics, private chat button, backup. `?section=` scrolls to a block and flashes it |
+| `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26); a plain field on web |
 | `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character |
-| `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead |
+| `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead. `?message=ID` opens it scrolled to that message |
 | `/rooms/:roomId` | `rooms/[roomId].tsx` | Scenes of one room, import of a member's chat |
 | `/room/:id` | `room/[id].tsx` | Room editor: members, floor mode, scene, background |
 | `/character/:id` | `character/[id].tsx` | Character editor: prompt, greeting, sampling, thinking mode, background |
 | `/background` | `background.tsx` | Background picker, effect and intensity |
-| `/settings` | `settings.tsx` | Server, theme, language, lock, haptics, private chat button, backup |
 | `/onboarding` | `onboarding.tsx` | First-run pages, including server setup |
 | `/viewer` | `viewer.tsx` | Full-screen image |
 | `/about` | `about.tsx` | About page |
+
+## Search
+
+A Spotlight-like search over everything, in `(tabs)/search/index.tsx`.
+
+- Characters, rooms (by name or a member's name) and chat titles are loaded whole on focus and matched in JS, where case folding works for Cyrillic. `listSearchChats` also serves the "Recent" list shown for an empty query.
+- Message text is matched in SQL by `searchMessages` (`src/db/search.ts`), from two characters on, debounced. SQLite folds case only for ASCII, so the query is tried in four spellings (as typed, lower, capitalized, upper).
+- Settings results are a static list of entries with keywords, each pointing at `/settings?section=…` (`SettingsSection` in `src/lib/searchScope.ts`).
+- The order of sections follows the tab search was opened from: the tabs layout reports each focus to `noteTabFocus`, and search reads `getSearchScope` (`ORDER` in the screen).
+- A message result opens `/chat/ID?message=ID`; `ConversationList` scrolls to the row (retrying while far rows are not rendered) and tints it with `Flash`. Settings blocks use the same `Flash`.
 
 Some data cannot go through route params (file URIs, callbacks, very long data URLs), so two tiny module-level slots carry it between screens: `src/lib/backgroundDraft.ts` and `src/lib/viewer.ts`.
 
@@ -80,6 +97,7 @@ Everything goes through `expo-sqlite`. Schema versioning is `PRAGMA user_version
 | `rooms.ts` | Room CRUD, members, scenes, `importChatToRoom` |
 | `characters.ts` | Character CRUD, duplicate, ordering, `DEFAULT_SAMPLING`, `CHARACTER_COLUMNS` |
 | `chats.ts` | Chat CRUD, duplicate, ordering, `pruneUntouchedChats`, `getLastChat` |
+| `search.ts` | `listSearchChats` (every chat with its owner's name and avatar), `searchMessages` |
 | `messages.ts` | Message CRUD, variants (`withNewVariant`, `withVariant`), images and thoughts as JSON columns |
 | `settings.ts` | Key/value helpers (`getSetting`, `getFlag`), server settings, theme and locale preference |
 | `appLock.ts`, `confirmDelete.ts`, `continue.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts` | One feature flag each, stored as `'1'`/`'0'` in `app_settings` via `getFlag`/`setFlag` |
@@ -96,7 +114,7 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 | Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
 | AI helpers | `promptGen.ts`, `titles.ts` |
 | Platform | `haptics.ts` / `.web.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` / `.web.ts` (where the data lives, the "show in Files" toggle) |
-| App | `version.ts` (the version shown in About and onboarding), `confirmDelete.ts` (delete that asks unless turned off) |
+| App | `version.ts` (the version shown in About and onboarding), `confirmDelete.ts` (delete that asks unless turned off), `searchScope.ts` (the tab search was opened from, `SettingsSection`) |
 | Message menu | `messageActions.ts` |
 
 ## `src/hooks`
@@ -106,6 +124,7 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 | `useChat` | Conversation state, streaming, variants, editing |
 | `useRoom` | A room scene: the speaker queue, director, autoplay, nudges |
 | `useCharacterActions` | Duplicate / delete / export actions for a character |
+| `useLastChat` | The chat behind the "Continue" capsule on the Characters and Rooms tabs |
 | `useConnectionTest` | "Test connection" button state |
 | `useReorder` | Drag-to-reorder lists (`react-native-reorderable-list`) |
 | `useStoredFlag` | React state bound to an `app_settings` flag |
@@ -114,11 +133,11 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 
 ## `src/components`
 
-- **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet on iOS).
+- **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet on iOS).
 - **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`.
 - **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton`, `EmptyState`, `Sidebar` (wide web).
 - **Forms:** `Field`, `Group`, `ToggleRow`, `Segmented`, `ChipGroup`, `ParamSlider`, `FormScreenHeader`, `PromptGenModal`.
-- **Chrome and glass:** `Glass`, `GlassHeader`, `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `SFIcon`.
+- **Chrome and glass:** `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs), `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `SFIcon`.
 - **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `ImageLink`, `HomePattern`, `Wordmark`.
 - **`motifs/`:** small brand decorations (`Shard*`, `Star*`, `Divider`, `Eyebrow`, `FieldRow`).
 
@@ -130,6 +149,6 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 
 - Screens stay thin: data access in `src/db`, logic in `src/lib` or hooks.
 - Strings always go through `t('key')`; add the key to both locale files.
-- New setting flag: new `src/db/<name>.ts` with `getFlag`/`setFlag`, a row in `settings.tsx`, strings in both locales.
+- New setting flag: new `src/db/<name>.ts` with `getFlag`/`setFlag`, a row in `(tabs)/settings.tsx`, strings in both locales. To make it findable, wrap the row in `block('<section>', …)`, add the id to `SettingsSection` and an entry to the settings list in `(tabs)/search/index.tsx`.
 - New column: append a migration, extend the `*_COLUMNS` constant and the type, and bump `BACKUP_VERSION` in `backup.ts` if the backup should carry it (older backups must still import).
 - Check types with `npm run typecheck`.

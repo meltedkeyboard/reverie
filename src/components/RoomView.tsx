@@ -39,11 +39,11 @@ import { CHAT_MAX_WIDTH, fonts, useColors, useStyles, type Colors } from '@/them
 const FLOORS: FloorMode[] = ['addressee', 'reactions', 'open']
 const AUTOPLAY_LENGTHS = [3, 5, 10]
 
-type Props = { chat: Chat; room: Room; members: RoomMember[] }
+type Props = { chat: Chat; room: Room; members: RoomMember[]; focusMessageId?: number | null }
 
 // A scene in a room: several characters, a cast bar to pick who is spoken to, and a
 // status line saying who is talking and who is next.
-export function RoomView({ chat, room: initialRoom, members: initialMembers }: Props) {
+export function RoomView({ chat, room: initialRoom, members: initialMembers, focusMessageId }: Props) {
   const chatId = chat.id
   const db = useSQLiteContext()
   const router = useRouter()
@@ -365,6 +365,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers }: P
           header={error ? <ErrorCard message={error} onRetry={retry} /> : null}
           footer={loaded && !empty ? <RoomIntro room={room} cast={cast} /> : null}
           onAwayChange={setAwayFromEnd}
+          focusId={focusMessageId}
         />
       </View>
 

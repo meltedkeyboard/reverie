@@ -66,7 +66,8 @@ export function Sidebar() {
       <View style={styles.header}>
         <Wordmark width={120} />
         <View style={styles.headerActions}>
-          <IconButton name="settings-outline" size={20} onPress={() => router.push('/settings')} />
+          <IconButton name="search" size={20} onPress={() => router.navigate('/search')} />
+          <IconButton name="settings-outline" size={20} onPress={() => router.navigate('/settings')} />
           <Link href="/character/new" asChild>
             <IconButton name="add" size={22} />
           </Link>

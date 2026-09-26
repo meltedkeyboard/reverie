@@ -167,7 +167,7 @@ export default function RoomEditorScreen() {
       onConfirm: async () => {
         await deleteRoom(db, Number(id))
         if (storedBackground.current) removeAvatar(storedBackground.current, 'backgrounds')
-        router.dismissTo('/')
+        router.dismissTo('/rooms')
       },
     })
   }

@@ -47,10 +47,12 @@ export default function ChatScreen() {
   // /chat/new?character=ID (or ?room=ID for a scene) creates the chat on arrival. A
   // button can then be a plain Link with a fixed address, which is what the zoom
   // transition needs.
-  const { id, character: characterParam, room: roomParam } = useLocalSearchParams<{
+  const { id, character: characterParam, room: roomParam, message: messageParam } = useLocalSearchParams<{
     id: string
     character?: string
     room?: string
+    // /chat/ID?message=ID opens the chat at that message, as search does.
+    message?: string
   }>()
   const db = useSQLiteContext()
   const router = useRouter()
@@ -104,7 +106,10 @@ export default function ChatScreen() {
   }
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: colors.bg }} />
-  if (loaded.kind === 'room') return <RoomView chat={loaded.chat} room={loaded.room} members={loaded.members} />
+  const focusMessageId = messageParam ? Number(messageParam) : null
+  if (loaded.kind === 'room') {
+    return <RoomView chat={loaded.chat} room={loaded.room} members={loaded.members} focusMessageId={focusMessageId} />
+  }
   // The private chat lives only in memory: leaving it throws the conversation away and
   // brings back the real chat as it is in the database.
   return (
@@ -116,6 +121,7 @@ export default function ChatScreen() {
         privateTarget={privateTarget}
         onTogglePrivate={togglePrivate}
         onCommitPrivate={setPrivateMode}
+        focusMessageId={focusMessageId}
       />
       {privateTarget ? <Vignette /> : null}
     </View>
@@ -155,12 +161,13 @@ type ChatViewProps = {
   privateTarget: boolean
   onTogglePrivate: () => void
   onCommitPrivate: (on: boolean) => void
+  focusMessageId: number | null
 }
 
 const SWITCH_OUT_MS = 140
 const SWITCH_IN_MS = 260
 
-function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate, onCommitPrivate }: ChatViewProps) {
+function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate, onCommitPrivate, focusMessageId }: ChatViewProps) {
   const chatId = chat.id
   const db = useSQLiteContext()
   const router = useRouter()
@@ -385,6 +392,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
             loaded && !empty ? privateMode ? <PrivateIntro /> : <Intro character={character} chat={chat} /> : null
           }
           onAwayChange={setAwayFromEnd}
+          focusId={privateMode ? null : focusMessageId}
         />
       </Animated.View>
 

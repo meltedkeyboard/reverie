@@ -97,10 +97,10 @@
 
   "onboarding.slide1.title": "Your own characters",
   "onboarding.slide1.text": "A name, a personality, a way of speaking — everything as you wish",
-  "onboarding.slide2.title": "Full control",
-  "onboarding.slide2.text": "Temperature, top-P, reply length — set per character",
+  "onboarding.rooms.title": "Rooms",
+  "onboarding.rooms.text": "Gather several characters in one scene — they talk to you and to each other",
   "onboarding.slide3.title": "Your own model",
-  "onboarding.slide3.text": "Reverie works with a server on your network: LM Studio, Ollama, llama.cpp. Nothing leaves it",
+  "onboarding.slide3.text": "A server on your network: LM Studio, Ollama, llama.cpp. Temperature, top-P and reply length set per character. Nothing leaves it",
   "onboarding.slide4.title": "It all stays with you",
   "onboarding.slide4.text": "Chats and avatars stay on this device only",
   "onboarding.welcomeTitle": "Welcome",
@@ -407,5 +407,18 @@
   "roomEditor.userNamePlaceholder": "E.g. Sasha",
   "roomEditor.deleteRoom": "Delete room",
   "roomEditor.deleteConfirmTitle": "Delete room?",
-  "roomEditor.deleteConfirmMessage": "The room and all its scenes will be deleted permanently. The characters stay"
+  "roomEditor.deleteConfirmMessage": "The room and all its scenes will be deleted permanently. The characters stay",
+
+  "search.title": "Search",
+  "search.placeholderCharacters": "Characters, chats, messages",
+  "search.placeholderRooms": "Rooms, scenes, messages",
+  "search.placeholderSettings": "Settings and everything else",
+  "search.chats": "Chats",
+  "search.messages": "Messages",
+  "search.recent": "Recent",
+  "search.you": "You",
+  "search.emptyTitle": "Search everything",
+  "search.emptyText": "Characters, rooms, chat titles and the text of messages",
+  "search.noResultsTitle": "Nothing found",
+  "search.noResultsText": "Try another word"
 }

@@ -17,6 +17,7 @@ import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import Animated, { FadeIn, FadeOut, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { Flash } from '@/components/Flash'
 import { GlassButton } from '@/components/Glass'
 import { useHeaderHeight } from '@/components/GlassHeader'
 import type { RowMessage } from '@/components/MessageRow'
@@ -47,7 +48,11 @@ type Props = {
   header?: ReactElement | null
   footer?: ReactElement | null
   onAwayChange: (away: boolean) => void
+  // A message to scroll to and flash once it is loaded, e.g. one opened from search.
+  focusId?: number | null
 }
+
+const MAX_JUMP_ATTEMPTS = 5
 
 export function ConversationList({
   ref,
@@ -59,9 +64,11 @@ export function ConversationList({
   header,
   footer,
   onAwayChange,
+  focusId,
 }: Props) {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
+  const styles = useStyles(createStyles)
   const listRef = useRef<FlatList<RowMessage>>(null)
   const restInset = useRef(0)
   const [scrolledBack, setScrolledBack] = useState(false)
@@ -90,6 +97,27 @@ export function ConversationList({
   useEffect(() => {
     if (draftIndex === -1) setFollowTail(false)
   }, [draftIndex])
+
+  // Jumps once per focus target. Rows far back are not rendered yet, so a failed jump
+  // first scrolls to where the row should roughly be and then tries again.
+  const jumped = useRef<number | null>(null)
+  const jumpAttempts = useRef(0)
+  const focusIndex = focusId == null ? -1 : rows.findIndex((row) => row.id === focusId)
+  useEffect(() => {
+    if (focusIndex === -1 || jumped.current === focusId) return
+    jumped.current = focusId ?? null
+    jumpAttempts.current = 0
+    const frame = requestAnimationFrame(() =>
+      listRef.current?.scrollToIndex({ index: focusIndex, viewPosition: 0.5, animated: false })
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [focusId, focusIndex])
+
+  const onScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
+    if (++jumpAttempts.current > MAX_JUMP_ATTEMPTS) return
+    listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false })
+    setTimeout(() => listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: false }), 80)
+  }, [])
 
   const onContentInsetChange = useCallback((inset: { top: number }) => {
     restInset.current = inset.top
@@ -134,9 +162,16 @@ export function ConversationList({
   const renderItem = useCallback(
     ({ item: row }: ListRenderItemInfo<RowMessage>) => {
       const content = renderRow(row)
-      return row.streaming ? <View onLayout={onDraftLayout}>{content}</View> : content
+      if (row.streaming) return <View onLayout={onDraftLayout}>{content}</View>
+      if (row.id !== focusId) return content
+      return (
+        <View>
+          <Flash style={styles.flash} />
+          {content}
+        </View>
+      )
     },
-    [renderRow, onDraftLayout]
+    [renderRow, onDraftLayout, focusId]
   )
 
   return (
@@ -150,6 +185,7 @@ export function ConversationList({
       renderScrollComponent={renderScroll}
       onScroll={onScroll}
       onScrollBeginDrag={() => setFollowTail(false)}
+      onScrollToIndexFailed={onScrollToIndexFailed}
       onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
       maintainVisibleContentPosition={holdPosition ? { minIndexForVisible: draftIndex + 1 } : undefined}
       scrollEventThrottle={32}
@@ -212,6 +248,7 @@ const createStyles = (colors: Colors) =>
     retry: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.surfaceRaised },
     retryText: { color: colors.text, fontSize: 14, fontWeight: '600' },
     jumpSlot: { marginBottom: 12 },
+    flash: { left: 8, right: 8, borderRadius: 18 },
     jump: {
       width: 38,
       height: 38,

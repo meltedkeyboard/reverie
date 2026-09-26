@@ -1,6 +1,6 @@
 {
   "name": "reverie",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {

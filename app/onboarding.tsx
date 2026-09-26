@@ -43,10 +43,10 @@ const FEATURES: Feature[] = [
     textKey: 'onboarding.slide1.text',
   },
   {
-    icon: 'slider.horizontal.3',
-    fallback: 'options-outline',
-    titleKey: 'onboarding.slide2.title',
-    textKey: 'onboarding.slide2.text',
+    icon: 'person.3',
+    fallback: 'people-outline',
+    titleKey: 'onboarding.rooms.title',
+    textKey: 'onboarding.rooms.text',
   },
   {
     icon: 'server.rack',

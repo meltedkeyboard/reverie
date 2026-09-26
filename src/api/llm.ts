@@ -1,5 +1,5 @@
 import { fetch } from 'expo/fetch'
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 
 import type { ThinkingMode } from '@/db/characters'
 import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/settings'
@@ -75,9 +75,36 @@ async function getJsonWithTimeout(cfg: ServerSettings, url: string, ms: number) 
   }
 }
 
+let localNetworkAsked = false
+
+// iOS asks for local network access on the first request to a LAN address, and that
+// request fails while the alert is up. So the first test of a session sends a throwaway
+// request, and if the alert shows (the app goes inactive), waits for the answer.
+async function askLocalNetworkAccess(url: string) {
+  if (Platform.OS !== 'ios' || localNetworkAsked) return
+  localNetworkAsked = true
+
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 2000)
+  await fetch(url, { signal: ctrl.signal }).catch(() => null)
+  clearTimeout(timer)
+
+  await new Promise(resolve => setTimeout(resolve, 300))
+  if (AppState.currentState === 'active') return
+  await new Promise<void>(resolve => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state !== 'active') return
+      sub.remove()
+      resolve()
+    })
+  })
+}
+
 export async function testConnection(cfg: ServerSettings) {
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) throw new Error(t('llm.setBaseUrl'))
+
+  await askLocalNetworkAccess(`${base}/v1/models`)
 
   try {
     const body = await getJsonWithTimeout(cfg, `${base}/v1/models`, 8000)

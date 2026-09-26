@@ -3,10 +3,11 @@ import { StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { fonts, HEADER_ROW_HEIGHT, useStyles, type Colors } from '@/theme'
+import { fonts, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
 
 import { BlurBar, EdgeFade } from './BarChrome'
 import { IconButton } from './IconButton'
+import { Star } from './motifs/Star'
 
 type Props = {
   left?: React.ReactNode
@@ -39,6 +40,20 @@ export function HeaderTitle({ children }: { children: React.ReactNode }) {
     <Text style={styles.title} numberOfLines={1}>
       {children}
     </Text>
+  )
+}
+
+// The large title of a tab: a red star and the name in the prose face.
+export function TabTitle({ children }: { children: React.ReactNode }) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  return (
+    <View style={styles.tabTitleRow}>
+      <Star size={22} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
+      <Text style={styles.tabTitle} numberOfLines={1}>
+        {children}
+      </Text>
+    </View>
   )
 }
 
@@ -80,6 +95,9 @@ export function GlassHeader({ left, right, children, floating }: Props) {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
+    tabTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    tabTitleStar: { marginTop: 2 },
+    tabTitle: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
     root: {
     position: 'absolute',
     top: 0,
