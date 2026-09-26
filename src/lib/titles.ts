@@ -9,12 +9,13 @@ const PROMPT =
 // Models like to wrap the title in straight or guillemet quotes, or in markdown bold.
 const QUOTES_AROUND = new RegExp('^["\'\\u00ab*]+|["\'\\u00bb*.]+$', 'g')
 
-export async function suggestTitle(cfg: ServerSettings, characterName: string, messages: Message[]) {
+// nameOf tells who said an assistant message: the character, or in a room whoever spoke.
+export async function suggestTitle(cfg: ServerSettings, nameOf: (m: Message) => string, messages: Message[]) {
   const transcript = messages
     .slice(-8)
     .map((m) => {
       const text = m.content.trim().slice(0, 600) || (m.images.length ? '[фото]' : '')
-      return `${m.role === 'user' ? 'Пользователь' : characterName}: ${text}`
+      return `${m.role === 'user' ? 'Пользователь' : nameOf(m)}: ${text}`
     })
     .join('\n\n')
 

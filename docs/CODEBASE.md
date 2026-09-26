@@ -10,10 +10,13 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 |---|---|
 | A request to the model, SSE parsing, thinking mode | `src/api/llm.ts` |
 | How many messages are sent as context | `CONTEXT_WINDOW` in `src/api/llm.ts` |
-| Send / regenerate / variants / edit / delete logic | `src/hooks/useChat.ts` |
+| Send / regenerate / variants / edit / delete logic | `src/hooks/useChat.ts` (rooms: `src/hooks/useRoom.ts`) |
+| Who speaks next in a room, whispers, eavesdropping | `src/lib/room/floor.ts`, `src/lib/room/audience.ts` |
+| What a room character sees of the scene | `src/lib/room/prompt.ts` |
+| The director request | `src/lib/room/director.ts` |
 | Which actions a message has in its menu | `src/lib/messageActions.ts`, rendered in `src/components/MessageRow.tsx` |
 | A DB column or a new table | new entry at the end of `MIGRATIONS` in `src/db/schema.ts`, then the matching `src/db/*.ts` file |
-| Backup format | `src/lib/backup.ts` (`BACKUP_VERSION`, currently 6) |
+| Backup format | `src/lib/backup.ts` (`BACKUP_VERSION`, currently 7) |
 | Auto chat title | `src/lib/titles.ts` |
 | System prompt / greeting generator | `src/lib/promptGen.ts` and `src/components/PromptGenModal.tsx` |
 | Colors, fonts, light/dark | `src/theme.tsx` |
@@ -30,9 +33,11 @@ File-based routes (expo-router). `_layout.tsx` is the root: it wires providers i
 
 | Route | File | Purpose |
 |---|---|---|
-| `/` | `index.tsx` | Character list, reorder, "Continue" capsule |
+| `/` | `index.tsx` | Characters and Rooms tabs, reorder, "Continue" capsule |
 | `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character |
-| `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen) |
+| `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead |
+| `/rooms/:roomId` | `rooms/[roomId].tsx` | Scenes of one room, import of a member's chat |
+| `/room/:id` | `room/[id].tsx` | Room editor: members, floor mode, scene, background |
 | `/character/:id` | `character/[id].tsx` | Character editor: prompt, greeting, sampling, thinking mode, background |
 | `/background` | `background.tsx` | Background picker, effect and intensity |
 | `/settings` | `settings.tsx` | Server, theme, language, lock, haptics, private chat button, backup |
@@ -52,13 +57,27 @@ Some data cannot go through route params (file URIs, callbacks, very long data U
 
 A private chat uses an in-memory `MessageStore` inside `useChat` instead of the DB, so nothing is left after leaving the screen. The header button is toggled by `src/db/privateChat.ts`.
 
+The streaming loop itself (reasoning, per-frame batching) is `runReplyStream` in `src/lib/replyStream.ts`, shared with rooms.
+
+## Rooms
+
+A room is a cast of characters (`room_members`) and settings; its chats are scenes (`chats.room_id`, with `character_id` NULL). `chat/[id].tsx` shows a scene with `src/components/RoomView.tsx`, driven by `useRoom`.
+
+1. The user picks addressees or the narrator in `CastSheet` (opened from the button in `CastBar`) and may switch on a whisper there. A swipe to the left on a member in the sheet walks them out of the scene or back in. The message is saved with `addressees`, `audience`, `overheard` (rolled once from each member's perception) and `absent` (members out of the scene).
+2. `planTurn` (`floor.ts`) scores the members and builds a queue for the room's floor mode: `addressee`, `reactions` or `open`. When the scores are too close it returns an `ambiguous` question, and `askDirector` asks the model with one short request (if the room allows it).
+3. `useRoom.runQueue` generates the queued lines one by one. `buildRoomRequest` gives each speaker their own view: their lines as `assistant`, everyone else as `user` with a name in front, and nothing they could not hear (`hearing` in `audience.ts`). In open floor a line that calls another character by name queues their answer (`followUps`).
+4. "Continue" and "Let them talk" use `nextSpeaker`; a nudge from the cast bar uses `turnFor`.
+
+Members can be muted (listen only) or out of the scene (hear nothing); entering and leaving is recorded as a narrator line (`useRoom.setPresent`). With the director on, the characters move by themselves too: after every line `movementCue` (`floor.ts`) looks for words of going or coming, and only then `askMovement` (`director.ts`) asks who actually left or came in. In open floor whoever came in gets a turn to react.
+
 ## `src/db` - persistence
 
 Everything goes through `expo-sqlite`. Schema versioning is `PRAGMA user_version` plus the ordered `MIGRATIONS` array in `schema.ts`. Never edit an existing entry, only append.
 
 | File | Contents |
 |---|---|
-| `schema.ts` | Migrations: `characters`, `chats`, `messages`, `app_settings` |
+| `schema.ts` | Migrations: `characters`, `chats`, `messages`, `app_settings`, `rooms`, `room_members`. `migrate` runs them with foreign keys off, so a table rebuild does not cascade |
+| `rooms.ts` | Room CRUD, members, scenes, `importChatToRoom` |
 | `characters.ts` | Character CRUD, duplicate, ordering, `DEFAULT_SAMPLING`, `CHARACTER_COLUMNS` |
 | `chats.ts` | Chat CRUD, duplicate, ordering, `pruneUntouchedChats`, `getLastChat` |
 | `messages.ts` | Message CRUD, variants (`withNewVariant`, `withVariant`), images and thoughts as JSON columns |
@@ -85,6 +104,7 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 | Hook | Purpose |
 |---|---|
 | `useChat` | Conversation state, streaming, variants, editing |
+| `useRoom` | A room scene: the speaker queue, director, autoplay, nudges |
 | `useCharacterActions` | Duplicate / delete / export actions for a character |
 | `useConnectionTest` | "Test connection" button state |
 | `useReorder` | Drag-to-reorder lists (`react-native-reorderable-list`) |
@@ -94,10 +114,11 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 
 ## `src/components`
 
-- **Chat:** `MessageRow`, `Composer`, `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet on iOS).
+- **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet on iOS).
+- **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`.
 - **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton`, `EmptyState`, `Sidebar` (wide web).
 - **Forms:** `Field`, `Group`, `ToggleRow`, `Segmented`, `ChipGroup`, `ParamSlider`, `FormScreenHeader`, `PromptGenModal`.
-- **Chrome and glass:** `Glass`, `GlassHeader`, `BarChrome`, `NativeMenu`, `PageSheet`, `IconButton`, `Button`, `SFIcon`.
+- **Chrome and glass:** `Glass`, `GlassHeader`, `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `SFIcon`.
 - **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `ImageLink`, `HomePattern`, `Wordmark`.
 - **`motifs/`:** small brand decorations (`Shard*`, `Star*`, `Divider`, `Eyebrow`, `FieldRow`).
 

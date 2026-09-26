@@ -16,6 +16,7 @@ import { messageActions, type MessageAction } from '@/lib/messageActions'
 import { splitRoleplay } from '@/lib/roleplay'
 import { CHAT_MAX_WIDTH, fonts, useColors, useStyles, type Colors } from '@/theme'
 
+import { Avatar } from './Avatar'
 import { IconButton } from './IconButton'
 import { ImageLink } from './ImageLink'
 import { NativeMenu } from './NativeMenu'
@@ -27,6 +28,18 @@ import { TypingIndicator } from './TypingIndicator'
 // once the thinking is over and the reply has started.
 export type RowMessage = Message & { streaming?: boolean; reasoning?: string; reasoningMs?: number | null }
 
+// How a line sits in a room's scene, already turned into names. Absent in a one-on-one
+// chat, where the row looks as it always did.
+export type RowScene = {
+  // Who said an assistant line; null once that character was deleted.
+  speaker: { name: string; avatar: string | null; color: string } | null
+  // The characters it was said to, when that is not simply the user.
+  to: string | null
+  // Everyone who was meant to hear a whisper.
+  whisper: string | null
+  overheard: string | null
+}
+
 type Props = {
   message: RowMessage
   canRegenerate: boolean
@@ -35,6 +48,7 @@ type Props = {
   onSelectVariant: (id: number, variant: number) => void
   // How much of the user's bubble color shows: below 1 over a chat background.
   bubbleOpacity?: number
+  scene?: RowScene
 }
 
 // On iOS a long press opens the message menu, which would fight with native text
@@ -42,10 +56,12 @@ type Props = {
 const SELECTABLE = Platform.OS === 'web'
 const LONG_PRESS_MS = 350
 
-function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1 }: Props) {
+function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1, scene }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
-  const isUser = message.role === 'user'
+  const { t } = useTranslation()
+  const narration = message.kind === 'narration'
+  const isUser = message.role === 'user' && !narration
   const spans = useMemo(() => (isUser ? [] : splitRoleplay(message.content)), [isUser, message.content])
   const actions = useMemo(
     () => messageActions(message, { canRegenerate, locked }),
@@ -71,21 +87,57 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
     />
   )
 
+  const text = (
+    <Text selectable={SELECTABLE} style={[styles.botText, narration && styles.narrationText]}>
+      {spans.map((span, i) => (
+        <Text key={i} style={span.action ? styles.action : undefined}>
+          {span.text}
+        </Text>
+      ))}
+    </Text>
+  )
+
+  if (narration) {
+    return (
+      <View style={styles.narrationRow}>
+        <View style={styles.narrationRule} />
+        <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS}>
+          {text}
+        </Pressable>
+        <View style={styles.narrationRule} />
+        {bar}
+      </View>
+    )
+  }
+
   if (isUser) {
     return (
       <View style={styles.userRow}>
+        {scene?.whisper || scene?.to ? (
+          <View style={styles.caption}>
+            <Ionicons name={scene.whisper ? 'lock-closed' : 'arrow-forward'} size={11} color={colors.textFaint} />
+            <Text style={styles.captionText} numberOfLines={1}>
+              {scene.whisper ? t('room.whisperTo', { names: scene.whisper }) : scene.to}
+            </Text>
+          </View>
+        ) : null}
         {message.images.map((image, index) => (
           <Picture key={index} image={image} onLongPress={openSheet} />
         ))}
         {message.content ? (
           <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS}
-            style={[styles.bubble, bubbleOpacity < 1 && { backgroundColor: withAlpha(colors.bubble, bubbleOpacity) }]}
+            style={[
+              styles.bubble,
+              bubbleOpacity < 1 && { backgroundColor: withAlpha(colors.bubble, bubbleOpacity) },
+              scene?.whisper ? styles.whisperBubble : null,
+            ]}
           >
             <Text selectable={SELECTABLE} style={styles.userText}>
               {message.content}
             </Text>
           </Pressable>
         ) : null}
+        {scene?.overheard ? <Overheard names={scene.overheard} end /> : null}
         {bar}
       </View>
     )
@@ -97,23 +149,57 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
       ? { text: message.reasoning, ms: message.reasoningMs ?? null }
       : null
     : message.thoughts[message.variant]
+  const speaker = scene?.speaker
   return (
-    <View style={styles.botRow}>
+    <View style={[styles.botRow, message.kind === 'reaction' && styles.reactionRow]}>
+      {scene ? (
+        <View style={styles.speaker}>
+          {speaker ? <Avatar name={speaker.name} file={speaker.avatar} size={22} viewable={false} /> : null}
+          <Text style={[styles.speakerName, { color: speaker?.color ?? colors.textFaint }]} numberOfLines={1}>
+            {speaker?.name ?? t('room.deletedCharacter')}
+          </Text>
+          {scene.to && !scene.whisper ? (
+            <>
+              <Ionicons name="arrow-forward" size={11} color={colors.textFaint} />
+              <Text style={styles.captionText} numberOfLines={1}>
+                {scene.to}
+              </Text>
+            </>
+          ) : null}
+          {scene.whisper ? (
+            <View style={styles.whisperBadge}>
+              <Ionicons name="lock-closed" size={10} color={colors.textMuted} />
+              <Text style={styles.whisperText} numberOfLines={1}>
+                {t('room.whisperTo', { names: scene.whisper })}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       {thought ? <ThoughtBlock text={thought.text} ms={thought.ms} /> : null}
       {waiting && thought ? null : waiting ? (
         <TypingIndicator />
       ) : (
         <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS}>
-          <Text selectable={SELECTABLE} style={styles.botText}>
-            {spans.map((span, i) => (
-              <Text key={i} style={span.action ? styles.action : undefined}>
-                {span.text}
-              </Text>
-            ))}
-          </Text>
+          {text}
         </Pressable>
       )}
+      {scene?.overheard ? <Overheard names={scene.overheard} /> : null}
       {bar}
+    </View>
+  )
+}
+
+function Overheard({ names, end = false }: { names: string; end?: boolean }) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  return (
+    <View style={[styles.caption, styles.overheard, end && styles.captionEnd]}>
+      <Ionicons name="ear-outline" size={13} color={colors.textFaint} />
+      <Text style={styles.captionText} numberOfLines={1}>
+        {t('room.overheardBy', { names })}
+      </Text>
     </View>
   )
 }
@@ -311,6 +397,37 @@ const createStyles = (colors: Colors) =>
   botRow: { alignItems: 'flex-start', paddingHorizontal: 20, marginVertical: 12, width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
   botText: { color: colors.text, fontFamily: fonts.prose, fontSize: 17, lineHeight: 27, letterSpacing: 0.1 },
   action: { fontStyle: 'italic', color: colors.textMuted },
+  reactionRow: { marginVertical: 6 },
+  speaker: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, maxWidth: '100%' },
+  speakerName: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
+  caption: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4, maxWidth: '100%' },
+  captionEnd: { alignSelf: 'flex-end' },
+  captionText: { color: colors.textFaint, fontSize: 12.5, flexShrink: 1 },
+  overheard: { marginTop: 6, marginBottom: 0 },
+  whisperBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+    flexShrink: 1,
+  },
+  whisperText: { color: colors.textMuted, fontSize: 12, flexShrink: 1 },
+  whisperBubble: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong, opacity: 0.85 },
+  narrationRow: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    marginVertical: 14,
+    width: '100%',
+    maxWidth: CHAT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
+  narrationRule: { width: 36, height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong, marginVertical: 10 },
+  narrationText: { fontStyle: 'italic', color: colors.textMuted, textAlign: 'center', fontSize: 16, lineHeight: 25 },
   thought: {
     alignSelf: 'stretch',
     marginBottom: 10,

@@ -52,6 +52,14 @@ type Props = {
   // Plain (non-worklet) mirror of `height`, for callers that need to react to it outside
   // reanimated — e.g. reserving list space on web, where extraContentPadding isn't wired up.
   onHeightChange?: (height: number) => void
+  // Drawn inside the field under the text, next to the send button, e.g. who a room's
+  // message goes to.
+  toolbar?: React.ReactNode
+  placeholder?: string
+  // A long press on the continue button, for a choice of how far to go on.
+  onContinueLongPress?: () => void
+  // Marks the field as a whisper.
+  hushed?: boolean
 }
 
 export function Composer({
@@ -65,6 +73,10 @@ export function Composer({
   onSubmitEdit,
   onCancelEdit,
   onHeightChange,
+  toolbar,
+  placeholder,
+  onContinueLongPress,
+  hushed = false,
 }: Props) {
   const insets = useSafeAreaInsets()
   const colors = useColors()
@@ -150,10 +162,37 @@ export function Composer({
     onHeightChange?.(e.nativeEvent.layout.height)
   }
 
+  const sendButton = (
+    <Pressable
+      onPress={onPress}
+      onLongPress={mode === 'continue' ? onContinueLongPress : undefined}
+      disabled={mode === 'idle'}
+      hitSlop={6}
+      accessibilityLabel={mode === 'continue' ? t('chat.continueAccessibility') : undefined}
+    >
+      <Animated.View style={[styles.send, buttonStyle]}>
+        {/* The symbol bounces when the button changes its meaning (send, stop, save),
+            but not when it merely lights up as the user starts typing. */}
+        <SFIcon
+          name={ICONS[mode].sf}
+          fallback={ICONS[mode].fallback}
+          size={mode === 'stop' ? 13 : 16}
+          color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.text : '#FFFFFF'}
+          effect={{ effect: 'bounce' }}
+          trigger={mode === 'idle' ? 'send' : mode}
+        />
+      </Animated.View>
+    </Pressable>
+  )
+
+  // With a toolbar the field has two tiers, as in the Claude app: the text across the
+  // whole width, and under it the toolbar on the left and the send button on the right.
+  const docked = toolbar !== undefined && toolbar !== null && !editing
+
   const row = (
     <View style={styles.row}>
       {editing ? null : <AttachButton disabled={picking} onPick={attach} />}
-      <GlassSurface style={styles.field} fallbackStyle={glass.solid}>
+      <GlassSurface style={[styles.field, hushed && styles.hushed]} fallbackStyle={glass.solid}>
         {editing ? (
           <View style={styles.banner}>
             <Ionicons name="create-outline" size={15} color={colors.accent} />
@@ -177,36 +216,25 @@ export function Composer({
             ))}
           </ScrollView>
         ) : null}
-        <View style={styles.inputRow}>
+        <View style={docked ? undefined : styles.inputRow}>
           <TextInput
             ref={inputRef}
             value={text}
             onChangeText={setText}
             onKeyPress={Platform.OS === 'web' ? onKeyPress : undefined}
-            placeholder={t('chat.messagePlaceholder')}
+            placeholder={placeholder ?? t('chat.messagePlaceholder')}
             {...inputColors}
             multiline
-            style={styles.input}
+            style={[styles.input, docked && styles.inputDocked]}
           />
-          <Pressable
-            onPress={onPress}
-            disabled={mode === 'idle'}
-            hitSlop={6}
-            accessibilityLabel={mode === 'continue' ? t('chat.continueAccessibility') : undefined}
-          >
-            <Animated.View style={[styles.send, buttonStyle]}>
-              {/* The symbol bounces when the button changes its meaning (send, stop, save),
-                  but not when it merely lights up as the user starts typing. */}
-              <SFIcon
-                name={ICONS[mode].sf}
-                fallback={ICONS[mode].fallback}
-                size={mode === 'stop' ? 13 : 16}
-                color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.text : '#FFFFFF'}
-                effect={{ effect: 'bounce' }}
-                trigger={mode === 'idle' ? 'send' : mode}
-              />
-            </Animated.View>
-          </Pressable>
+          {docked ? (
+            <View style={styles.tools}>
+              <View style={styles.toolbar}>{toolbar}</View>
+              {sendButton}
+            </View>
+          ) : (
+            sendButton
+          )}
         </View>
       </GlassSurface>
     </View>
@@ -257,6 +285,7 @@ const createStyles = (colors: Colors) =>
   // on phone widths.
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
   field: { flex: 1, borderRadius: 22, padding: 4 },
+  hushed: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong },
   attachment: { margin: 6, marginBottom: 2, marginRight: 4 },
   thumb: { width: 72, height: 72, borderRadius: 14 },
   thumbRemove: {
@@ -282,5 +311,8 @@ const createStyles = (colors: Colors) =>
     paddingBottom: 8,
     paddingHorizontal: 12,
   },
+  inputDocked: { paddingTop: 10, paddingBottom: 6 },
+  tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  toolbar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   send: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
 })

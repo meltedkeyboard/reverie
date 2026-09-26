@@ -133,10 +133,75 @@ const MIGRATIONS = [
   `
     ALTER TABLE characters ADD COLUMN background_bubble_transparency REAL NOT NULL DEFAULT 0.3;
   `,
+  // Rooms: several characters in one scene. A chat now belongs either to a character or
+  // to a room, so chats is rebuilt with character_id nullable. Messages learn who said
+  // them, to whom, who could hear it, who overheard it anyway and who was out of the scene.
+  `
+    CREATE TABLE rooms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      scenario TEXT NOT NULL DEFAULT '',
+      opening TEXT NOT NULL DEFAULT '',
+      user_name TEXT NOT NULL DEFAULT '',
+      floor TEXT NOT NULL DEFAULT 'addressee',
+      max_chain INTEGER NOT NULL DEFAULT 3,
+      director INTEGER NOT NULL DEFAULT 1,
+      background TEXT,
+      background_effect TEXT NOT NULL DEFAULT 'blur',
+      background_intensity REAL NOT NULL DEFAULT 0.5,
+      background_bubble_transparency REAL NOT NULL DEFAULT 0.3,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE room_members (
+      room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+      character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL DEFAULT 0,
+      talkativeness REAL NOT NULL DEFAULT 0.5,
+      perception REAL NOT NULL DEFAULT 0.15,
+      triggers TEXT NOT NULL DEFAULT '',
+      muted INTEGER NOT NULL DEFAULT 0,
+      present INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (room_id, character_id)
+    );
+    CREATE INDEX idx_room_members_character ON room_members(character_id);
+
+    CREATE TABLE chats_v2 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+      room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
+      title TEXT,
+      created_at INTEGER NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      CHECK ((character_id IS NULL) <> (room_id IS NULL))
+    );
+    INSERT INTO chats_v2 (id, character_id, room_id, title, created_at, sort_order)
+      SELECT id, character_id, NULL, title, created_at, sort_order FROM chats;
+    DROP TABLE chats;
+    ALTER TABLE chats_v2 RENAME TO chats;
+    CREATE INDEX idx_chats_character ON chats(character_id);
+    CREATE INDEX idx_chats_room ON chats(room_id);
+    CREATE TRIGGER chats_new_on_top AFTER INSERT ON chats BEGIN
+      UPDATE chats SET sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM chats) WHERE id = NEW.id;
+    END;
+    CREATE TRIGGER rooms_new_on_top AFTER INSERT ON rooms BEGIN
+      UPDATE rooms SET sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM rooms) WHERE id = NEW.id;
+    END;
+
+    ALTER TABLE messages ADD COLUMN speaker_id INTEGER REFERENCES characters(id) ON DELETE SET NULL;
+    ALTER TABLE messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'say';
+    ALTER TABLE messages ADD COLUMN addressees TEXT;
+    ALTER TABLE messages ADD COLUMN audience TEXT;
+    ALTER TABLE messages ADD COLUMN overheard TEXT;
+    ALTER TABLE messages ADD COLUMN absent TEXT;
+  `,
 ]
 
 export async function migrate(db: SQLiteDatabase) {
-  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
+  // Foreign keys stay off while migrating: rebuilding a table means dropping the old one,
+  // and with them on that drop would cascade into every row that points at it. The pragma
+  // is a no-op inside a transaction, so it is switched around the loop, not in it.
+  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = OFF;')
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version')
   for (let version = row?.user_version ?? 0; version < MIGRATIONS.length; version++) {
     await db.withTransactionAsync(async () => {
@@ -144,4 +209,7 @@ export async function migrate(db: SQLiteDatabase) {
       await db.execAsync(`PRAGMA user_version = ${version + 1}`)
     })
   }
+  const broken = await db.getAllAsync('PRAGMA foreign_key_check')
+  if (broken.length) console.warn('Foreign key violations after migration', broken)
+  await db.execAsync('PRAGMA foreign_keys = ON;')
 }

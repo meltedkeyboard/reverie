@@ -7,6 +7,10 @@ export type MessageImage = { base64: string; width: number; height: number }
 // What a reasoning model thought before answering and for how long.
 export type Thought = { text: string; ms: number }
 
+// 'reaction' is a short aside from someone who was not asked; 'narration' is the user
+// describing the scene instead of speaking in it.
+export type MessageKind = 'say' | 'reaction' | 'narration'
+
 export type Message = {
   id: number
   chatId: number
@@ -19,17 +23,47 @@ export type Message = {
   // Parallel to variants: the reasoning behind each version, null where there was none.
   thoughts: (Thought | null)[]
   createdAt: number
+  // The rest only means something in a room. speakerId is the character who said an
+  // assistant line (null in a one-on-one chat, or once that character is deleted).
+  speakerId: number | null
+  kind: MessageKind
+  // Character ids the line is aimed at, 0 standing for the user; null is everyone.
+  addressees: number[] | null
+  // Character ids who can hear it; null is everyone. The user always hears everything.
+  audience: number[] | null
+  // Characters outside the audience who overheard it anyway.
+  overheard: number[]
+  // Characters who were out of the scene when it was said; they never learn of it.
+  absent: number[]
 }
 
-type Row = Omit<Message, 'variants' | 'thoughts' | 'images'> & {
+type Row = Omit<Message, 'variants' | 'thoughts' | 'images' | 'addressees' | 'audience' | 'overheard' | 'absent'> & {
   images: string | null
   variants: string | null
   thoughts: string | null
+  addressees: string | null
+  audience: string | null
+  overheard: string | null
+  absent: string | null
 }
 
-export const MESSAGE_COLUMNS = `id, chat_id AS chatId, role, content, images, variants, variant, thoughts, created_at AS createdAt`
+export const MESSAGE_COLUMNS = `id, chat_id AS chatId, role, content, images, variants, variant, thoughts, created_at AS createdAt,
+  speaker_id AS speakerId, kind, addressees, audience, overheard, absent`
 
-export type NewMessageExtra = { images?: MessageImage[]; thought?: Thought | null }
+// The columns copied as they are when a chat is duplicated or moved.
+export const MESSAGE_COPY_COLUMNS =
+  'role, content, images, variants, variant, thoughts, created_at, speaker_id, kind, addressees, audience, overheard, absent'
+
+export type NewMessageExtra = {
+  images?: MessageImage[]
+  thought?: Thought | null
+  speakerId?: number | null
+  kind?: MessageKind
+  addressees?: number[] | null
+  audience?: number[] | null
+  overheard?: number[]
+  absent?: number[]
+}
 
 // How a message changes is kept apart from where it is stored, so the database and a
 // private chat's in-memory store can't drift apart.
@@ -38,7 +72,16 @@ export function newMessage(
   chatId: number,
   role: Role,
   content: string,
-  { images = [], thought = null }: NewMessageExtra = {},
+  {
+    images = [],
+    thought = null,
+    speakerId = null,
+    kind = 'say',
+    addressees = null,
+    audience = null,
+    overheard = [],
+    absent = [],
+  }: NewMessageExtra = {},
   createdAt = Date.now()
 ): Message {
   return {
@@ -51,6 +94,12 @@ export function newMessage(
     variant: 0,
     thoughts: [thought],
     createdAt,
+    speakerId,
+    kind,
+    addressees,
+    audience,
+    overheard,
+    absent,
   }
 }
 
@@ -78,7 +127,25 @@ function fromRow(row: Row): Message {
   const variants: string[] = row.variants ? JSON.parse(row.variants) : [row.content]
   const thoughts: (Thought | null)[] = row.thoughts ? JSON.parse(row.thoughts) : []
   const images: MessageImage[] = row.images ? JSON.parse(row.images) : []
-  return { ...row, images, variants, thoughts: variants.map((_, i) => thoughts[i] ?? null) }
+  return {
+    ...row,
+    images,
+    variants,
+    thoughts: variants.map((_, i) => thoughts[i] ?? null),
+    addressees: row.addressees ? JSON.parse(row.addressees) : null,
+    audience: row.audience ? JSON.parse(row.audience) : null,
+    overheard: row.overheard ? JSON.parse(row.overheard) : [],
+    absent: row.absent ? JSON.parse(row.absent) : [],
+  }
+}
+
+export function packIds(ids: number[] | null) {
+  return ids ? JSON.stringify(ids) : null
+}
+
+// For the lists that are empty far more often than not.
+function packSome(ids: number[]) {
+  return ids.length ? JSON.stringify(ids) : null
 }
 
 // A message without pictures keeps the column empty.
@@ -103,8 +170,8 @@ export async function listMessages(db: SQLiteDatabase, chatId: number) {
 export async function addMessage(db: SQLiteDatabase, chatId: number, role: Role, content: string, extra?: NewMessageExtra) {
   const message = newMessage(0, chatId, role, content, extra)
   const res = await db.runAsync(
-    `INSERT INTO messages (chat_id, role, content, images, thoughts, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO messages (chat_id, role, content, images, thoughts, created_at, speaker_id, kind, addressees, audience, overheard, absent)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       chatId,
       role,
@@ -112,6 +179,12 @@ export async function addMessage(db: SQLiteDatabase, chatId: number, role: Role,
       packImages(message.images),
       packThoughts(message.thoughts),
       message.createdAt,
+      message.speakerId,
+      message.kind,
+      packIds(message.addressees),
+      packIds(message.audience),
+      packSome(message.overheard),
+      packSome(message.absent),
     ]
   )
   return { ...message, id: res.lastInsertRowId }

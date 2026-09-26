@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { PREVIEW } from '@/db/chats'
+import { MESSAGE_COPY_COLUMNS } from '@/db/messages'
 
 export type CharacterFields = {
   name: string
@@ -145,8 +146,8 @@ export async function duplicateCharacter(
         [characterId, chat.id]
       )
       await db.runAsync(
-        `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, created_at)
-         SELECT ?, role, content, images, variants, variant, thoughts, created_at
+        `INSERT INTO messages (chat_id, ${MESSAGE_COPY_COLUMNS})
+         SELECT ?, ${MESSAGE_COPY_COLUMNS}
          FROM messages WHERE chat_id = ? ORDER BY id`,
         [copy.lastInsertRowId, chat.id]
       )

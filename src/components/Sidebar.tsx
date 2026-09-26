@@ -5,12 +5,14 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
+import { listRooms, type RoomPreview } from '@/db/rooms'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useTranslation } from '@/i18n'
 import { characterPreview } from '@/lib/roleplay'
 import { useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
+import { AvatarStack } from './AvatarStack'
 import { IconButton } from './IconButton'
 import { Wordmark } from './Wordmark'
 
@@ -25,10 +27,12 @@ export function Sidebar() {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
+  const [rooms, setRooms] = useState<RoomPreview[]>([])
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
     setCharacters(await listCharacters(db))
+    setRooms(await listRooms(db))
   }, [db])
 
   // Re-listed on every route change (not just on mount) so creating, editing, deleting
@@ -41,9 +45,18 @@ export function Sidebar() {
   // /chat/:id carries a chat id, not a character id, so the highlight is remembered
   // from the last /chats/:id or /character/:id visit instead of derived from the path.
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [activeRoom, setActiveRoom] = useState<number | null>(null)
   useEffect(() => {
     const match = pathname.match(/^\/(chats|character)\/(\d+)/)
-    if (match) setActiveId(Number(match[2]))
+    if (match) {
+      setActiveId(Number(match[2]))
+      setActiveRoom(null)
+    }
+    const room = pathname.match(/^\/rooms?\/(\d+)/)
+    if (room) {
+      setActiveRoom(Number(room[1]))
+      setActiveId(null)
+    }
   }, [pathname])
 
   const { openMenu } = useCharacterActions(reload, (character) => setActiveId(character.id))
@@ -87,6 +100,39 @@ export function Sidebar() {
             </Pressable>
           )
         }}
+        ListFooterComponent={
+          <>
+            <View style={styles.sectionRow}>
+              <Text style={[styles.section, styles.sectionInRow]}>{t('rooms.title')}</Text>
+              <Link href="/room/new" asChild>
+                <IconButton name="add" size={18} />
+              </Link>
+            </View>
+            {rooms.map((room) => (
+              <Pressable
+                key={room.id}
+                onPress={() => {
+                  setActiveRoom(room.id)
+                  setActiveId(null)
+                  router.push(`/rooms/${room.id}`)
+                }}
+                style={({ pressed }) => [styles.row, room.id === activeRoom && styles.rowActive, pressed && { opacity: 0.75 }]}
+              >
+                <View style={styles.stack}>
+                  <AvatarStack cast={room.cast} size={30} max={2} />
+                </View>
+                <View style={styles.rowBody}>
+                  <Text style={styles.name} numberOfLines={1}>
+                    {room.name}
+                  </Text>
+                  <Text style={styles.preview} numberOfLines={1}>
+                    {room.cast.map((m) => m.name).join(', ')}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </>
+        }
         ListEmptyComponent={
           characters && characters.length === 0 ? (
             <View style={styles.empty}>
@@ -127,6 +173,9 @@ const createStyles = (colors: Colors) =>
     rowBody: { flex: 1 },
     name: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 2 },
     preview: { color: colors.textMuted, fontSize: 13 },
+    sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginRight: 4 },
+    sectionInRow: { marginTop: 0, marginBottom: 0 },
+    stack: { width: 44, alignItems: 'flex-start' },
     empty: { padding: 24, alignItems: 'center' },
     emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center' },
   })

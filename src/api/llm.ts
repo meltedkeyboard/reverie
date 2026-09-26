@@ -180,13 +180,15 @@ async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: 
   return res
 }
 
-export async function completeChat(cfg: ServerSettings, req: ChatRequest) {
-  const body = await (await requestCompletion(cfg, req, false)).json()
+export async function completeChat(cfg: ServerSettings, req: ChatRequest, signal?: AbortSignal) {
+  const body = await (await requestCompletion(cfg, req, false, signal)).json()
   const content = body?.choices?.[0]?.message?.content
   return typeof content === 'string' ? content : ''
 }
 
-export type StreamPart = { kind: 'reasoning' | 'content'; text: string }
+// 'cutoff' carries no text: the server stopped at max_tokens rather than at the end of
+// the reply. A reasoning model can spend the whole budget thinking and never answer.
+export type StreamPart = { kind: 'reasoning' | 'content' | 'cutoff'; text: string }
 
 const THINK_OPEN = '<think>'
 const THINK_CLOSE = '</think>'
@@ -273,6 +275,7 @@ export async function* streamChat(cfg: ServerSettings, req: ChatRequest, signal:
         const reasoning = delta?.reasoning_content ?? delta?.reasoning
         if (typeof reasoning === 'string' && reasoning) yield { kind: 'reasoning', text: reasoning } as StreamPart
         if (typeof delta?.content === 'string' && delta.content) yield* splitter.push(delta.content)
+        if (chunk.choices?.[0]?.finish_reason === 'length') yield { kind: 'cutoff', text: '' } as StreamPart
       }
     }
     yield* splitter.flush()

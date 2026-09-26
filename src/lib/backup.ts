@@ -2,13 +2,14 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { CHARACTER_COLUMNS, insertCharacter, type BackgroundEffect, type ThinkingMode } from '@/db/characters'
 import { MESSAGE_COLUMNS } from '@/db/messages'
+import { DEFAULT_MEMBER, DEFAULT_ROOM, insertRoom, ROOM_COLUMNS, type FloorMode } from '@/db/rooms'
 import { loadSettings, saveSettings } from '@/db/settings'
 import { t } from '@/i18n'
 import { pickJsonFile } from '@/lib/pickJson'
 import { readAvatarBase64, removeAllAvatars, writeAvatarBase64, type ImageKind } from '@/lib/avatars'
 import { saveJson } from '@/lib/download'
 
-const BACKUP_VERSION = 6
+const BACKUP_VERSION = 7
 
 type BackupCharacter = {
   id: number
@@ -29,7 +30,35 @@ type BackupCharacter = {
   createdAt: number
 }
 
-type BackupChat = { id: number; characterId: number; title: string | null; createdAt: number }
+// Backups from before rooms have no roomId, and every chat has a character.
+type BackupChat = { id: number; characterId: number | null; roomId?: number | null; title: string | null; createdAt: number }
+
+type BackupRoom = {
+  id: number
+  name: string
+  scenario: string
+  opening: string
+  userName: string
+  floor: FloorMode
+  maxChain: number
+  director: number | boolean
+  background: string | null
+  backgroundEffect: BackgroundEffect
+  backgroundIntensity: number
+  backgroundBubbleTransparency: number
+  createdAt: number
+}
+
+type BackupMember = {
+  roomId: number
+  characterId: number
+  position: number
+  talkativeness: number
+  perception: number
+  triggers: string
+  muted: number
+  present: number
+}
 
 type BackupMessage = {
   id: number
@@ -45,11 +74,20 @@ type BackupMessage = {
   variant: number
   thoughts: string | null
   createdAt: number
+  // Room fields; character ids inside them are remapped on import.
+  speakerId?: number | null
+  kind?: string
+  addressees?: string | null
+  audience?: string | null
+  overheard?: string | null
+  absent?: string | null
 }
 
 type Backup = {
   app: string
   characters: BackupCharacter[]
+  rooms?: BackupRoom[]
+  roomMembers?: BackupMember[]
   chats: BackupChat[]
   messages: BackupMessage[]
   avatars: Record<string, string>
@@ -66,8 +104,13 @@ export async function exportBackup(db: SQLiteDatabase) {
   const characters = await db.getAllAsync<{ id: number; avatar: string | null; background: string | null }>(
     `SELECT ${CHARACTER_COLUMNS} FROM characters ORDER BY sort_order, id`
   )
+  const rooms = await db.getAllAsync<{ background: string | null }>(`SELECT ${ROOM_COLUMNS} FROM rooms ORDER BY sort_order, id`)
+  const roomMembers = await db.getAllAsync(
+    `SELECT room_id AS roomId, character_id AS characterId, position, talkativeness, perception, triggers, muted, present
+     FROM room_members ORDER BY room_id, position`
+  )
   const chats = await db.getAllAsync(
-    'SELECT id, character_id AS characterId, title, created_at AS createdAt FROM chats ORDER BY sort_order, id'
+    'SELECT id, character_id AS characterId, room_id AS roomId, title, created_at AS createdAt FROM chats ORDER BY sort_order, id'
   )
   const messages = await db.getAllAsync(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`)
   const { baseUrl, model } = await loadSettings(db)
@@ -81,9 +124,14 @@ export async function exportBackup(db: SQLiteDatabase) {
       if (base64) avatars[name] = base64
     }
   }
+  for (const room of rooms) {
+    if (!room.background) continue
+    const base64 = await readAvatarBase64(room.background, 'backgrounds')
+    if (base64) avatars[room.background] = base64
+  }
 
   // The API key is left out on purpose: the file usually ends up in iCloud Drive.
-  const dump = { app: 'reverie', version: BACKUP_VERSION, exportedAt: new Date().toISOString(), settings: { baseUrl, model }, characters, chats, messages, avatars }
+  const dump = { app: 'reverie', version: BACKUP_VERSION, exportedAt: new Date().toISOString(), settings: { baseUrl, model }, characters, rooms, roomMembers, chats, messages, avatars }
 
   return saveJson(`reverie-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(dump))
 }
@@ -105,7 +153,15 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
   }
 
   const characterIds = new Map<number, number>()
+  const roomIds = new Map<number, number>()
   const chatIds = new Map<number, number>()
+  // The user (0) stays 0; a character that did not come along is dropped from the list.
+  const remapIds = (json: string | null | undefined) => {
+    if (!json) return null
+    const ids: number[] = JSON.parse(json)
+    const mapped = ids.flatMap((id) => (id === 0 ? [0] : characterIds.has(id) ? [characterIds.get(id)!] : []))
+    return JSON.stringify(mapped)
+  }
   const avatarNames = new Map<string, string>()
 
   await db.withTransactionAsync(async () => {
@@ -139,11 +195,47 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
       characterIds.set(character.id, id)
     }
 
+    for (const room of dump.rooms ?? []) {
+      const id = await insertRoom(
+        db,
+        {
+          ...DEFAULT_ROOM,
+          ...room,
+          director: Boolean(room.director),
+          background: await importImage(room.background, 'backgrounds'),
+        },
+        room.createdAt
+      )
+      roomIds.set(room.id, id)
+    }
+
+    for (const member of dump.roomMembers ?? []) {
+      const roomId = roomIds.get(member.roomId)
+      const characterId = characterIds.get(member.characterId)
+      if (!roomId || !characterId) continue
+      await db.runAsync(
+        `INSERT OR IGNORE INTO room_members (room_id, character_id, position, talkativeness, perception, triggers, muted, present)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          roomId,
+          characterId,
+          member.position ?? 0,
+          member.talkativeness ?? DEFAULT_MEMBER.talkativeness,
+          member.perception ?? DEFAULT_MEMBER.perception,
+          member.triggers ?? '',
+          member.muted ? 1 : 0,
+          member.present === 0 ? 0 : 1,
+        ]
+      )
+    }
+
     for (const chat of dump.chats ?? []) {
-      const characterId = characterIds.get(chat.characterId)
-      if (!characterId) continue
-      const res = await db.runAsync('INSERT INTO chats (character_id, title, created_at) VALUES (?, ?, ?)', [
-        characterId,
+      const roomId = chat.roomId ? roomIds.get(chat.roomId) : undefined
+      const characterId = chat.characterId ? characterIds.get(chat.characterId) : undefined
+      if (!roomId && !characterId) continue
+      const res = await db.runAsync('INSERT INTO chats (character_id, room_id, title, created_at) VALUES (?, ?, ?, ?)', [
+        roomId ? null : characterId!,
+        roomId ?? null,
         chat.title,
         chat.createdAt,
       ])
@@ -154,8 +246,9 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
       const chatId = chatIds.get(message.chatId)
       if (!chatId) continue
       await db.runAsync(
-        `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, created_at,
+           speaker_id, kind, addressees, audience, overheard, absent)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           chatId,
           message.role,
@@ -165,6 +258,12 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
           message.variant ?? 0,
           message.thoughts ?? null,
           message.createdAt,
+          message.speakerId ? (characterIds.get(message.speakerId) ?? null) : null,
+          message.kind ?? 'say',
+          remapIds(message.addressees),
+          remapIds(message.audience),
+          remapIds(message.overheard),
+          remapIds(message.absent),
         ]
       )
     }
@@ -178,12 +277,12 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
   return { characters: characterIds.size }
 }
 
-// Deletes every character, chat, message and avatar, plus the server settings. Cascades
+// Deletes every room, character, chat, message and avatar, plus the server settings. Cascades
 // take care of chats and messages; only the app_settings table and avatar files need
 // clearing by hand.
 export async function wipeAllData(db: SQLiteDatabase) {
   await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM characters; DELETE FROM app_settings;')
+    await db.execAsync('DELETE FROM rooms; DELETE FROM characters; DELETE FROM app_settings;')
   })
   removeAllAvatars()
 }

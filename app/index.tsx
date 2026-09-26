@@ -14,9 +14,13 @@ import { IconButton } from '@/components/IconButton'
 import { GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import { HomePattern } from '@/components/HomePattern'
 import { Star } from '@/components/motifs/Star'
+import type { MenuItem } from '@/components/NativeMenu'
+import { RoomCard } from '@/components/RoomCard'
+import { Segmented } from '@/components/Segmented'
 import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
 import { getLastChat, pruneUntouchedChats, type LastChat } from '@/db/chats'
+import { deleteRoom, listRooms, setRoomOrder, type RoomPreview } from '@/db/rooms'
 import { isContinueEnabled, isContinueHidden, setContinueHidden } from '@/db/continue'
 import { isOnboardingComplete } from '@/db/onboarding'
 import { loadSettings } from '@/db/settings'
@@ -24,7 +28,14 @@ import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useReorder } from '@/hooks/useReorder'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
+import { removeAvatar } from '@/lib/avatars'
+import { confirmDeletion } from '@/lib/confirmDelete'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
+
+type Tab = 'characters' | 'rooms'
+
+// Kept for the app's lifetime, so coming back from a room lands on the rooms again.
+let lastTab: Tab = 'characters'
 
 export default function CharactersScreen() {
   const db = useSQLiteContext()
@@ -38,10 +49,17 @@ export default function CharactersScreen() {
   const [serverSet, setServerSet] = useState(true)
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
   const [lastChat, setLastChat] = useState<LastChat | null>(null)
+  const [rooms, setRooms] = useState<RoomPreview[] | null>(null)
+  const [tab, setTabState] = useState<Tab>(lastTab)
+  const setTab = (next: Tab) => {
+    lastTab = next
+    setTabState(next)
+  }
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
     setCharacters(await listCharacters(db))
+    setRooms(await listRooms(db))
     setServerSet(Boolean((await loadSettings(db)).baseUrl.trim()))
     const showContinue = (await isContinueEnabled(db)) && !(await isContinueHidden(db))
     setLastChat(showContinue ? await getLastChat(db) : null)
@@ -66,6 +84,27 @@ export default function CharactersScreen() {
 
   const { menuItems, confirmDelete } = useCharacterActions(reload)
   const reorder = useReorder(characters, setCharacters, (ids) => setCharacterOrder(db, ids))
+  const reorderRooms = useReorder(rooms, setRooms, (ids) => setRoomOrder(db, ids))
+
+  const confirmDeleteRoom = (room: RoomPreview) => {
+    confirmDeletion({
+      title: t('roomEditor.deleteConfirmTitle'),
+      message: t('rooms.deleteConfirmMessage', { name: room.name }),
+      confirmLabel: t('common.delete'),
+      destructive: true,
+      onConfirm: async () => {
+        await deleteRoom(db, room.id)
+        if (room.background) removeAvatar(room.background, 'backgrounds')
+        reload()
+      },
+    })
+  }
+
+  const roomMenu = (room: RoomPreview): MenuItem[] => [
+    { label: t('rooms.newScene'), systemImage: 'plus.bubble', onSelect: () => router.push(`/chat/new?room=${room.id}`) },
+    { label: t('characters.edit'), systemImage: 'pencil', onSelect: () => router.push(`/room/${room.id}`) },
+    { label: t('common.delete'), systemImage: 'trash', destructive: true, onSelect: () => confirmDeleteRoom(room) },
+  ]
 
   if (!onboarded) return <View style={styles.screen} />
 
@@ -80,69 +119,116 @@ export default function CharactersScreen() {
     )
   }
 
+  const listPadding = [padding, lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE }]
+  const tabs = (
+    <Segmented
+      options={[
+        { value: 'characters', label: t('characters.title') },
+        { value: 'rooms', label: t('rooms.title') },
+      ]}
+      value={tab}
+      onChange={setTab}
+      style={styles.tabs}
+    />
+  )
+
   return (
     <View style={styles.screen}>
       <HomePattern />
-      <ReorderableList
-        data={characters ?? []}
-        keyExtractor={(c) => String(c.id)}
-        {...reorder}
-        contentContainerStyle={[
-          padding,
-          lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE },
-        ]}
-        ItemSeparatorComponent={ListSeparator}
-        ListHeaderComponent={
-          <>
-            {!serverSet && characters ? (
-              // A row like the "finish setting up" one in iOS Settings: a glyph on a
-              // colored tile, the text, and a chevron to where it is fixed.
-              <Pressable
-                onPress={() => router.push('/settings')}
-                style={({ pressed }) => [styles.notice, pressed && { opacity: 0.6 }]}
-              >
-                <View style={styles.noticeTile}>
-                  <SFIcon name="server.rack" fallback="server" size={15} color="#FFFFFF" />
-                </View>
-                <View style={styles.noticeBody}>
-                  <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
-                  <Text style={styles.noticeText}>{t('characters.serverNotSetText')}</Text>
-                </View>
-                <SFIcon name="chevron.right" fallback="chevron-forward" size={14} color={colors.textFaint} />
-              </Pressable>
-            ) : null}
-          </>
-        }
-        ListEmptyComponent={
-          characters ? (
-            <EmptyState
-              title={t('characters.emptyTitle')}
-              text={t('characters.emptyText')}
-              action={
-                <Link href="/character/new" asChild>
-                  <Link.AppleZoom>
-                    <Button variant="glass" label={t('characters.createCharacter')} style={styles.emptyButton} />
-                  </Link.AppleZoom>
-                </Link>
-              }
+      {tab === 'rooms' ? (
+        <ReorderableList
+          data={rooms ?? []}
+          keyExtractor={(r) => String(r.id)}
+          {...reorderRooms}
+          contentContainerStyle={listPadding}
+          ItemSeparatorComponent={ListSeparator}
+          ListHeaderComponent={tabs}
+          ListEmptyComponent={
+            rooms ? (
+              <EmptyState
+                title={t('rooms.emptyTitle')}
+                text={(characters?.length ?? 0) < 2 ? t('rooms.emptyTextFew') : t('rooms.emptyText')}
+                action={
+                  (characters?.length ?? 0) >= 2 ? (
+                    <Link href="/room/new" asChild>
+                      <Link.AppleZoom>
+                        <Button variant="glass" label={t('rooms.createRoom')} style={styles.emptyButton} />
+                      </Link.AppleZoom>
+                    </Link>
+                  ) : undefined
+                }
+              />
+            ) : null
+          }
+          renderItem={({ item: room }) => (
+            <RoomCard
+              room={room}
+              onOpen={() => router.push(`/rooms/${room.id}`)}
+              onDelete={() => confirmDeleteRoom(room)}
+              menu={roomMenu(room)}
             />
-          ) : null
-        }
-        renderItem={({ item: character }) => (
-          <CharacterCard
-            character={character}
-            onOpen={() => router.push(`/chats/${character.id}`)}
-            onDelete={() => confirmDelete(character)}
-            menu={menuItems(character)}
-          />
-        )}
-      />
+          )}
+        />
+      ) : (
+        <ReorderableList
+          data={characters ?? []}
+          keyExtractor={(c) => String(c.id)}
+          {...reorder}
+          contentContainerStyle={listPadding}
+          ItemSeparatorComponent={ListSeparator}
+          ListHeaderComponent={
+            <>
+              {tabs}
+              {!serverSet && characters ? (
+                // A row like the "finish setting up" one in iOS Settings: a glyph on a
+                // colored tile, the text, and a chevron to where it is fixed.
+                <Pressable
+                  onPress={() => router.push('/settings')}
+                  style={({ pressed }) => [styles.notice, pressed && { opacity: 0.6 }]}
+                >
+                  <View style={styles.noticeTile}>
+                    <SFIcon name="server.rack" fallback="server" size={15} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.noticeBody}>
+                    <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
+                    <Text style={styles.noticeText}>{t('characters.serverNotSetText')}</Text>
+                  </View>
+                  <SFIcon name="chevron.right" fallback="chevron-forward" size={14} color={colors.textFaint} />
+                </Pressable>
+              ) : null}
+            </>
+          }
+          ListEmptyComponent={
+            characters ? (
+              <EmptyState
+                title={t('characters.emptyTitle')}
+                text={t('characters.emptyText')}
+                action={
+                  <Link href="/character/new" asChild>
+                    <Link.AppleZoom>
+                      <Button variant="glass" label={t('characters.createCharacter')} style={styles.emptyButton} />
+                    </Link.AppleZoom>
+                  </Link>
+                }
+              />
+            ) : null
+          }
+          renderItem={({ item: character }) => (
+            <CharacterCard
+              character={character}
+              onOpen={() => router.push(`/chats/${character.id}`)}
+              onDelete={() => confirmDelete(character)}
+              menu={menuItems(character)}
+            />
+          )}
+        />
+      )}
       <GlassHeader
         floating
         right={
           <GlassGroup>
             <IconButton name="settings-outline" onPress={() => router.push('/settings')} />
-            <Link href="/character/new" asChild>
+            <Link href={tab === 'rooms' ? '/room/new' : '/character/new'} asChild>
               <Link.AppleZoom>
                 <IconButton name="add" size={26} />
               </Link.AppleZoom>
@@ -152,7 +238,7 @@ export default function CharactersScreen() {
       >
         <View style={styles.titleRow}>
           <Star size={22} color={colors.danger} rotation={-14} style={styles.titleStar} />
-          <Text style={styles.title}>{t('characters.title')}</Text>
+          <Text style={styles.title}>{tab === 'rooms' ? t('rooms.title') : t('characters.title')}</Text>
         </View>
       </GlassHeader>
       {lastChat ? (
@@ -203,4 +289,5 @@ const createStyles = (colors: Colors) =>
   noticeTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 2 },
   noticeText: { color: colors.textMuted, fontSize: 14, lineHeight: 19 },
   emptyButton: { minWidth: 200 },
+  tabs: { marginBottom: 14 },
 })

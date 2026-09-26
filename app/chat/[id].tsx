@@ -4,31 +4,21 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  FlatList,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type LayoutChangeEvent,
-  type ListRenderItemInfo,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  type ScrollViewProps,
-} from 'react-native'
-import { KeyboardChatScrollView, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
-import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
+import { Platform, StyleSheet, Text, View } from 'react-native'
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
+import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/Avatar'
 import { ChatBackground } from '@/components/ChatBackground'
 import { Composer } from '@/components/Composer'
+import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { MessageRow, type RowMessage } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
+import { RoomView } from '@/components/RoomView'
 import { SFIcon } from '@/components/SFIcon'
 import { TextSheet } from '@/components/TextSheet'
 import { getCharacter, type Character } from '@/db/characters'
@@ -36,6 +26,7 @@ import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { setContinueHidden } from '@/db/continue'
 import { newMessage } from '@/db/messages'
 import { isPrivateChatEnabled } from '@/db/privateChat'
+import { createRoomChat, getRoom, importChatToRoom, listRoomMembers, type Room, type RoomMember } from '@/db/rooms'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
@@ -48,19 +39,23 @@ import type { MessageAction } from '@/lib/messageActions'
 import { liquidGlass } from '@/lib/nativeUI'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
-// How far above the newest message the list has to be before the jump button shows up.
-const JUMP_THRESHOLD = 240
-// How far back the user has to scroll before a streaming reply stops following its tail.
-const HOLD_THRESHOLD = 24
+type Loaded =
+  | { kind: 'character'; chat: Chat; character: Character }
+  | { kind: 'room'; chat: Chat; room: Room; members: RoomMember[] }
 
 export default function ChatScreen() {
-  // /chat/new?character=ID creates the chat on arrival. A button can then be a plain
-  // Link with a fixed address, which is what the zoom transition needs.
-  const { id, character: characterParam } = useLocalSearchParams<{ id: string; character?: string }>()
+  // /chat/new?character=ID (or ?room=ID for a scene) creates the chat on arrival. A
+  // button can then be a plain Link with a fixed address, which is what the zoom
+  // transition needs.
+  const { id, character: characterParam, room: roomParam } = useLocalSearchParams<{
+    id: string
+    character?: string
+    room?: string
+  }>()
   const db = useSQLiteContext()
   const router = useRouter()
   const colors = useColors()
-  const [loaded, setLoaded] = useState<{ chat: Chat; character: Character } | null>(null)
+  const [loaded, setLoaded] = useState<Loaded | null>(null)
   // Kept across focus changes, so coming back from the character editor does not
   // start yet another chat.
   const created = useRef<Promise<number> | null>(null)
@@ -73,21 +68,34 @@ export default function ChatScreen() {
     useCallback(() => {
       ;(async () => {
         let chatId = Number(id)
-        if (id === 'new') {
+        if (id === 'new' && roomParam) {
+          const room = await getRoom(db, Number(roomParam))
+          if (!room) return router.back()
+          created.current ??= createRoomChat(db, room)
+          chatId = await created.current
+        } else if (id === 'new') {
           const owner = await getCharacter(db, Number(characterParam))
           if (!owner) return router.back()
           created.current ??= createChat(db, owner)
           chatId = await created.current
         }
         const chat = await getChat(db, chatId)
-        const character = chat && (await getCharacter(db, chat.characterId))
+        if (chat?.roomId) {
+          // Re-read on every focus: the room or its cast may have been edited meanwhile.
+          const room = await getRoom(db, chat.roomId)
+          if (!room) return router.back()
+          setLoaded({ kind: 'room', chat, room, members: await listRoomMembers(db, room.id) })
+          setContinueHidden(db, false)
+          return
+        }
+        const character = chat?.characterId ? await getCharacter(db, chat.characterId) : null
         if (chat && character) {
-          setLoaded({ chat, character })
+          setLoaded({ kind: 'character', chat, character })
           // A continue button swiped away on the home screen comes back once a chat opens.
           setContinueHidden(db, false)
         } else router.back()
       })()
-    }, [db, id, characterParam, router])
+    }, [db, id, characterParam, roomParam, router])
   )
 
   const togglePrivate = () => {
@@ -96,6 +104,7 @@ export default function ChatScreen() {
   }
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: colors.bg }} />
+  if (loaded.kind === 'room') return <RoomView chat={loaded.chat} room={loaded.room} members={loaded.members} />
   // The private chat lives only in memory: leaving it throws the conversation away and
   // brings back the real chat as it is in the database.
   return (
@@ -188,21 +197,15 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     autoName,
   } = useChat(chat, character, { ephemeral: privateMode })
 
-  const listRef = useRef<FlatList<RowMessage>>(null)
+  const listRef = useRef<ConversationHandle>(null)
   const composerHeight = useSharedValue(0)
   // react-native-keyboard-controller's extraContentPadding keeps the list clear of the
   // composer on native; on web that mechanism doesn't reserve any space, so the plain
   // height below drives an explicit padding instead (see contentContainerStyle).
   const [webComposerHeight, setWebComposerHeight] = useState(0)
-  const restInset = useRef(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [selecting, setSelecting] = useState<string | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
-  const [scrolledBack, setScrolledBack] = useState(false)
-  const [listHeight, setListHeight] = useState(0)
-  const [draftHeight, setDraftHeight] = useState(0)
-  // Set by the jump button while a reply streams: the user asked to watch it come in.
-  const [followTail, setFollowTail] = useState(false)
   const keyboard = useReanimatedKeyboardAnimation()
 
   // Entering private mode is animated: the conversation fades out, the store is swapped
@@ -283,56 +286,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     [editingRow]
   )
 
-  const scrollToNewest = useCallback(() => {
-    listRef.current?.scrollToOffset({ offset: -restInset.current, animated: true })
-  }, [])
-
-  const jumpToNewest = () => {
-    if (draft !== null) setFollowTail(true)
-    scrollToNewest()
-  }
-
-  useEffect(() => {
-    if (draft === null) setFollowTail(false)
-  }, [draft])
-
-  const onContentInsetChange = useCallback((inset: { top: number }) => {
-    restInset.current = inset.top
-  }, [])
-
-  // The list is inverted, so the offset grows as the user scrolls back in time.
-  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const back = event.nativeEvent.contentOffset.y + restInset.current
-    setAwayFromEnd(back > JUMP_THRESHOLD)
-    setScrolledBack(back > HOLD_THRESHOLD)
-  }, [])
-
-  const onDraftLayout = useCallback((event: LayoutChangeEvent) => {
-    setDraftHeight(event.nativeEvent.layout.height)
-  }, [])
-
-  // A streaming reply follows its tail only while all of it fits between the header and
-  // the composer. Once its start reaches the header, or the user has scrolled back, the
-  // row above it is held in place and the reply grows off the bottom of the screen
-  // instead of dragging the text being read along with it.
-  const draftIndex = rows.findIndex((row) => row.streaming)
-  const room = listHeight - restInset.current - headerHeight - 20
-  const holdPosition =
-    draftIndex !== -1 && !followTail && (scrolledBack || (listHeight > 0 && draftHeight > room))
-
-  const renderScroll = useCallback(
-    (props: ScrollViewProps) => (
-      <KeyboardChatScrollView
-        {...props}
-        inverted
-        keyboardLiftBehavior="always"
-        offset={insets.bottom}
-        extraContentPadding={composerHeight}
-        onContentInsetChange={onContentInsetChange}
-      />
-    ),
-    [insets.bottom, composerHeight, onContentInsetChange]
-  )
+  const scrollToNewest = () => listRef.current?.scrollToNewest()
 
   const onAction = useCallback(
     (message: RowMessage, action: MessageAction) => {
@@ -358,20 +312,17 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   // Over a chat background the user's bubbles can be made see-through.
   const bubbleOpacity = character.background ? 1 - character.backgroundBubbleTransparency : 1
   const renderRow = useCallback(
-    ({ item: row }: ListRenderItemInfo<RowMessage>) => {
-      const content = (
-        <MessageRow
-          message={row}
-          canRegenerate={regenerable.has(row.id)}
-          locked={locked}
-          onAction={onAction}
-          onSelectVariant={selectVariant}
-          bubbleOpacity={bubbleOpacity}
-        />
-      )
-      return row.streaming ? <View onLayout={onDraftLayout}>{content}</View> : content
-    },
-    [regenerable, locked, onAction, selectVariant, onDraftLayout, bubbleOpacity]
+    (row: RowMessage) => (
+      <MessageRow
+        message={row}
+        canRegenerate={regenerable.has(row.id)}
+        locked={locked}
+        onAction={onAction}
+        onSelectVariant={selectVariant}
+        bubbleOpacity={bubbleOpacity}
+      />
+    ),
+    [regenerable, locked, onAction, selectVariant, bubbleOpacity]
   )
 
   const confirmDelete = () => {
@@ -392,21 +343,23 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     }
   }
 
+  // The chat is copied, so the one-on-one version stays where it was. The new room's
+  // editor opens over the scene, to add the rest of the cast right away.
+  const moveToRoom = async () => {
+    const { roomId, chatId: sceneId } = await importChatToRoom(db, chatId, null)
+    router.push(`/chat/${sceneId}`)
+    router.push(`/room/${roomId}`)
+  }
+
   const chatMenu: MenuItem[] = [
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     { label: t('chat.menuEditCharacter'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}`) },
+    { label: t('chat.menuMoveToRoom'), systemImage: 'person.3', onSelect: moveToRoom },
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: confirmDelete },
   ]
 
-  const errorCard = error ? (
-    <View style={styles.error}>
-      <Text style={styles.errorText}>{error}</Text>
-      <Pressable onPress={retry} style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}>
-        <Text style={styles.retryText}>{t('chat.retry')}</Text>
-      </Pressable>
-    </View>
-  ) : null
+  const errorCard = error ? <ErrorCard message={error} onRetry={retry} /> : null
 
   const empty = loaded && rows.length === 0
 
@@ -420,30 +373,18 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
         />
       ) : null}
       <Animated.View style={[StyleSheet.absoluteFill, contentStyle]}>
-        <FlatList
+        <ConversationList
           ref={listRef}
-          inverted
-          data={rows}
+          rows={rows}
+          renderRow={renderRow}
           extraData={locked}
-          keyExtractor={(row) => (row.streaming ? 'draft' : String(row.id))}
-          renderItem={renderRow}
-          renderScrollComponent={renderScroll}
-          onScroll={onScroll}
-          onScrollBeginDrag={() => setFollowTail(false)}
-          onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
-          maintainVisibleContentPosition={holdPosition ? { minIndexForVisible: draftIndex + 1 } : undefined}
-          scrollEventThrottle={32}
-          ListHeaderComponent={errorCard}
-          ListFooterComponent={
+          composerHeight={composerHeight}
+          webComposerHeight={webComposerHeight}
+          header={errorCard}
+          footer={
             loaded && !empty ? privateMode ? <PrivateIntro /> : <Intro character={character} chat={chat} /> : null
           }
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            // The list is inverted, so this visually sits just above the composer.
-            paddingTop: 8 + (Platform.OS === 'web' ? webComposerHeight : 0),
-            paddingBottom: headerHeight + 12,
-          }}
+          onAwayChange={setAwayFromEnd}
         />
       </Animated.View>
 
@@ -526,19 +467,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
         onHeightChange={Platform.OS === 'web' ? setWebComposerHeight : undefined}
         generating={!idle}
         editing={editing}
-        accessory={
-          awayFromEnd ? (
-            <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(160)} style={styles.jumpSlot}>
-              {liquidGlass ? (
-                <GlassButton icon="arrow-down" onPress={jumpToNewest} />
-              ) : (
-                <Pressable onPress={jumpToNewest} hitSlop={8} style={({ pressed }) => [styles.jump, pressed && { opacity: 0.7 }]}>
-                  <Ionicons name="arrow-down" size={18} color={colors.text} />
-                </Pressable>
-              )}
-            </Animated.View>
-          ) : null
-        }
+        accessory={awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null}
         onSend={(text, image) => {
           send(text, image)
           scrollToNewest()
@@ -625,31 +554,4 @@ const createStyles = (colors: Colors) =>
   introName: { color: colors.text, fontFamily: fonts.prose, fontSize: 22, marginTop: 12 },
   introMeta: { color: colors.textFaint, fontSize: 14, marginTop: 4, textAlign: 'center' },
   empty: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
-  jumpSlot: { marginBottom: 12 },
-  jump: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000000',
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  error: {
-    marginHorizontal: 16,
-    marginVertical: 8,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: colors.dangerSoft,
-    borderWidth: 1,
-    borderColor: colors.dangerBorder,
-  },
-  errorText: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  retry: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.surfaceRaised },
-  retryText: { color: colors.text, fontSize: 14, fontWeight: '600' },
 })

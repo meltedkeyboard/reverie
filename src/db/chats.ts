@@ -1,9 +1,10 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import type { Character } from '@/db/characters'
-import { addMessage } from '@/db/messages'
+import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
 
-export type Chat = { id: number; characterId: number; title: string | null; createdAt: number }
+// Exactly one of characterId and roomId is set: a chat is either one-on-one or a scene.
+export type Chat = { id: number; characterId: number | null; roomId: number | null; title: string | null; createdAt: number }
 
 export type ChatPreview = Chat & {
   lastMessage: string | null
@@ -14,11 +15,11 @@ export type ChatPreview = Chat & {
 // A message that is only a picture has empty text, so the list shows a label instead.
 export const PREVIEW = "CASE WHEN m.content = '' AND m.images IS NOT NULL THEN 'Фото' ELSE m.content END"
 
-const COLUMNS = 'ch.id, ch.character_id AS characterId, ch.title, ch.created_at AS createdAt'
+export const CHAT_COLUMNS = 'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt'
 
 export function listChats(db: SQLiteDatabase, characterId: number) {
   return db.getAllAsync<ChatPreview>(
-    `SELECT ${COLUMNS},
+    `SELECT ${CHAT_COLUMNS},
        (SELECT ${PREVIEW} FROM messages m WHERE m.chat_id = ch.id ORDER BY m.id DESC LIMIT 1) AS lastMessage,
        COALESCE(
          (SELECT created_at FROM messages m WHERE m.chat_id = ch.id ORDER BY m.id DESC LIMIT 1),
@@ -42,7 +43,7 @@ export function setChatOrder(db: SQLiteDatabase, ids: number[]) {
 }
 
 export function getChat(db: SQLiteDatabase, id: number) {
-  return db.getFirstAsync<Chat>(`SELECT ${COLUMNS} FROM chats ch WHERE ch.id = ?`, id)
+  return db.getFirstAsync<Chat>(`SELECT ${CHAT_COLUMNS} FROM chats ch WHERE ch.id = ?`, id)
 }
 
 export async function createChat(db: SQLiteDatabase, character: Character) {
@@ -70,13 +71,13 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
   let chatId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      'INSERT INTO chats (character_id, title, created_at) SELECT character_id, ?, created_at FROM chats WHERE id = ?',
+      'INSERT INTO chats (character_id, room_id, title, created_at) SELECT character_id, room_id, ?, created_at FROM chats WHERE id = ?',
       [title, id]
     )
     chatId = res.lastInsertRowId
     await db.runAsync(
-      `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, created_at)
-       SELECT ?, role, content, images, variants, variant, thoughts, created_at
+      `INSERT INTO messages (chat_id, ${MESSAGE_COPY_COLUMNS})
+       SELECT ?, ${MESSAGE_COPY_COLUMNS}
        FROM messages WHERE chat_id = ? ORDER BY id`,
       [chatId, id]
     )
@@ -106,12 +107,18 @@ export type LastChat = {
   characterAvatar: string | null
 }
 
-// The chat the user wrote in most recently, for the home screen's continue button.
+// The chat the user wrote in most recently, for the home screen's continue button. A
+// scene shows its room's name and the avatar of the room's first member.
 export function getLastChat(db: SQLiteDatabase) {
   return db.getFirstAsync<LastChat>(`
-    SELECT ch.id, ch.title, c.name AS characterName, c.avatar AS characterAvatar,
+    SELECT ch.id, ch.title,
+      COALESCE(c.name, r.name) AS characterName,
+      COALESCE(c.avatar, (SELECT mc.avatar FROM room_members rm JOIN characters mc ON mc.id = rm.character_id
+        WHERE rm.room_id = r.id ORDER BY rm.position LIMIT 1)) AS characterAvatar,
       (SELECT MAX(m.created_at) FROM messages m WHERE m.chat_id = ch.id) AS lastActivity
-    FROM chats ch JOIN characters c ON c.id = ch.character_id
+    FROM chats ch
+      LEFT JOIN characters c ON c.id = ch.character_id
+      LEFT JOIN rooms r ON r.id = ch.room_id
     WHERE EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.role = 'user')
     ORDER BY lastActivity DESC, ch.id DESC
     LIMIT 1

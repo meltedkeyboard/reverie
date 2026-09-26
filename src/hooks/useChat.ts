@@ -2,7 +2,7 @@ import { useSQLiteContext } from 'expo-sqlite'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { CONTEXT_WINDOW, streamChat, type ChatTurn, type ContentPart } from '@/api/llm'
+import { CONTEXT_WINDOW, type ChatTurn } from '@/api/llm'
 import { DEFAULT_SAMPLING, type Character } from '@/db/characters'
 import { setChatTitle, type Chat } from '@/db/chats'
 import {
@@ -27,7 +27,7 @@ import { useAbortable } from '@/hooks/useAbortable'
 import { t } from '@/i18n'
 import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
-import { imageDataUrl } from '@/lib/images'
+import { CONTINUE_NOTE, emptyReplyReason, runReplyStream, toTurn, withReplyLimit } from '@/lib/replyStream'
 import { suggestTitle } from '@/lib/titles'
 
 export type ChatPhase = 'idle' | 'waiting' | 'streaming'
@@ -142,7 +142,8 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
     setNaming(true)
     try {
       const cfg = await loadSettings(db)
-      const next = await suggestTitle(cfg, characterRef.current.name, messagesRef.current)
+      const name = characterRef.current.name
+      const next = await suggestTitle(cfg, () => name, messagesRef.current)
       if (next) await rename(next)
       return next
     } finally {
@@ -189,24 +190,15 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
       const target = ephemeral
         ? { ...DEFAULT_SAMPLING, systemPrompt: PRIVATE_PROMPT, replyLimit: null, thinking: 'auto' as const }
         : characterRef.current
-      let text = ''
-      let thought = ''
-      let thinkingSince = 0
-      let thinkingMs: number | null = null
-      let frame = 0
-      // Chunks arrive faster than the screen refreshes, so renders are batched per frame.
-      const flush = () => {
-        frame = 0
-        if (storeRef.current !== store) return
-        setDraft(text.trimStart())
-        if (thought) setReasoning(thought.trim())
-      }
+      let reply = ''
+      let keptThought: Thought | null = null
+      let cutoff = false
 
       try {
         const cfg = await loadSettings(db)
         const system = withReplyLimit(target.systemPrompt.trim(), target.replyLimit)
         const turns = history.slice(-CONTEXT_WINDOW).map(toTurn)
-        const stream = streamChat(
+        const streamed = await runReplyStream(
           cfg,
           {
             messages: requestTurns(system, turns, guidance),
@@ -215,43 +207,31 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
             topP: target.topP,
             thinking: target.thinking,
           },
-          ctrl.signal
+          ctrl.signal,
+          {
+            onStart: () => setPhase('streaming'),
+            onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
+            onFrame: ({ text, thought, thinkingMs }) => {
+              if (storeRef.current !== store) return
+              setDraft(text.trimStart())
+              if (thought) setReasoning(thought.trim())
+              setReasoningMs(thinkingMs)
+            },
+          }
         )
-
-        for await (const part of stream) {
-          if (part.kind === 'reasoning') {
-            if (!thought) {
-              setPhase('streaming')
-              thinkingSince = Date.now()
-            }
-            thought += part.text
-            if (!frame) frame = requestAnimationFrame(flush)
-            continue
-          }
-          if (thought && thinkingMs === null) {
-            thinkingMs = Date.now() - thinkingSince
-            setReasoningMs(thinkingMs)
-          }
-          const wasEmpty = !text.trim()
-          text += part.text
-          if (wasEmpty && text.trim()) {
-            setPhase('streaming')
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)
-          }
-          if (!frame) frame = requestAnimationFrame(flush)
-        }
+        // A stopped or broken stream still keeps what it had written.
+        reply = streamed.text
+        keptThought = streamed.thought
+        cutoff = streamed.cutoff
+        if (streamed.error) throw streamed.error
       } catch (err) {
         if (!ctrl.signal.aborted) setError(errorMessage(err))
       } finally {
         // An empty reply otherwise vanishes silently, as if the tap did nothing.
-        if (!text.trim() && !ctrl.signal.aborted) {
-          setError((prev) => prev ?? t('chat.emptyReply'))
+        if (!reply && !ctrl.signal.aborted) {
+          setError((prev) => prev ?? t(emptyReplyReason({ thought: keptThought, cutoff })))
         }
-        if (frame) cancelAnimationFrame(frame)
-        const reply = discarded.current.has(ctrl) ? '' : text.trim()
-        const keptThought: Thought | null = thought.trim()
-          ? { text: thought.trim(), ms: thinkingMs ?? Date.now() - thinkingSince }
-          : null
+        if (discarded.current.has(ctrl)) reply = ''
         const current = () => storeRef.current === store
         if (reply && replacing) {
           const updated = await store.addVariant(replacing, reply, keptThought)
@@ -388,18 +368,6 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
   }
 }
 
-// Without a cap the system prompt goes out exactly as written. With one, an instruction
-// is appended asking the model to keep the reply within that many paragraphs; nothing
-// after the fact trims what comes back; a model that ignores it just writes long.
-function withReplyLimit(system: string, limit: number | null): string {
-  if (!limit) return system
-  const rule = `Keep your reply to at most ${limit} ${limit === 1 ? 'paragraph' : 'paragraphs'}.`
-  return system ? `${system}\n\n${rule}` : rule
-}
-
-const CONTINUE_NOTE =
-  'Continue the roleplay from where it stopped: develop your last reply further or move the scene forward. Do not repeat what was already said and do not speak for the user.'
-
 // A wish for the regenerated reply goes into the last user turn as an out-of-character
 // note, a convention roleplay models know; it is sent once and never saved. It is not a
 // trailing system message because many chat templates accept the system role only first.
@@ -423,14 +391,4 @@ function requestTurns(system: string, turns: ChatTurn[], guidance: string | unde
     turns = [...turns, { role: 'user', content: note || CONTINUE_NOTE }]
   }
   return header ? [{ role: 'system', content: header }, ...turns] : turns
-}
-
-function toTurn(m: Message): ChatTurn {
-  if (!m.images.length) return { role: m.role, content: m.content }
-  const parts: ContentPart[] = m.images.map((image) => ({
-    type: 'image_url',
-    image_url: { url: imageDataUrl(image.base64) },
-  }))
-  if (m.content.trim()) parts.push({ type: 'text', text: m.content })
-  return { role: m.role, content: parts }
 }

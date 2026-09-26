@@ -27,6 +27,8 @@ export type Colors = {
   // A stronger hairline than `border`, for outlines that need to read as a shape's
   // edge (shard chips/buttons) rather than a faint divider.
   borderStrong: string
+  // Name colors for the characters of a room, by their place in it; readable on bg.
+  cast: string[]
 }
 
 const darkColors: Colors = {
@@ -47,6 +49,7 @@ const darkColors: Colors = {
   dangerBorder: 'rgba(240, 97, 109, 0.3)',
   success: '#5FCB8B',
   borderStrong: 'rgba(255, 255, 255, 0.14)',
+  cast: ['#F0A35E', '#6CC4E8', '#E779B2', '#7FD17F', '#B99BFF', '#F2D46B'],
 }
 
 const lightColors: Colors = {
@@ -67,6 +70,7 @@ const lightColors: Colors = {
   dangerBorder: 'rgba(214, 57, 74, 0.3)',
   success: '#2F9A5C',
   borderStrong: 'rgba(0, 0, 0, 0.14)',
+  cast: ['#C26A12', '#1F86B5', '#C0407F', '#2F8F3A', '#6D4FD1', '#9A7A00'],
 }
 
 const palettes: Record<Scheme, Colors> = { dark: darkColors, light: lightColors }
