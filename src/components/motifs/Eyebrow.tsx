@@ -18,7 +18,7 @@ export function Eyebrow({ label, color, star = true }: { label: string; color: s
 
 const createStyles = (_colors: Colors) =>
   StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
     star: { marginTop: 1 },
     label: { fontFamily: fonts.prose, fontWeight: '700', fontSize: 13, letterSpacing: 1.1, textTransform: 'uppercase' },
   })

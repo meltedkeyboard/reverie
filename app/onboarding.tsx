@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
@@ -21,6 +20,7 @@ import { Group } from '@/components/Group'
 import { SFIcon } from '@/components/SFIcon'
 import { Wordmark } from '@/components/Wordmark'
 import { setOnboardingComplete } from '@/db/onboarding'
+import { useDatabase } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useTranslation } from '@/i18n'
@@ -66,7 +66,7 @@ const FEATURES: Feature[] = [
 // then the server to talk to, which can be left for later. The content settles in once,
 // and the second page turns in from the right like the next page of a pager.
 export default function OnboardingScreen() {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()

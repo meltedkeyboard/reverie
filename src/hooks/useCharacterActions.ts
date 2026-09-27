@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 
 import { deleteCharacter, duplicateCharacter, type CharacterPreview } from '@/db/characters'
 import { createChat } from '@/db/chats'
+import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { copyStoredImage, removeCharacterImages } from '@/lib/avatars'
 import type { MenuItem } from '@/components/NativeMenu'
@@ -13,7 +13,7 @@ import { showSheet } from '@/lib/dialogs'
 // home screen and the wide-web sidebar; reload re-lists them after a delete, and
 // onStart lets the caller react before the new chat opens.
 export function useCharacterActions(reload: () => void, onStart?: (character: CharacterPreview) => void) {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const { t } = useTranslation()
 

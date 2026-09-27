@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Redirect, Tabs } from 'expo-router'
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useState } from 'react'
 import { Platform, StyleSheet, View, type ColorValue } from 'react-native'
 
 import { isOnboardingComplete } from '@/db/onboarding'
+import { useDatabase } from '@/db/provider'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
 import { noteTabFocus } from '@/lib/searchScope'
@@ -14,7 +14,7 @@ import { useColors } from '@/theme'
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
 export default function TabsLayout() {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const colors = useColors()
   const { t } = useTranslation()
   const [onboarded, setOnboarded] = useState<boolean | null>(null)

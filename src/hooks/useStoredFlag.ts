@@ -1,5 +1,7 @@
-import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite'
+import type { SQLiteDatabase } from 'expo-sqlite'
 import { useEffect, useState } from 'react'
+
+import { useDatabase } from '@/db/provider'
 
 // A switch that lives in the database: shown as `initial` until it is read, and written
 // back as soon as it changes.
@@ -8,7 +10,7 @@ export function useStoredFlag(
   save: (db: SQLiteDatabase, on: boolean) => Promise<void>,
   initial: boolean
 ) {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const [value, setValue] = useState(initial)
 
   useEffect(() => {

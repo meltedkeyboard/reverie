@@ -1,10 +1,10 @@
 import { Link, usePathname, useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
+import { useDatabase } from '@/db/provider'
 import { listRooms, type RoomPreview } from '@/db/rooms'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useTranslation } from '@/i18n'
@@ -21,7 +21,7 @@ import { Wordmark } from './Wordmark'
 // CharacterCard's data and actions rather than the screen itself, which stays the
 // phone layout used on narrow web and native.
 export function Sidebar() {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const pathname = usePathname()
   const styles = useStyles(createStyles)

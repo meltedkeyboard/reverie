@@ -107,9 +107,11 @@ export type LastChat = {
   characterAvatar: string | null
 }
 
-// The chat the user wrote in most recently, for the home screen's continue button. A
-// scene shows its room's name and the avatar of the room's first member.
-export function getLastChat(db: SQLiteDatabase) {
+// The chat of the given kind for the continue button on its home tab: the one opened last if
+// it is still there and has been written in, otherwise the one written in most recently.
+// A scene shows its room's name and the avatar of the room's first member.
+export function getLastChat(db: SQLiteDatabase, kind: 'character' | 'room', openedId: number | null) {
+  const column = kind === 'room' ? 'room_id' : 'character_id'
   return db.getFirstAsync<LastChat>(`
     SELECT ch.id, ch.title,
       COALESCE(c.name, r.name) AS characterName,
@@ -119,8 +121,9 @@ export function getLastChat(db: SQLiteDatabase) {
     FROM chats ch
       LEFT JOIN characters c ON c.id = ch.character_id
       LEFT JOIN rooms r ON r.id = ch.room_id
-    WHERE EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.role = 'user')
-    ORDER BY lastActivity DESC, ch.id DESC
+    WHERE ch.${column} IS NOT NULL
+      AND EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.role = 'user')
+    ORDER BY ch.id = ? DESC, lastActivity DESC, ch.id DESC
     LIMIT 1
-  `)
+  `, openedId ?? -1)
 }

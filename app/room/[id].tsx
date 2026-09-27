@@ -1,6 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
@@ -14,11 +13,12 @@ import { ImageSourceMenu } from '@/components/ImageSourceMenu'
 import { Divider } from '@/components/motifs/Divider'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
 import { FieldRow } from '@/components/motifs/FieldRow'
-import { ShardButton } from '@/components/motifs/ShardButton'
+import { PillButton } from '@/components/PillButton'
 import { PageSheet } from '@/components/PageSheet'
 import { ParamSlider } from '@/components/ParamSlider'
 import { ToggleRow } from '@/components/ToggleRow'
 import { listCharacters, type Character, type CharacterPreview } from '@/db/characters'
+import { useDatabase } from '@/db/provider'
 import {
   DEFAULT_MEMBER,
   DEFAULT_ROOM,
@@ -47,7 +47,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
 export default function RoomEditorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const isNew = id === 'new'
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('form')
   const colors = useColors()
@@ -208,7 +208,7 @@ export default function RoomEditorScreen() {
                   onPress={() => setExpanded(open ? null : member.characterId)}
                   style={({ pressed }) => [styles.memberHead, pressed && { opacity: 0.7 }]}
                 >
-                  <Avatar name={member.character.name} file={member.character.avatar} size={36} viewable={false} />
+                  <Avatar name={member.character.name} file={member.character.avatar} size={36} />
                   <View style={styles.memberBody}>
                     <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
                       {member.character.name}
@@ -311,7 +311,7 @@ export default function RoomEditorScreen() {
             onChangeText={(v) => set('scenario', v)}
             placeholder={t('roomEditor.scenarioPlaceholder')}
             multiline
-            minHeight={110}
+            expandTitle={t('roomEditor.scenario')}
           />
           <FieldRow
             label={t('roomEditor.opening')}
@@ -320,6 +320,7 @@ export default function RoomEditorScreen() {
             onChangeText={(v) => set('opening', v)}
             placeholder={t('roomEditor.openingPlaceholder')}
             multiline
+            expandTitle={t('roomEditor.opening')}
           />
           <FieldRow
             label={t('roomEditor.userName')}
@@ -365,7 +366,7 @@ export default function RoomEditorScreen() {
           {!isNew ? (
             <>
               <Divider />
-              <ShardButton label={t('roomEditor.deleteRoom')} onPress={confirmDelete} color={colors.danger} />
+              <PillButton label={t('roomEditor.deleteRoom')} onPress={confirmDelete} color={colors.danger} />
             </>
           ) : null}
         </KeyboardAwareScrollView>
@@ -416,6 +417,7 @@ export default function RoomEditorScreen() {
               disabled={!canSave}
               onPress={onSave}
               accessibilityLabel={t('common.save')}
+              prominent
             />
           }
         />
@@ -435,11 +437,11 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    chips: { marginBottom: 14 },
+    chips: { marginBottom: 16 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
     hint: { color: colors.textFaint, fontSize: 12, lineHeight: 17, marginTop: -4, marginBottom: 16 },
-    gap: { height: 18 },
-    gapBelow: { marginBottom: 20 },
+    gap: { height: 16 },
+    gapBelow: { marginBottom: 16 },
     link: { color: colors.accent, fontSize: 15 },
     linkMuted: { color: colors.textMuted, fontSize: 15 },
     linkDanger: { color: colors.danger, fontSize: 15, marginTop: 4 },

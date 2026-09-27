@@ -1,6 +1,8 @@
 import { toByteArray } from 'base64-js'
 import { Directory, File, Paths } from 'expo-file-system'
-import * as Sharing from 'expo-sharing'
+import * as MediaLibrary from 'expo-media-library/legacy'
+
+import { t } from '@/i18n'
 
 // "backup.json" -> "backup (2).json" when the folder already has one, so an old backup
 // is never overwritten.
@@ -30,16 +32,22 @@ export async function saveJson(fileName: string, contents: string): Promise<{ na
   return { name, folder: dir.name }
 }
 
-// The share sheet has "Save Image", which puts the picture into Photos without the
-// app asking for photo library access.
+// Puts the picture straight into Photos. Only permission to add is asked for, so the app
+// never gets to see the library.
 export async function saveImage(uri: string) {
-  let target = uri
+  const permission = await MediaLibrary.requestPermissionsAsync(true, ['photo'])
+  if (!permission.granted) throw new Error(t('images.savePermission'))
+
+  // Photos takes only a local file, and one with an extension.
   const inline = uri.match(/^data:image\/(\w+);base64,(.*)$/)
-  if (inline) {
-    const out = new File(Paths.cache, `image-${Date.now()}.${inline[1] === 'jpeg' ? 'jpg' : inline[1]}`)
+  const out = inline ? new File(Paths.cache, `image-${Date.now()}.${inline[1] === 'jpeg' ? 'jpg' : inline[1]}`) : null
+  if (out && inline) {
     out.create({ overwrite: true })
     out.write(toByteArray(inline[2]))
-    target = out.uri
   }
-  await Sharing.shareAsync(target)
+  try {
+    await MediaLibrary.saveToLibraryAsync(out?.uri ?? uri)
+  } finally {
+    if (out?.exists) out.delete()
+  }
 }

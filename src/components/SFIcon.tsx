@@ -21,6 +21,9 @@ type Props = {
   active?: boolean
   // Swapping `name` plays the system Replace transition instead of a hard cut.
   animateChange?: boolean
+  // Drawn on the accent fill. In the light scheme the symbol comes out dark even with an
+  // explicit white color, so the hosted view is given the dark scheme instead.
+  onAccent?: boolean
 }
 
 // The system symbol animations of iOS 17 and 18 are drawn by SwiftUI itself, so they
@@ -31,8 +34,9 @@ function FallbackIcon({ fallback, size, color }: Props) {
   return <Ionicons name={fallback} size={size} color={color} />
 }
 
-function NativeIcon({ name, size, color, effect, trigger, active, animateChange }: Props) {
-  const { scheme } = useTheme()
+function NativeIcon({ name, size, color, effect, trigger, active, animateChange, onAccent = false }: Props) {
+  const theme = useTheme()
+  const scheme = onAccent ? 'dark' : theme.scheme
   const { Host, Image, useNativeState } = swiftUI!.ui
   const { symbolEffect, animation, Animation } = swiftUI!.modifiers
   // A symbol image that changes inside an animated transaction gets the Replace effect

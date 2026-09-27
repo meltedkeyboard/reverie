@@ -1,12 +1,12 @@
 import { BlurView } from 'expo-blur'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Animated, AppState, Platform, StyleSheet, Text, View } from 'react-native'
 
-import { ShardButton } from '@/components/motifs/ShardButton'
+import { PillButton } from '@/components/PillButton'
 import { Star } from '@/components/motifs/Star'
 import { isAppLockEnabled, isAppLockEnabledCached } from '@/db/appLock'
+import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { fonts, useColors, useTheme } from '@/theme'
 
@@ -14,7 +14,7 @@ import { fonts, useColors, useTheme } from '@/theme'
 // and after the app has been in the background. It also blurs the app in the app
 // switcher while the lock is on. Native only.
 export function AppLock({ children }: { children: ReactNode }) {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const colors = useColors()
   const { scheme } = useTheme()
   const { t } = useTranslation()
@@ -22,6 +22,7 @@ export function AppLock({ children }: { children: ReactNode }) {
   const [shielded, setShielded] = useState(false)
   const [checked, setChecked] = useState(Platform.OS === 'web')
   const busy = useRef(false)
+  const launchChecked = useRef(false)
   const shieldOpacity = useRef(new Animated.Value(0)).current
 
   const unlock = useCallback(async () => {
@@ -35,8 +36,11 @@ export function AppLock({ children }: { children: ReactNode }) {
     }
   }, [t])
 
+  // Only on launch. The effect also reruns when `unlock` changes with the language, or
+  // when the database is swapped for one in another folder, and neither should ask again.
   useEffect(() => {
-    if (Platform.OS === 'web') return
+    if (Platform.OS === 'web' || launchChecked.current) return
+    launchChecked.current = true
     isAppLockEnabled(db).then((enabled) => {
       setChecked(true)
       if (enabled) unlock()
@@ -88,7 +92,7 @@ export function AppLock({ children }: { children: ReactNode }) {
         <View style={[styles.cover, { backgroundColor: colors.bg }]}>
           <Star size={40} color={colors.accent} rotation={-14} />
           <Text style={[styles.title, { color: colors.text }]}>{t('lock.title')}</Text>
-          <ShardButton label={t('lock.unlock')} onPress={unlock} />
+          <PillButton label={t('lock.unlock')} onPress={unlock} />
         </View>
       ) : null}
     </>

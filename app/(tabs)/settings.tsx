@@ -1,5 +1,4 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
@@ -11,15 +10,16 @@ import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/comp
 import { Divider } from '@/components/motifs/Divider'
 import { FieldRow } from '@/components/motifs/FieldRow'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
-import { ShardButton } from '@/components/motifs/ShardButton'
-import { ShardChip } from '@/components/motifs/ShardChip'
+import { PillButton } from '@/components/PillButton'
+import { Chip } from '@/components/Chip'
 import { Star } from '@/components/motifs/Star'
 import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/confirmDelete'
-import { isContinueEnabled, setContinueEnabled } from '@/db/continue'
+import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/continue'
 import { isHapticsEnabled, setHapticsEnabled } from '@/db/haptics'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
+import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
@@ -28,11 +28,11 @@ import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import type { SettingsSection } from '@/lib/searchScope'
-import { isShownInFiles, isStoragePending, setShownInFiles } from '@/lib/storage'
+import { isShownInFiles } from '@/lib/storage'
 import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
 
 export default function SettingsScreen() {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('form')
   const colors = useColors()
@@ -81,6 +81,10 @@ export default function SettingsScreen() {
     { value: 'light', label: t('theme.light') },
     { value: 'dark', label: t('theme.dark') },
   ]
+  const CONTINUE_OPTIONS: { value: 'visit' | 'message'; label: string }[] = [
+    { value: 'visit', label: t('settings.continueByVisit') },
+    { value: 'message', label: t('settings.continueByMessage') },
+  ]
   const LANGUAGE_OPTIONS: { value: LocalePreference; label: string }[] = [
     { value: 'system', label: t('language.system') },
     { value: 'ru', label: t('language.ru') },
@@ -94,18 +98,29 @@ export default function SettingsScreen() {
   const [importing, setImporting] = useState(false)
   const [wiping, setWiping] = useState(false)
   const [continueButton, toggleContinueButton] = useStoredFlag(isContinueEnabled, setContinueEnabled, true)
+  const [continueByVisit, setContinueByVisitValue] = useStoredFlag(isContinueByVisit, setContinueByVisit, true)
   const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
   const [appLock, setAppLock] = useStoredFlag(isAppLockEnabled, setAppLockEnabled, false)
 
   const [showInFiles, setShowInFiles] = useState(isShownInFiles)
+  const [movingFiles, setMovingFiles] = useState(false)
+  const moveFiles = useShowInFiles()
 
-  const toggleShowInFiles = (shown: boolean) => {
+  // The data moves right away: the database is copied, reopened from the new place, and
+  // every screen reloads from it. The row is disabled while that runs.
+  const toggleShowInFiles = async (shown: boolean) => {
     setShowInFiles(shown)
-    setShownInFiles(shown)
-    // The database can't move while it is open, so the files change place on the next launch.
-    if (isStoragePending()) showMessage(t('settings.showInFilesRestartTitle'), t('settings.showInFilesRestartMessage'))
+    setMovingFiles(true)
+    try {
+      await moveFiles(shown)
+    } catch (err) {
+      setShowInFiles(isShownInFiles())
+      showMessage(t('settings.showInFilesFailedTitle'), errorMessage(err))
+    } finally {
+      setMovingFiles(false)
+    }
   }
 
   const toggleAppLock = async (enabled: boolean) => {
@@ -212,12 +227,22 @@ export default function SettingsScreen() {
           <Eyebrow label={t('settings.homeScreen')} color={colors.accent} />
           {block(
             'continue',
-            <ToggleRow
-              label={t('settings.continueButton')}
-              note={t('settings.continueButtonNote')}
-              value={continueButton}
-              onValueChange={toggleContinueButton}
-            />
+            <>
+              <ToggleRow
+                label={t('settings.continueButton')}
+                note={t('settings.continueButtonNote')}
+                value={continueButton}
+                onValueChange={toggleContinueButton}
+              />
+              {continueButton ? (
+                <ChipGroup
+                  options={CONTINUE_OPTIONS}
+                  value={continueByVisit ? 'visit' : 'message'}
+                  onChange={(v) => setContinueByVisitValue(v === 'visit')}
+                  style={styles.chips}
+                />
+              ) : null}
+            </>
           )}
 
           <Divider />
@@ -276,6 +301,7 @@ export default function SettingsScreen() {
                   note={t('settings.showInFilesNote')}
                   value={showInFiles}
                   onValueChange={toggleShowInFiles}
+                  disabled={movingFiles}
                 />
               )}
 
@@ -322,12 +348,12 @@ export default function SettingsScreen() {
               {models.length > 0 ? (
                 <View style={[styles.chipsRow, styles.modelChips]}>
                   {models.map((id) => (
-                    <ShardChip key={id} label={id} active={id === cfg.model} onPress={() => update({ model: id })} />
+                    <Chip key={id} label={id} active={id === cfg.model} onPress={() => update({ model: id })} />
                   ))}
                 </View>
               ) : null}
 
-              <ShardButton label={t('settings.testConnection')} onPress={() => test(cfg)} loading={status.kind === 'testing'} style={styles.testButton} />
+              <PillButton label={t('settings.testConnection')} onPress={() => test(cfg)} loading={status.kind === 'testing'} style={styles.testButton} />
 
               {status.kind === 'ok' || status.kind === 'error' ? <Text style={styles.statusText}>{status.text}</Text> : null}
             </>
@@ -341,13 +367,12 @@ export default function SettingsScreen() {
               <Eyebrow label={t('settings.backupTitle')} color={colors.accent} />
               <Text style={styles.note}>{t('settings.backupNote')}</Text>
               <View style={styles.buttonPairRow}>
-                <ShardButton label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting} style={styles.pairButton} />
-                <ShardButton
+                <PillButton label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting} style={styles.pairButton} />
+                <PillButton
                   label={t('settings.importJson')}
                   onPress={onImport}
                   loading={importing}
                   disabled={importing}
-                  flip
                   style={styles.pairButton}
                 />
               </View>
@@ -372,7 +397,7 @@ export default function SettingsScreen() {
             <>
               <Eyebrow label={t('settings.dangerZone')} color={colors.danger} />
               <Text style={styles.note}>{t('settings.dangerNote')}</Text>
-              <ShardButton label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
+              <PillButton label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
             </>
           )}
 
@@ -392,19 +417,19 @@ export default function SettingsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    chips: { marginBottom: 26 },
+    chips: { marginBottom: 16 },
     // Reaches a little past the block, so the tint frames it instead of hugging the text.
     flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 16 },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 26 },
-    modelChips: { marginTop: -6 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+    modelChips: { marginTop: -4 },
     rowLabel: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 14 },
-    testButton: { alignSelf: 'flex-start', marginTop: 4 },
-    statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 14 },
-    buttonPairRow: { flexDirection: 'row', gap: 14 },
+    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 12 },
+    testButton: { alignSelf: 'flex-start' },
+    statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12 },
+    buttonPairRow: { flexDirection: 'row', gap: 12 },
     pairButton: { flex: 1 },
     linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
     linkLabel: { marginBottom: 0 },
     chevron: { color: colors.textFaint, fontSize: 20 },
-    footer: { alignItems: 'center', marginTop: 36 },
+    footer: { alignItems: 'center', marginTop: 32 },
   })

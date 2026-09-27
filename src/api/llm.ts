@@ -38,6 +38,11 @@ function requestHeaders(cfg: ServerSettings) {
 // them again as "unreachable" — independent of the message's language.
 class ServerError extends Error {}
 
+// The server answered, but with an error, as opposed to not answering at all.
+export function isServerError(err: unknown) {
+  return err instanceof ServerError
+}
+
 async function readServerError(res: Awaited<ReturnType<typeof fetch>>) {
   const body = await res.text().catch(() => '')
   try {

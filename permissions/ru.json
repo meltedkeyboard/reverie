@@ -1,5 +1,6 @@
 {
   "NSPhotoLibraryUsageDescription": "Reverie использует фото для аватаров персонажей и сообщений.",
+  "NSPhotoLibraryAddUsageDescription": "Reverie сохраняет в «Фото» картинки, которые вы скачиваете.",
   "NSCameraUsageDescription": "Reverie использует камеру, чтобы отправить снимок в чат.",
   "NSFaceIDUsageDescription": "Reverie использует Face ID, чтобы защитить ваши чаты.",
   "NSLocalNetworkUsageDescription": "Reverie подключается к серверу модели в вашей локальной сети."

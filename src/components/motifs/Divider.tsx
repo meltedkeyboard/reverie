@@ -9,5 +9,5 @@ export function Divider() {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 26 },
+    divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 24 },
   })

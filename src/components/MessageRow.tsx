@@ -154,7 +154,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
     <View style={[styles.botRow, message.kind === 'reaction' && styles.reactionRow]}>
       {scene ? (
         <View style={styles.speaker}>
-          {speaker ? <Avatar name={speaker.name} file={speaker.avatar} size={22} viewable={false} /> : null}
+          {speaker ? <Avatar name={speaker.name} file={speaker.avatar} size={22} /> : null}
           <Text style={[styles.speakerName, { color: speaker?.color ?? colors.textFaint }]} numberOfLines={1}>
             {speaker?.name ?? t('room.deletedCharacter')}
           </Text>

@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -22,6 +21,7 @@ import {
   type Role,
   type Thought,
 } from '@/db/messages'
+import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
 import { useAbortable } from '@/hooks/useAbortable'
 import { t } from '@/i18n'
@@ -92,7 +92,7 @@ const PRIVATE_PROMPT =
 
 export function useChat(chat: Chat, character: Character, { ephemeral = false } = {}) {
   const chatId = chat.id
-  const db = useSQLiteContext()
+  const db = useDatabase()
   // Switching between the real and the private chat swaps the store in place, so the
   // screen around it stays mounted and can animate the change.
   const store = useMemo(() => (ephemeral ? memoryStore(chatId) : dbStore(db, chatId)), [ephemeral, db, chatId])

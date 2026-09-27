@@ -1,13 +1,16 @@
-// The picture the viewer screen shows. It goes around the URL because a chat photo is
+// The pictures the viewer screen shows. They go around the URL because a chat photo is
 // a data URL far too long for a route param.
 export type ViewerImage = { uri: string; aspect: number }
 
-let pending: ViewerImage | null = null
+type Pending = { images: ViewerImage[]; index: number }
 
-export function setViewerImage(image: ViewerImage) {
-  pending = image
+let pending: Pending | null = null
+
+// Several pictures are swiped through, starting from `index`: a room's cast, say.
+export function setViewerImages(images: ViewerImage[], index = 0) {
+  pending = images.length ? { images, index: Math.min(Math.max(index, 0), images.length - 1) } : null
 }
 
-export function viewerImage() {
+export function viewerImages() {
   return pending
 }

@@ -1,5 +1,4 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
@@ -13,7 +12,7 @@ import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
 import { FieldRow } from '@/components/motifs/FieldRow'
-import { ShardButton } from '@/components/motifs/ShardButton'
+import { PillButton } from '@/components/PillButton'
 import { ParamSlider } from '@/components/ParamSlider'
 import { PromptGenModal, type GeneratedCharacter } from '@/components/PromptGenModal'
 import {
@@ -24,6 +23,7 @@ import {
   type BackgroundEffect,
   type ThinkingMode,
 } from '@/db/characters'
+import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { avatarUri, persistAvatar, pickAvatar, pickBackground, removeAvatar, removeCharacterImages } from '@/lib/avatars'
 import { setBackgroundDraft } from '@/lib/backgroundDraft'
@@ -37,7 +37,7 @@ import { useColors, useStyles, type Colors } from '@/theme'
 export default function CharacterEditorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const isNew = id === 'new'
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('form')
   const colors = useColors()
@@ -323,6 +323,7 @@ export default function CharacterEditorScreen() {
             onChangeText={setGreeting}
             placeholder={t('editor.greetingPlaceholder')}
             multiline
+            expandTitle={t('editor.greetingLabel')}
           />
 
           <Divider />
@@ -335,7 +336,7 @@ export default function CharacterEditorScreen() {
               </Pressable>
             ) : null}
           </View>
-          <ShardButton
+          <PillButton
             label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
             onPress={() => setShowPromptGen(true)}
             style={styles.aiButton}
@@ -350,6 +351,7 @@ export default function CharacterEditorScreen() {
             placeholder={t('editor.systemPromptPlaceholder')}
             multiline
             minHeight={180}
+            expandTitle={t('editor.systemPromptLabel')}
           />
 
           <PromptGenModal
@@ -364,7 +366,7 @@ export default function CharacterEditorScreen() {
           {!isNew ? (
             <>
               <Divider />
-              <ShardButton label={t('editor.deleteCharacter')} onPress={confirmDelete} color={colors.danger} />
+              <PillButton label={t('editor.deleteCharacter')} onPress={confirmDelete} color={colors.danger} />
             </>
           ) : null}
         </KeyboardAwareScrollView>
@@ -382,6 +384,7 @@ export default function CharacterEditorScreen() {
               disabled={!canSave}
               onPress={onSave}
               accessibilityLabel={t('common.save')}
+              prominent
             />
           }
         />
@@ -400,10 +403,10 @@ export default function CharacterEditorScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    chips: { marginBottom: 14 },
+    chips: { marginBottom: 16 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
-    aiButton: { alignSelf: 'flex-start', marginBottom: 18 },
-    avatarBlock: { alignItems: 'center', marginBottom: 28, gap: 12 },
+    aiButton: { alignSelf: 'flex-start', marginBottom: 12 },
+    avatarBlock: { alignItems: 'center', marginBottom: 24, gap: 12 },
     avatarActions: { flexDirection: 'row', gap: 20 },
     backgroundRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 4 },
     backgroundThumb: {

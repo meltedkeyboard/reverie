@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
@@ -10,6 +9,7 @@ import { Eyebrow } from '@/components/motifs/Eyebrow'
 import { Star } from '@/components/motifs/Star'
 import { Wordmark } from '@/components/Wordmark'
 import { setOnboardingComplete } from '@/db/onboarding'
+import { useDatabase } from '@/db/provider'
 import { useShake } from '@/hooks/useShake'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
@@ -18,7 +18,7 @@ import { useColors, useStyles, type Colors } from '@/theme'
 
 export default function AboutScreen() {
   const router = useRouter()
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const padding = useScreenPadding('form')
   const colors = useColors()
   const styles = useStyles(createStyles)

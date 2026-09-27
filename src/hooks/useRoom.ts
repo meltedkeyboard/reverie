@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { setChatTitle, type Chat } from '@/db/chats'
@@ -14,6 +13,7 @@ import {
   type MessageKind,
   type Thought,
 } from '@/db/messages'
+import { useDatabase } from '@/db/provider'
 import { setMemberPresent, type Room, type RoomMember } from '@/db/rooms'
 import { loadSettings } from '@/db/settings'
 import { useAbortable } from '@/hooks/useAbortable'
@@ -68,7 +68,7 @@ type Spoken = { line: Message | null; ok: boolean }
 // too, and must pass the new cast back in as `members`.
 export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembersChange: (next: RoomMember[]) => void) {
   const chatId = chat.id
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const [messages, setMessagesState] = useState<Message[]>([])
   const [loaded, setLoaded] = useState(false)
   const [draft, setDraft] = useState<RoomDraft | null>(null)

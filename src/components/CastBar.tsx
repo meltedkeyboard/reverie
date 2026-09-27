@@ -55,7 +55,7 @@ export function CastBar({ members, addressees, whisper, narration, onOpen }: Pro
           <Ionicons name={narration ? 'book' : 'people'} size={14} color={on ? colors.accent : colors.textMuted} />
         </View>
       ) : (
-        <AvatarStack cast={faces} size={FACE} max={3} />
+        <AvatarStack cast={faces} size={FACE} max={3} viewable={false} />
       )}
       {hushed ? <Ionicons name="lock-closed" size={13} color={colors.accent} /> : null}
       <Text style={styles.label} numberOfLines={1}>

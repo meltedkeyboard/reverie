@@ -1,23 +1,25 @@
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useState } from 'react'
 
 import { getLastChat, type LastChat } from '@/db/chats'
-import { isContinueEnabled, isContinueHidden, setContinueHidden } from '@/db/continue'
+import { getLastOpened, isContinueByVisit, isContinueEnabled, isContinueHidden, setContinueHidden, type ContinueKind } from '@/db/continue'
+import { useDatabase } from '@/db/provider'
 
-// The chat the continue button on the home tabs opens, or null while it is turned off
-// or swiped away.
-export function useLastChat() {
-  const db = useSQLiteContext()
+// The chat the continue button on a home tab opens: the last one with a character on
+// Characters, the last scene on Rooms. Null while the button is turned off or swiped away.
+export function useLastChat(kind: ContinueKind) {
+  const db = useDatabase()
   const [lastChat, setLastChat] = useState<LastChat | null>(null)
 
   const reload = useCallback(async () => {
-    const show = (await isContinueEnabled(db)) && !(await isContinueHidden(db))
-    setLastChat(show ? await getLastChat(db) : null)
-  }, [db])
+    const show = (await isContinueEnabled(db)) && !(await isContinueHidden(db, kind))
+    if (!show) return setLastChat(null)
+    const openedId = (await isContinueByVisit(db)) ? await getLastOpened(db, kind) : null
+    setLastChat(await getLastChat(db, kind, openedId))
+  }, [db, kind])
 
   const hide = () => {
     setLastChat(null)
-    setContinueHidden(db, true)
+    setContinueHidden(db, kind, true)
   }
 
   return { lastChat, reload, hide }

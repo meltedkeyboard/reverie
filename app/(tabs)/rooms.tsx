@@ -1,5 +1,4 @@
 import { Link, useRouter, useFocusEffect } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
@@ -15,6 +14,7 @@ import type { MenuItem } from '@/components/NativeMenu'
 import { RoomCard } from '@/components/RoomCard'
 import { listCharacters } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
+import { useDatabase } from '@/db/provider'
 import { deleteRoom, listRooms, setRoomOrder, type RoomPreview } from '@/db/rooms'
 import { useLastChat } from '@/hooks/useLastChat'
 import { useReorder } from '@/hooks/useReorder'
@@ -24,14 +24,14 @@ import { confirmDeletion } from '@/lib/confirmDelete'
 import { useStyles, type Colors } from '@/theme'
 
 export default function RoomsScreen() {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [rooms, setRooms] = useState<RoomPreview[] | null>(null)
   const [characterCount, setCharacterCount] = useState(0)
-  const { lastChat, reload: reloadLastChat, hide: hideLastChat } = useLastChat()
+  const { lastChat, reload: reloadLastChat, hide: hideLastChat } = useLastChat('room')
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)

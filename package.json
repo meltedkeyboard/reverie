@@ -1,6 +1,6 @@
 {
   "name": "reverie",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/build-icons.mjs",
-    "postinstall": "node scripts/build-icons.mjs"
+    "postinstall": "patch-package && node scripts/build-icons.mjs"
   },
   "dependencies": {
     "@expo/ui": "~57.0.19",
@@ -31,9 +31,9 @@
     "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.10",
     "expo-local-authentication": "~57.0.3",
+    "expo-media-library": "~57.0.5",
     "expo-router": "~57.0.22",
     "expo-sensors": "~57.0.3",
-    "expo-sharing": "~57.0.21",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
@@ -53,6 +53,7 @@
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "@types/react": "~19.2.4",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   }
 }

@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
+import { liquidGlass } from '@/lib/nativeUI'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 import { GlassSurface } from './Glass'
@@ -38,7 +39,7 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
       <Pressable
         onPress={onPress}
         disabled={disabled || loading}
-        style={({ pressed }) => [pressed && { transform: [{ scale: 0.98 }] }, disabled && { opacity: 0.4 }]}
+        style={({ pressed }) => [!liquidGlass && pressed && { transform: [{ scale: 0.98 }] }, disabled && { opacity: 0.4 }]}
       >
         <GlassSurface
           interactive

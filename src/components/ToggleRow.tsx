@@ -10,14 +10,17 @@ interface ToggleRowProps {
   note?: string
   value: boolean
   onValueChange: (v: boolean) => void
+  // Dimmed and ignoring taps, e.g. while the change it made is still being applied.
+  disabled?: boolean
 }
 
 // A labelled toggle where the whole row is tappable, not just the star.
-export function ToggleRow({ label, note, value, onValueChange }: ToggleRowProps) {
+export function ToggleRow({ label, note, value, onValueChange, disabled = false }: ToggleRowProps) {
   const styles = useStyles(createStyles)
   return (
     <Pressable
-      style={styles.row}
+      disabled={disabled}
+      style={[styles.row, disabled && styles.disabled]}
       onPress={() => {
         Haptics.selectionAsync()
         onValueChange(!value)
@@ -27,7 +30,9 @@ export function ToggleRow({ label, note, value, onValueChange }: ToggleRowProps)
         <Text style={styles.label}>{label}</Text>
         {note ? <Text style={styles.note}>{note}</Text> : null}
       </View>
-      <StarToggle value={value} onValueChange={onValueChange} />
+      <View pointerEvents={disabled ? 'none' : 'auto'}>
+        <StarToggle value={value} onValueChange={onValueChange} />
+      </View>
     </Pressable>
   )
 }
@@ -36,6 +41,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
     body: { flex: 1 },
+    disabled: { opacity: 0.5 },
     label: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 14 },
+    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 12 },
   })

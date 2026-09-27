@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { ChatTurn } from '@/api/llm'
+import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
 import { useAbortable } from '@/hooks/useAbortable'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
@@ -30,8 +30,8 @@ import { useInputColors } from './Field'
 import { Divider } from './motifs/Divider'
 import { Eyebrow } from './motifs/Eyebrow'
 import { FieldRow } from './motifs/FieldRow'
-import { ShardButton } from './motifs/ShardButton'
-import { ShardChip } from './motifs/ShardChip'
+import { PillButton } from './PillButton'
+import { Chip } from './Chip'
 import { ChipGroup } from './ChipGroup'
 import { PageSheet } from './PageSheet'
 import { Pager } from './Pager'
@@ -56,7 +56,7 @@ const IDEA_KEYS = ['promptGen.idea1', 'promptGen.idea2', 'promptGen.idea3', 'pro
 const TWEAK_KEYS = ['promptGen.tweakShorter', 'promptGen.tweakLonger', 'promptGen.tweakSpeech', 'promptGen.tweakVivid']
 
 export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, onClose, onApply }: Props) {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -210,7 +210,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
   const column = wide ? styles.wideColumn : null
 
   const chip = (label: string, onPress: () => void, key?: string) => (
-    <ShardChip key={key ?? label} label={label} active={false} onPress={() => !busy && onPress()} />
+    <Chip key={key ?? label} label={label} active={false} onPress={() => !busy && onPress()} />
   )
 
   const composeView = (
@@ -370,25 +370,24 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
   const footer =
     phase === 'compose' ? (
-      <ShardButton
+      <PillButton
         label={effectiveMode === 'improve' ? t('promptGen.improve') : t('promptGen.generate')}
         onPress={() => run()}
         disabled={!canGenerate}
         color={colors.accent}
       />
     ) : busy ? (
-      <ShardButton label={t('promptGen.stop')} onPress={stop} color={colors.danger} />
+      <PillButton label={t('promptGen.stop')} onPress={stop} color={colors.danger} />
     ) : !current ? (
-      <ShardButton label={t('promptGen.retry')} onPress={() => run()} color={colors.accent} />
+      <PillButton label={t('promptGen.retry')} onPress={() => run()} color={colors.accent} />
     ) : (
       <View style={styles.footerRow}>
-        <ShardButton label={t('promptGen.another')} onPress={() => run()} style={{ flex: 1 }} />
-        <ShardButton
+        <PillButton label={t('promptGen.another')} onPress={() => run()} style={{ flex: 1 }} />
+        <PillButton
           label={hasCurrent ? t('promptGen.replace') : t('promptGen.apply')}
           onPress={apply}
           disabled={!current?.prompt.trim()}
           color={colors.accent}
-          flip
           style={{ flex: 1 }}
         />
       </View>
@@ -432,8 +431,8 @@ const createStyles = (colors: Colors) =>
     headerButton: { color: colors.textMuted, fontSize: 16 },
     content: { padding: 20, paddingBottom: 32 },
     wideColumn: { width: '100%', maxWidth: 720, alignSelf: 'center' },
-    block: { marginBottom: 20 },
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    block: { marginBottom: 16 },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -490,5 +489,5 @@ const createStyles = (colors: Colors) =>
       borderTopColor: colors.border,
       backgroundColor: colors.surface,
     },
-    footerRow: { flexDirection: 'row', gap: 14 },
+    footerRow: { flexDirection: 'row', gap: 12 },
   })

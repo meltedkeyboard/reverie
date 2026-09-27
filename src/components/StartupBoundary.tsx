@@ -7,7 +7,7 @@ import { colors, fonts } from '@/theme'
 type Props = { children: ReactNode }
 type State = { error: Error | null }
 
-// The database opens before anything can render, and SQLiteProvider reports a
+// The database opens before anything can render, and DatabaseProvider reports a
 // failure by throwing. Without this the screen would just stay empty, with the
 // reason visible only in the console.
 export class StartupBoundary extends Component<Props, State> {

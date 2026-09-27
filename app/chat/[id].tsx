@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Clipboard from 'expo-clipboard'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, Text, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
@@ -11,11 +10,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/Avatar'
+import { castGallery } from '@/components/AvatarStack'
 import { ChatBackground } from '@/components/ChatBackground'
 import { Composer } from '@/components/Composer'
 import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
+import { useOpenViewer } from '@/components/ImageLink'
 import { MessageRow, type RowMessage } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { RoomView } from '@/components/RoomView'
@@ -23,9 +24,10 @@ import { SFIcon } from '@/components/SFIcon'
 import { TextSheet } from '@/components/TextSheet'
 import { getCharacter, type Character } from '@/db/characters'
 import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
-import { setContinueHidden } from '@/db/continue'
+import { setContinueHidden, setLastOpened } from '@/db/continue'
 import { newMessage } from '@/db/messages'
 import { isPrivateChatEnabled } from '@/db/privateChat'
+import { useDatabase } from '@/db/provider'
 import { createRoomChat, getRoom, importChatToRoom, listRoomMembers, type Room, type RoomMember } from '@/db/rooms'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
@@ -54,7 +56,7 @@ export default function ChatScreen() {
     // /chat/ID?message=ID opens the chat at that message, as search does.
     message?: string
   }>()
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const colors = useColors()
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -87,14 +89,16 @@ export default function ChatScreen() {
           const room = await getRoom(db, chat.roomId)
           if (!room) return router.back()
           setLoaded({ kind: 'room', chat, room, members: await listRoomMembers(db, room.id) })
-          setContinueHidden(db, false)
+          setContinueHidden(db, 'room', false)
+          setLastOpened(db, 'room', chat.id)
           return
         }
         const character = chat?.characterId ? await getCharacter(db, chat.characterId) : null
         if (chat && character) {
           setLoaded({ kind: 'character', chat, character })
           // A continue button swiped away on the home screen comes back once a chat opens.
-          setContinueHidden(db, false)
+          setContinueHidden(db, 'character', false)
+          setLastOpened(db, 'character', chat.id)
         } else router.back()
       })()
     }, [db, id, characterParam, roomParam, router])
@@ -169,8 +173,9 @@ const SWITCH_IN_MS = 260
 
 function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate, onCommitPrivate, focusMessageId }: ChatViewProps) {
   const chatId = chat.id
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
+  const openViewer = useOpenViewer()
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
   const colors = useColors()
@@ -358,7 +363,10 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     router.push(`/room/${roomId}`)
   }
 
+  // The avatar in the header is the menu's trigger, so its photo opens from the menu.
+  const avatar = castGallery([character])
   const chatMenu: MenuItem[] = [
+    ...(avatar.length ? [{ label: t('chat.menuShowAvatar'), systemImage: 'photo', onSelect: () => openViewer(avatar) }] : []),
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     { label: t('chat.menuEditCharacter'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}`) },

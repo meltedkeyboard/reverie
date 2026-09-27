@@ -8,7 +8,7 @@ export type ImageKind = 'avatars' | 'backgrounds'
 
 // Only the file name goes into the database. The absolute path of the app
 // container changes between installs and updates, so it is resolved on read.
-const folder = (kind: ImageKind) => new Directory(dataDirectory, kind)
+const folder = (kind: ImageKind) => new Directory(dataDirectory(), kind)
 
 // Backgrounds used to be saved next to the avatars, so a name that isn't in its own
 // folder is looked for there.

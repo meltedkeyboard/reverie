@@ -1,4 +1,5 @@
-import { completeChat } from '@/api/llm'
+import { completeChat, isServerError } from '@/api/llm'
+import type { ThinkingMode } from '@/db/characters'
 import type { Message } from '@/db/messages'
 import type { ServerSettings } from '@/db/settings'
 
@@ -19,25 +20,37 @@ export async function suggestTitle(cfg: ServerSettings, nameOf: (m: Message) => 
     })
     .join('\n\n')
 
-  const raw = await completeChat(cfg, {
-    messages: [
-      { role: 'system', content: PROMPT },
-      { role: 'user', content: transcript },
-    ],
-    temperature: 0.5,
-    // Reasoning models think before they answer, so the budget is far above what a
-    // five-word title needs; the rest is cut off by cleanTitle.
-    maxTokens: 400,
-    topP: 0.95,
-    thinking: 'auto',
+  const ask = (thinking: ThinkingMode, maxTokens: number) =>
+    completeChat(cfg, {
+      messages: [
+        { role: 'system', content: PROMPT },
+        { role: 'user', content: transcript },
+      ],
+      temperature: 0.5,
+      maxTokens,
+      topP: 0.95,
+      thinking,
+    })
+
+  // A title needs no thinking, whatever the character's own setting is, so it is asked
+  // for with thinking off. Some servers or models can't turn it off (or reject the field),
+  // and then the model spends the short budget thinking and returns nothing; that gets a
+  // second try with the server's default and room to think. A server that can't be
+  // reached isn't asked twice.
+  const quick = await ask('off', 400).catch((err) => {
+    if (isServerError(err)) return ''
+    throw err
   })
-  return cleanTitle(raw)
+  return cleanTitle(quick) ?? cleanTitle(await ask('auto', 2048))
 }
 
 function cleanTitle(raw: string) {
+  // The answer is what follows the thinking. Some templates open <think> themselves, so
+  // only the closing tag shows up; a reply cut off mid-thought has only the opening one.
+  const parts = raw.split(/<\/think>/i)
+  const answer = parts.length > 1 ? parts[parts.length - 1] : raw.replace(/<think>[\s\S]*$/i, '')
   const line =
-    raw
-      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    answer
       .split('\n')
       .map((l) => l.trim())
       .find(Boolean) ?? ''

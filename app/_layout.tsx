@@ -1,6 +1,5 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, type Theme } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -11,12 +10,11 @@ import { Sidebar } from '@/components/Sidebar'
 import { StartupBoundary } from '@/components/StartupBoundary'
 import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { isHapticsEnabled } from '@/db/haptics'
-import { migrate } from '@/db/schema'
+import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { DialogHost } from '@/lib/dialogs'
-import { databaseDirectory } from '@/lib/storage'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
 
 export default function RootLayout() {
@@ -25,9 +23,9 @@ export default function RootLayout() {
       <StartupBoundary>
         <KeyboardProvider>
           <Suspense fallback={<View style={styles.root} />}>
-            <SQLiteProvider databaseName="reverie.db" directory={databaseDirectory} onInit={migrate}>
+            <DatabaseProvider>
               <ThemedApp />
-            </SQLiteProvider>
+            </DatabaseProvider>
           </Suspense>
         </KeyboardProvider>
       </StartupBoundary>
@@ -36,7 +34,7 @@ export default function RootLayout() {
 }
 
 function ThemedApp() {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const [preference, setPreferenceState] = useState<ThemePreference>('system')
   const [localePreference, setLocalePreferenceState] = useState<LocalePreference>('system')
 

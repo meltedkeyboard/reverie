@@ -1,5 +1,4 @@
 import { Link, useRouter, useFocusEffect } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
@@ -15,6 +14,7 @@ import { HomePattern } from '@/components/HomePattern'
 import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
+import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useLastChat } from '@/hooks/useLastChat'
@@ -24,7 +24,7 @@ import { useTranslation } from '@/i18n'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharactersScreen() {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
@@ -33,7 +33,7 @@ export default function CharactersScreen() {
   const isWideWeb = useIsWideWeb()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
   const [serverSet, setServerSet] = useState(true)
-  const { lastChat, reload: reloadLastChat, hide: hideLastChat } = useLastChat()
+  const { lastChat, reload: reloadLastChat, hide: hideLastChat } = useLastChat('character')
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)

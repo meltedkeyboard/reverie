@@ -12,9 +12,11 @@ type SurfaceProps = ViewProps & {
   fallbackStyle?: StyleProp<ViewStyle>
   interactive?: boolean
   tintColor?: ColorValue
+  // 'clear' is the see-through variant, with barely any frost of its own.
+  variant?: 'regular' | 'clear'
 }
 
-export function GlassSurface({ style, fallbackStyle, interactive, tintColor, children, ...rest }: SurfaceProps) {
+export function GlassSurface({ style, fallbackStyle, interactive, tintColor, variant = 'regular', children, ...rest }: SurfaceProps) {
   const { scheme } = useTheme()
   if (!glassEffect) {
     return (
@@ -26,7 +28,7 @@ export function GlassSurface({ style, fallbackStyle, interactive, tintColor, chi
   const { GlassView } = glassEffect
   return (
     <GlassView
-      glassEffectStyle="regular"
+      glassEffectStyle={variant}
       colorScheme={scheme}
       isInteractive={interactive}
       tintColor={tintColor}
@@ -45,18 +47,30 @@ type ButtonProps = {
   onPress?: () => void
   disabled?: boolean
   accessibilityLabel?: string
+  // Fills the button, for the one action a screen leads to (like saving). A disabled
+  // button stays plain glass.
+  tint?: string
   // Replaces the Ionicons glyph, e.g. with an animated SF Symbol.
   children?: React.ReactNode
 }
 
 // A round Liquid Glass button of the same 44 pt as the other glass controls; outside
-// iOS 26 it is the plain icon button.
-export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, accessibilityLabel, children }: ButtonProps) {
+// iOS 26 it is the plain icon button. The glass is interactive and springs under the
+// finger by itself, so a glass control adds no press scale of its own: the two fight.
+export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, accessibilityLabel, tint, children }: ButtonProps) {
   const { colors } = useTheme()
   const styles = useStyles(createStyles)
+  const fill = disabled ? undefined : tint
   if (!liquidGlass) {
     return (
-      <IconButton name={icon} size={iconSize} onPress={onPress} disabled={disabled} accessibilityLabel={accessibilityLabel}>
+      <IconButton
+        name={icon}
+        size={iconSize}
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityLabel={accessibilityLabel}
+        style={fill ? { backgroundColor: fill } : undefined}
+      >
         {children}
       </IconButton>
     )
@@ -68,9 +82,8 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       hitSlop={6}
-      style={({ pressed }) => pressed && { transform: [{ scale: 0.94 }] }}
     >
-      <GlassSurface interactive={!disabled} style={styles.circle}>
+      <GlassSurface interactive={!disabled} tintColor={fill} style={styles.circle}>
         {/* Like a disabled bar button: the glass stays, only the glyph greys out. */}
         <View style={disabled && styles.disabled}>
           {children ?? <Ionicons name={icon} size={iconSize - 2} color={colors.text} />}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Reverie",
     "slug": "reverie",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "reverie",
@@ -52,6 +52,14 @@
         {
           "photosPermission": "Reverie uses your photos for character avatars and messages.",
           "cameraPermission": "Reverie uses the camera to send a photo in chat."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Reverie uses your photos for character avatars and messages.",
+          "savePhotosPermission": "Reverie saves the pictures you download to Photos.",
+          "granularPermissions": ["photo"]
         }
       ],
       [

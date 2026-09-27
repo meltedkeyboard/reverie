@@ -1,6 +1,5 @@
 import type Ionicons from '@expo/vector-icons/Ionicons'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, Pressable, SectionList, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle } from 'react-native'
 import type { SearchBarCommands } from 'react-native-screens'
@@ -12,6 +11,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/GlassHeader'
 import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, type CharacterPreview } from '@/db/characters'
+import { useDatabase } from '@/db/provider'
 import { listRooms, type RoomPreview } from '@/db/rooms'
 import { listSearchChats, searchMessages, type SearchChat, type SearchMessage } from '@/db/search'
 import { useTranslation } from '@/i18n'
@@ -56,7 +56,7 @@ const MESSAGE_MIN_LENGTH = 2
 type Loaded = { characters: CharacterPreview[]; rooms: RoomPreview[]; chats: SearchChat[] }
 
 export default function SearchScreen() {
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -294,7 +294,7 @@ function ResultRow({ item, needle, locale, you }: RowProps) {
     const { character } = item
     return (
       <>
-        <Avatar name={character.name} file={character.avatar} size={40} viewable={false} />
+        <Avatar name={character.name} file={character.avatar} size={40} />
         <View style={styles.body}>
           <Highlighted text={character.name} needle={needle} style={styles.title} />
           <Text style={styles.subtitle} numberOfLines={1}>
@@ -325,7 +325,7 @@ function ResultRow({ item, needle, locale, you }: RowProps) {
     const when = formatWhen(chat.lastActivity, locale)
     return (
       <>
-        <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={40} viewable={false} />
+        <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={40} />
         <View style={styles.body}>
           <Highlighted text={chat.title ?? when} needle={needle} style={styles.title} />
           <Text style={styles.subtitle} numberOfLines={1}>
@@ -346,7 +346,6 @@ function ResultRow({ item, needle, locale, you }: RowProps) {
           name={message.speakerName ?? message.ownerName}
           file={message.speakerName ? message.speakerAvatar : message.ownerAvatar}
           size={40}
-          viewable={false}
         />
         <View style={styles.body}>
           <View style={styles.titleLine}>

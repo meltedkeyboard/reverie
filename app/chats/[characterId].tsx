@@ -1,5 +1,4 @@
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
@@ -15,6 +14,7 @@ import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHea
 import type { MenuItem } from '@/components/NativeMenu'
 import { getCharacter, type Character } from '@/db/characters'
 import { deleteChat, duplicateChat, listChats, pruneUntouchedChats, setChatOrder, setChatTitle, type ChatPreview } from '@/db/chats'
+import { useDatabase } from '@/db/provider'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
@@ -22,7 +22,7 @@ import { fonts, useStyles, type Colors } from '@/theme'
 
 export default function CharacterChatsScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>()
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)

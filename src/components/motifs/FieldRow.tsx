@@ -1,7 +1,13 @@
+import { Link } from 'expo-router'
 import { useState } from 'react'
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
 
 import { useInputColors } from '@/components/Field'
+import { GlassSurface } from '@/components/Glass'
+import { SFIcon } from '@/components/SFIcon'
+import { useTranslation } from '@/i18n'
+import { liquidGlass } from '@/lib/nativeUI'
+import { setTextDraft } from '@/lib/textDraft'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 import { Star } from './Star'
@@ -14,15 +20,92 @@ type Props = Pick<
   hint?: string
   minHeight?: number
   star?: boolean
+  // The title of the full-screen editor. A multiline field with one is edited only there.
+  expandTitle?: string
 }
 
-// A caps label with a tiny star mark, a plain value on a hairline rule (no box), and an
-// optional helper line below.
-export function FieldRow({ label, hint, minHeight, multiline, star = true, ...input }: Props) {
+const LINE_HEIGHT = 21
+// A multiline input keeps this height unless given its own, and scrolls inside.
+const AREA_HEIGHT = 110
+
+// A caps label with a tiny star mark, the input, and an optional helper line below.
+// On iOS 26 the input is Liquid Glass, tinted while it has focus: a capsule for one line,
+// a rounded box for several. Without Liquid Glass it is a box with a hairline.
+//
+// A multiline input has a set height and scrolls inside, so a form of long texts stays
+// short enough to see at a glance. With expandTitle the text is only shown there: it
+// scrolls, and a tap opens it for editing on the whole screen (app/text-editor.tsx),
+// zooming out of the field on iOS.
+export function FieldRow({ label, hint, minHeight, multiline, star = true, expandTitle, ...input }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const inputColors = useInputColors()
+  const { t } = useTranslation()
   const [focused, setFocused] = useState(false)
+  const expands = !!multiline && !!expandTitle && !!input.onChangeText
+  const height = minHeight ?? AREA_HEIGHT
+
+  // Runs before the link navigates, so the editor finds the text waiting.
+  const prepareEditor = () => {
+    setTextDraft({
+      title: expandTitle!,
+      value: input.value ?? '',
+      placeholder: input.placeholder,
+      onChange: input.onChangeText!,
+    })
+  }
+
+  const frame = (body: React.ReactNode) =>
+    liquidGlass ? (
+      <GlassSurface
+        variant="clear"
+        tintColor={focused ? colors.accentSoft : undefined}
+        style={multiline ? styles.glassArea : styles.glassBox}
+      >
+        {body}
+      </GlassSurface>
+    ) : (
+      <View style={[styles.box, focused && { borderColor: colors.accent }]}>{body}</View>
+    )
+
+  const field = expands ? (
+    <Link href="/text-editor" onPress={prepareEditor} asChild>
+      <Link.AppleZoom>
+        <Pressable accessibilityRole="button" accessibilityLabel={expandTitle} accessibilityHint={t('common.expand')}>
+          {frame(
+            <>
+              {/* A drag scrolls the text; only a tap opens the editor. */}
+              <ScrollView style={{ height }} contentContainerStyle={[styles.readerContent, liquidGlass && styles.glassReader]}>
+                <Text style={[styles.reader, !input.value && { color: colors.textFaint }]}>
+                  {input.value || input.placeholder}
+                </Text>
+              </ScrollView>
+              <View style={styles.expand} pointerEvents="none">
+                <SFIcon name="arrow.up.left.and.arrow.down.right" fallback="expand-outline" size={15} color={colors.textFaint} />
+              </View>
+            </>
+          )}
+        </Pressable>
+      </Link.AppleZoom>
+    </Link>
+  ) : (
+    frame(
+      <TextInput
+        {...inputColors}
+        {...input}
+        multiline={multiline}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={[
+          styles.fieldInput,
+          liquidGlass && styles.glassInput,
+          multiline && styles.multilineInput,
+          multiline && { height },
+        ]}
+      />
+    )
+  )
+
   return (
     <View style={styles.fieldWrap}>
       {label ? (
@@ -31,16 +114,7 @@ export function FieldRow({ label, hint, minHeight, multiline, star = true, ...in
           <Text style={styles.fieldLabel}>{label}</Text>
         </View>
       ) : null}
-      <View style={[styles.box, focused && { borderColor: colors.accent }]}>
-        <TextInput
-          {...inputColors}
-          {...input}
-          multiline={multiline}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          style={[styles.fieldInput, multiline && { minHeight: minHeight ?? 90, textAlignVertical: 'top' }]}
-        />
-      </View>
+      {field}
       {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   )
@@ -48,8 +122,8 @@ export function FieldRow({ label, hint, minHeight, multiline, star = true, ...in
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    fieldWrap: { marginBottom: 22 },
-    fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+    fieldWrap: { marginBottom: 16 },
+    fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginLeft: 4 },
     fieldLabel: { color: colors.textFaint, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
     box: {
       borderWidth: 1.5,
@@ -57,6 +131,17 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.surface,
       overflow: 'hidden',
     },
+    glassBox: { borderRadius: 23, borderCurve: 'continuous' },
+    // A capsule's radius on a tall box would round it into a pill.
+    glassArea: { borderRadius: 20, borderCurve: 'continuous' },
+    glassInput: { minHeight: 46, paddingHorizontal: 18 },
     fieldInput: { color: colors.text, fontSize: 16, paddingVertical: 12, paddingHorizontal: 14 },
-    fieldHint: { color: colors.textFaint, fontSize: 12, lineHeight: 17, marginTop: 8 },
+    multilineInput: { lineHeight: LINE_HEIGHT, textAlignVertical: 'top' },
+    // The text of an expanding field, laid out like the input it stands in for, with
+    // room on the right for the expand mark.
+    readerContent: { paddingVertical: 12, paddingLeft: 14, paddingRight: 40 },
+    glassReader: { paddingLeft: 18 },
+    reader: { color: colors.text, fontSize: 16, lineHeight: LINE_HEIGHT },
+    expand: { position: 'absolute', top: 10, right: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+    fieldHint: { color: colors.textFaint, fontSize: 12, lineHeight: 17, marginTop: 6, marginHorizontal: 4 },
   })

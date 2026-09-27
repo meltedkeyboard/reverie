@@ -1,0 +1,46 @@
+diff --git a/node_modules/expo-glass-effect/ios/GlassView.swift b/node_modules/expo-glass-effect/ios/GlassView.swift
+index 35cd8f3..8eb2fa8 100644
+--- a/node_modules/expo-glass-effect/ios/GlassView.swift
++++ b/node_modules/expo-glass-effect/ios/GlassView.swift
+@@ -214,10 +214,41 @@ public final class GlassView: ExpoView {
+   func setTintColor(_ color: UIColor?) {
+     if color != glassTintColor {
+       glassTintColor = color
++      // Reverie: a tint that changes on a mounted view (a chip being chosen, a switch
++      // turned on) fades over instead of snapping. UIKit animates only a switch to a new
++      // effect object, so the changed one is built fresh and set inside the animation.
++      if animateTintChange() {
++        return
++      }
+       updateEffect()
+     }
+   }
+ 
++  private func animateTintChange() -> Bool {
++    guard isMounted, isGlassEffectAvailable() else {
++      return false
++    }
++    #if compiler(>=6.2)
++    if #available(iOS 26.0, tvOS 26.0, macOS 26.0, *) {
++      guard let uiStyle = glassStyle?.toUIGlassEffectStyle() else {
++        return false
++      }
++      let next = UIGlassEffect(style: uiStyle)
++      next.tintColor = glassTintColor
++      next.isInteractive = glassIsInteractive ?? false
++      glassEffect = next
++      // Outside React's mount pass, which may run with animations turned off.
++      DispatchQueue.main.async {
++        UIView.animate(withDuration: 0.3, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
++          self.glassEffectView.effect = next
++        }
++      }
++      return true
++    }
++    #endif
++    return false
++  }
++
+   func setInteractive(_ interactive: Bool) {
+     if interactive != glassIsInteractive {
+       glassIsInteractive = interactive

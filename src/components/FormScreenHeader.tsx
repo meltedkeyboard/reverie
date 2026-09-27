@@ -11,10 +11,13 @@ import { useHeaderHeight } from './GlassHeader'
 import { Star } from './motifs/Star'
 import { SFIcon } from './SFIcon'
 
+const ON_ACCENT = '#FFFFFF'
+
 // The transparent native header of a form-style screen: a red star and a title on the
 // left, with the content fading out underneath. Rendered inside the screen it belongs to.
 export function FormScreenHeader({ title }: { title: string }) {
   const headerHeight = useHeaderHeight()
+  const colors = useColors()
   const styles = useStyles(createStyles)
   return (
     <>
@@ -24,6 +27,8 @@ export function FormScreenHeader({ title }: { title: string }) {
           headerShown: true,
           headerTransparent: true,
           headerShadowVisible: false,
+          // Like the glass buttons everywhere else, not the accent the navigation theme tints with.
+          headerTintColor: colors.text,
           headerBackButtonDisplayMode: 'minimal',
           headerTitleAlign: 'left',
           headerTitle: () => <FormTitle title={title} />,
@@ -37,8 +42,7 @@ export function FormScreenHeader({ title }: { title: string }) {
 // With a native bar there, a swipe back that is started and then cancelled leaves the
 // screen without it: the header-less screen underneath hides the bar as the swipe begins,
 // and after a zoom transition nothing shows it again. Laid out like the native one: a
-// Liquid Glass back button, the title centered, the actions on the right, all tinted like
-// the navigation bar.
+// Liquid Glass back button, the title centered, the actions on the right.
 export function DrawnFormScreenHeader({ title, right }: { title: string; right?: React.ReactNode }) {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
@@ -68,15 +72,24 @@ type BarButtonProps = {
   onPress?: () => void
   disabled?: boolean
   accessibilityLabel?: string
+  // The confirming action (the checkmark that saves): filled with the brand color.
+  prominent?: boolean
 }
 
-// A bar button of the drawn header: an SF Symbol in the accent color, which is what the
-// navigation theme tints the native bar with.
-export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLabel }: BarButtonProps) {
+// A bar button of the drawn header: an SF Symbol in the text color, like every other
+// glass button in the app, or white on the accent when prominent.
+export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLabel, prominent = false }: BarButtonProps) {
   const colors = useColors()
+  const filled = prominent && !disabled
   return (
-    <GlassButton icon={fallback} onPress={onPress} disabled={disabled} accessibilityLabel={accessibilityLabel}>
-      <SFIcon name={symbol} fallback={fallback} size={19} color={colors.accent} />
+    <GlassButton
+      icon={fallback}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityLabel={accessibilityLabel}
+      tint={prominent ? colors.accent : undefined}
+    >
+      <SFIcon name={symbol} fallback={fallback} size={19} color={filled ? ON_ACCENT : colors.text} onAccent={filled} />
     </GlassButton>
   )
 }

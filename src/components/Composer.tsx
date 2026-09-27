@@ -180,6 +180,7 @@ export function Composer({
           color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.text : '#FFFFFF'}
           effect={{ effect: 'bounce' }}
           trigger={mode === 'idle' ? 'send' : mode}
+          onAccent={mode === 'send' || mode === 'save' || mode === 'stop'}
         />
       </Animated.View>
     </Pressable>
@@ -192,7 +193,7 @@ export function Composer({
   const row = (
     <View style={styles.row}>
       {editing ? null : <AttachButton disabled={picking} onPick={attach} />}
-      <GlassSurface style={[styles.field, hushed && styles.hushed]} fallbackStyle={glass.solid}>
+      <GlassSurface variant="clear" style={[styles.field, hushed && styles.hushed]} fallbackStyle={glass.solid}>
         {editing ? (
           <View style={styles.banner}>
             <Ionicons name="create-outline" size={15} color={colors.accent} />

@@ -1,5 +1,4 @@
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
@@ -14,6 +13,7 @@ import { IconButton } from '@/components/IconButton'
 import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import type { MenuItem } from '@/components/NativeMenu'
 import { deleteChat, duplicateChat, listChats, pruneUntouchedChats, setChatOrder, setChatTitle } from '@/db/chats'
+import { useDatabase } from '@/db/provider'
 import {
   getRoom,
   importChatToRoom,
@@ -34,7 +34,7 @@ const IMPORT_CHOICES = 12
 
 export default function RoomScenesScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>()
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)

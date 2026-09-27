@@ -1,14 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useRouter } from 'expo-router'
-import { useSQLiteContext } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keyboard, Platform, StyleSheet, Text, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { AvatarStack } from '@/components/AvatarStack'
+import { AvatarStack, castGallery } from '@/components/AvatarStack'
 import { CastBar, FloorButton } from '@/components/CastBar'
 import { CastSheet } from '@/components/CastSheet'
 import { ChatBackground } from '@/components/ChatBackground'
@@ -16,12 +15,14 @@ import { Composer } from '@/components/Composer'
 import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
+import { useOpenViewer } from '@/components/ImageLink'
 import { MessageRow, type RowMessage, type RowScene } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { TextSheet } from '@/components/TextSheet'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { deleteChat, type Chat } from '@/db/chats'
 import { newMessage, type Message } from '@/db/messages'
+import { useDatabase } from '@/db/provider'
 import { setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
 import { useRoom, type RoomPhase } from '@/hooks/useRoom'
 import { useTranslation } from '@/i18n'
@@ -45,8 +46,9 @@ type Props = { chat: Chat; room: Room; members: RoomMember[]; focusMessageId?: n
 // status line saying who is talking and who is next.
 export function RoomView({ chat, room: initialRoom, members: initialMembers, focusMessageId }: Props) {
   const chatId = chat.id
-  const db = useSQLiteContext()
+  const db = useDatabase()
   const router = useRouter()
+  const openViewer = useOpenViewer()
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
   const colors = useColors()
@@ -215,6 +217,9 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   // Opened from the cast sheet. What leads back to the scene or away from it closes the
   // sheet; muting and walking in or out stay there, so the change is seen in the list.
   const memberMenu = (member: RoomMember) => {
+    // A tap on a row in the cast sheet picks who is addressed, so the photo is here.
+    const avatar = castGallery([member.character])
+    const showAvatar = avatar.length ? [{ label: t('chat.menuShowAvatar'), onSelect: () => openViewer(avatar) }] : []
     const openCharacter = {
       label: t('room.openCharacter'),
       onSelect: () => {
@@ -225,6 +230,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     if (!member.present) {
       return showSheet(member.character.name, [
         ...(idle ? [{ label: t('room.enter'), onSelect: () => togglePresent(member) }] : []),
+        ...showAvatar,
         openCharacter,
       ])
     }
@@ -261,6 +267,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
       },
       { label: member.muted ? t('room.unmute') : t('room.mute'), onSelect: () => toggleMuted(member) },
       ...(idle ? [{ label: t('room.leave'), onSelect: () => togglePresent(member) }] : []),
+      ...showAvatar,
       openCharacter,
     ]
     showSheet(member.character.name, actions)
@@ -313,7 +320,10 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     }
   }
 
+  // The cast in the header is the menu's trigger, so their photos open from the menu.
+  const gallery = castGallery(members.map((m) => m.character))
   const roomMenu: MenuItem[] = [
+    ...(gallery.length ? [{ label: t('room.menuShowAvatars'), systemImage: 'photo.on.rectangle', onSelect: () => openViewer(gallery) }] : []),
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: () => promptRenameChat(title, rename) },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     {
@@ -388,7 +398,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
       >
         <NativeMenu items={roomMenu} style={styles.whoPress} glassRadius={22}>
           <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
-            <AvatarStack cast={cast} size={28} />
+            <AvatarStack cast={cast} size={28} viewable={false} />
             <View style={styles.whoText}>
               <View style={styles.nameRow}>
                 <Text style={styles.name} numberOfLines={1}>
