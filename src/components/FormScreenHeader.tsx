@@ -1,5 +1,6 @@
 import { Stack, useRouter } from 'expo-router'
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
@@ -43,21 +44,36 @@ export function FormScreenHeader({ title }: { title: string }) {
 // screen without it: the header-less screen underneath hides the bar as the swipe begins,
 // and after a zoom transition nothing shows it again. Laid out like the native one: a
 // Liquid Glass back button, the title centered, the actions on the right.
-export function DrawnFormScreenHeader({ title, right }: { title: string; right?: React.ReactNode }) {
+//
+// overPhoto, from 0 to 1, is how far a photo has spread under the header (the character
+// editor's avatar): the fade and the title give way to it, while the glass buttons stay,
+// since Liquid Glass renders wrongly under a fading parent.
+export function DrawnFormScreenHeader({
+  title,
+  right,
+  overPhoto,
+}: {
+  title: string
+  right?: React.ReactNode
+  overPhoto?: SharedValue<number>
+}) {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
   const router = useRouter()
   const { t } = useTranslation()
   const styles = useStyles(createStyles)
+  const giveWay = useAnimatedStyle(() => ({ opacity: overPhoto ? 1 - overPhoto.value : 1 }))
   return (
     <>
-      <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
+      <Animated.View style={[styles.fade, { height: headerHeight + 28 }, giveWay]}>
+        <EdgeFade edge="top" style={StyleSheet.absoluteFill} />
+      </Animated.View>
       <View style={[styles.bar, { paddingTop: insets.top }]} pointerEvents="box-none">
         <View style={styles.row} pointerEvents="box-none">
           <BarButton symbol="chevron.backward" fallback="chevron-back" onPress={() => router.back()} accessibilityLabel={t('common.back')} />
-          <View style={styles.titleSlot} pointerEvents="none">
+          <Animated.View style={[styles.titleSlot, giveWay]} pointerEvents="none">
             <FormTitle title={title} />
-          </View>
+          </Animated.View>
           {right}
         </View>
       </View>

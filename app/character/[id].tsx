@@ -1,12 +1,16 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { StatusBar } from 'expo-status-bar'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
+import Animated, { useAnimatedReaction, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/Avatar'
 import { ChatBackground } from '@/components/ChatBackground'
 import { ImageSourceMenu } from '@/components/ImageSourceMenu'
 import { ChipGroup } from '@/components/ChipGroup'
+import { ExpandingAvatar, useSpreadPush } from '@/components/ExpandingAvatar'
 import { BarButton, DrawnFormScreenHeader, FormScreenHeader } from '@/components/FormScreenHeader'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
@@ -25,7 +29,16 @@ import {
 } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
-import { avatarUri, persistAvatar, pickAvatar, pickBackground, removeAvatar, removeCharacterImages } from '@/lib/avatars'
+import { setAvatarCropDraft } from '@/lib/avatarCrop'
+import {
+  avatarUri,
+  persistAvatar,
+  pickAvatar,
+  pickAvatarFile,
+  pickBackground,
+  removeAvatar,
+  removeCharacterImages,
+} from '@/lib/avatars'
 import { setBackgroundDraft } from '@/lib/backgroundDraft'
 import type { ImageSource } from '@/lib/images'
 import { confirmDeletion } from '@/lib/confirmDelete'
@@ -101,6 +114,13 @@ export default function CharacterEditorScreen() {
 
   const onPickAvatar = async (source: ImageSource) => {
     try {
+      if (source === 'files') {
+        const file = await pickAvatarFile()
+        if (!file) return
+        setAvatarCropDraft({ uri: file, onDone: setPickedUri })
+        router.push('/avatar-crop')
+        return
+      }
       const uri = await pickAvatar(source)
       if (uri) setPickedUri(uri)
     } catch (err) {
@@ -206,8 +226,34 @@ export default function CharacterEditorScreen() {
     setBeforeGen(null)
   }
 
-  const hasPhoto = Boolean(pickedUri || avatar)
-  const title = isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle')
+  const photoUri = pickedUri ?? (avatar ? avatarUri(avatar) : null)
+  const hasPhoto = Boolean(photoUri)
+  // The character's own name heads the screen once it has one.
+  const title = name.trim() || (isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle'))
+
+  const scrollY = useSharedValue(0)
+  const dragging = useSharedValue(false)
+  const photoSpread = useSharedValue(0)
+  const pushed = useSpreadPush(photoSpread, padding.paddingTop)
+  // Over the open photo the status bar turns light, whatever the theme.
+  const [photoOpen, setPhotoOpen] = useState(false)
+  useAnimatedReaction(
+    () => photoSpread.value > 0.5,
+    (open, was) => {
+      if (open !== was) scheduleOnRN(setPhotoOpen, open)
+    }
+  )
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y
+    },
+    onBeginDrag: () => {
+      dragging.value = true
+    },
+    onEndDrag: () => {
+      dragging.value = false
+    },
+  })
 
   return (
     <View style={styles.screen}>
@@ -217,16 +263,30 @@ export default function CharacterEditorScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           contentContainerStyle={padding}
+          onScroll={onScroll}
         >
           <View style={styles.avatarBlock}>
-            {/* With a photo the tap opens it; without one it picks a photo. */}
-            {hasPhoto ? (
-              <Avatar name={name} file={avatar} uri={pickedUri} size={96} />
+            {/* With a photo the tap opens it and a pull spreads it out; without one the
+                tap picks a photo. */}
+            {photoUri ? (
+              <ExpandingAvatar
+                name={name}
+                uri={photoUri}
+                scrollY={scrollY}
+                dragging={dragging}
+                progress={photoSpread}
+                top={padding.paddingTop}
+                side={padding.paddingHorizontal}
+              />
             ) : (
               <ImageSourceMenu onPick={onPickAvatar}>
                 <Avatar name={name} file={avatar} uri={pickedUri} size={96} />
               </ImageSourceMenu>
             )}
+          </View>
+          {/* Pushed down by a transform while the photo spreads: animating the height of
+              the block above would lay out the whole form again on every frame. */}
+          <Animated.View style={pushed}>
             <View style={styles.avatarActions}>
               <ImageSourceMenu onPick={onPickAvatar}>
                 <Text style={styles.link}>{hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')}</Text>
@@ -237,146 +297,148 @@ export default function CharacterEditorScreen() {
                 </Pressable>
               ) : null}
             </View>
-          </View>
 
-          <Eyebrow label={t('background.title')} color={colors.accent} />
-          <View style={styles.backgroundRow}>
-            <View style={styles.backgroundThumb}>
-              {backgroundUri ? <ChatBackground uri={backgroundUri} effect={bgEffect} intensity={bgIntensity} /> : null}
+            <Eyebrow label={t('background.title')} color={colors.accent} />
+            <View style={styles.backgroundRow}>
+              <View style={styles.backgroundThumb}>
+                {backgroundUri ? <ChatBackground uri={backgroundUri} effect={bgEffect} intensity={bgIntensity} /> : null}
+              </View>
+              <View style={styles.backgroundActions}>
+                <ImageSourceMenu onPick={onPickBackground}>
+                  <Text style={styles.link}>{backgroundUri ? t('background.change') : t('background.choose')}</Text>
+                </ImageSourceMenu>
+                {backgroundUri ? (
+                  <>
+                    <Pressable onPress={() => openBackground(backgroundUri, false)} hitSlop={8}>
+                      <Text style={styles.link}>{t('background.adjust')}</Text>
+                    </Pressable>
+                    <Pressable onPress={onClearBackground} hitSlop={8}>
+                      <Text style={styles.linkMuted}>{t('background.remove')}</Text>
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
             </View>
-            <View style={styles.backgroundActions}>
-              <ImageSourceMenu onPick={onPickBackground}>
-                <Text style={styles.link}>{backgroundUri ? t('background.change') : t('background.choose')}</Text>
-              </ImageSourceMenu>
-              {backgroundUri ? (
-                <>
-                  <Pressable onPress={() => openBackground(backgroundUri, false)} hitSlop={8}>
-                    <Text style={styles.link}>{t('background.adjust')}</Text>
-                  </Pressable>
-                  <Pressable onPress={onClearBackground} hitSlop={8}>
-                    <Text style={styles.linkMuted}>{t('background.remove')}</Text>
-                  </Pressable>
-                </>
+
+            <Divider />
+
+            <FieldRow
+              label={t('editor.nameLabel')}
+              value={name}
+              onChangeText={setName}
+              placeholder={t('editor.namePlaceholder')}
+              autoCapitalize="sentences"
+            />
+
+            <Divider />
+
+            <Eyebrow label={t('editor.genParamsSection')} color={colors.accent} />
+            <ParamSlider
+              label={t('editor.temperature')}
+              value={temperature}
+              min={0}
+              max={2}
+              step={0.05}
+              digits={2}
+              onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
+            />
+            <ParamSlider label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={setMaxTokens} />
+            <ParamSlider
+              label={t('editor.topP')}
+              value={topP}
+              min={0.1}
+              max={1}
+              step={0.01}
+              digits={2}
+              onChange={(v) => setTopP(Math.round(v * 100) / 100)}
+            />
+
+            <Divider />
+
+            <Eyebrow label={t('editor.thinkingSection')} color={colors.accent} />
+            <ChipGroup style={styles.chips} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
+            <Text style={styles.note}>{t('editor.thinkingHint')}</Text>
+
+            <Divider />
+
+            <Eyebrow label={t('editor.replyLengthSection')} color={colors.accent} />
+            <ParamSlider
+              label={t('editor.paragraphLimit')}
+              value={replyLimit ?? 0}
+              min={0}
+              max={6}
+              step={1}
+              formatValue={(v) => (v === 0 ? t('editor.unlimited') : `${v} ${plural(v, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`)}
+              onChange={(v) => setReplyLimit(v === 0 ? null : v)}
+            />
+            <Text style={styles.note}>{t('editor.replyLengthHint')}</Text>
+
+            <Divider />
+
+            <Eyebrow label={t('editor.greetingLabel')} color={colors.accent} />
+            <FieldRow
+              hint={t('editor.greetingHint')}
+              value={greeting}
+              onChangeText={setGreeting}
+              placeholder={t('editor.greetingPlaceholder')}
+              multiline
+              expandTitle={t('editor.greetingLabel')}
+            />
+
+            <Divider />
+
+            <View style={styles.systemPromptHeader}>
+              <Eyebrow label={t('editor.systemPromptLabel')} color={colors.accent} />
+              {beforeGen ? (
+                <Pressable onPress={undoGenerated} hitSlop={8}>
+                  <Text style={styles.linkMuted}>{t('editor.undoGenerated')}</Text>
+                </Pressable>
               ) : null}
             </View>
-          </View>
+            <PillButton
+              label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
+              onPress={() => setShowPromptGen(true)}
+              style={styles.aiButton}
+            />
+            <FieldRow
+              hint={t('editor.systemPromptHint')}
+              value={systemPrompt}
+              onChangeText={(v) => {
+                setSystemPrompt(v)
+                setBeforeGen(null)
+              }}
+              placeholder={t('editor.systemPromptPlaceholder')}
+              multiline
+              minHeight={180}
+              expandTitle={t('editor.systemPromptLabel')}
+            />
 
-          <Divider />
+            <PromptGenModal
+              visible={showPromptGen}
+              name={name}
+              currentPrompt={systemPrompt}
+              currentGreeting={greeting}
+              onClose={() => setShowPromptGen(false)}
+              onApply={applyGenerated}
+            />
 
-          <FieldRow
-            label={t('editor.nameLabel')}
-            value={name}
-            onChangeText={setName}
-            placeholder={t('editor.namePlaceholder')}
-            autoCapitalize="sentences"
-          />
-
-          <Divider />
-
-          <Eyebrow label={t('editor.genParamsSection')} color={colors.accent} />
-          <ParamSlider
-            label={t('editor.temperature')}
-            value={temperature}
-            min={0}
-            max={2}
-            step={0.05}
-            digits={2}
-            onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
-          />
-          <ParamSlider label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={setMaxTokens} />
-          <ParamSlider
-            label={t('editor.topP')}
-            value={topP}
-            min={0.1}
-            max={1}
-            step={0.01}
-            digits={2}
-            onChange={(v) => setTopP(Math.round(v * 100) / 100)}
-          />
-
-          <Divider />
-
-          <Eyebrow label={t('editor.thinkingSection')} color={colors.accent} />
-          <ChipGroup style={styles.chips} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
-          <Text style={styles.note}>{t('editor.thinkingHint')}</Text>
-
-          <Divider />
-
-          <Eyebrow label={t('editor.replyLengthSection')} color={colors.accent} />
-          <ParamSlider
-            label={t('editor.paragraphLimit')}
-            value={replyLimit ?? 0}
-            min={0}
-            max={6}
-            step={1}
-            formatValue={(v) => (v === 0 ? t('editor.unlimited') : `${v} ${plural(v, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`)}
-            onChange={(v) => setReplyLimit(v === 0 ? null : v)}
-          />
-          <Text style={styles.note}>{t('editor.replyLengthHint')}</Text>
-
-          <Divider />
-
-          <Eyebrow label={t('editor.greetingLabel')} color={colors.accent} />
-          <FieldRow
-            hint={t('editor.greetingHint')}
-            value={greeting}
-            onChangeText={setGreeting}
-            placeholder={t('editor.greetingPlaceholder')}
-            multiline
-            expandTitle={t('editor.greetingLabel')}
-          />
-
-          <Divider />
-
-          <View style={styles.systemPromptHeader}>
-            <Eyebrow label={t('editor.systemPromptLabel')} color={colors.accent} />
-            {beforeGen ? (
-              <Pressable onPress={undoGenerated} hitSlop={8}>
-                <Text style={styles.linkMuted}>{t('editor.undoGenerated')}</Text>
-              </Pressable>
+            {!isNew ? (
+              <>
+                <Divider />
+                <PillButton filled label={t('editor.deleteCharacter')} onPress={confirmDelete} color={colors.danger} />
+              </>
             ) : null}
-          </View>
-          <PillButton
-            label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
-            onPress={() => setShowPromptGen(true)}
-            style={styles.aiButton}
-          />
-          <FieldRow
-            hint={t('editor.systemPromptHint')}
-            value={systemPrompt}
-            onChangeText={(v) => {
-              setSystemPrompt(v)
-              setBeforeGen(null)
-            }}
-            placeholder={t('editor.systemPromptPlaceholder')}
-            multiline
-            minHeight={180}
-            expandTitle={t('editor.systemPromptLabel')}
-          />
-
-          <PromptGenModal
-            visible={showPromptGen}
-            name={name}
-            currentPrompt={systemPrompt}
-            currentGreeting={greeting}
-            onClose={() => setShowPromptGen(false)}
-            onApply={applyGenerated}
-          />
-
-          {!isNew ? (
-            <>
-              <Divider />
-              <PillButton label={t('editor.deleteCharacter')} onPress={confirmDelete} color={colors.danger} />
-            </>
-          ) : null}
+          </Animated.View>
         </KeyboardAwareScrollView>
       ) : null}
 
+      {photoOpen ? <StatusBar style="light" /> : null}
       {/* Opened with a zoom from the character list, so on iOS the header is drawn here
           rather than by the native bar; see DrawnFormScreenHeader. */}
       {Platform.OS === 'ios' ? (
         <DrawnFormScreenHeader
           title={title}
+          overPhoto={photoSpread}
           right={
             <BarButton
               symbol="checkmark"
@@ -406,8 +468,8 @@ const createStyles = (colors: Colors) =>
     chips: { marginBottom: 16 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
     aiButton: { alignSelf: 'flex-start', marginBottom: 12 },
-    avatarBlock: { alignItems: 'center', marginBottom: 24, gap: 12 },
-    avatarActions: { flexDirection: 'row', gap: 20 },
+    avatarBlock: { alignItems: 'center', marginBottom: 12 },
+    avatarActions: { flexDirection: 'row', gap: 20, alignSelf: 'center', marginBottom: 24 },
     backgroundRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 4 },
     backgroundThumb: {
       width: 72,

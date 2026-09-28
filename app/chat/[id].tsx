@@ -1,18 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Clipboard from 'expo-clipboard'
-import { LinearGradient } from 'expo-linear-gradient'
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, Text, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
-import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { scheduleOnRN } from 'react-native-worklets'
 
+import { AsidePanel } from '@/components/AsidePanel'
 import { Avatar } from '@/components/Avatar'
 import { castGallery } from '@/components/AvatarStack'
 import { ChatBackground } from '@/components/ChatBackground'
-import { Composer } from '@/components/Composer'
+import { Composer, ComposerSwap } from '@/components/Composer'
 import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
@@ -28,9 +27,11 @@ import { setContinueHidden, setLastOpened } from '@/db/continue'
 import { newMessage } from '@/db/messages'
 import { isPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase } from '@/db/provider'
-import { createRoomChat, getRoom, importChatToRoom, listRoomMembers, type Room, type RoomMember } from '@/db/rooms'
+import { createRoomChat, getRoom, listRoomMembers, type Room, type RoomMember } from '@/db/rooms'
+import { useAside } from '@/hooks/useAside'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
+import { characterScene } from '@/lib/aside'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { promptText, showMessage } from '@/lib/dialogs'
 import { avatarUri } from '@/lib/avatars'
@@ -63,10 +64,6 @@ export default function ChatScreen() {
   // Kept across focus changes, so coming back from the character editor does not
   // start yet another chat.
   const created = useRef<Promise<number> | null>(null)
-  // The tap flips the target at once (icon, vignette); the conversation itself is
-  // swapped only once the old one has faded out, see ChatView.
-  const [privateTarget, setPrivateTarget] = useState(false)
-  const [privateMode, setPrivateMode] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
@@ -104,74 +101,21 @@ export default function ChatScreen() {
     }, [db, id, characterParam, roomParam, router])
   )
 
-  const togglePrivate = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    setPrivateTarget((on) => !on)
-  }
-
   if (!loaded) return <View style={{ flex: 1, backgroundColor: colors.bg }} />
   const focusMessageId = messageParam ? Number(messageParam) : null
   if (loaded.kind === 'room') {
     return <RoomView chat={loaded.chat} room={loaded.room} members={loaded.members} focusMessageId={focusMessageId} />
   }
-  // The private chat lives only in memory: leaving it throws the conversation away and
-  // brings back the real chat as it is in the database.
-  return (
-    <View style={{ flex: 1 }}>
-      <ChatView
-        chat={loaded.chat}
-        character={loaded.character}
-        privateMode={privateMode}
-        privateTarget={privateTarget}
-        onTogglePrivate={togglePrivate}
-        onCommitPrivate={setPrivateMode}
-        focusMessageId={focusMessageId}
-      />
-      {privateTarget ? <Vignette /> : null}
-    </View>
-  )
+  return <ChatView chat={loaded.chat} character={loaded.character} focusMessageId={focusMessageId} />
 }
-
-// Dark edges closing in on the screen while a private chat is open.
-function Vignette() {
-  const shade = ['rgba(0, 0, 0, 0.8)', 'rgba(0, 0, 0, 0)'] as const
-  return (
-    <Animated.View
-      entering={FadeIn.duration(450)}
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none"
-    >
-      <LinearGradient colors={shade} style={[vignette.edge, vignette.top]} />
-      <LinearGradient colors={shade} style={[vignette.edge, vignette.bottom]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} />
-      <LinearGradient colors={shade} style={[vignette.edge, vignette.left]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
-      <LinearGradient colors={shade} style={[vignette.edge, vignette.right]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 0 }} />
-    </Animated.View>
-  )
-}
-
-const vignette = StyleSheet.create({
-  edge: { position: 'absolute' },
-  top: { top: 0, left: 0, right: 0, height: '22%' },
-  bottom: { bottom: 0, left: 0, right: 0, height: '28%' },
-  left: { top: 0, bottom: 0, left: 0, width: '22%' },
-  right: { top: 0, bottom: 0, right: 0, width: '22%' },
-})
 
 type ChatViewProps = {
   chat: Chat
   character: Character
-  // The conversation shown, and the one the button asks for; they differ mid-switch.
-  privateMode: boolean
-  privateTarget: boolean
-  onTogglePrivate: () => void
-  onCommitPrivate: (on: boolean) => void
   focusMessageId: number | null
 }
 
-const SWITCH_OUT_MS = 140
-const SWITCH_IN_MS = 260
-
-function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate, onCommitPrivate, focusMessageId }: ChatViewProps) {
+function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const chatId = chat.id
   const db = useDatabase()
   const router = useRouter()
@@ -207,7 +151,14 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     discard,
     rename,
     autoName,
-  } = useChat(chat, character, { ephemeral: privateMode })
+  } = useChat(chat, character)
+  // The eye in the header opens a private thread with the model about this chat, like
+  // /btw: the model reads the conversation and answers aside, and nothing of it is kept.
+  const [asideOpen, setAsideOpen] = useState(false)
+  // What was typed to the characters waits here while the field asks the model aside.
+  const sceneDraft = useRef('')
+  const scene = useMemo(() => characterScene(character), [character])
+  const aside = useAside(scene, messages)
 
   const listRef = useRef<ConversationHandle>(null)
   const composerHeight = useSharedValue(0)
@@ -220,44 +171,13 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
   const [awayFromEnd, setAwayFromEnd] = useState(false)
   const keyboard = useReanimatedKeyboardAnimation()
 
-  // Entering private mode is animated: the conversation fades out, the store is swapped
-  // while nothing is visible, and the private chat fades in once it has loaded. Leaving
-  // it is instant. A second tap during the fade-out cancels it before the swap.
-  const contentOpacity = useSharedValue(1)
-  const createScale = useSharedValue(1)
-  useEffect(() => {
-    if (!privateTarget) {
-      contentOpacity.value = 1
-      createScale.value = 1
-      if (privateMode) onCommitPrivate(false)
-      return
-    }
-    if (!privateMode) {
-      createScale.value = withSpring(0, { damping: 18, stiffness: 260, overshootClamping: true })
-      contentOpacity.value = withTiming(0, { duration: SWITCH_OUT_MS }, (finished) => {
-        if (finished) scheduleOnRN(onCommitPrivate, true)
-      })
-      return
-    }
-    if (!loaded) return
-    // The first frames after the swap go to rendering the new list; a fade started in
-    // the same frame would lose them and stutter.
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
-        contentOpacity.value = withTiming(1, { duration: SWITCH_IN_MS, easing: Easing.out(Easing.cubic) })
-      })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [privateTarget, privateMode, loaded, contentOpacity, createScale, onCommitPrivate])
-  const contentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }))
-  // Scaled rather than faded: the button is Liquid Glass too, see the header below.
-  const createStyle = useAnimatedStyle(() => ({ transform: [{ scale: createScale.value }] }))
 
-  // Whatever was being edited or looked at belongs to the conversation just left.
-  useEffect(() => {
-    setEditingRow(null)
-    setSelecting(null)
-  }, [privateMode])
+  const toggleAside = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    if (asideOpen) aside.reset()
+    else setEditingRow(null)
+    setAsideOpen(!asideOpen)
+  }
 
   // The empty-chat intro stays centered in the space left between the header and the
   // composer, which moves up with the keyboard; the dock is lifted by the keyboard
@@ -355,14 +275,6 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     }
   }
 
-  // The chat is copied, so the one-on-one version stays where it was. The new room's
-  // editor opens over the scene, to add the rest of the cast right away.
-  const moveToRoom = async () => {
-    const { roomId, chatId: sceneId } = await importChatToRoom(db, chatId, null)
-    router.push(`/chat/${sceneId}`)
-    router.push(`/room/${roomId}`)
-  }
-
   // The avatar in the header is the menu's trigger, so its photo opens from the menu.
   const avatar = castGallery([character])
   const chatMenu: MenuItem[] = [
@@ -370,9 +282,22 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     { label: t('chat.menuEditCharacter'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}`) },
-    { label: t('chat.menuMoveToRoom'), systemImage: 'person.3', onSelect: moveToRoom },
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: confirmDelete },
   ]
+
+  const asidePanel = asideOpen ? (
+    <AsidePanel
+      turns={aside.turns}
+      pending={aside.pending}
+      draft={aside.draft}
+      phase={aside.phase}
+      error={aside.error}
+      composerHeight={composerHeight}
+      onRetry={aside.retry}
+      onClose={toggleAside}
+      onSelectText={setSelecting}
+    />
+  ) : null
 
   const errorCard = error ? <ErrorCard message={error} onRetry={retry} /> : null
 
@@ -387,7 +312,7 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
           intensity={character.backgroundIntensity}
         />
       ) : null}
-      <Animated.View style={[StyleSheet.absoluteFill, contentStyle]}>
+      <View style={StyleSheet.absoluteFill}>
         <ConversationList
           ref={listRef}
           rows={rows}
@@ -396,17 +321,15 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
           composerHeight={composerHeight}
           webComposerHeight={webComposerHeight}
           header={errorCard}
-          footer={
-            loaded && !empty ? privateMode ? <PrivateIntro /> : <Intro character={character} chat={chat} /> : null
-          }
+          footer={loaded && !empty ? <Intro character={character} chat={chat} /> : null}
           onAwayChange={setAwayFromEnd}
-          focusId={privateMode ? null : focusMessageId}
+          focusId={focusMessageId}
         />
-      </Animated.View>
+      </View>
 
       {empty ? (
-        <Animated.View style={[styles.empty, emptyStyle, contentStyle]} pointerEvents="none">
-          {privateMode ? <PrivateIntro hint={t('chat.privateHint')} /> : <Intro character={character} chat={chat} hint={t('chat.emptyHint')} />}
+        <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="none">
+          <Intro character={character} chat={chat} hint={t('chat.emptyHint')} />
         </Animated.View>
       ) : null}
 
@@ -417,92 +340,88 @@ function ChatView({ chat, character, privateMode, privateTarget, onTogglePrivate
         }
         right={
           <View style={styles.headerActions}>
-            {privateEnabled || privateTarget ? (
-              <GlassButton icon={privateTarget ? 'eye-off' : 'eye-off-outline'} onPress={onTogglePrivate}>
+            {privateEnabled || asideOpen ? (
+              <GlassButton
+                icon={asideOpen ? 'eye-off' : 'eye-off-outline'}
+                onPress={toggleAside}
+                accessibilityLabel={t('chat.privateTitle')}
+              >
                 <SFIcon
-                  name={privateTarget ? 'eye.slash.fill' : 'eye.slash'}
-                  fallback={privateTarget ? 'eye-off' : 'eye-off-outline'}
+                  name={asideOpen ? 'eye.slash.fill' : 'eye.slash'}
+                  fallback={asideOpen ? 'eye-off' : 'eye-off-outline'}
                   size={20}
                   color={colors.text}
-                  animateChange={privateTarget}
+                  animateChange={asideOpen}
                 />
               </GlassButton>
             ) : null}
-            {/* Stays in the row while hidden, so the eye button next to it does not jump. */}
-            <Animated.View style={createStyle} pointerEvents={privateTarget ? 'none' : 'auto'}>
-              <Link href={`/chat/new?character=${character.id}`} asChild>
-                <Link.AppleZoom>
-                  <GlassButton icon="create-outline" />
-                </Link.AppleZoom>
-              </Link>
-            </Animated.View>
+            <Link href={`/chat/new?character=${character.id}`} asChild>
+              <Link.AppleZoom>
+                <GlassButton icon="create-outline" />
+              </Link.AppleZoom>
+            </Link>
           </View>
         }
       >
-        {/* Liquid Glass renders wrongly under a parent with opacity below 1 and snaps
-            back when it reaches 1, so the pill itself stays put and only its content
-            fades. When the menu can, it draws the pill's glass itself, so the menu
-            morphs out of the pill. */}
-        <NativeMenu items={chatMenu} disabled={privateMode} style={styles.whoPress} glassRadius={22}>
+        {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
+            of the pill. */}
+        <NativeMenu items={chatMenu} style={styles.whoPress} glassRadius={22}>
           <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
-            <Animated.View style={[styles.whoContent, contentStyle]}>
-              {privateMode ? (
-                <>
-                  <View style={styles.privateBadge}>
-                    <Ionicons name="eye-off" size={16} color={colors.textMuted} />
-                  </View>
+            <View style={styles.whoContent}>
+              <Avatar name={character.name} file={character.avatar} size={34} viewable={false} />
+              <View style={styles.whoText}>
+                <View style={styles.nameRow}>
                   <Text style={styles.name} numberOfLines={1}>
-                    {t('chat.privateTitle')}
+                    {character.name}
                   </Text>
-                </>
-              ) : (
-                <>
-                  <Avatar name={character.name} file={character.avatar} size={34} viewable={false} />
-                  <View style={styles.whoText}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.name} numberOfLines={1}>
-                        {character.name}
-                      </Text>
-                      <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
-                    </View>
-                    {title || naming ? (
-                      <Text style={styles.subtitle} numberOfLines={1}>
-                        {title ?? t('chat.namingInProgress')}
-                      </Text>
-                    ) : null}
-                  </View>
-                </>
-              )}
-            </Animated.View>
+                  <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
+                </View>
+                {title || naming ? (
+                  <Text style={styles.subtitle} numberOfLines={1}>
+                    {title ?? t('chat.namingInProgress')}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
           </PillSurface>
         </NativeMenu>
       </GlassHeader>
 
-      <Composer
-        height={composerHeight}
-        onHeightChange={Platform.OS === 'web' ? setWebComposerHeight : undefined}
-        generating={!idle}
-        editing={editing}
-        accessory={awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null}
-        onSend={(text, image) => {
-          send(text, image)
-          scrollToNewest()
-        }}
-        onStop={stop}
-        onContinue={
-          messages.length
-            ? () => {
-                proceed()
-                scrollToNewest()
-              }
-            : undefined
-        }
-        onSubmitEdit={async (text) => {
-          if (editingRow) await editMessage(editingRow.id, text)
-          setEditingRow(null)
-        }}
-        onCancelEdit={() => setEditingRow(null)}
-      />
+      {/* With the private thread open the field talks to the model aside, and the thread
+          takes the accessory slot so it rides the keyboard with the field. */}
+      <ComposerSwap id={asideOpen ? 'aside' : 'scene'}>
+        <Composer
+          height={composerHeight}
+          initialText={asideOpen ? undefined : sceneDraft.current}
+          onTextChange={asideOpen ? undefined : (text) => (sceneDraft.current = text)}
+          autoFocus={asideOpen}
+          onHeightChange={Platform.OS === 'web' ? setWebComposerHeight : undefined}
+          generating={asideOpen ? aside.phase !== 'idle' : !idle}
+          editing={asideOpen ? null : editing}
+          accessory={asidePanel ?? (awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null)}
+          placeholder={asideOpen ? t('chat.privatePlaceholder') : undefined}
+          hushed={asideOpen}
+          onSend={(text, image) => {
+            if (asideOpen) return void aside.ask(text, image)
+            send(text, image)
+            scrollToNewest()
+          }}
+          onStop={asideOpen ? aside.stop : stop}
+          onContinue={
+            messages.length && !asideOpen
+              ? () => {
+                  proceed()
+                  scrollToNewest()
+                }
+              : undefined
+          }
+          onSubmitEdit={async (text) => {
+            if (editingRow) await editMessage(editingRow.id, text)
+            setEditingRow(null)
+          }}
+          onCancelEdit={() => setEditingRow(null)}
+        />
+      </ComposerSwap>
 
       <TextSheet text={selecting} onClose={() => setSelecting(null)} />
     </View>
@@ -521,21 +440,6 @@ function Intro({ character, chat, hint }: { character: Character; chat: Chat; hi
   )
 }
 
-function PrivateIntro({ hint }: { hint?: string }) {
-  const colors = useColors()
-  const styles = useStyles(createStyles)
-  const { t } = useTranslation()
-  return (
-    <View style={styles.intro}>
-      <View style={styles.privateAvatar}>
-        <Ionicons name="eye-off" size={30} color={colors.textMuted} />
-      </View>
-      <Text style={styles.introName}>{t('chat.privateTitle')}</Text>
-      {hint ? <Text style={styles.introMeta}>{hint}</Text> : null}
-    </View>
-  )
-}
-
 const PillSurface = nativeMenuGlass ? View : GlassSurface
 
 const createStyles = (colors: Colors) =>
@@ -547,22 +451,6 @@ const createStyles = (colors: Colors) =>
   whoPill: { borderRadius: 22, paddingVertical: 4, paddingLeft: 4, paddingRight: 14 },
   whoText: { flexShrink: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  privateBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-  },
-  privateAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-  },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
   subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 1 },

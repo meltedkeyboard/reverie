@@ -2,7 +2,8 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { getFlag, setFlag } from '@/db/settings'
 
-// The eye button in a chat's header that opens a private chat. On unless turned off in Settings.
+// The eye button in the header of a chat or a scene that opens a private question to the
+// model about it. On unless turned off in Settings.
 const ENABLED_KEY = 'private_chat_button'
 
 export function isPrivateChatEnabled(db: SQLiteDatabase) {

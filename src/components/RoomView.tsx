@@ -7,25 +7,30 @@ import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { AsidePanel } from '@/components/AsidePanel'
 import { AvatarStack, castGallery } from '@/components/AvatarStack'
 import { CastBar, FloorButton } from '@/components/CastBar'
 import { CastSheet } from '@/components/CastSheet'
 import { ChatBackground } from '@/components/ChatBackground'
-import { Composer } from '@/components/Composer'
+import { Composer, ComposerSwap } from '@/components/Composer'
 import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { useOpenViewer } from '@/components/ImageLink'
 import { MessageRow, type RowMessage, type RowScene } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
+import { SFIcon } from '@/components/SFIcon'
 import { TextSheet } from '@/components/TextSheet'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { deleteChat, type Chat } from '@/db/chats'
 import { newMessage, type Message } from '@/db/messages'
+import { isPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase } from '@/db/provider'
 import { setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
+import { useAside } from '@/hooks/useAside'
 import { useRoom, type RoomPhase } from '@/hooks/useRoom'
 import { useTranslation } from '@/i18n'
+import { roomScene } from '@/lib/aside'
 import { avatarUri } from '@/lib/avatars'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { promptText, showMessage, showSheet } from '@/lib/dialogs'
@@ -101,6 +106,24 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const [whisper, setWhisper] = useState(false)
   const [narration, setNarration] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
+  const [privateEnabled, setPrivateEnabled] = useState(true)
+  useEffect(() => {
+    isPrivateChatEnabled(db).then(setPrivateEnabled)
+  }, [db])
+
+  // A private thread with the model about the scene, as in a one-on-one chat. While it is
+  // open the field talks to the model, so who is addressed does not matter.
+  const [asideOpen, setAsideOpen] = useState(false)
+  // What was typed to the characters waits here while the field asks the model aside.
+  const sceneDraft = useRef('')
+  const scene = useMemo(() => roomScene(room, members), [room, members])
+  const aside = useAside(scene, messages)
+  const toggleAside = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    if (asideOpen) aside.reset()
+    else setEditingRow(null)
+    setAsideOpen(!asideOpen)
+  }
 
   // Someone removed from the room, or out of the scene, can't stay picked.
   useEffect(() => {
@@ -353,6 +376,20 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     paddingBottom: composerHeight.value + Math.max(0, Math.abs(keyboard.height.value) - insets.bottom),
   }))
 
+  const asidePanel = asideOpen ? (
+    <AsidePanel
+      turns={aside.turns}
+      pending={aside.pending}
+      draft={aside.draft}
+      phase={aside.phase}
+      error={aside.error}
+      composerHeight={composerHeight}
+      onRetry={aside.retry}
+      onClose={toggleAside}
+      onSelectText={setSelecting}
+    />
+  ) : null
+
   const status = <Status phase={phase} draftSpeaker={draft ? nameOf(draft.speakerId) : null} next={queue.map((p) => nameOf(p.characterId))} auto={auto} />
 
   return (
@@ -389,11 +426,28 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
         floating
         left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
         right={
-          <Link href={`/chat/new?room=${room.id}`} asChild>
-            <Link.AppleZoom>
-              <GlassButton icon="create-outline" />
-            </Link.AppleZoom>
-          </Link>
+          <View style={styles.headerActions}>
+            {privateEnabled || asideOpen ? (
+              <GlassButton
+                icon={asideOpen ? 'eye-off' : 'eye-off-outline'}
+                onPress={toggleAside}
+                accessibilityLabel={t('chat.privateTitle')}
+              >
+                <SFIcon
+                  name={asideOpen ? 'eye.slash.fill' : 'eye.slash'}
+                  fallback={asideOpen ? 'eye-off' : 'eye-off-outline'}
+                  size={20}
+                  color={colors.text}
+                  animateChange={asideOpen}
+                />
+              </GlassButton>
+            ) : null}
+            <Link href={`/chat/new?room=${room.id}`} asChild>
+              <Link.AppleZoom>
+                <GlassButton icon="create-outline" />
+              </Link.AppleZoom>
+            </Link>
+          </View>
         }
       >
         <NativeMenu items={roomMenu} style={styles.whoPress} glassRadius={22}>
@@ -416,58 +470,66 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
         </NativeMenu>
       </GlassHeader>
 
-      <Composer
-        height={composerHeight}
-        onHeightChange={Platform.OS === 'web' ? setWebComposerHeight : undefined}
-        generating={!idle}
-        editing={editing}
-        placeholder={placeholder}
-        hushed={whisper && addressees.length > 0 && !narration}
-        toolbar={
-          members.length ? (
-            <>
-              <CastBar
-                members={members}
-                addressees={addressees}
-                whisper={whisper}
-                narration={narration}
-                onOpen={() => {
-                  Keyboard.dismiss()
-                  setCastOpen(true)
-                }}
-              />
-              <FloorButton floor={floor} onChange={changeFloor} />
-            </>
-          ) : null
-        }
-        accessory={
-          <View style={styles.accessory} pointerEvents="box-none">
-            {awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null}
-            {idle ? null : status}
-          </View>
-        }
-        onSend={(text, images) => {
-          send(text, images, { addressees, whisper, narration })
-          setWhisper(false)
-          setNarration(false)
-          scrollToNewest()
-        }}
-        onStop={stop}
-        onContinue={
-          members.some((m) => m.present && !m.muted)
-            ? () => {
-                proceed()
-                scrollToNewest()
-              }
-            : undefined
-        }
-        onContinueLongPress={chooseAutoplay}
-        onSubmitEdit={async (text) => {
-          if (editingRow) await editMessage(editingRow.id, text)
-          setEditingRow(null)
-        }}
-        onCancelEdit={() => setEditingRow(null)}
-      />
+      <ComposerSwap id={asideOpen ? 'aside' : 'scene'}>
+        <Composer
+          height={composerHeight}
+          initialText={asideOpen ? undefined : sceneDraft.current}
+          onTextChange={asideOpen ? undefined : (text) => (sceneDraft.current = text)}
+          autoFocus={asideOpen}
+          onHeightChange={Platform.OS === 'web' ? setWebComposerHeight : undefined}
+          generating={asideOpen ? aside.phase !== 'idle' : !idle}
+          editing={asideOpen ? null : editing}
+          placeholder={asideOpen ? t('chat.privatePlaceholder') : placeholder}
+          hushed={asideOpen || (whisper && addressees.length > 0 && !narration)}
+          toolbar={
+            members.length && !asideOpen ? (
+              <>
+                <CastBar
+                  members={members}
+                  addressees={addressees}
+                  whisper={whisper}
+                  narration={narration}
+                  onOpen={() => {
+                    Keyboard.dismiss()
+                    setCastOpen(true)
+                  }}
+                />
+                <FloorButton floor={floor} onChange={changeFloor} />
+              </>
+            ) : null
+          }
+          accessory={
+            asidePanel ?? (
+              <View style={styles.accessory} pointerEvents="box-none">
+                {awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null}
+                {idle ? null : status}
+              </View>
+            )
+          }
+          onSend={(text, images) => {
+            if (asideOpen) return void aside.ask(text, images)
+            send(text, images, { addressees, whisper, narration })
+            setWhisper(false)
+            setNarration(false)
+            scrollToNewest()
+          }}
+          onStop={asideOpen ? aside.stop : stop}
+          onContinue={
+            members.some((m) => m.present && !m.muted) && !asideOpen
+              ? () => {
+                  proceed()
+                  scrollToNewest()
+                }
+              : undefined
+          }
+          onContinueLongPress={asideOpen ? undefined : chooseAutoplay}
+          onSubmitEdit={async (text) => {
+            if (editingRow) await editMessage(editingRow.id, text)
+            setEditingRow(null)
+          }}
+          onCancelEdit={() => setEditingRow(null)}
+        />
+      </ComposerSwap>
 
       <CastSheet
         visible={castOpen}
@@ -556,6 +618,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     whoPress: { alignSelf: 'flex-start', maxWidth: '100%' },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     who: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     whoPill: { borderRadius: 22, paddingVertical: 4, paddingLeft: 6, paddingRight: 14 },
     whoText: { flexShrink: 1 },

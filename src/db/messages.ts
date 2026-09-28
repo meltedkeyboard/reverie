@@ -65,8 +65,8 @@ export type NewMessageExtra = {
   absent?: number[]
 }
 
-// How a message changes is kept apart from where it is stored, so the database and a
-// private chat's in-memory store can't drift apart.
+// How a message changes is kept apart from where it is stored, so the database rows and
+// the draft row of a streaming reply are built the same way.
 export function newMessage(
   id: number,
   chatId: number,

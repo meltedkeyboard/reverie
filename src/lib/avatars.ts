@@ -12,32 +12,32 @@ export { avatarUri, persistAvatar, removeAvatar, readAvatarBase64, writeAvatarBa
 
 const SIDE = 512
 
-export async function pickAvatar(source: ImageSource = 'library') {
-  const uri = source === 'files' ? await pickFile() : await pickPhoto(source)
-  if (!uri) return null
+export type CropRect = { originX: number; originY: number; width: number; height: number }
 
-  // The library crops in its own editor; a file is cropped to the middle square here.
-  const original = await ImageManipulator.manipulate(uri).renderAsync()
-  const side = Math.min(original.width, original.height)
-  const squared = await ImageManipulator.manipulate(original)
-    .crop({ originX: (original.width - side) / 2, originY: (original.height - side) / 2, width: side, height: side })
-    .resize({ width: SIDE })
-    .renderAsync()
-  const saved = await squared.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 })
-  return saved.uri
-}
-
-async function pickPhoto(source: 'library' | 'camera') {
+// A photo from the library or the camera, already cropped in the system's own editor.
+export async function pickAvatar(source: 'library' | 'camera') {
   const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 }
   if (source === 'camera') await requireCamera()
   const picked =
     source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options)
+  return picked.canceled ? null : squareAvatar(picked.assets[0].uri)
+}
+
+// A picture file as it is; the Files picker has no editor, so it is framed on /avatar-crop.
+export async function pickAvatarFile() {
+  const picked = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true })
   return picked.canceled ? null : picked.assets[0].uri
 }
 
-async function pickFile() {
-  const picked = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true })
-  return picked.canceled ? null : picked.assets[0].uri
+// Cuts the square out of the picture (the middle one unless given) and shrinks it to the
+// avatar size. Returns a temporary file.
+export async function squareAvatar(uri: string, rect?: CropRect) {
+  const original = await ImageManipulator.manipulate(uri).renderAsync()
+  const side = Math.min(original.width, original.height)
+  const square = rect ?? { originX: (original.width - side) / 2, originY: (original.height - side) / 2, width: side, height: side }
+  const cropped = await ImageManipulator.manipulate(original).crop(square).resize({ width: SIDE }).renderAsync()
+  const saved = await cropped.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 })
+  return saved.uri
 }
 
 const BACKGROUND_SIDE = 1600

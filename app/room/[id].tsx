@@ -366,7 +366,7 @@ export default function RoomEditorScreen() {
           {!isNew ? (
             <>
               <Divider />
-              <PillButton label={t('roomEditor.deleteRoom')} onPress={confirmDelete} color={colors.danger} />
+              <PillButton filled label={t('roomEditor.deleteRoom')} onPress={confirmDelete} color={colors.danger} />
             </>
           ) : null}
         </KeyboardAwareScrollView>

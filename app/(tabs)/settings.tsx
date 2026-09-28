@@ -12,7 +12,6 @@ import { FieldRow } from '@/components/motifs/FieldRow'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
 import { PillButton } from '@/components/PillButton'
 import { Chip } from '@/components/Chip'
-import { Star } from '@/components/motifs/Star'
 import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/confirmDelete'
@@ -367,8 +366,9 @@ export default function SettingsScreen() {
               <Eyebrow label={t('settings.backupTitle')} color={colors.accent} />
               <Text style={styles.note}>{t('settings.backupNote')}</Text>
               <View style={styles.buttonPairRow}>
-                <PillButton label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting} style={styles.pairButton} />
+                <PillButton filled label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting} style={styles.pairButton} />
                 <PillButton
+                  filled
                   label={t('settings.importJson')}
                   onPress={onImport}
                   loading={importing}
@@ -397,13 +397,10 @@ export default function SettingsScreen() {
             <>
               <Eyebrow label={t('settings.dangerZone')} color={colors.danger} />
               <Text style={styles.note}>{t('settings.dangerNote')}</Text>
-              <PillButton label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
+              <PillButton filled label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
             </>
           )}
 
-          <View style={styles.footer}>
-            <Star size={14} color={colors.textFaint} filled={false} rotation={12} strokeWidth={70} />
-          </View>
         </KeyboardAwareScrollView>
       ) : null}
 
@@ -431,5 +428,4 @@ const createStyles = (colors: Colors) =>
     linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
     linkLabel: { marginBottom: 0 },
     chevron: { color: colors.textFaint, fontSize: 20 },
-    footer: { alignItems: 'center', marginTop: 32 },
   })

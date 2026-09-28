@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native'
 import ReorderableList from 'react-native-reorderable-list'
 
 import { Button } from '@/components/Button'
-import { CONTINUE_BUTTON_SPACE, ContinueButton } from '@/components/ContinueButton'
+import { CONTINUE_BUTTON_SPACE } from '@/components/ContinueButton'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
 import { GlassButton } from '@/components/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/GlassHeader'
@@ -16,7 +16,7 @@ import { listCharacters } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { deleteRoom, listRooms, setRoomOrder, type RoomPreview } from '@/db/rooms'
-import { useLastChat } from '@/hooks/useLastChat'
+import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { removeAvatar } from '@/lib/avatars'
@@ -31,7 +31,9 @@ export default function RoomsScreen() {
   const { t } = useTranslation()
   const [rooms, setRooms] = useState<RoomPreview[] | null>(null)
   const [characterCount, setCharacterCount] = useState(0)
-  const { lastChat, reload: reloadLastChat, hide: hideLastChat } = useLastChat('room')
+  const { lastChat, reload: reloadLastChat } = useLastChat('room')
+  // The continue button itself is drawn by the tabs layout, over both home tabs.
+  const anchor = useContinueAnchor()
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
@@ -69,7 +71,7 @@ export default function RoomsScreen() {
   ]
 
   return (
-    <View style={styles.screen}>
+    <View style={styles.screen} ref={anchor.ref} onLayout={anchor.onLayout}>
       <HomePattern />
       <ReorderableList
         data={rooms ?? []}
@@ -115,15 +117,6 @@ export default function RoomsScreen() {
       >
         <TabTitle>{t('rooms.title')}</TabTitle>
       </GlassHeader>
-      {lastChat ? (
-        <ContinueButton
-          // A fresh button for another chat, so a swipe in progress does not carry over.
-          key={lastChat.id}
-          chat={lastChat}
-          onOpen={() => router.push(`/chat/${lastChat.id}`)}
-          onDismiss={hideLastChat}
-        />
-      ) : null}
     </View>
   )
 }

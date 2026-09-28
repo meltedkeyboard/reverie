@@ -15,6 +15,7 @@ import type { MenuItem } from '@/components/NativeMenu'
 import { getCharacter, type Character } from '@/db/characters'
 import { deleteChat, duplicateChat, listChats, pruneUntouchedChats, setChatOrder, setChatTitle, type ChatPreview } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
+import { importChatToRoom } from '@/db/rooms'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
@@ -49,6 +50,7 @@ export default function CharacterChatsScreen() {
   const menuItems = (chat: ChatPreview): MenuItem[] => [
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: () => promptRename(chat) },
     { label: t('chat.menuDuplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(chat) },
+    { label: t('chat.menuMoveToRoom'), systemImage: 'person.3', onSelect: () => moveToRoom(chat) },
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(chat) },
   ]
 
@@ -56,6 +58,14 @@ export default function CharacterChatsScreen() {
     const title = chat.title ? `${chat.title} (${t('characters.copySuffix')})` : null
     await duplicateChat(db, chat.id, title)
     reload()
+  }
+
+  // The chat is copied, so the one-on-one version stays where it was. The new room's
+  // editor opens over the scene, to add the rest of the cast right away.
+  const moveToRoom = async (chat: ChatPreview) => {
+    const { roomId, chatId: sceneId } = await importChatToRoom(db, chat.id, null)
+    router.push(`/chat/${sceneId}`)
+    router.push(`/room/${roomId}`)
   }
 
   const promptRename = (chat: ChatPreview) => {

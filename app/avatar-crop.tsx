@@ -1,0 +1,182 @@
+import { Image } from 'expo-image'
+import { ImageManipulator } from 'expo-image-manipulator'
+import { useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
+import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Circle, Path } from 'react-native-svg'
+
+import { Button } from '@/components/Button'
+import { GlassButton } from '@/components/Glass'
+import { GlassHeader, HeaderTitle } from '@/components/GlassHeader'
+import { useTranslation } from '@/i18n'
+import { avatarCropDraft } from '@/lib/avatarCrop'
+import { squareAvatar } from '@/lib/avatars'
+import { showMessage } from '@/lib/dialogs'
+import { errorMessage } from '@/lib/errors'
+import { HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
+
+const MAX_ZOOM = 4
+// The hint and the button under the window.
+const DOCK_SPACE = 110
+
+// The Files picker has no editor of its own, so a picked file is framed here the way the
+// photo library frames a photo: moved and pinched under a round window.
+export default function AvatarCropScreen() {
+  const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  // Read once: the draft may be replaced under a screen still closing.
+  const [draft] = useState(avatarCropDraft)
+  const [saving, setSaving] = useState(false)
+  const [frame, setFrame] = useState({ width: 0, height: 0 })
+  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null)
+
+  useEffect(() => {
+    if (!draft) return
+    ImageManipulator.manipulate(draft.uri)
+      .renderAsync()
+      .then((picture) => setNatural({ width: picture.width, height: picture.height }))
+      .catch((err) => showMessage(t('editor.avatarFailedTitle'), errorMessage(err)))
+  }, [draft, t])
+
+  // The window is the largest circle that fits between the header and the button.
+  const top = insets.top + HEADER_ROW_HEIGHT
+  const bottom = insets.bottom + DOCK_SPACE
+  const diameter = Math.max(0, Math.min(frame.width - 32, frame.height - top - bottom - 32))
+  const cx = frame.width / 2
+  const cy = top + (frame.height - top - bottom) / 2
+  // At zoom 1 the picture just covers the window with its shorter side.
+  const cover = natural && diameter ? diameter / Math.min(natural.width, natural.height) : 0
+  const pictureWidth = natural ? natural.width * cover : 0
+  const pictureHeight = natural ? natural.height * cover : 0
+
+  const zoom = useSharedValue(1)
+  const offsetX = useSharedValue(0)
+  const offsetY = useSharedValue(0)
+  const startZoom = useSharedValue(1)
+  const startX = useSharedValue(0)
+  const startY = useSharedValue(0)
+  const coverWidth = useSharedValue(0)
+  const coverHeight = useSharedValue(0)
+  const window = useSharedValue(0)
+
+  useEffect(() => {
+    coverWidth.value = pictureWidth
+    coverHeight.value = pictureHeight
+    window.value = diameter
+  }, [pictureWidth, pictureHeight, diameter, coverWidth, coverHeight, window])
+
+  // The picture may never leave part of the window uncovered.
+  const clampX = (x: number, k: number) => {
+    'worklet'
+    const limit = Math.max(0, (coverWidth.value * k - window.value) / 2)
+    return Math.min(limit, Math.max(-limit, x))
+  }
+  const clampY = (y: number, k: number) => {
+    'worklet'
+    const limit = Math.max(0, (coverHeight.value * k - window.value) / 2)
+    return Math.min(limit, Math.max(-limit, y))
+  }
+
+  const pan = Gesture.Pan()
+    .onStart(() => {
+      startX.value = offsetX.value
+      startY.value = offsetY.value
+    })
+    .onUpdate((event) => {
+      offsetX.value = clampX(startX.value + event.translationX, zoom.value)
+      offsetY.value = clampY(startY.value + event.translationY, zoom.value)
+    })
+  const pinch = Gesture.Pinch()
+    .onStart(() => {
+      startZoom.value = zoom.value
+    })
+    .onUpdate((event) => {
+      const k = Math.min(MAX_ZOOM, Math.max(1, startZoom.value * event.scale))
+      zoom.value = k
+      offsetX.value = clampX(offsetX.value, k)
+      offsetY.value = clampY(offsetY.value, k)
+    })
+  const pictureStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: offsetX.value }, { translateY: offsetY.value }, { scale: zoom.value }],
+  }))
+
+  const onLayout = (event: LayoutChangeEvent) => setFrame(event.nativeEvent.layout)
+
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
+
+  const choose = async () => {
+    if (!draft || !natural || !cover || saving) return
+    setSaving(true)
+    try {
+      const scale = cover * zoom.value
+      const side = Math.min(natural.width, natural.height, Math.round(diameter / scale))
+      const originX = Math.round(natural.width / 2 - offsetX.value / scale - side / 2)
+      const originY = Math.round(natural.height / 2 - offsetY.value / scale - side / 2)
+      const uri = await squareAvatar(draft.uri, {
+        originX: Math.min(natural.width - side, Math.max(0, originX)),
+        originY: Math.min(natural.height - side, Math.max(0, originY)),
+        width: side,
+        height: side,
+      })
+      draft.onDone(uri)
+      close()
+    } catch (err) {
+      setSaving(false)
+      showMessage(t('editor.avatarFailedTitle'), errorMessage(err))
+    }
+  }
+
+  const r = diameter / 2
+  // The screen with a round hole in it: evenodd leaves the circle unfilled.
+  const shade = `M0 0H${frame.width}V${frame.height}H0Z M${cx - r} ${cy} a${r} ${r} 0 1 0 ${diameter} 0 a${r} ${r} 0 1 0 ${-diameter} 0Z`
+
+  return (
+    <View style={styles.screen} onLayout={onLayout}>
+      <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
+        <View style={StyleSheet.absoluteFill}>
+          {draft && natural && diameter ? (
+            <Animated.View
+              style={[
+                styles.picture,
+                { left: cx - pictureWidth / 2, top: cy - pictureHeight / 2, width: pictureWidth, height: pictureHeight },
+                pictureStyle,
+              ]}
+            >
+              <Image source={{ uri: draft.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            </Animated.View>
+          ) : null}
+        </View>
+      </GestureDetector>
+
+      {diameter ? (
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Path d={shade} fill={`rgba(${colors.bgRgb}, 0.78)`} fillRule="evenodd" />
+          <Circle cx={cx} cy={cy} r={r} stroke={colors.borderStrong} strokeWidth={1} fill="none" />
+        </Svg>
+      ) : null}
+
+      <GlassHeader floating left={<GlassButton icon="chevron-back" iconSize={26} onPress={close} />}>
+        <HeaderTitle>{t('avatarCrop.title')}</HeaderTitle>
+      </GlassHeader>
+
+      <View style={[styles.dock, { paddingBottom: insets.bottom + 8 }]} pointerEvents="box-none">
+        <Text style={styles.hint}>{t('avatarCrop.hint')}</Text>
+        <Button variant="glass" label={t('avatarCrop.choose')} onPress={choose} disabled={!natural} loading={saving} />
+      </View>
+    </View>
+  )
+}
+
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.bg, overflow: 'hidden' },
+    picture: { position: 'absolute' },
+    dock: { position: 'absolute', left: 16, right: 16, bottom: 0, gap: 12, alignItems: 'center' },
+    hint: { color: colors.textMuted, fontSize: 13 },
+  })

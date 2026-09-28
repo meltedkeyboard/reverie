@@ -10,17 +10,21 @@ type Props = {
   onPress?: () => void
   // The label's color, which says what the action is: the accent, or danger for deleting.
   color?: string
+  // Tints the glass with the color and turns the label white, for actions that should
+  // stand out on the page: backups, deleting.
+  filled?: boolean
   disabled?: boolean
   loading?: boolean
   style?: StyleProp<ViewStyle>
 }
 
 // A capsule of Liquid Glass for the secondary actions of a screen, with the label in the
-// action's color. Outside iOS 26 it is the plain surface with a hairline.
-export function PillButton({ label, onPress, color, disabled, loading, style }: Props) {
+// action's color. Outside iOS 26 it is the plain surface with a hairline, or a solid fill.
+export function PillButton({ label, onPress, color, filled = false, disabled, loading, style }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const tint = color ?? colors.accent
+  const ink = filled ? ON_FILL : tint
   const inactive = disabled || loading
   return (
     <Pressable
@@ -30,11 +34,16 @@ export function PillButton({ label, onPress, color, disabled, loading, style }: 
       // Interactive glass springs under the finger by itself; a scale on top would fight it.
       style={({ pressed }) => [style, inactive && { opacity: 0.5 }, !liquidGlass && pressed && { transform: [{ scale: 0.97 }] }]}
     >
-      <GlassSurface interactive={!inactive} style={styles.pill} fallbackStyle={styles.solid}>
+      <GlassSurface
+        interactive={!inactive}
+        tintColor={filled ? tint : undefined}
+        style={styles.pill}
+        fallbackStyle={filled ? { backgroundColor: tint } : styles.solid}
+      >
         {loading ? (
-          <ActivityIndicator color={tint} />
+          <ActivityIndicator color={ink} />
         ) : (
-          <Text style={[styles.label, { color: tint }]} numberOfLines={1}>
+          <Text style={[styles.label, { color: ink }]} numberOfLines={1}>
             {label}
           </Text>
         )}
@@ -42,6 +51,8 @@ export function PillButton({ label, onPress, color, disabled, loading, style }: 
     </Pressable>
   )
 }
+
+const ON_FILL = '#FFFFFF'
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({

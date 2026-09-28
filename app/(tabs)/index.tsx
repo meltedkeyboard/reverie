@@ -6,9 +6,9 @@ import ReorderableList from 'react-native-reorderable-list'
 
 import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
-import { CONTINUE_BUTTON_SPACE, ContinueButton } from '@/components/ContinueButton'
+import { CONTINUE_BUTTON_SPACE } from '@/components/ContinueButton'
 import { EmptyState, ListSeparator } from '@/components/EmptyState'
-import { GlassButton } from '@/components/Glass'
+import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/GlassHeader'
 import { HomePattern } from '@/components/HomePattern'
 import { SFIcon } from '@/components/SFIcon'
@@ -17,10 +17,11 @@ import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
-import { useLastChat } from '@/hooks/useLastChat'
+import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
 import { useReorder } from '@/hooks/useReorder'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
+import { liquidGlass } from '@/lib/nativeUI'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharactersScreen() {
@@ -33,7 +34,9 @@ export default function CharactersScreen() {
   const isWideWeb = useIsWideWeb()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
   const [serverSet, setServerSet] = useState(true)
-  const { lastChat, reload: reloadLastChat, hide: hideLastChat } = useLastChat('character')
+  const { lastChat, reload: reloadLastChat } = useLastChat('character')
+  // The continue button itself is drawn by the tabs layout, over both home tabs.
+  const anchor = useContinueAnchor()
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
@@ -63,7 +66,7 @@ export default function CharactersScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={styles.screen} ref={anchor.ref} onLayout={anchor.onLayout}>
       <HomePattern />
       <ReorderableList
         data={characters ?? []}
@@ -74,11 +77,13 @@ export default function CharactersScreen() {
         ListHeaderComponent={
           !serverSet && characters ? (
             // A row like the "finish setting up" one in iOS Settings: a glyph on a
-            // colored tile, the text, and a chevron to where it is fixed.
+            // colored tile, the text, and a chevron to where it is fixed. Clear glass like
+            // the cards under it, drawn as a sibling layer for the same reason as ListCard.
             <Pressable
               onPress={() => router.navigate('/settings')}
-              style={({ pressed }) => [styles.notice, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.notice, liquidGlass ? styles.noticeGlass : pressed && { opacity: 0.6 }]}
             >
+              {liquidGlass ? <GlassSurface interactive variant="clear" style={styles.noticeLayer} /> : null}
               <View style={styles.noticeTile}>
                 <SFIcon name="server.rack" fallback="server" size={15} color="#FFFFFF" />
               </View>
@@ -126,15 +131,6 @@ export default function CharactersScreen() {
       >
         <TabTitle>{t('characters.title')}</TabTitle>
       </GlassHeader>
-      {lastChat ? (
-        <ContinueButton
-          // A fresh button for another chat, so a swipe in progress does not carry over.
-          key={lastChat.id}
-          chat={lastChat}
-          onOpen={() => router.push(`/chat/${lastChat.id}`)}
-          onDismiss={hideLastChat}
-        />
-      ) : null}
     </View>
   )
 }
@@ -153,10 +149,21 @@ const createStyles = (colors: Colors) =>
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 20,
+    borderCurve: 'continuous',
     paddingVertical: 12,
     paddingLeft: 14,
     paddingRight: 12,
     marginBottom: 14,
+  },
+  noticeGlass: { borderWidth: 0, backgroundColor: 'transparent' },
+  noticeLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 20,
+    borderCurve: 'continuous',
   },
   noticeTile: {
     width: 30,

@@ -9,19 +9,23 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
 } from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
+  Easing,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import { AttachButton } from './AttachButton'
 import { BlurBar, EdgeFade } from './BarChrome'
@@ -60,6 +64,11 @@ type Props = {
   onContinueLongPress?: () => void
   // Marks the field as a whisper.
   hushed?: boolean
+  // What the field starts with and where its text goes, so a draft outlives the field
+  // being swapped for another one.
+  initialText?: string
+  onTextChange?: (text: string) => void
+  autoFocus?: boolean
 }
 
 export function Composer({
@@ -75,6 +84,9 @@ export function Composer({
   onHeightChange,
   toolbar,
   placeholder,
+  initialText = '',
+  onTextChange,
+  autoFocus = false,
   onContinueLongPress,
   hushed = false,
 }: Props) {
@@ -84,9 +96,13 @@ export function Composer({
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initialText)
   const textRef = useRef(text)
   textRef.current = text
+  // A message being edited is not a draft.
+  useEffect(() => {
+    if (!editing) onTextChange?.(text)
+  }, [text])
   const stash = useRef('')
   const inputRef = useRef<TextInput>(null)
   const [images, setImages] = useState<MessageImage[]>([])
@@ -226,6 +242,7 @@ export function Composer({
             placeholder={placeholder ?? t('chat.messagePlaceholder')}
             {...inputColors}
             multiline
+            autoFocus={autoFocus}
             style={[styles.input, docked && styles.inputDocked]}
           />
           {docked ? (
@@ -261,6 +278,44 @@ export function Composer({
         </BlurBar>
       )}
     </KeyboardStickyView>
+  )
+}
+
+// Holds the composer and swaps it for another when `id` changes, as between the chat's
+// field and the one that asks the model aside: the old one sinks out of sight with all it
+// carries, and only then is it replaced and the new one springs up. Only a transform,
+// since Liquid Glass renders wrongly under a fading parent.
+export function ComposerSwap({ id, children }: { id: string; children: React.ReactNode }) {
+  const { height: screenHeight } = useWindowDimensions()
+  const [shownId, setShownId] = useState(id)
+  // The old field keeps its last props while it leaves.
+  const shown = useRef(children)
+  if (id === shownId) shown.current = children
+  const offset = useSharedValue(0)
+  // Far enough to clear the screen even with the keyboard up and a panel over the field.
+  const distance = screenHeight * 0.6
+
+  useEffect(() => {
+    if (id === shownId) return
+    offset.value = withTiming(distance, { duration: 170, easing: Easing.in(Easing.cubic) }, (finished) => {
+      if (finished) scheduleOnRN(setShownId, id)
+    })
+  }, [id, shownId, distance, offset])
+
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    offset.value = withSpring(0, { damping: 17, stiffness: 210, mass: 0.9 })
+  }, [shownId, offset])
+
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }))
+  return (
+    <Animated.View key={shownId} style={[StyleSheet.absoluteFill, style]} pointerEvents="box-none">
+      {shown.current}
+    </Animated.View>
   )
 }
 

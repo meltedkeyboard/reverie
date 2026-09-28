@@ -2,19 +2,15 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { CONTEXT_WINDOW, type ChatTurn } from '@/api/llm'
-import { DEFAULT_SAMPLING, type Character } from '@/db/characters'
+import type { Character } from '@/db/characters'
 import { setChatTitle, type Chat } from '@/db/chats'
 import {
   addMessage,
   addVariant,
   deleteMessage,
   listMessages,
-  newMessage,
   selectVariant as storeVariant,
   updateMessage,
-  withContent,
-  withNewVariant,
-  withVariant,
   type Message,
   type MessageImage,
   type NewMessageExtra,
@@ -52,8 +48,9 @@ export function regenerateTargetAt(history: Message[], index: number): Regenerat
   return next.role === 'assistant' ? { context: history.slice(0, index + 1), replacing: next } : null
 }
 
-// Where the conversation lives: the database, or for a private chat only memory, so
-// nothing of it is left once the screen lets it go.
+// The conversation's rows in the database it was loaded from. When the database moves to
+// another folder the store is rebuilt, and a reply still streaming into the old one must
+// not land in the list of the new one.
 type MessageStore = {
   list(): Promise<Message[]>
   add(role: Role, content: string, extra?: NewMessageExtra): Promise<Message>
@@ -74,28 +71,10 @@ function dbStore(db: SQLiteDatabase, chatId: number): MessageStore {
   }
 }
 
-function memoryStore(chatId: number): MessageStore {
-  let nextId = 1
-  return {
-    list: async () => [],
-    add: async (role, content, extra) => newMessage(nextId++, chatId, role, content, extra),
-    update: async (message, content) => withContent(message, content),
-    addVariant: async (message, content, thought) => withNewVariant(message, content, thought),
-    select: async (message, variant) => withVariant(message, variant),
-    remove: async () => {},
-  }
-}
-
-// A private chat talks to the bare model: no character, no greeting, no reply limit.
-const PRIVATE_PROMPT =
-  'You are a plain AI assistant. Answer directly and concisely, in a neutral, matter-of-fact tone, without roleplay, persona, emotions or small talk. Reply in the language of the user.'
-
-export function useChat(chat: Chat, character: Character, { ephemeral = false } = {}) {
+export function useChat(chat: Chat, character: Character) {
   const chatId = chat.id
   const db = useDatabase()
-  // Switching between the real and the private chat swaps the store in place, so the
-  // screen around it stays mounted and can animate the change.
-  const store = useMemo(() => (ephemeral ? memoryStore(chatId) : dbStore(db, chatId)), [ephemeral, db, chatId])
+  const store = useMemo(() => dbStore(db, chatId), [db, chatId])
   const storeRef = useRef(store)
   storeRef.current = store
   const [messages, setMessagesState] = useState<Message[]>([])
@@ -187,9 +166,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
       setReasoning(null)
       setReasoningMs(null)
 
-      const target = ephemeral
-        ? { ...DEFAULT_SAMPLING, systemPrompt: PRIVATE_PROMPT, replyLimit: null, thinking: 'auto' as const }
-        : characterRef.current
+      const target = characterRef.current
       let reply = ''
       let keptThought: Thought | null = null
       let cutoff = false
@@ -243,7 +220,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
           setMessages(next)
           // The first answer is where a chat gets its name. A failure here is not worth
           // an error card: the user can always ask for a title from the menu.
-          if (!ephemeral && !titleRef.current && next.filter((m) => m.role === 'user').length === 1) {
+          if (!titleRef.current && next.filter((m) => m.role === 'user').length === 1) {
             autoName().catch(() => {})
           }
         }
@@ -256,7 +233,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
         }
       }
     },
-    [db, store, ephemeral, setMessages, autoName]
+    [db, store, setMessages, autoName]
   )
 
   const send = useCallback(
@@ -349,7 +326,7 @@ export function useChat(chat: Chat, character: Character, { ephemeral = false } 
     draft,
     phase,
     error,
-    title: ephemeral ? null : title,
+    title,
     naming,
     replacingId,
     reasoning,

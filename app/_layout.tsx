@@ -98,6 +98,7 @@ function AppShell() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="viewer" options={{ animation: 'fade' }} />
       <Stack.Screen name="background" options={{ animation: 'fade' }} />
+      <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
     </Stack>
   )
 

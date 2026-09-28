@@ -40,16 +40,17 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 
 | Route | File | Purpose |
 |---|---|---|
-| `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice, "Continue" capsule |
-| `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder, "Continue" capsule |
-| `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, Continue capsule and where it leads, lock, haptics, private chat button, backup. `?section=` scrolls to a block and flashes it |
+| `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice |
+| `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder |
+| `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, Continue capsule and where it leads, lock, haptics, private question button, backup. `?section=` scrolls to a block and flashes it |
 | `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26); a plain field on web |
 | `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character |
 | `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead. `?message=ID` opens it scrolled to that message |
 | `/rooms/:roomId` | `rooms/[roomId].tsx` | Scenes of one room, import of a member's chat |
 | `/room/:id` | `room/[id].tsx` | Room editor: members, floor mode, scene, background |
-| `/character/:id` | `character/[id].tsx` | Character editor: prompt, greeting, sampling, thinking mode, background |
+| `/character/:id` | `character/[id].tsx` | Character editor: prompt, greeting, sampling, thinking mode, background. The avatar spreads into a full-width photo on a pull (`ExpandingAvatar`, fed the scroll offset by `useAnimatedScrollHandler`), the drawn header giving way and the name moving onto the photo. Transforms only: the photo is laid out full size and scaled into the circle, and `useSpreadPush` moves the form down, since animating sizes re-laid out the form every frame |
 | `/background` | `background.tsx` | Background picker, effect and intensity |
+| `/avatar-crop` | `avatar-crop.tsx` | Moving and pinching an avatar picked from Files under a round window; the library and the camera crop in the system editor instead |
 | `/text-editor` | `text-editor.tsx` | A long form text (system prompt, greeting, scene) on the whole screen, like a note; each change goes straight back to the form. Opens without the keyboard; on iOS a wrapper takes the JS touch (`onStartShouldSetResponderCapture`), because `TextInput` focuses itself when any touch ends, a scroll included |
 | `/onboarding` | `onboarding.tsx` | First-run pages, including server setup |
 | `/viewer` | `viewer.tsx` | Full-screen images: pinch and double-tap zoom, swipe between several (a room's cast) |
@@ -65,7 +66,7 @@ A Spotlight-like search over everything, in `(tabs)/search/index.tsx`.
 - The order of sections follows the tab search was opened from: the tabs layout reports each focus to `noteTabFocus`, and search reads `getSearchScope` (`ORDER` in the screen).
 - A message result opens `/chat/ID?message=ID`; `ConversationList` scrolls to the row (retrying while far rows are not rendered) and tints it with `Flash`. Settings blocks use the same `Flash`.
 
-Some data cannot go through route params (file URIs, callbacks, very long data URLs), so tiny module-level slots carry it between screens: `src/lib/backgroundDraft.ts`, `src/lib/textDraft.ts` and `src/lib/viewer.ts`.
+Some data cannot go through route params (file URIs, callbacks, very long data URLs), so tiny module-level slots carry it between screens: `src/lib/backgroundDraft.ts`, `src/lib/avatarCrop.ts`, `src/lib/textDraft.ts` and `src/lib/viewer.ts`.
 
 Every avatar opens the viewer: `Avatar` and `AvatarStack` (the whole cast, via `castGallery`) wrap themselves in `ImageLink` unless `viewable={false}`. In a list row that opens something, the avatar keeps its own tap (the rest of the row still opens). `viewable={false}` is for places where the tap on the avatar itself must do something else: a header menu trigger, the cast button, a cast sheet row, the Continue capsule, the character picker in the room editor. Where it matters, the photo is offered as a menu item through `useOpenViewer` instead.
 
@@ -77,7 +78,7 @@ Every avatar opens the viewer: `Avatar` and `AvatarStack` (the whole cast, via `
 4. `regenerateTargetAt` decides what a regenerate replaces and which history the model sees.
 5. After the first reply `autoName` calls `suggestTitle` and stores the title with `setChatTitle`. The title is asked for with thinking off, regardless of the character; if the model still answers with nothing, it is asked again with the server default and a larger budget.
 
-A private chat uses an in-memory `MessageStore` inside `useChat` instead of the DB, so nothing is left after leaving the screen. The header button is toggled by `src/db/privateChat.ts`.
+The eye in the header of a chat or a scene opens Private: a question to the model beside the story, like `/btw`. `useAside` keeps the thread in memory, `buildAsideRequest` (`src/lib/aside.ts`) sends the scene brief and a text transcript of the latest lines (text, not assistant/user turns, so the model does not carry on in character), and `AsidePanel` shows it in the composer's `accessory` slot, so it rides the keyboard with the field. Opening and closing swaps the whole field through `ComposerSwap` (`Composer.tsx`): the old one sinks, the new one springs up, and the chat's draft is kept in `initialText`/`onTextChange`. Nothing of it is saved or reaches the characters; closing the eye throws it away. The button is toggled by `src/db/privateChat.ts`.
 
 The streaming loop itself (reasoning, per-frame batching) is `runReplyStream` in `src/lib/replyStream.ts`, shared with rooms.
 
@@ -123,11 +124,11 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 
 | Group | Files |
 |---|---|
-| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, copy), `avatarStore.ts` / `.web.ts` (file or `localStorage` storage, avatars and backgrounds in separate folders) |
+| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, `squareAvatar` cuts a given square, copy), `avatarStore.ts` / `.web.ts` (file or `localStorage` storage, avatars and backgrounds in separate folders) |
 | Backup | `backup.ts` (export, import, wipe), `download.ts` / `.web.ts` (save JSON to a folder, an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` / `.web.ts` |
 | Dialogs | `dialogs.tsx` (native alerts and sheets), `dialogs.web.tsx` (DOM implementation), `dialogs.types.ts`, `chatDialogs.ts` |
 | Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
-| AI helpers | `promptGen.ts`, `titles.ts` |
+| AI helpers | `promptGen.ts`, `titles.ts`, `aside.ts` (the Private request, `characterScene`/`roomScene`) |
 | Platform | `haptics.ts` / `.web.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` / `.web.ts` (where the data lives, the "show in Files" toggle, see below) |
 | App | `version.ts` (the version shown in About and onboarding), `confirmDelete.ts` (delete that asks unless turned off), `searchScope.ts` (the tab search was opened from, `SettingsSection`) |
 | Message menu | `messageActions.ts` |
@@ -138,8 +139,9 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 |---|---|
 | `useChat` | Conversation state, streaming, variants, editing |
 | `useRoom` | A room scene: the speaker queue, director, autoplay, nudges |
+| `useAside` | The Private thread with the model beside a chat or a scene, in memory only |
 | `useCharacterActions` | Duplicate / delete / export actions for a character |
-| `useLastChat` | The chat behind the "Continue" capsule on the Characters and Rooms tabs: the one opened last, or the one written in last, as set in Settings. Chats without a user message never count |
+| `useLastChat` | The chat behind the "Continue" capsule on the Characters and Rooms tabs: the one opened last, or the one written in last, as set in Settings. Chats without a user message never count. `LastChatProvider` in the tabs layout holds both kinds for the one shared button; `useContinueAnchor` on a tab's root view tells it where the content ends (inside a tab on iOS the safe area includes the tab bar); only the focused tab reports, re-measuring on focus and every half second |
 | `useConnectionTest` | "Test connection" button state |
 | `useReorder` | Drag-to-reorder lists (`react-native-reorderable-list`) |
 | `useStoredFlag` | React state bound to an `app_settings` flag |
@@ -148,23 +150,23 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 
 ## `src/components`
 
-- **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet on iOS).
+- **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet on iOS), `AsidePanel` (Private).
 - **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`.
-- **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton`, `EmptyState`, `Sidebar` (wide web).
+- **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton` (one for both home tabs, drawn by `(tabs)/_layout.tsx` over them as `HomeContinueButton`; slides its content out and in when it comes to lead to another chat; on a switch between Characters and Rooms the content just changes), `EmptyState`, `Sidebar` (wide web).
 - **Forms:** `Field`, `Group`, `ToggleRow`, `Segmented`, `ChipGroup` (a row of `Chip`), `ParamSlider`, `FormScreenHeader`, `PromptGenModal`.
 - **Chrome and glass:** `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs), `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `PillButton`, `Chip`, `SFIcon`.
-- **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `ImageLink`, `HomePattern`, `Wordmark`.
+- **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `ExpandingAvatar` (the character editor's), `ImageLink`, `HomePattern`, `Wordmark`.
 - **`motifs/`:** small brand decorations (`Star*`, `Divider`, `Eyebrow`, `FieldRow`).
 
 ### Liquid Glass
 
 On iOS 26 the controls are Liquid Glass through `GlassSurface` in `Glass.tsx`; it takes a `fallbackStyle` for everything else (older iOS, Android, web), where the same control is the plain surface with a hairline. `nativeUI.ts` says whether glass is available (`liquidGlass`).
 
-- **Buttons:** `Button` (`variant="glass"` for the one call to action), `PillButton` for secondary actions (label in the action's color, `colors.danger` for deleting), `GlassButton` / `GlassGroup` for round icon buttons. `GlassButton` with `tint` fills with the accent; the save checkmark of `FormScreenHeader` is one (`prominent`).
+- **Buttons:** `Button` (`variant="glass"` for the one call to action), `PillButton` for secondary actions (label in the action's color, `colors.danger` for deleting; `filled` tints the glass with that color under a white label, for backup and delete buttons), `GlassButton` / `GlassGroup` for round icon buttons. `GlassButton` with `tint` fills with the accent; the save checkmark of `FormScreenHeader` is one (`prominent`).
 - **Choices:** `Chip`, tinted with the accent when chosen. It stays regular glass: made clear, it turned the accent-tinted `StarToggle` next to it blue in the dark scheme.
 - **Switches:** `StarToggle` (in `ToggleRow` and the whisper row of `CastSheet`), a round 44 pt glass button with the brand star: clear with an outlined star when off, accent with a white star when on, the star swinging over with a spring.
 - **Inputs:** `Field`, `FieldRow` and the chat `Composer` are clear glass, tinted with `accentSoft` while focused: a capsule for one line, a rounded box for several. A multiline `FieldRow` has a set height (`minHeight`, 110 by default) and scrolls inside; with `expandTitle` it only shows the text (it scrolls), and a tap opens it for editing in `/text-editor`, zooming out of the field on iOS (`Link.AppleZoom`). A multiline `Field` keeps the hairline box (nothing uses one now).
-- **Cards:** `ListCard` (characters, chats, rooms) is clear glass (`GlassSurface variant="clear"`) with no fill under it; the regular glass over a solid fill looked like a grey haze in the dark scheme. The glass is a sibling of the content, not inside it: a clipped glass loses its rim at the corners.
+- **Cards:** `ListCard` (characters, chats, rooms) and the "server not set up" row above the characters are clear glass (`GlassSurface variant="clear"`) with no fill under it; the regular glass over a solid fill looked like a grey haze in the dark scheme. The glass is a sibling of the content, not inside it: a clipped glass loses its rim at the corners.
 - **Pressing:** interactive glass springs under the finger by itself, so glass controls add no press scale of their own (the two fight and the control jumps); the scale stays only on the non-glass fallback.
 - **Tint changes:** `patches/expo-glass-effect+*.patch` (applied by `patch-package` on `postinstall`) makes a change of `tintColor` on a mounted glass view fade over 0.3 s instead of snapping: UIKit animates only a switch to a new effect object, so the patch builds a fresh `UIGlassEffect` and sets it in `UIView.animate`, after the mount pass. Re-create the patch when updating `expo-glass-effect`.
 - **Corners:** glass draws continuous (squircle) corners, so anything that sits on it or clips next to it uses `borderCurve: 'continuous'`.

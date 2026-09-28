@@ -316,7 +316,7 @@ type ThoughtProps = {
 // Folded by default like in ChatGPT and Claude. While the model thinks, the folded block
 // shows the latest lines so it is clear something is happening; afterwards only the
 // header stays, and a tap unfolds the whole reasoning either way.
-function ThoughtBlock({ text, ms }: ThoughtProps) {
+export function ThoughtBlock({ text, ms }: ThoughtProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
