@@ -2,7 +2,8 @@
   "expo": {
     "name": "Reverie",
     "slug": "reverie",
-    "version": "3.3.0",
+    "platforms": ["ios"],
+    "version": "3.4.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "reverie",
@@ -24,13 +25,6 @@
         "dark": "./assets/images/icon-dark.png",
         "tinted": "./assets/images/icon-tinted.png"
       }
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "single",
-      "lang": "ru",
-      "themeColor": "#0F0F12",
-      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -75,13 +69,6 @@
     },
     "experiments": {
       "typedRoutes": false
-    },
-    "android": {
-      "package": "reverie.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#F5F5F7"
-      }
     }
   }
 }

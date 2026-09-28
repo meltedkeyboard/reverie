@@ -103,7 +103,6 @@
   "characters.emptyTitle": "Пока никого нет",
   "characters.emptyText": "Создайте первого персонажа и начните историю",
   "characters.createCharacter": "Создать персонажа",
-  "characters.wideWelcomeText": "Выберите персонажа слева или создайте нового",
 
   "onboarding.slide1.title": "Свои персонажи",
   "onboarding.slide1.text": "Имя, характер, манера речи — всё на ваш вкус",
@@ -273,13 +272,10 @@
   "characterCard.noDescription": "Без описания",
 
   "startup.dbFailedTitle": "Не удалось открыть базу данных",
-  "startup.webSingleTab": "База открыта в другой вкладке. Закройте её и перезагрузите страницу",
-  "startup.reload": "Перезагрузить",
 
   "llm.serverError": "Сервер вернул ошибку {{status}}: {{msg}}",
   "llm.serverErrorNoMsg": "Сервер вернул ошибку {{status}}{{body}}",
-  "llm.corsHint": ". Если сервер запущен, включите на нём CORS",
-  "llm.unreachable": "Сервер недоступен: {{detail}}{{hint}}",
+  "llm.unreachable": "Сервер недоступен: {{detail}}",
   "llm.setBaseUrl": "Укажите адрес сервера",
   "llm.timeout": "Сервер не ответил за 8 секунд. Проверьте адрес и сеть",
   "llm.baseUrlMissing": "Укажите адрес сервера в настройках",
@@ -300,7 +296,6 @@
   "images.saveFailed": "Не удалось сохранить фото",
   "images.savePermission": "Нет разрешения добавлять фото. Включите его в настройках iOS",
 
-  "avatarStore.noSpace": "В браузере не осталось места для аватара",
 
   "backup.corrupted": "Файл повреждён или это не копия Reverie",
   "backup.notBackup": "Это не копия Reverie",

@@ -9,7 +9,6 @@ import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
 import { useAbortable } from '@/hooks/useAbortable'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
-import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
 import { errorMessage } from '@/lib/errors'
 import { plural } from '@/lib/format'
@@ -62,7 +61,6 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
   const styles = useStyles(createStyles)
   const inputColors = useInputColors()
   const { t, locale } = useTranslation()
-  const wide = useIsWideWeb()
 
   const [phase, setPhase] = useState<'compose' | 'result'>('compose')
   const [mode, setMode] = useState<Mode>('new')
@@ -77,8 +75,6 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
   const [activity, setActivity] = useState<Activity | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  // A multiline TextInput doesn't grow with its text on web, so the height is set by hand.
-  const [heights, setHeights] = useState<Partial<Record<'prompt' | 'greeting', number>>>({})
   const task = useAbortable()
   const versionCount = useRef(0)
 
@@ -93,10 +89,6 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
     if (visible && phase === 'compose' && !description) setMode(hasCurrent ? 'improve' : 'new')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
-
-  // A fixed height never lets the measured content shrink, so it is dropped whenever
-  // another, possibly shorter version is shown.
-  useEffect(() => setHeights({}), [index])
 
   const effectiveMode: Mode = hasCurrent ? mode : 'new'
   const canGenerate = effectiveMode === 'improve' || description.trim().length > 0
@@ -207,8 +199,6 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
     return `${words} ${plural(words, locale, ['слово', 'слова', 'слов'], ['word', 'words'])}`
   })()
 
-  const column = wide ? styles.wideColumn : null
-
   const chip = (label: string, onPress: () => void, key?: string) => (
     <Chip key={key ?? label} label={label} active={false} onPress={() => !busy && onPress()} />
   )
@@ -308,11 +298,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
             multiline
             scrollEnabled={false}
             {...inputColors}
-            onContentSizeChange={(e) => {
-              const h = Math.ceil(e.nativeEvent.contentSize.height)
-              setHeights((prev) => (prev[target] === h ? prev : { ...prev, [target]: h }))
-            }}
-            style={[styles.resultText, styles.resultInput, heights[target] ? { height: heights[target] } : null]}
+            style={[styles.resultText, styles.resultInput]}
           />
         )}
       </View>
@@ -414,13 +400,13 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
       <KeyboardAwareScrollView
         bottomOffset={24}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.content, column]}
+        contentContainerStyle={styles.content}
       >
         {phase === 'compose' ? composeView : resultView}
       </KeyboardAwareScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <View style={column}>{footer}</View>
+        <View>{footer}</View>
       </View>
     </PageSheet>
   )
@@ -430,7 +416,6 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     headerButton: { color: colors.textMuted, fontSize: 16 },
     content: { padding: 20, paddingBottom: 32 },
-    wideColumn: { width: '100%', maxWidth: 720, alignSelf: 'center' },
     block: { marginBottom: 16 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     metaRow: {

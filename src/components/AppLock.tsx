@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, AppState, Platform, StyleSheet, Text, View } from 'react-native'
+import { Animated, AppState, StyleSheet, Text, View } from 'react-native'
 
 import { PillButton } from '@/components/PillButton'
 import { Star } from '@/components/motifs/Star'
@@ -12,15 +12,15 @@ import { fonts, useColors, useTheme } from '@/theme'
 
 // Covers the app with a lock screen until Face ID (or the passcode) succeeds — on launch
 // and after the app has been in the background. It also blurs the app in the app
-// switcher while the lock is on. Native only.
+// switcher while the lock is on.
 export function AppLock({ children }: { children: ReactNode }) {
   const db = useDatabase()
   const colors = useColors()
   const { scheme } = useTheme()
   const { t } = useTranslation()
-  const [locked, setLocked] = useState(Platform.OS !== 'web')
+  const [locked, setLocked] = useState(true)
   const [shielded, setShielded] = useState(false)
-  const [checked, setChecked] = useState(Platform.OS === 'web')
+  const [checked, setChecked] = useState(false)
   const busy = useRef(false)
   const launchChecked = useRef(false)
   const shieldOpacity = useRef(new Animated.Value(0)).current
@@ -39,7 +39,7 @@ export function AppLock({ children }: { children: ReactNode }) {
   // Only on launch. The effect also reruns when `unlock` changes with the language, or
   // when the database is swapped for one in another folder, and neither should ask again.
   useEffect(() => {
-    if (Platform.OS === 'web' || launchChecked.current) return
+    if (launchChecked.current) return
     launchChecked.current = true
     isAppLockEnabled(db).then((enabled) => {
       setChecked(true)
@@ -49,7 +49,6 @@ export function AppLock({ children }: { children: ReactNode }) {
   }, [db, unlock])
 
   useEffect(() => {
-    if (Platform.OS === 'web') return
     // Only 'background': the Face ID prompt itself makes the app 'inactive'.
     let wasBackground = false
     const sub = AppState.addEventListener('change', async (state) => {

@@ -80,7 +80,7 @@ const SETTLE_DELAYS = [0, 100, 300, 700]
 const RECHECK_MS = 500
 
 // For the root view of a home tab: tells the button where the tab's content ends. Inside a
-// tab on iOS the safe area already takes in the tab bar; the web bar sits below the screen.
+// tab the safe area already takes in the tab bar.
 // Only the tab in focus reports: a hidden one can measure wrong and push the button off
 // its place, down to the very bottom of the screen.
 export function useContinueAnchor() {

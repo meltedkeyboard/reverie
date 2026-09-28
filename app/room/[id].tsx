@@ -1,13 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { Avatar } from '@/components/Avatar'
 import { ChatBackground } from '@/components/ChatBackground'
 import { ChipGroup } from '@/components/ChipGroup'
-import { BarButton, DrawnFormScreenHeader, FormScreenHeader } from '@/components/FormScreenHeader'
+import { BarButton, DrawnFormScreenHeader } from '@/components/FormScreenHeader'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { ImageSourceMenu } from '@/components/ImageSourceMenu'
 import { Divider } from '@/components/motifs/Divider'
@@ -407,28 +407,19 @@ export default function RoomEditorScreen() {
         </ScrollView>
       </PageSheet>
 
-      {Platform.OS === 'ios' ? (
-        <DrawnFormScreenHeader
-          title={title}
-          right={
-            <BarButton
-              symbol="checkmark"
-              fallback="checkmark"
-              disabled={!canSave}
-              onPress={onSave}
-              accessibilityLabel={t('common.save')}
-              prominent
-            />
-          }
-        />
-      ) : (
-        <>
-          <FormScreenHeader title={title} />
-          <Stack.Toolbar placement="right">
-            <Stack.Toolbar.Button icon="checkmark" disabled={!canSave} onPress={onSave} />
-          </Stack.Toolbar>
-        </>
-      )}
+      <DrawnFormScreenHeader
+        title={title}
+        right={
+          <BarButton
+            symbol="checkmark"
+            fallback="checkmark"
+            disabled={!canSave}
+            onPress={onSave}
+            accessibilityLabel={t('common.save')}
+            prominent
+          />
+        }
+      />
     </View>
   )
 }

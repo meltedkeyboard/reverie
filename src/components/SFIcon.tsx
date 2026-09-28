@@ -9,7 +9,7 @@ type SymbolName = NonNullable<ComponentProps<NonNullable<typeof swiftUI>['ui']['
 type Effect = Parameters<NonNullable<typeof swiftUI>['modifiers']['symbolEffect']>[0]
 
 type Props = {
-  // SF Symbol on iOS, the Ionicons glyph everywhere else.
+  // SF Symbol, or the Ionicons glyph without @expo/ui (Expo Go).
   name: SymbolName
   fallback: ComponentProps<typeof Ionicons>['name']
   size: number

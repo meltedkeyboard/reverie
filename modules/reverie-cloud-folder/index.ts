@@ -1,5 +1,4 @@
 import { requireOptionalNativeModule } from 'expo'
-import { Platform } from 'react-native'
 
 type CloudFolderModule = {
   pickFolder(): Promise<string | null>
@@ -11,5 +10,5 @@ type CloudFolderModule = {
   remove(path: string): Promise<void>
 }
 
-// Missing in Expo Go and on the web, where there is nothing to sync with.
-export const cloudFolder = Platform.OS === 'ios' ? requireOptionalNativeModule<CloudFolderModule>('ReverieCloudFolder') : null
+// Missing in Expo Go.
+export const cloudFolder = requireOptionalNativeModule<CloudFolderModule>('ReverieCloudFolder')

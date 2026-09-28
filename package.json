@@ -1,12 +1,11 @@
 {
   "name": "reverie",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
-    "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/build-icons.mjs",
     "postinstall": "patch-package && node scripts/build-icons.mjs"
@@ -47,7 +46,6 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
-    "react-native-web": "^0.21.2",
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {

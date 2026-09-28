@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { Image } from 'expo-image'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,8 +10,6 @@ import {
   View,
   useWindowDimensions,
   type LayoutChangeEvent,
-  type NativeSyntheticEvent,
-  type TextInputKeyPressEventData,
 } from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
@@ -39,7 +36,7 @@ import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import { imageDataUrl, pickMessageImages, type ImageSource } from '@/lib/images'
 import { liquidGlass } from '@/lib/nativeUI'
-import { CHAT_MAX_WIDTH, useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 type Props = {
   height: SharedValue<number>
@@ -53,9 +50,6 @@ type Props = {
   onContinue?: () => void
   onSubmitEdit: (text: string) => void
   onCancelEdit: () => void
-  // Plain (non-worklet) mirror of `height`, for callers that need to react to it outside
-  // reanimated — e.g. reserving list space on web, where extraContentPadding isn't wired up.
-  onHeightChange?: (height: number) => void
   // Drawn inside the field under the text, next to the send button, e.g. who a room's
   // message goes to.
   toolbar?: React.ReactNode
@@ -81,7 +75,6 @@ export function Composer({
   onContinue,
   onSubmitEdit,
   onCancelEdit,
-  onHeightChange,
   toolbar,
   placeholder,
   initialText = '',
@@ -164,18 +157,8 @@ export function Composer({
     }
   }
 
-  // A desktop keyboard has no send button, so Enter sends and Shift+Enter breaks
-  // the line. On a phone Enter keeps inserting a newline as before.
-  const onKeyPress = (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
-    const key = event.nativeEvent as unknown as KeyboardEvent
-    if (key.key !== 'Enter' || key.shiftKey || key.isComposing) return
-    event.preventDefault()
-    if (mode === 'send' || mode === 'save') onPress()
-  }
-
   const measure = (e: LayoutChangeEvent) => {
     height.value = e.nativeEvent.layout.height
-    onHeightChange?.(e.nativeEvent.layout.height)
   }
 
   const sendButton = (
@@ -238,7 +221,6 @@ export function Composer({
             ref={inputRef}
             value={text}
             onChangeText={setText}
-            onKeyPress={Platform.OS === 'web' ? onKeyPress : undefined}
             placeholder={placeholder ?? t('chat.messagePlaceholder')}
             {...inputColors}
             multiline
@@ -339,7 +321,7 @@ const createStyles = (colors: Colors) =>
   bannerClose: { width: 28, height: 28 },
   // Matches MessageRow's cap so the composer lines up with the message column; a no-op
   // on phone widths.
-  row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
+  row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', alignSelf: 'center' },
   field: { flex: 1, borderRadius: 22, padding: 4 },
   hushed: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong },
   attachment: { margin: 6, marginBottom: 2, marginRight: 4 },

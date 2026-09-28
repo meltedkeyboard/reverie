@@ -1,5 +1,5 @@
 import { fetch } from 'expo/fetch'
-import { AppState, Platform } from 'react-native'
+import { AppState } from 'react-native'
 
 import type { ThinkingMode } from '@/db/characters'
 import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/settings'
@@ -55,12 +55,8 @@ async function readServerError(res: Awaited<ReturnType<typeof fetch>>) {
   return new ServerError(t('llm.serverErrorNoMsg', { status: res.status, body: body ? `: ${body.slice(0, 200)}` : '' }))
 }
 
-// In a browser a request blocked by the same-origin policy looks exactly like an
-// unreachable host, and a server started without CORS is the usual reason.
 function unreachable(err: unknown) {
-  const detail = errorMessage(err)
-  const hint = Platform.OS === 'web' ? t('llm.corsHint') : ''
-  return new Error(t('llm.unreachable', { detail, hint }))
+  return new Error(t('llm.unreachable', { detail: errorMessage(err) }))
 }
 
 class TimeoutError extends Error {}
@@ -86,7 +82,7 @@ let localNetworkAsked = false
 // request fails while the alert is up. So the first test of a session sends a throwaway
 // request, and if the alert shows (the app goes inactive), waits for the answer.
 async function askLocalNetworkAccess(url: string) {
-  if (Platform.OS !== 'ios' || localNetworkAsked) return
+  if (localNetworkAsked) return
   localNetworkAsked = true
 
   const ctrl = new AbortController()

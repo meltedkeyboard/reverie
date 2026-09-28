@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo } from 'react'
-import { Appearance, Platform, useColorScheme } from 'react-native'
+import { Appearance, useColorScheme } from 'react-native'
 
 export type Scheme = 'light' | 'dark'
 export type ThemePreference = Scheme | 'system'
@@ -86,10 +86,6 @@ export const fonts = {
 
 export const HEADER_ROW_HEIGHT = 52
 
-// A no-op on phone widths (always narrower than this), but keeps message bubbles and
-// the composer from stretching edge to edge once the desktop pane fills the monitor.
-export const CHAT_MAX_WIDTH = 820
-
 type ThemeContextValue = {
   colors: Colors
   scheme: Scheme
@@ -113,7 +109,7 @@ export function ThemeContextProvider({
   // Alerts, action sheets and the keyboard follow the window rather than the app, so
   // a theme picked in the app is passed down to it; 'system' gives it back to iOS.
   useEffect(() => {
-    if (Platform.OS !== 'web') Appearance.setColorScheme(preference === 'system' ? 'unspecified' : preference)
+    Appearance.setColorScheme(preference === 'system' ? 'unspecified' : preference)
   }, [preference])
   const value = useMemo(
     () => ({ colors: palettes[scheme], scheme, preference, setPreference }),

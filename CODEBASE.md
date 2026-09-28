@@ -1,8 +1,8 @@
 # Codebase map
 
-Where things live and how they connect. For setup and features see the [README](../README.md).
+Where things live and how they connect. For setup and features see the [README](README.md).
 
-Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict). Path alias `@/*` points to `src/`.
+Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict). iOS only. Path alias `@/*` points to `src/`.
 
 ## Find it fast
 
@@ -23,28 +23,27 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Long text fields of the editors and their full-screen editor | `FieldRow` with `expandTitle`, `app/text-editor.tsx`, `src/lib/textDraft.ts` |
 | UI strings | `src/locales/en.json`, `src/locales/ru.json`; lookup in `src/i18n.tsx` |
 | iOS permission texts | `app.json` plugins (English) and `permissions/ru.json` (Russian) |
-| Tab bar: tabs, icons, web fallback | `app/(tabs)/_layout.tsx` |
+| Tab bar: tabs, icons | `app/(tabs)/_layout.tsx` |
 | What search finds and in which order | `app/(tabs)/search/index.tsx` (`ORDER`, settings entries), queries in `src/db/search.ts` |
 | Opening a chat at a message / Settings at a section | `?message=ID` in `chat/[id].tsx` → `focusId` in `ConversationList`; `?section=` in `(tabs)/settings.tsx` |
 | iCloud sync: when it runs, what goes up, conflicts | `src/lib/cloudSync.ts`, the provider in `src/hooks/useCloudSync.tsx`, the native folder in `modules/reverie-cloud-folder` |
 | Where the data lives, the "show in Files" toggle | `src/lib/storage.ts` (folders, startup settling) and `src/db/provider.tsx` (live switch) |
-| Web-only behavior | files with a `.web.ts(x)` suffix |
 | Brand assets and generated icons | `assets/brand/`, `scripts/build-icons.mjs` |
 | CI build | `.github/workflows/ios.yml`, `build-ipa.sh` |
 
 ## Screens (`app/`)
 
 File-based routes (expo-router). `_layout.tsx` is the root: it wires providers in this order:
-`GestureHandlerRootView` > `StartupBoundary` > `KeyboardProvider` > `DatabaseProvider` (`src/db/provider.tsx`, opens the DB and runs `migrate`) > locale and theme contexts > `CloudSyncProvider` > `AppLock` > `AppShell` (stack navigator, plus `Sidebar` on wide web).
+`GestureHandlerRootView` > `StartupBoundary` > `KeyboardProvider` > `DatabaseProvider` (`src/db/provider.tsx`, opens the DB and runs `migrate`) > locale and theme contexts > `CloudSyncProvider` > `AppLock` > `AppShell` (stack navigator).
 
-The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users out (redirect to `/onboarding`) and renders `NativeTabs` from `expo-router/unstable-native-tabs`: the system tab bar, Liquid Glass on iOS 26, with Search as a separate `role="search"` tab. The web build of native tabs is a pill over the top of the page, so the web renders JS `Tabs` instead, with the bar hidden on wide web where the `Sidebar` leads everywhere. On iOS the tab screens set `disableAutomaticContentInsets` and pad themselves from `useSafeAreaInsets`, which inside a tab already includes the tab bar. Everything else is pushed on the root stack over the tabs.
+The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users out (redirect to `/onboarding`) and renders `NativeTabs` from `expo-router/unstable-native-tabs`: the system tab bar, Liquid Glass on iOS 26, with Search as a separate `role="search"` tab. The tab screens set `disableAutomaticContentInsets` and pad themselves from `useSafeAreaInsets`, which inside a tab already includes the tab bar. Everything else is pushed on the root stack over the tabs.
 
 | Route | File | Purpose |
 |---|---|---|
 | `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice |
 | `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder |
 | `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, Continue capsule and where it leads, lock, haptics, private question button, iCloud sync, backup. `?section=` scrolls to a block and flashes it |
-| `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26); a plain field on web |
+| `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26) |
 | `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character |
 | `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead. `?message=ID` opens it scrolled to that message |
 | `/rooms/:roomId` | `rooms/[roomId].tsx` | Scenes of one room, import of a member's chat |
@@ -52,7 +51,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 | `/character/:id` | `character/[id].tsx` | Character editor: prompt, greeting, sampling, thinking mode, background. The avatar spreads into a full-width photo on a pull (`ExpandingAvatar`, fed the scroll offset by `useAnimatedScrollHandler`), the drawn header giving way and the name moving onto the photo. Transforms only: the photo is laid out full size and scaled into the circle, and `useSpreadPush` moves the form down, since animating sizes re-laid out the form every frame |
 | `/background` | `background.tsx` | Background picker, effect and intensity |
 | `/avatar-crop` | `avatar-crop.tsx` | Moving and pinching an avatar picked from Files under a round window; the library and the camera crop in the system editor instead |
-| `/text-editor` | `text-editor.tsx` | A long form text (system prompt, greeting, scene) on the whole screen, like a note; each change goes straight back to the form. Opens without the keyboard; on iOS a wrapper takes the JS touch (`onStartShouldSetResponderCapture`), because `TextInput` focuses itself when any touch ends, a scroll included |
+| `/text-editor` | `text-editor.tsx` | A long form text (system prompt, greeting, scene) on the whole screen, like a note; each change goes straight back to the form. Opens without the keyboard; a wrapper takes the JS touch (`onStartShouldSetResponderCapture`), because `TextInput` focuses itself when any touch ends, a scroll included |
 | `/onboarding` | `onboarding.tsx` | First-run pages, including server setup |
 | `/viewer` | `viewer.tsx` | Full-screen images: pinch and double-tap zoom, swipe between several (a room's cast) |
 | `/about` | `about.tsx` | About page |
@@ -124,7 +123,7 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 
 ## iCloud sync
 
-A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a paid developer account, and the app is signed with a free Apple ID. `modules/reverie-cloud-folder` is a local Expo module (autolinked from `modules/`): it shows the folder picker, keeps a bookmark in `UserDefaults`, and does every read and write under `NSFileCoordinator`, which is what makes iCloud download a placeholder and upload a new file. It is missing in Expo Go and on the web, and then the Settings block is hidden (`cloudSyncAvailable`).
+A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a paid developer account, and the app is signed with a free Apple ID. `modules/reverie-cloud-folder` is a local Expo module (autolinked from `modules/`): it shows the folder picker, keeps a bookmark in `UserDefaults`, and does every read and write under `NSFileCoordinator`, which is what makes iCloud download a placeholder and upload a new file. It is missing in Expo Go, and then the Settings block is hidden (`cloudSyncAvailable`).
 
 - In the folder: `manifest.json` (the revision, written last), `reverie.db` (a `VACUUM INTO` snapshot with `app_settings` removed under `secure_delete`, so the API key never leaves the device) and `avatars/`, `backgrounds/` by their unique names.
 - A device remembers the revision it last matched (`sync_rev`) and whether anything changed since (`sync_dirty`). Only one side changed: it wins. Both: a sheet asks which one to keep, and if it is iCloud's, the local database is first put aside in `earlier-databases` (`keepCopy` in `storage.ts`).
@@ -136,13 +135,13 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 
 | Group | Files |
 |---|---|
-| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, `squareAvatar` cuts a given square, copy), `avatarStore.ts` / `.web.ts` (file or `localStorage` storage, avatars and backgrounds in separate folders) |
-| Backup | `backup.ts` (export, import, wipe), `download.ts` / `.web.ts` (save JSON through the Files "Save as" sheet from `modules/reverie-save-as`, or to a picked folder without it, an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` / `.web.ts` |
-| Dialogs | `dialogs.tsx` (native alerts and sheets), `dialogs.web.tsx` (DOM implementation), `dialogs.types.ts`, `chatDialogs.ts` |
+| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, `squareAvatar` cuts a given square, copy), `avatarStore.ts` (files, avatars and backgrounds in separate folders) |
+| Backup | `backup.ts` (export, import, wipe), `download.ts` (save JSON through the Files "Save as" sheet from `modules/reverie-save-as`, or to a picked folder without it, an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` |
+| Dialogs | `dialogs.tsx` (native alerts and sheets), `chatDialogs.ts` |
 | Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
 | AI helpers | `promptGen.ts`, `titles.ts`, `aside.ts` (the Private request, `characterScene`/`roomScene`) |
-| Platform | `haptics.ts` / `.web.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` / `.web.ts` (where the data lives, the "show in Files" toggle, see below) |
-| Sync | `cloudSync.ts` / `.web.ts` (iCloud Drive folder sync, see above) |
+| Platform | `haptics.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` (where the data lives, the "show in Files" toggle, see below) |
+| Sync | `cloudSync.ts` (iCloud Drive folder sync, see above) |
 | App | `version.ts` (the version shown in About and onboarding), `confirmDelete.ts` (delete that asks unless turned off), `searchScope.ts` (the tab search was opened from, `SettingsSection`) |
 | Message menu | `messageActions.ts` |
 
@@ -154,18 +153,18 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 | `useRoom` | A room scene: the speaker queue, director, autoplay, nudges |
 | `useAside` | The Private thread with the model beside a chat or a scene, in memory only |
 | `useCharacterActions` | Duplicate / delete / export actions for a character |
-| `useLastChat` | The chat behind the "Continue" capsule on the Characters and Rooms tabs: the one opened last, or the one written in last, as set in Settings. Chats without a user message never count. `LastChatProvider` in the tabs layout holds both kinds for the one shared button; `useContinueAnchor` on a tab's root view tells it where the content ends (inside a tab on iOS the safe area includes the tab bar); only the focused tab reports, re-measuring on focus and every half second |
+| `useLastChat` | The chat behind the "Continue" capsule on the Characters and Rooms tabs: the one opened last, or the one written in last, as set in Settings. Chats without a user message never count. `LastChatProvider` in the tabs layout holds both kinds for the one shared button; `useContinueAnchor` on a tab's root view tells it where the content ends (inside a tab the safe area includes the tab bar); only the focused tab reports, re-measuring on focus and every half second |
 | `useConnectionTest` | "Test connection" button state |
 | `useReorder` | Drag-to-reorder lists (`react-native-reorderable-list`) |
 | `useStoredFlag` | React state bound to an `app_settings` flag |
 | `useAbortable` | `AbortController` tied to component lifetime |
-| `useElapsedSeconds`, `useShake`, `useResponsive` | Timer, shake animation, wide-web check |
+| `useElapsedSeconds`, `useShake` | Timer, shake animation |
 
 ## `src/components`
 
-- **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet on iOS), `AsidePanel` (Private).
+- **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet: message bubbles aren't selectable, the long press opens the menu), `AsidePanel` (Private).
 - **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`.
-- **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton` (one for both home tabs, drawn by `(tabs)/_layout.tsx` over them as `HomeContinueButton`; slides its content out and in when it comes to lead to another chat; on a switch between Characters and Rooms the content just changes), `EmptyState`, `Sidebar` (wide web).
+- **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton` (one for both home tabs, drawn by `(tabs)/_layout.tsx` over them as `HomeContinueButton`; slides its content out and in when it comes to lead to another chat; on a switch between Characters and Rooms the content just changes), `EmptyState`.
 - **Forms:** `Field`, `Group`, `ToggleRow`, `Segmented`, `ChipGroup` (a row of `Chip`), `ParamSlider`, `FormScreenHeader`, `PromptGenModal`.
 - **Chrome and glass:** `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs), `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `PillButton`, `Chip`, `SFIcon`.
 - **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `ExpandingAvatar` (the character editor's), `ImageLink`, `HomePattern`, `Wordmark`.
@@ -173,21 +172,17 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 
 ### Liquid Glass
 
-On iOS 26 the controls are Liquid Glass through `GlassSurface` in `Glass.tsx`; it takes a `fallbackStyle` for everything else (older iOS, Android, web), where the same control is the plain surface with a hairline. `nativeUI.ts` says whether glass is available (`liquidGlass`).
+On iOS 26 the controls are Liquid Glass through `GlassSurface` in `Glass.tsx`; it takes a `fallbackStyle` for older iOS, where the same control is the plain surface with a hairline. `nativeUI.ts` says whether glass is available (`liquidGlass`).
 
-- **Buttons:** `Button` (`variant="glass"` for the one call to action), `PillButton` for secondary actions (label in the action's color, `colors.danger` for deleting; `filled` tints the glass with that color under a white label, for backup and delete buttons), `GlassButton` / `GlassGroup` for round icon buttons. `GlassButton` with `tint` fills with the accent; the save checkmark of `FormScreenHeader` is one (`prominent`).
+- **Buttons:** `Button` (`variant="glass"` for the one call to action), `PillButton` for secondary actions (label in the action's color, `colors.danger` for deleting; `filled` tints the glass with that color under a white label, for backup and delete buttons), `GlassButton` / `GlassGroup` for round icon buttons. `GlassButton` with `tint` fills with the accent; the save checkmark of `DrawnFormScreenHeader` is one (`prominent`).
 - **Choices:** `Chip`, tinted with the accent when chosen. It stays regular glass: made clear, it turned the accent-tinted `StarToggle` next to it blue in the dark scheme.
 - **Switches:** `StarToggle` (in `ToggleRow` and the whisper row of `CastSheet`), a round 44 pt glass button with the brand star: clear with an outlined star when off, accent with a white star when on, the star swinging over with a spring.
-- **Inputs:** `Field`, `FieldRow` and the chat `Composer` are clear glass, tinted with `accentSoft` while focused: a capsule for one line, a rounded box for several. A multiline `FieldRow` has a set height (`minHeight`, 110 by default) and scrolls inside; with `expandTitle` it only shows the text (it scrolls), and a tap opens it for editing in `/text-editor`, zooming out of the field on iOS (`Link.AppleZoom`). A multiline `Field` keeps the hairline box (nothing uses one now).
+- **Inputs:** `Field`, `FieldRow` and the chat `Composer` are clear glass, tinted with `accentSoft` while focused: a capsule for one line, a rounded box for several. A multiline `FieldRow` has a set height (`minHeight`, 110 by default) and scrolls inside; with `expandTitle` it only shows the text (it scrolls), and a tap opens it for editing in `/text-editor`, zooming out of the field (`Link.AppleZoom`). A multiline `Field` keeps the hairline box (nothing uses one now).
 - **Cards:** `ListCard` (characters, chats, rooms) and the "server not set up" row above the characters are clear glass (`GlassSurface variant="clear"`) with no fill under it; the regular glass over a solid fill looked like a grey haze in the dark scheme. The glass is a sibling of the content, not inside it: a clipped glass loses its rim at the corners.
 - **Pressing:** interactive glass springs under the finger by itself, so glass controls add no press scale of their own (the two fight and the control jumps); the scale stays only on the non-glass fallback.
 - **Tint changes:** `patches/expo-glass-effect+*.patch` (applied by `patch-package` on `postinstall`) makes a change of `tintColor` on a mounted glass view fade over 0.3 s instead of snapping: UIKit animates only a switch to a new effect object, so the patch builds a fresh `UIGlassEffect` and sets it in `UIView.animate`, after the mount pass. Re-create the patch when updating `expo-glass-effect`.
 - **Corners:** glass draws continuous (squircle) corners, so anything that sits on it or clips next to it uses `borderCurve: 'continuous'`.
 - **Icons on the accent:** `SFIcon` with `onAccent`. SwiftUI draws a symbol dark in the light scheme even with an explicit white color, so the hosted view gets the dark scheme instead.
-
-## Platform split
-
-`Foo.ts` is the native implementation and `Foo.web.ts` the browser one, resolved by Metro. Pairs: `avatarStore`, `cloudSync`, `download`, `dialogs`, `haptics`, `pickJson`, `storage`. Keep their exported signatures identical.
 
 ## Conventions
 

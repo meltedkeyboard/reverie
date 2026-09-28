@@ -17,7 +17,7 @@ import { useTranslation } from '@/i18n'
 import { backgroundDraft } from '@/lib/backgroundDraft'
 import { withAlpha } from '@/lib/color'
 import { liquidGlass } from '@/lib/nativeUI'
-import { CHAT_MAX_WIDTH, useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 const MAX_ZOOM = 4
 
@@ -231,7 +231,6 @@ const createStyles = (colors: Colors) =>
       paddingHorizontal: 10,
       gap: 8,
       width: '100%',
-      maxWidth: CHAT_MAX_WIDTH,
       alignSelf: 'center',
     },
     sample: { position: 'absolute', top: '22%', right: 16, left: 56, alignItems: 'flex-end' },

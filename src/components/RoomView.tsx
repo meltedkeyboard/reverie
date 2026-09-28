@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Keyboard, Platform, StyleSheet, Text, View } from 'react-native'
+import { Keyboard, StyleSheet, Text, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -40,7 +40,7 @@ import * as Haptics from '@/lib/haptics'
 import type { MessageAction } from '@/lib/messageActions'
 import { liquidGlass } from '@/lib/nativeUI'
 import { USER } from '@/lib/room/audience'
-import { CHAT_MAX_WIDTH, fonts, useColors, useStyles, type Colors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 const FLOORS: FloorMode[] = ['addressee', 'reactions', 'open']
 const AUTOPLAY_LENGTHS = [3, 5, 10]
@@ -98,7 +98,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
   const listRef = useRef<ConversationHandle>(null)
   const composerHeight = useSharedValue(0)
-  const [webComposerHeight, setWebComposerHeight] = useState(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [selecting, setSelecting] = useState<string | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
@@ -408,7 +407,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
           renderRow={renderRow}
           extraData={locked}
           composerHeight={composerHeight}
-          webComposerHeight={webComposerHeight}
           header={error ? <ErrorCard message={error} onRetry={retry} /> : null}
           footer={loaded && !empty ? <RoomIntro room={room} cast={cast} /> : null}
           onAwayChange={setAwayFromEnd}
@@ -476,7 +474,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
           initialText={asideOpen ? undefined : sceneDraft.current}
           onTextChange={asideOpen ? undefined : (text) => (sceneDraft.current = text)}
           autoFocus={asideOpen}
-          onHeightChange={Platform.OS === 'web' ? setWebComposerHeight : undefined}
           generating={asideOpen ? aside.phase !== 'idle' : !idle}
           editing={asideOpen ? null : editing}
           placeholder={asideOpen ? t('chat.privatePlaceholder') : placeholder}
@@ -635,7 +632,6 @@ const createStyles = (colors: Colors) =>
       lineHeight: 22,
       marginTop: 8,
       textAlign: 'center',
-      maxWidth: CHAT_MAX_WIDTH,
     },
     introMeta: { color: colors.textFaint, fontSize: 14, marginTop: 8, textAlign: 'center' },
     empty: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },

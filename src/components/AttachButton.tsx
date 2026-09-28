@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { Platform, Pressable, View } from 'react-native'
+import { View } from 'react-native'
 
 import { useColors } from '@/theme'
 
@@ -22,20 +22,6 @@ export function AttachButton({ disabled, onPick }: Props) {
       {icon}
     </GlassSurface>
   )
-
-  // A browser has no separate camera flow, the file dialog covers it.
-  if (Platform.OS === 'web') {
-    return (
-      <Pressable
-        onPress={() => onPick('library')}
-        disabled={disabled}
-        hitSlop={6}
-        style={({ pressed }) => (pressed || disabled) && { opacity: 0.55 }}
-      >
-        {circle}
-      </Pressable>
-    )
-  }
 
   return (
     <ImageSourceMenu

@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ChipGroup } from '@/components/ChipGroup'
@@ -301,32 +301,28 @@ export default function SettingsScreen() {
 
           <Divider />
 
-          {Platform.OS !== 'web' ? (
-            <>
-              <Eyebrow label={t('settings.security')} color={colors.accent} />
-              {block(
-                'faceId',
-                <ToggleRow
-                  label={t('settings.requireFaceId')}
-                  note={t('settings.requireFaceIdNote')}
-                  value={appLock}
-                  onValueChange={toggleAppLock}
-                />
-              )}
-              {block(
-                'files',
-                <ToggleRow
-                  label={t('settings.showInFiles')}
-                  note={t('settings.showInFilesNote')}
-                  value={showInFiles}
-                  onValueChange={toggleShowInFiles}
-                  disabled={movingFiles}
-                />
-              )}
+          <Eyebrow label={t('settings.security')} color={colors.accent} />
+          {block(
+            'faceId',
+            <ToggleRow
+              label={t('settings.requireFaceId')}
+              note={t('settings.requireFaceIdNote')}
+              value={appLock}
+              onValueChange={toggleAppLock}
+            />
+          )}
+          {block(
+            'files',
+            <ToggleRow
+              label={t('settings.showInFiles')}
+              note={t('settings.showInFilesNote')}
+              value={showInFiles}
+              onValueChange={toggleShowInFiles}
+              disabled={movingFiles}
+            />
+          )}
 
-              <Divider />
-            </>
-          ) : null}
+          <Divider />
 
           {block(
             'server',

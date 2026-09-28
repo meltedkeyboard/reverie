@@ -1,4 +1,3 @@
-import { Platform } from 'react-native'
 
 import { t } from '@/i18n'
 import type { Role } from '@/db/messages'
@@ -24,8 +23,7 @@ export function messageActions(message: { role: Role; content: string }, { canRe
   const items: ActionItem[] = []
   if (message.content) {
     items.push({ action: 'copy', label: t('action.copy'), systemImage: 'doc.on.doc' })
-    // In the browser the text is selectable in place.
-    if (Platform.OS !== 'web') items.push({ action: 'select', label: t('action.selectText'), systemImage: 'text.cursor' })
+    items.push({ action: 'select', label: t('action.selectText'), systemImage: 'text.cursor' })
   }
   if (!locked) {
     if (canRegenerate) {

@@ -2,7 +2,7 @@
   <img src="assets/brand/wordmark.svg" alt="Reverie" width="420" />
 </p>
 
-Roleplay chat client built with Expo (iOS and web). It talks directly to a local model server over an OpenAI-compatible API (LM Studio, llama.cpp, Ollama). All data stays on the device.
+Roleplay chat client for iOS, built with Expo. It talks directly to a local model server over an OpenAI-compatible API (LM Studio, llama.cpp, Ollama). All data stays on the device.
 
 ## Features
 
@@ -18,9 +18,9 @@ Roleplay chat client built with Expo (iOS and web). It talks directly to a local
 - Private questions: the eye in a chat or a scene asks the model about it aside, like `/btw` — it reads the chat and answers out of character, and nothing is saved or seen by the characters.
 - App lock with Face ID, haptics toggle, "Continue" capsule on the home screen that jumps to the last active chat.
 - Backup export and import as JSON (the API key is not included).
-- iCloud sync (native build only): the data is kept in a folder picked in iCloud Drive and picked up by the other devices. Works with an app signed by a free Apple ID, see below.
+- iCloud sync (not in Expo Go): the data is kept in a folder picked in iCloud Drive and picked up by the other devices. Works with an app signed by a free Apple ID, see below.
 - English and Russian UI.
-- iOS 26 Liquid Glass UI where available, with a plain fallback on older iOS and in the browser.
+- iOS 26 Liquid Glass UI where available, with a plain fallback on older iOS.
 
 ## Quick start
 
@@ -31,15 +31,7 @@ npx expo start
 
 Open the app in Expo Go and set the server address in settings, for example `http://192.168.1.10:1234`. A trailing `/v1` is stripped. The API key is optional.
 
-Web:
-
-```
-npm run web
-```
-
-Static build: `npx expo export --platform web`, output goes to `dist/`.
-
-Other scripts: `npm run typecheck`, `npm run icons` (renders icons from `assets/brand` into `assets/images/` and `public/`; also runs on `postinstall`).
+Other scripts: `npm run typecheck`, `npm run icons` (renders icons from `assets/brand` into `assets/images/`; also runs on `postinstall`).
 
 ## Building an .ipa
 
@@ -59,28 +51,16 @@ To build locally on a Mac, run `./build-ipa.sh` (needs Xcode, CocoaPods, Node 24
 - `src/lib/` - avatars, backup, dialogs, prompt generation, `*action*` parsing, haptics.
 - `src/components/` - UI components.
 - `src/locales/` - `en.json` and `ru.json`. `permissions/ru.json` holds localized iOS permission strings.
-- `public/index.html` - web page shell. `metro.config.js` - `.wasm` support.
 
-A detailed map of the code (where to change what, data flow, conventions) is in [docs/CODEBASE.md](docs/CODEBASE.md).
-
-Files with a `.web` suffix (`avatarStore`, `download`, `dialogs`, `haptics`, `pickJson`) are browser implementations of the same interface. Everything else is shared.
+A detailed map of the code (where to change what, data flow, conventions) is in [CODEBASE.md](CODEBASE.md).
 
 ## Implementation notes
 
-- Streaming uses `fetch` from `expo/fetch`, because the React Native `fetch` does not expose the response body incrementally. On web it is the standard `fetch`.
-- Native menus (the "+" button, the message "..." menu, the chat title capsule) are SwiftUI `Menu` from `@expo/ui`. The button is drawn by React Native and embedded via `RNHostView`, so the menu morphs out of the button. Without the `ExpoUI` module, and on web, an action sheet is shown instead (`src/components/NativeMenu.tsx`).
+- Streaming uses `fetch` from `expo/fetch`, because the React Native `fetch` does not expose the response body incrementally.
+- Native menus (the "+" button, the message "..." menu, the chat title capsule) are SwiftUI `Menu` from `@expo/ui`. The button is drawn by React Native and embedded via `RNHostView`, so the menu morphs out of the button. Without the `ExpoUI` module (Expo Go) an action sheet is shown instead (`src/components/NativeMenu.tsx`).
 - Native modules for the glass UI are loaded in `src/lib/nativeUI.ts` only if they exist in the build.
 - The database lives in iOS Documents. Avatars are files, the database stores only the file name.
 - Plain HTTP servers are allowed through `NSAllowsArbitraryLoads` in `app.json`.
 - A chat where the user wrote nothing is deleted when returning to the list.
 - The "Continue" capsule state is stored in `app_settings` (`src/db/continue.ts`).
 - iCloud sync does not use the iCloud entitlement (CloudKit or an app container), which a free Apple ID cannot sign. The user picks a folder in iCloud Drive through the document picker instead, and the app keeps a bookmark to it (`modules/reverie-cloud-folder`). The whole database and the pictures go there as a snapshot; when both devices changed since the last sync, the user picks which copy wins.
-
-## Web notes
-
-- The model server must send CORS headers: in LM Studio it is a server setting, in Ollama set `OLLAMA_ORIGINS`. A page served over HTTPS cannot call an HTTP server.
-- SQLite runs on WebAssembly and OPFS. Avatars are kept in `localStorage`, which is limited to a few megabytes. Data is bound to the origin and browser.
-- The database is available to one tab only. A second tab shows an error instead of an empty screen.
-- `Alert` and `ActionSheetIOS` do not work on web, so dialogs are drawn by `src/lib/dialogs.web.tsx`.
-- Backup export downloads a file instead of opening the share sheet.
-- Enter sends a message, Shift+Enter inserts a newline.

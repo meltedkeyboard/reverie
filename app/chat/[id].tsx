@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Platform, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -162,10 +162,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
 
   const listRef = useRef<ConversationHandle>(null)
   const composerHeight = useSharedValue(0)
-  // react-native-keyboard-controller's extraContentPadding keeps the list clear of the
-  // composer on native; on web that mechanism doesn't reserve any space, so the plain
-  // height below drives an explicit padding instead (see contentContainerStyle).
-  const [webComposerHeight, setWebComposerHeight] = useState(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [selecting, setSelecting] = useState<string | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
@@ -319,7 +315,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           renderRow={renderRow}
           extraData={locked}
           composerHeight={composerHeight}
-          webComposerHeight={webComposerHeight}
           header={errorCard}
           footer={loaded && !empty ? <Intro character={character} chat={chat} /> : null}
           onAwayChange={setAwayFromEnd}
@@ -395,7 +390,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           initialText={asideOpen ? undefined : sceneDraft.current}
           onTextChange={asideOpen ? undefined : (text) => (sceneDraft.current = text)}
           autoFocus={asideOpen}
-          onHeightChange={Platform.OS === 'web' ? setWebComposerHeight : undefined}
           generating={asideOpen ? aside.phase !== 'idle' : !idle}
           editing={asideOpen ? null : editing}
           accessory={asidePanel ?? (awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null)}

@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactElement, type Ref } from 'react'
 import {
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -43,8 +42,6 @@ type Props = {
   renderRow: (row: RowMessage) => ReactElement
   extraData?: unknown
   composerHeight: SharedValue<number>
-  // On web the composer's space is reserved by padding, see contentContainerStyle.
-  webComposerHeight: number
   header?: ReactElement | null
   footer?: ReactElement | null
   onAwayChange: (away: boolean) => void
@@ -60,7 +57,6 @@ export function ConversationList({
   renderRow,
   extraData,
   composerHeight,
-  webComposerHeight,
   header,
   footer,
   onAwayChange,
@@ -195,7 +191,7 @@ export function ConversationList({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
         // The list is inverted, so this visually sits just above the composer.
-        paddingTop: 8 + (Platform.OS === 'web' ? webComposerHeight : 0),
+        paddingTop: 8,
         paddingBottom: headerHeight + 12,
       }}
     />

@@ -1,14 +1,13 @@
 import type Ionicons from '@expo/vector-icons/Ionicons'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Platform, Pressable, SectionList, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle } from 'react-native'
+import { Pressable, SectionList, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
 import type { SearchBarCommands } from 'react-native-screens'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Avatar } from '@/components/Avatar'
 import { AvatarStack } from '@/components/AvatarStack'
 import { EmptyState } from '@/components/EmptyState'
-import { GlassHeader, TabTitle, useScreenPadding } from '@/components/GlassHeader'
+import { TabTitle } from '@/components/GlassHeader'
 import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
@@ -61,8 +60,6 @@ export default function SearchScreen() {
   const router = useRouter()
   const colors = useColors()
   const styles = useStyles(createStyles)
-  const insets = useSafeAreaInsets()
-  const webPadding = useScreenPadding('list')
   const { t, locale } = useTranslation()
   const searchBar = useRef<SearchBarCommands>(null)
   const [query, setQuery] = useState('')
@@ -111,6 +108,8 @@ export default function SearchScreen() {
       { label: t('settings.privateButton'), keywords: [t('settings.chats')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('private') },
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
+      { label: t('settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
+      { label: t('settings.showInFiles'), keywords: [t('settings.security')], symbol: 'folder', fallback: 'folder-outline', href: settingsAt('files') },
       {
         label: t('settings.server'),
         keywords: [t('settings.baseUrlLabel'), t('settings.apiKeyLabel'), t('settings.modelLabel'), t('settings.testConnection')],
@@ -122,14 +121,6 @@ export default function SearchScreen() {
       { label: t('settings.aboutReverie'), keywords: [t('settings.aboutTitle')], symbol: 'info.circle', fallback: 'information-circle-outline', href: '/about' },
       { label: t('settings.wipeAll'), keywords: [t('settings.dangerZone')], symbol: 'exclamationmark.triangle', fallback: 'warning-outline', href: settingsAt('wipe'), danger: true },
     ]
-    if (Platform.OS !== 'web') {
-      entries.splice(
-        6,
-        0,
-        { label: t('settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
-        { label: t('settings.showInFiles'), keywords: [t('settings.security')], symbol: 'folder', fallback: 'folder-outline', href: settingsAt('files') }
-      )
-    }
     if (cloudSyncAvailable) {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
       entries.splice(backup, 0, { label: t('settings.icloud'), keywords: [t('settings.icloudSync'), 'iCloud'], symbol: 'icloud', fallback: 'cloud-outline', href: settingsAt('icloud') })
@@ -219,14 +210,13 @@ export default function SearchScreen() {
     )
   ) : null
 
-  const list = (contentStyle: object, header?: React.ReactElement) => (
+  const list = (contentStyle: object) => (
     <SectionList
       sections={sections}
       keyExtractor={(item) => item.key}
       renderItem={renderItem}
       renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}
       stickySectionHeadersEnabled={false}
-      ListHeaderComponent={header}
       ListEmptyComponent={empty}
       contentContainerStyle={[styles.content, contentStyle]}
       contentInsetAdjustmentBehavior="automatic"
@@ -235,39 +225,13 @@ export default function SearchScreen() {
     />
   )
 
-  // The web has no native search bar: the field is the first thing in the list, under
-  // the same drawn header as the other tabs.
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ headerShown: false }} />
-        {list(
-          webPadding,
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={placeholder}
-            placeholderTextColor={colors.textFaint}
-            autoFocus
-            autoCorrect={false}
-            style={styles.webField}
-          />
-        )}
-        <GlassHeader floating>
-          <TabTitle>{t('search.title')}</TabTitle>
-        </GlassHeader>
-      </View>
-    )
-  }
-
   return (
     <View style={styles.screen}>
       <Stack.Screen
         options={{
           headerShown: true,
-          // iOS draws the scroll edge effect under a transparent bar; Android gets a plain one.
-          headerTransparent: Platform.OS === 'ios',
-          headerStyle: Platform.OS === 'ios' ? undefined : { backgroundColor: colors.bg },
+          // The scroll edge effect is drawn under a transparent bar.
+          headerTransparent: true,
           headerShadowVisible: false,
           headerTitleAlign: 'left',
           headerTitle: () => <TabTitle>{t('search.title')}</TabTitle>,
@@ -284,7 +248,7 @@ export default function SearchScreen() {
           },
         }}
       />
-      {list({ paddingBottom: Platform.OS === 'ios' ? 24 : insets.bottom + 24 })}
+      {list({ paddingBottom: 24 })}
     </View>
   )
 }
@@ -414,17 +378,6 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     content: { flexGrow: 1, paddingHorizontal: 16 },
-    webField: {
-      height: 44,
-      borderRadius: 22,
-      paddingHorizontal: 18,
-      marginBottom: 8,
-      fontSize: 16,
-      color: colors.text,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
     section: {
       color: colors.textFaint,
       fontSize: 12,

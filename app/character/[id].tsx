@@ -1,6 +1,6 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedReaction, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
@@ -11,7 +11,7 @@ import { ChatBackground } from '@/components/ChatBackground'
 import { ImageSourceMenu } from '@/components/ImageSourceMenu'
 import { ChipGroup } from '@/components/ChipGroup'
 import { ExpandingAvatar, useSpreadPush } from '@/components/ExpandingAvatar'
-import { BarButton, DrawnFormScreenHeader, FormScreenHeader } from '@/components/FormScreenHeader'
+import { BarButton, DrawnFormScreenHeader } from '@/components/FormScreenHeader'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
@@ -433,31 +433,22 @@ export default function CharacterEditorScreen() {
       ) : null}
 
       {photoOpen ? <StatusBar style="light" /> : null}
-      {/* Opened with a zoom from the character list, so on iOS the header is drawn here
-          rather than by the native bar; see DrawnFormScreenHeader. */}
-      {Platform.OS === 'ios' ? (
-        <DrawnFormScreenHeader
-          title={title}
-          overPhoto={photoSpread}
-          right={
-            <BarButton
-              symbol="checkmark"
-              fallback="checkmark"
-              disabled={!canSave}
-              onPress={onSave}
-              accessibilityLabel={t('common.save')}
-              prominent
-            />
-          }
-        />
-      ) : (
-        <>
-          <FormScreenHeader title={title} />
-          <Stack.Toolbar placement="right">
-            <Stack.Toolbar.Button icon="checkmark" disabled={!canSave} onPress={onSave} />
-          </Stack.Toolbar>
-        </>
-      )}
+      {/* Opened with a zoom from the character list, so the header is drawn here rather
+          than by the native bar; see DrawnFormScreenHeader. */}
+      <DrawnFormScreenHeader
+        title={title}
+        overPhoto={photoSpread}
+        right={
+          <BarButton
+            symbol="checkmark"
+            fallback="checkmark"
+            disabled={!canSave}
+            onPress={onSave}
+            accessibilityLabel={t('common.save')}
+            prominent
+          />
+        }
+      />
     </View>
   )
 }

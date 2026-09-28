@@ -19,10 +19,9 @@ import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
 import { useReorder } from '@/hooks/useReorder'
-import { useIsWideWeb } from '@/hooks/useResponsive'
 import { useTranslation } from '@/i18n'
 import { liquidGlass } from '@/lib/nativeUI'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharactersScreen() {
   const db = useDatabase()
@@ -31,7 +30,6 @@ export default function CharactersScreen() {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
-  const isWideWeb = useIsWideWeb()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
   const [serverSet, setServerSet] = useState(true)
   const { lastChat, reload: reloadLastChat } = useLastChat('character')
@@ -53,17 +51,6 @@ export default function CharactersScreen() {
 
   const { menuItems, confirmDelete } = useCharacterActions(reload)
   const reorder = useReorder(characters, setCharacters, (ids) => setCharacterOrder(db, ids))
-
-  // The character list already lives in the sidebar on wide web, so the root route
-  // just welcomes the visitor instead of repeating it.
-  if (isWideWeb) {
-    return (
-      <View style={styles.wideWelcome}>
-        <Text style={styles.wideWelcomeTitle}>{t('characters.title')}</Text>
-        <Text style={styles.wideWelcomeText}>{t('characters.wideWelcomeText')}</Text>
-      </View>
-    )
-  }
 
   return (
     <View style={styles.screen} ref={anchor.ref} onLayout={anchor.onLayout}>
@@ -138,9 +125,6 @@ export default function CharactersScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  wideWelcome: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, paddingHorizontal: 40 },
-  wideWelcomeTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 26, marginBottom: 10 },
-  wideWelcomeText: { color: colors.textMuted, fontSize: 15, textAlign: 'center', maxWidth: 360, lineHeight: 21 },
   notice: {
     flexDirection: 'row',
     alignItems: 'center',

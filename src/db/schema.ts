@@ -53,8 +53,7 @@ const MIGRATIONS = [
     ALTER TABLE messages_v2 RENAME TO messages;
     CREATE INDEX idx_messages_chat ON messages(chat_id, id);
   `,
-  // The picture is kept as base64 JPEG right in the row: the model needs base64 anyway,
-  // and in the browser localStorage is too small for photos.
+  // The picture is kept as base64 JPEG right in the row: the model needs base64 anyway.
   `
     ALTER TABLE chats ADD COLUMN title TEXT;
     ALTER TABLE messages ADD COLUMN image TEXT;

@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { Platform, StyleSheet, TextInput, View } from 'react-native'
+import { StyleSheet, TextInput, View } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useInputColors } from '@/components/Field'
-import { DrawnFormScreenHeader, FormScreenHeader } from '@/components/FormScreenHeader'
+import { DrawnFormScreenHeader } from '@/components/FormScreenHeader'
 import { useHeaderHeight } from '@/components/GlassHeader'
 import { textDraft } from '@/lib/textDraft'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -31,9 +31,9 @@ export default function TextEditorScreen() {
   return (
     <KeyboardAvoidingView behavior="padding" style={[styles.screen, { backgroundColor: colors.bg }]}>
       {/* A TextInput focuses itself when a touch ends, even one that scrolled the text,
-          since a native scroll doesn't cancel the JS touch. On iOS this view takes the
-          JS touch instead; a tap still puts the caret in natively, where it landed. */}
-      <View style={styles.screen} onStartShouldSetResponderCapture={Platform.OS === 'ios' ? () => true : undefined}>
+          since a native scroll doesn't cancel the JS touch. This view takes the JS touch
+          instead; a tap still puts the caret in natively, where it landed. */}
+      <View style={styles.screen} onStartShouldSetResponderCapture={() => true}>
         <TextInput
           {...inputColors}
           value={text}
@@ -47,9 +47,9 @@ export default function TextEditorScreen() {
           style={[styles.input, { paddingTop: headerHeight + 12, paddingBottom: insets.bottom + 24 }]}
         />
       </View>
-      {/* Opened with a zoom from the field, so on iOS the header is drawn here rather than
-          by the native bar; see DrawnFormScreenHeader. */}
-      {Platform.OS === 'ios' ? <DrawnFormScreenHeader title={draft.title} /> : <FormScreenHeader title={draft.title} />}
+      {/* Opened with a zoom from the field, so the header is drawn here rather than by the
+          native bar; see DrawnFormScreenHeader. */}
+      <DrawnFormScreenHeader title={draft.title} />
     </KeyboardAvoidingView>
   )
 }

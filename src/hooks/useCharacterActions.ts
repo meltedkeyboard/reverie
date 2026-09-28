@@ -9,16 +9,14 @@ import type { MenuItem } from '@/components/NativeMenu'
 import { confirmDeletion } from '@/lib/confirmDelete'
 import { showSheet } from '@/lib/dialogs'
 
-// What a character in a list can do: start a chat, be edited or deleted. Shared by the
-// home screen and the wide-web sidebar; reload re-lists them after a delete, and
-// onStart lets the caller react before the new chat opens.
-export function useCharacterActions(reload: () => void, onStart?: (character: CharacterPreview) => void) {
+// What a character in the list can do: start a chat, be edited or deleted; reload
+// re-lists them after a delete.
+export function useCharacterActions(reload: () => void) {
   const db = useDatabase()
   const router = useRouter()
   const { t } = useTranslation()
 
   const startChat = async (character: CharacterPreview) => {
-    onStart?.(character)
     router.push(`/chat/${await createChat(db, character)}`)
   }
 

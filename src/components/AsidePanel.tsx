@@ -16,7 +16,7 @@ import { useTranslation } from '@/i18n'
 import type { AsideQuestion, AsideTurn } from '@/lib/aside'
 import { imageDataUrl } from '@/lib/images'
 import type { ReplyFrame } from '@/lib/replyStream'
-import { CHAT_MAX_WIDTH, fonts, useColors, useStyles, type Colors } from '@/theme'
+import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 import { ErrorCard } from './ConversationList'
 import { GlassSurface } from './Glass'
@@ -149,7 +149,7 @@ function Question({ text }: { text: AsideQuestion }) {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    slot: { alignSelf: 'center', width: '100%', maxWidth: CHAT_MAX_WIDTH, paddingHorizontal: 10, marginBottom: 8, transformOrigin: 'bottom' },
+    slot: { alignSelf: 'center', width: '100%', paddingHorizontal: 10, marginBottom: 8, transformOrigin: 'bottom' },
     panel: { flexShrink: 1 },
     layer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 24, borderCurve: 'continuous' },
     clip: { flexShrink: 1, borderRadius: 24, borderCurve: 'continuous', overflow: 'hidden' },

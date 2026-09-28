@@ -103,7 +103,6 @@
   "characters.emptyTitle": "No one here yet",
   "characters.emptyText": "Create your first character and start a story",
   "characters.createCharacter": "Create character",
-  "characters.wideWelcomeText": "Pick a character on the left or create a new one",
 
   "onboarding.slide1.title": "Your own characters",
   "onboarding.slide1.text": "A name, a personality, a way of speaking — everything as you wish",
@@ -273,13 +272,10 @@
   "characterCard.noDescription": "No description",
 
   "startup.dbFailedTitle": "Couldn't open the database",
-  "startup.webSingleTab": "The database is open in another tab. Close it and reload the page",
-  "startup.reload": "Reload",
 
   "llm.serverError": "The server returned error {{status}}: {{msg}}",
   "llm.serverErrorNoMsg": "The server returned error {{status}}{{body}}",
-  "llm.corsHint": ". If the server is running, enable CORS on it",
-  "llm.unreachable": "Server unreachable: {{detail}}{{hint}}",
+  "llm.unreachable": "Server unreachable: {{detail}}",
   "llm.setBaseUrl": "Set the server address",
   "llm.timeout": "The server didn't respond within 8 seconds. Check the address and network",
   "llm.baseUrlMissing": "Set the server address in settings",
@@ -300,7 +296,6 @@
   "images.saveFailed": "Couldn't save the photo",
   "images.savePermission": "No permission to add photos. Enable it in iOS settings",
 
-  "avatarStore.noSpace": "The browser has no room left for the avatar",
 
   "backup.corrupted": "The file is corrupted or isn't a Reverie backup",
   "backup.notBackup": "This isn't a Reverie backup",

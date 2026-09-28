@@ -8,7 +8,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { useTranslation } from '@/i18n'
 import { liquidGlass } from '@/lib/nativeUI'
-import { CHAT_MAX_WIDTH, useStyles, useTheme, type Colors } from '@/theme'
+import { useStyles, useTheme, type Colors } from '@/theme'
 
 import { GlassButton, GlassSurface } from './Glass'
 
@@ -212,7 +212,7 @@ const createStyles = (colors: Colors) =>
     backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.45)' },
     // Glass takes its look from what is behind it, so the screen is dimmed less.
     backdropGlass: { backgroundColor: 'rgba(0, 0, 0, 0.2)' },
-    slot: { width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center', marginBottom: INSET },
+    slot: { width: '100%', alignSelf: 'center', marginBottom: INSET },
     sheet: { flexShrink: 1, borderRadius: 38 },
     solid: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
     header: { paddingTop: 7, paddingBottom: 12, paddingHorizontal: 16 },
