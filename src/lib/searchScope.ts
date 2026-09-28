@@ -25,6 +25,7 @@ export type SettingsSection =
   | 'haptics'
   | 'faceId'
   | 'files'
+  | 'icloud'
   | 'server'
   | 'backup'
   | 'wipe'

@@ -214,6 +214,15 @@ function writeMarker(value: boolean) {
   }
 }
 
+// A copy of the database put aside next to the ones settle() keeps, for when the data here
+// is about to be replaced with the iCloud copy.
+export async function keepCopy(db: SQLiteDatabase) {
+  const shelf = new Directory(hiddenRoot, 'earlier-databases', `${Date.now()}-before-icloud`)
+  shelf.create({ intermediates: true, idempotent: true })
+  const path = `${plainPath(shelf)}/${DATABASE_NAME}`
+  await db.execAsync(`VACUUM INTO '${path.replace(/'/g, "''")}'`)
+}
+
 export function discardInactiveDatabase() {
   const stale = databaseFolder(rootFor(!shown))
   if (stale.exists && hasDatabase(rootFor(shown))) stale.delete()

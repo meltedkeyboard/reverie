@@ -12,6 +12,7 @@ import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { isHapticsEnabled } from '@/db/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
+import { CloudSyncProvider } from '@/hooks/useCloudSync'
 import { useIsWideWeb } from '@/hooks/useResponsive'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { DialogHost } from '@/lib/dialogs'
@@ -65,9 +66,11 @@ function ThemedApp() {
   return (
     <LocaleContextProvider preference={localePreference} setPreference={setLocalePreference}>
       <ThemeContextProvider preference={preference} setPreference={setPreference}>
-        <AppLock>
-          <AppShell />
-        </AppLock>
+        <CloudSyncProvider>
+          <AppLock>
+            <AppShell />
+          </AppLock>
+        </CloudSyncProvider>
       </ThemeContextProvider>
     </LocaleContextProvider>
   )

@@ -1,8 +1,8 @@
 node_modules/
 .expo/
 dist/
-ios/
-android/
+/ios/
+/android/
 *.log
 
 # Rendered from assets/brand by scripts/build-icons.mjs

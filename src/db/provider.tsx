@@ -7,12 +7,15 @@ import { databaseDirectory, discardInactiveDatabase, moveStorage } from '@/lib/s
 type DatabaseContextValue = {
   db: SQLiteDatabase
   setShownInFiles: (shown: boolean) => Promise<void>
+  reload: () => Promise<void>
 }
 
 const DatabaseContext = createContext<DatabaseContextValue | null>(null)
 
-async function openReverieDatabase() {
-  const db = await openDatabaseAsync('reverie.db', undefined, databaseDirectory())
+// expo-sqlite hands out one cached connection per path, and closing the old one would close
+// that too, so a reload of the same file asks for a new connection.
+async function openReverieDatabase(newConnection = false) {
+  const db = await openDatabaseAsync('reverie.db', newConnection ? { useNewConnection: true } : undefined, databaseDirectory())
   await migrate(db)
   return db
 }
@@ -79,7 +82,17 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     [db]
   )
 
-  const value = useMemo(() => (db ? { db, setShownInFiles } : null), [db, setShownInFiles])
+  // For after the data was replaced underneath (an iCloud pull): the same file on a new
+  // connection, so every screen reloads through its [db] effects.
+  const reload = useCallback(async () => {
+    if (!db) return
+    const next = await openReverieDatabase(true)
+    retired.current = db
+    current.current = next
+    setDb(next)
+  }, [db])
+
+  const value = useMemo(() => (db ? { db, setShownInFiles, reload } : null), [db, setShownInFiles, reload])
 
   // Thrown during render so StartupBoundary shows why the app can't start.
   if (error) throw error
@@ -99,4 +112,8 @@ export function useDatabase() {
 
 export function useShowInFiles() {
   return useDatabaseContext().setShownInFiles
+}
+
+export function useReloadDatabase() {
+  return useDatabaseContext().reload
 }

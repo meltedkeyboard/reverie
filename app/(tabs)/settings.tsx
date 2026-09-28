@@ -20,12 +20,14 @@ import { isHapticsEnabled, setHapticsEnabled } from '@/db/haptics'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
+import { useCloudSync } from '@/hooks/useCloudSync'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
+import { formatWhen } from '@/lib/format'
 import type { SettingsSection } from '@/lib/searchScope'
 import { isShownInFiles } from '@/lib/storage'
 import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
@@ -37,7 +39,7 @@ export default function SettingsScreen() {
   const colors = useColors()
   const { preference, setPreference } = useTheme()
   const styles = useStyles(createStyles)
-  const { t, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
+  const { t, locale, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
   const headerHeight = useHeaderHeight()
   const { section } = useLocalSearchParams<{ section?: SettingsSection }>()
   const scrollRef = useRef<KeyboardAwareScrollViewRef>(null)
@@ -121,6 +123,24 @@ export default function SettingsScreen() {
       setMovingFiles(false)
     }
   }
+
+  const cloudSync = useCloudSync()
+
+  const toggleCloudSync = async (on: boolean) => {
+    try {
+      if (on) await cloudSync.enable()
+      else await cloudSync.disable()
+    } catch (err) {
+      showMessage(t('sync.failedTitle'), errorMessage(err))
+    }
+  }
+
+  const cloudStatus = [
+    cloudSync.folder ? t('settings.icloudFolder', { folder: cloudSync.folder }) : t('settings.icloudNoFolder'),
+    cloudSync.syncedAt ? t('settings.icloudSyncedAt', { when: formatWhen(cloudSync.syncedAt, locale) }) : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   const toggleAppLock = async (enabled: boolean) => {
     if (enabled) {
@@ -359,6 +379,46 @@ export default function SettingsScreen() {
           )}
 
           <Divider />
+
+          {cloudSync.available ? (
+            <>
+              {block(
+                'icloud',
+                <>
+                  <Eyebrow label={t('settings.icloud')} color={colors.accent} />
+                  <ToggleRow
+                    label={t('settings.icloudSync')}
+                    note={t('settings.icloudSyncNote')}
+                    value={cloudSync.enabled}
+                    onValueChange={toggleCloudSync}
+                    disabled={cloudSync.syncing}
+                  />
+                  {cloudSync.enabled ? (
+                    <>
+                      <Text style={styles.note}>{cloudStatus}</Text>
+                      <View style={styles.buttonPairRow}>
+                        <PillButton
+                          label={t('settings.icloudSyncNow')}
+                          onPress={cloudSync.syncNow}
+                          loading={cloudSync.syncing}
+                          disabled={cloudSync.syncing}
+                          style={styles.pairButton}
+                        />
+                        <PillButton
+                          label={t('settings.icloudChangeFolder')}
+                          onPress={() => cloudSync.changeFolder().catch((err) => showMessage(t('sync.failedTitle'), errorMessage(err)))}
+                          disabled={cloudSync.syncing}
+                          style={styles.pairButton}
+                        />
+                      </View>
+                    </>
+                  ) : null}
+                </>
+              )}
+
+              <Divider />
+            </>
+          ) : null}
 
           {block(
             'backup',

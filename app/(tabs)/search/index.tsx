@@ -15,6 +15,7 @@ import { useDatabase } from '@/db/provider'
 import { listRooms, type RoomPreview } from '@/db/rooms'
 import { listSearchChats, searchMessages, type SearchChat, type SearchMessage } from '@/db/search'
 import { useTranslation } from '@/i18n'
+import { cloudSyncAvailable } from '@/lib/cloudSync'
 import { formatWhen } from '@/lib/format'
 import { characterPreview } from '@/lib/roleplay'
 import { getSearchScope, type SearchScope, type SettingsSection } from '@/lib/searchScope'
@@ -128,6 +129,10 @@ export default function SearchScreen() {
         { label: t('settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
         { label: t('settings.showInFiles'), keywords: [t('settings.security')], symbol: 'folder', fallback: 'folder-outline', href: settingsAt('files') }
       )
+    }
+    if (cloudSyncAvailable) {
+      const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
+      entries.splice(backup, 0, { label: t('settings.icloud'), keywords: [t('settings.icloudSync'), 'iCloud'], symbol: 'icloud', fallback: 'cloud-outline', href: settingsAt('icloud') })
     }
     return entries
   }, [t])

@@ -52,6 +52,14 @@
   "settings.testConnection": "Проверить связь",
   "settings.connectedWithModels": "Подключено, моделей: {{count}}",
   "settings.connected": "Подключено",
+  "settings.icloud": "iCloud",
+  "settings.icloudSync": "Синхронизация через iCloud Drive",
+  "settings.icloudSyncNote": "Персонажи, комнаты и переписки хранятся в выбранной папке iCloud Drive, и другие ваши устройства забирают их оттуда. Ключ API и эти настройки остаются на устройстве",
+  "settings.icloudFolder": "Папка: {{folder}}",
+  "settings.icloudNoFolder": "Папка больше недоступна. Выберите её заново",
+  "settings.icloudSyncedAt": "Синхронизировано: {{when}}",
+  "settings.icloudSyncNow": "Синхронизировать",
+  "settings.icloudChangeFolder": "Другая папка",
   "settings.backupTitle": "Резервная копия",
   "settings.backupNote": "Персонажи, переписки и аватары в одном файле JSON. Ключ API не сохраняется",
   "settings.exportJson": "Экспорт",
@@ -431,5 +439,13 @@
   "search.emptyTitle": "Поиск по всему",
   "search.emptyText": "Персонажи, комнаты, названия чатов и текст сообщений",
   "search.noResultsTitle": "Ничего не найдено",
-  "search.noResultsText": "Попробуйте другое слово"
+  "search.noResultsText": "Попробуйте другое слово",
+
+  "sync.failedTitle": "Не удалось синхронизировать с iCloud",
+  "sync.unavailable": "В этой сборке нет синхронизации с iCloud",
+  "sync.corrupted": "В папке синхронизации лежат не данные Reverie",
+  "sync.newerApp": "Данные в iCloud сохранены более новой версией Reverie. Обновите приложение на этом устройстве",
+  "sync.conflictTitle": "Переписки изменились и на этом устройстве, и в iCloud. Какие оставить? Другая копия будет заменена; данные этого устройства сначала откладываются в сторону",
+  "sync.keepDevice": "С этого устройства",
+  "sync.takeCloud": "Из iCloud"
 }

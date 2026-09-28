@@ -3,6 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system'
 import * as MediaLibrary from 'expo-media-library/legacy'
 
 import { t } from '@/i18n'
+import { saveAsSheet } from '../../modules/reverie-save-as'
 
 // "backup.json" -> "backup (2).json" when the folder already has one, so an old backup
 // is never overwritten.
@@ -16,9 +17,26 @@ function freeName(taken: Set<string>, fileName: string) {
   return `${base} (${n})${ext}`
 }
 
-// Asks for a folder instead of opening the share sheet, so the file can't end up in a
-// messenger by a stray tap. Cancelling the picker just does nothing.
+// Shows the Files "Save as" sheet, where the user picks the folder and can change the name,
+// instead of the share sheet, so the file can't end up in a messenger by a stray tap.
+// Cancelling just does nothing.
 export async function saveJson(fileName: string, contents: string): Promise<{ name: string; folder: string } | null> {
+  if (saveAsSheet) {
+    const draft = new File(Paths.cache, fileName)
+    draft.create({ overwrite: true })
+    draft.write(contents)
+    try {
+      return await saveAsSheet.saveAs(draft.uri)
+    } finally {
+      if (draft.exists) draft.delete()
+    }
+  }
+  return saveToPickedFolder(fileName, contents)
+}
+
+// Without the native sheet (Expo Go) only a folder can be asked for, and the name is made
+// free here.
+async function saveToPickedFolder(fileName: string, contents: string) {
   let dir: Directory
   try {
     dir = await Directory.pickDirectoryAsync()

@@ -195,7 +195,24 @@ const MIGRATIONS = [
     ALTER TABLE messages ADD COLUMN overheard TEXT;
     ALTER TABLE messages ADD COLUMN absent TEXT;
   `,
+  // iCloud sync needs to know whether anything changed since the last sync. Any write to
+  // the synced tables sets sync_dirty; only the first one after a sync actually writes.
+  ['characters', 'rooms', 'room_members', 'chats', 'messages']
+    .flatMap((table) =>
+      ['INSERT', 'UPDATE', 'DELETE'].map(
+        (op) => `
+    CREATE TRIGGER ${table}_${op.toLowerCase()}_sync AFTER ${op} ON ${table}
+      WHEN (SELECT value FROM app_settings WHERE key = 'sync_dirty') IS NOT '1'
+    BEGIN
+      INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_dirty', '1');
+    END;`
+      )
+    )
+    .join('\n'),
 ]
+
+// The schema version this build writes, for telling a database from a newer app apart.
+export const SCHEMA_VERSION = MIGRATIONS.length
 
 export async function migrate(db: SQLiteDatabase) {
   // Foreign keys stay off while migrating: rebuilding a table means dropping the old one,

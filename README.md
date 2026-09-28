@@ -18,6 +18,7 @@ Roleplay chat client built with Expo (iOS and web). It talks directly to a local
 - Private questions: the eye in a chat or a scene asks the model about it aside, like `/btw` — it reads the chat and answers out of character, and nothing is saved or seen by the characters.
 - App lock with Face ID, haptics toggle, "Continue" capsule on the home screen that jumps to the last active chat.
 - Backup export and import as JSON (the API key is not included).
+- iCloud sync (native build only): the data is kept in a folder picked in iCloud Drive and picked up by the other devices. Works with an app signed by a free Apple ID, see below.
 - English and Russian UI.
 - iOS 26 Liquid Glass UI where available, with a plain fallback on older iOS and in the browser.
 
@@ -73,6 +74,7 @@ Files with a `.web` suffix (`avatarStore`, `download`, `dialogs`, `haptics`, `pi
 - Plain HTTP servers are allowed through `NSAllowsArbitraryLoads` in `app.json`.
 - A chat where the user wrote nothing is deleted when returning to the list.
 - The "Continue" capsule state is stored in `app_settings` (`src/db/continue.ts`).
+- iCloud sync does not use the iCloud entitlement (CloudKit or an app container), which a free Apple ID cannot sign. The user picks a folder in iCloud Drive through the document picker instead, and the app keeps a bookmark to it (`modules/reverie-cloud-folder`). The whole database and the pictures go there as a snapshot; when both devices changed since the last sync, the user picks which copy wins.
 
 ## Web notes
 

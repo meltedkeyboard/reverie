@@ -26,6 +26,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Tab bar: tabs, icons, web fallback | `app/(tabs)/_layout.tsx` |
 | What search finds and in which order | `app/(tabs)/search/index.tsx` (`ORDER`, settings entries), queries in `src/db/search.ts` |
 | Opening a chat at a message / Settings at a section | `?message=ID` in `chat/[id].tsx` → `focusId` in `ConversationList`; `?section=` in `(tabs)/settings.tsx` |
+| iCloud sync: when it runs, what goes up, conflicts | `src/lib/cloudSync.ts`, the provider in `src/hooks/useCloudSync.tsx`, the native folder in `modules/reverie-cloud-folder` |
 | Where the data lives, the "show in Files" toggle | `src/lib/storage.ts` (folders, startup settling) and `src/db/provider.tsx` (live switch) |
 | Web-only behavior | files with a `.web.ts(x)` suffix |
 | Brand assets and generated icons | `assets/brand/`, `scripts/build-icons.mjs` |
@@ -34,7 +35,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 ## Screens (`app/`)
 
 File-based routes (expo-router). `_layout.tsx` is the root: it wires providers in this order:
-`GestureHandlerRootView` > `StartupBoundary` > `KeyboardProvider` > `DatabaseProvider` (`src/db/provider.tsx`, opens the DB and runs `migrate`) > locale and theme contexts > `AppLock` > `AppShell` (stack navigator, plus `Sidebar` on wide web).
+`GestureHandlerRootView` > `StartupBoundary` > `KeyboardProvider` > `DatabaseProvider` (`src/db/provider.tsx`, opens the DB and runs `migrate`) > locale and theme contexts > `CloudSyncProvider` > `AppLock` > `AppShell` (stack navigator, plus `Sidebar` on wide web).
 
 The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users out (redirect to `/onboarding`) and renders `NativeTabs` from `expo-router/unstable-native-tabs`: the system tab bar, Liquid Glass on iOS 26, with Search as a separate `role="search"` tab. The web build of native tabs is a pill over the top of the page, so the web renders JS `Tabs` instead, with the bar hidden on wide web where the `Sidebar` leads everywhere. On iOS the tab screens set `disableAutomaticContentInsets` and pad themselves from `useSafeAreaInsets`, which inside a tab already includes the tab bar. Everything else is pushed on the root stack over the tabs.
 
@@ -42,7 +43,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 |---|---|---|
 | `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice |
 | `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder |
-| `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, Continue capsule and where it leads, lock, haptics, private question button, backup. `?section=` scrolls to a block and flashes it |
+| `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, Continue capsule and where it leads, lock, haptics, private question button, iCloud sync, backup. `?section=` scrolls to a block and flashes it |
 | `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26); a plain field on web |
 | `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character |
 | `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead. `?message=ID` opens it scrolled to that message |
@@ -99,7 +100,7 @@ Everything goes through `expo-sqlite`. Components get the database from `useData
 
 | File | Contents |
 |---|---|
-| `provider.tsx` | `DatabaseProvider`, `useDatabase`, `useShowInFiles`. Replaces expo-sqlite's `SQLiteProvider` so the database can be swapped for one in another folder without remounting the app |
+| `provider.tsx` | `DatabaseProvider`, `useDatabase`, `useShowInFiles`, `useReloadDatabase` (the same file on a new connection, after an iCloud pull). Replaces expo-sqlite's `SQLiteProvider` so the database can be swapped for one in another folder without remounting the app |
 | `schema.ts` | Migrations: `characters`, `chats`, `messages`, `app_settings`, `rooms`, `room_members`. `migrate` runs them with foreign keys off, so a table rebuild does not cascade |
 | `rooms.ts` | Room CRUD, members, scenes, `importChatToRoom` |
 | `characters.ts` | Character CRUD, duplicate, ordering, `DEFAULT_SAMPLING`, `CHARACTER_COLUMNS` |
@@ -108,6 +109,7 @@ Everything goes through `expo-sqlite`. Components get the database from `useData
 | `messages.ts` | Message CRUD, variants (`withNewVariant`, `withVariant`), images and thoughts as JSON columns |
 | `settings.ts` | Key/value helpers (`getSetting`, `getFlag`), server settings, theme and locale preference |
 | `appLock.ts`, `confirmDelete.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts` | One feature flag each, stored as `'1'`/`'0'` in `app_settings` via `getFlag`/`setFlag` |
+| `cloudSync.ts` | iCloud sync state, local only: on/off, `sync_dirty` (set by triggers on the synced tables, see the last migration), the revision last synced and when |
 | `continue.ts` | The Continue capsule: on/off, last visited or last message (`isContinueByVisit`), swiped away per kind, and the id of the chat opened last per kind (`setLastOpened`, written by `chat/[id].tsx`) |
 
 Flags that many call sites need synchronously keep an in-memory copy: `src/lib/hapticsState.ts`, `src/lib/confirmDelete.ts`, `isAppLockEnabledCached`.
@@ -120,16 +122,27 @@ Flags that many call sites need synchronously keep an in-memory copy: `src/lib/h
 - `settle()` runs once on import, before the database opens. It moves the files to where the marker says and picks up what older versions left behind (`Application Support/Reverie`, `Application%20Support/Reverie`, Documents). If several databases turn up, the one the app was last showing is kept, and the others are moved to `Library/Reverie/earlier-databases/`, never deleted.
 - The toggle works without a restart: `useShowInFiles` calls `moveStorage`, which copies the open database with `VACUUM INTO`, moves the images and flips the marker. Then `DatabaseProvider` opens the copy and hands it down in place of the old one, and screens reload through their `[db]` effects. The old database is closed after that re-render, and `discardInactiveDatabase` removes it.
 
+## iCloud sync
+
+A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a paid developer account, and the app is signed with a free Apple ID. `modules/reverie-cloud-folder` is a local Expo module (autolinked from `modules/`): it shows the folder picker, keeps a bookmark in `UserDefaults`, and does every read and write under `NSFileCoordinator`, which is what makes iCloud download a placeholder and upload a new file. It is missing in Expo Go and on the web, and then the Settings block is hidden (`cloudSyncAvailable`).
+
+- In the folder: `manifest.json` (the revision, written last), `reverie.db` (a `VACUUM INTO` snapshot with `app_settings` removed under `secure_delete`, so the API key never leaves the device) and `avatars/`, `backgrounds/` by their unique names.
+- A device remembers the revision it last matched (`sync_rev`) and whether anything changed since (`sync_dirty`). Only one side changed: it wins. Both: a sheet asks which one to keep, and if it is iCloud's, the local database is first put aside in `earlier-databases` (`keepCopy` in `storage.ts`).
+- A pull writes the rows straight into the open database from the attached copy (older copies are migrated first, newer ones refused), then `useReloadDatabase` hands the screens a new connection. The database in iCloud is never opened in place.
+- `CloudSyncProvider` syncs on start and on coming to the front, and pushes on going to the background. Quiet runs only log errors; "Sync now" shows them.
+- Sync uses a connection of its own: `ATTACH` fails inside a transaction, and the app's connection may be in one.
+
 ## `src/lib` - logic without UI
 
 | Group | Files |
 |---|---|
 | Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, `squareAvatar` cuts a given square, copy), `avatarStore.ts` / `.web.ts` (file or `localStorage` storage, avatars and backgrounds in separate folders) |
-| Backup | `backup.ts` (export, import, wipe), `download.ts` / `.web.ts` (save JSON to a folder, an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` / `.web.ts` |
+| Backup | `backup.ts` (export, import, wipe), `download.ts` / `.web.ts` (save JSON through the Files "Save as" sheet from `modules/reverie-save-as`, or to a picked folder without it, an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` / `.web.ts` |
 | Dialogs | `dialogs.tsx` (native alerts and sheets), `dialogs.web.tsx` (DOM implementation), `dialogs.types.ts`, `chatDialogs.ts` |
 | Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
 | AI helpers | `promptGen.ts`, `titles.ts`, `aside.ts` (the Private request, `characterScene`/`roomScene`) |
 | Platform | `haptics.ts` / `.web.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` / `.web.ts` (where the data lives, the "show in Files" toggle, see below) |
+| Sync | `cloudSync.ts` / `.web.ts` (iCloud Drive folder sync, see above) |
 | App | `version.ts` (the version shown in About and onboarding), `confirmDelete.ts` (delete that asks unless turned off), `searchScope.ts` (the tab search was opened from, `SettingsSection`) |
 | Message menu | `messageActions.ts` |
 
@@ -174,7 +187,7 @@ On iOS 26 the controls are Liquid Glass through `GlassSurface` in `Glass.tsx`; i
 
 ## Platform split
 
-`Foo.ts` is the native implementation and `Foo.web.ts` the browser one, resolved by Metro. Pairs: `avatarStore`, `download`, `dialogs`, `haptics`, `pickJson`, `storage`. Keep their exported signatures identical.
+`Foo.ts` is the native implementation and `Foo.web.ts` the browser one, resolved by Metro. Pairs: `avatarStore`, `cloudSync`, `download`, `dialogs`, `haptics`, `pickJson`, `storage`. Keep their exported signatures identical.
 
 ## Conventions
 

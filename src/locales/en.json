@@ -52,6 +52,14 @@
   "settings.testConnection": "Test connection",
   "settings.connectedWithModels": "Connected, models: {{count}}",
   "settings.connected": "Connected",
+  "settings.icloud": "iCloud",
+  "settings.icloudSync": "Sync through iCloud Drive",
+  "settings.icloudSyncNote": "Characters, rooms and chats are kept in a folder you pick in iCloud Drive, and your other devices pick them up from there. The API key and these settings stay on this device",
+  "settings.icloudFolder": "Folder: {{folder}}",
+  "settings.icloudNoFolder": "The folder can't be reached anymore. Pick it again",
+  "settings.icloudSyncedAt": "Synced: {{when}}",
+  "settings.icloudSyncNow": "Sync now",
+  "settings.icloudChangeFolder": "Another folder",
   "settings.backupTitle": "Backup",
   "settings.backupNote": "Characters, chats and avatars in one JSON file. The API key isn't saved",
   "settings.exportJson": "Export",
@@ -431,5 +439,13 @@
   "search.emptyTitle": "Search everything",
   "search.emptyText": "Characters, rooms, chat titles and the text of messages",
   "search.noResultsTitle": "Nothing found",
-  "search.noResultsText": "Try another word"
+  "search.noResultsText": "Try another word",
+
+  "sync.failedTitle": "Couldn't sync with iCloud",
+  "sync.unavailable": "This build has no iCloud sync",
+  "sync.corrupted": "The sync folder holds something that isn't Reverie data",
+  "sync.newerApp": "The data in iCloud was saved by a newer version of Reverie. Update the app on this device",
+  "sync.conflictTitle": "Chats changed both on this device and in iCloud. Which to keep? The other copy is replaced; this device's data is put aside first",
+  "sync.keepDevice": "This device's",
+  "sync.takeCloud": "The ones in iCloud"
 }

@@ -13,4 +13,6 @@ export async function moveStorage(_db: SQLiteDatabase, _shown: boolean) {
   return () => {}
 }
 
+export async function keepCopy(_db: SQLiteDatabase) {}
+
 export function discardInactiveDatabase() {}
