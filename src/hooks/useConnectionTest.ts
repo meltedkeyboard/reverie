@@ -34,7 +34,11 @@ export function useConnectionTest() {
     }
   }
 
-  const reset = () => setStatus({ kind: 'idle' })
+  // After the address or the key changed: the models listed were another server's.
+  const reset = () => {
+    setStatus({ kind: 'idle' })
+    setModels([])
+  }
 
   return { status, models, test, reset }
 }

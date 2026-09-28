@@ -24,7 +24,9 @@ export function CharacterCard({ character, onOpen, onDelete, menu }: Props) {
   const chats = character.chatCount
   return (
     <ListCard onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.card}>
-      <Avatar name={character.name} file={character.avatar} size={AVATAR} square />
+      <View style={styles.avatar}>
+        <Avatar name={character.name} file={character.avatar} size={AVATAR} square fill />
+      </View>
       <View style={styles.body}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>
@@ -45,12 +47,14 @@ export function CharacterCard({ character, onOpen, onDelete, menu }: Props) {
 }
 
 // The avatar fills the card's left edge from top to bottom, and the card's rounded
-// corners clip it. It is as tall as a card with a name and two preview lines.
+// corners clip it. It is as tall as a card with a name and two preview lines, and
+// stretches with the card when a larger text size makes the card taller.
 const AVATAR = 88
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   card: { gap: 14, paddingLeft: 0, paddingVertical: 0, minHeight: AVATAR, overflow: 'hidden' },
+  avatar: { width: AVATAR, alignSelf: 'stretch' },
   body: { flex: 1, paddingVertical: 12 },
   nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 3 },
   name: { flexShrink: 1, color: colors.text, fontSize: 17, fontWeight: '600' },

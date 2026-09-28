@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text } from 'react-native'
 
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 import { GlassSurface } from './Glass'
 
@@ -34,7 +34,7 @@ export function Chip({ label, active, onPress }: Props) {
         style={styles.chip}
         fallbackStyle={active ? styles.solidActive : styles.solid}
       >
-        <Text style={[styles.label, { color: active ? '#FFFFFF' : colors.textMuted }]} numberOfLines={1}>
+        <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color: active ? '#FFFFFF' : colors.textMuted }]} numberOfLines={1}>
           {label}
         </Text>
       </GlassSurface>

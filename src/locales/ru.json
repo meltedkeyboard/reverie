@@ -118,6 +118,7 @@
   "onboarding.serverText": "Укажите адрес вашего сервера LM Studio, Ollama или llama.cpp",
   "onboarding.serverLater": "Всё это можно поменять потом в настройках",
   "onboarding.done": "Готово",
+  "onboarding.pickModel": "Выберите модель",
   "onboarding.skip": "Пропустить",
 
   "editor.thinkingAuto": "Как на сервере",
@@ -222,6 +223,9 @@
   "editor.deleteConfirmMessage": "Персонаж и все его чаты удалятся безвозвратно",
   "editor.newCharacterTitle": "Новый персонаж",
   "editor.characterTitle": "Персонаж",
+  "profile.title": "Профиль",
+  "profile.showMore": "ещё",
+  "profile.showLess": "Свернуть",
 
   "chat.editingMessage": "Редактирование сообщения",
   "chat.messagePlaceholder": "Сообщение",
@@ -239,7 +243,7 @@
   "chat.menuShowAvatar": "Показать аватар",
   "chat.menuRename": "Переименовать",
   "chat.menuSuggestTitle": "Придумать название",
-  "chat.menuEditCharacter": "Изменить персонажа",
+  "chat.menuShowProfile": "Показать профиль",
   "chat.menuMoveToRoom": "Перенести в комнату",
   "chat.menuDuplicate": "Дублировать чат",
   "chat.menuDeleteChat": "Удалить чат",

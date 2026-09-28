@@ -10,8 +10,8 @@ import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/comp
 import { Divider } from '@/components/motifs/Divider'
 import { FieldRow } from '@/components/motifs/FieldRow'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
+import { ModelSheet } from '@/components/ModelSheet'
 import { PillButton } from '@/components/PillButton'
-import { Chip } from '@/components/Chip'
 import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/confirmDelete'
@@ -94,7 +94,8 @@ export default function SettingsScreen() {
 
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
-  const { status, models, test } = useConnectionTest()
+  const { status, models, test, reset: resetStatus } = useConnectionTest()
+  const [pickingModel, setPickingModel] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const [wiping, setWiping] = useState(false)
@@ -166,7 +167,18 @@ export default function SettingsScreen() {
     if (loaded) saveSettings(db, cfg)
   }, [db, cfg, loaded])
 
-  const update = (patch: Partial<ServerSettings>) => setCfg((prev) => ({ ...prev, ...patch }))
+  const update = (patch: Partial<ServerSettings>) => {
+    setCfg((prev) => ({ ...prev, ...patch }))
+    if (patch.baseUrl !== undefined || patch.apiKey !== undefined) resetStatus()
+  }
+
+  // The models the server lists are picked from a sheet; one alone is taken as it is.
+  const onTest = async () => {
+    const found = await test(cfg)
+    if (found.includes(cfg.model)) return
+    if (found.length === 1) update({ model: found[0] })
+    else if (found.length > 1) setPickingModel(true)
+  }
 
   const onExport = async () => {
     setExporting(true)
@@ -350,25 +362,28 @@ export default function SettingsScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <FieldRow
-                star={false}
-                label={t('settings.modelLabel')}
-                value={cfg.model}
-                onChangeText={(model) => update({ model })}
-                placeholder={t('settings.modelPlaceholder')}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
+              {/* Typed by hand until the server has listed its models, then picked from them. */}
               {models.length > 0 ? (
-                <View style={[styles.chipsRow, styles.modelChips]}>
-                  {models.map((id) => (
-                    <Chip key={id} label={id} active={id === cfg.model} onPress={() => update({ model: id })} />
-                  ))}
-                </View>
-              ) : null}
+                <FieldRow
+                  star={false}
+                  label={t('settings.modelLabel')}
+                  value={models.includes(cfg.model) ? cfg.model : ''}
+                  placeholder={t('onboarding.pickModel')}
+                  onPress={() => setPickingModel(true)}
+                />
+              ) : (
+                <FieldRow
+                  star={false}
+                  label={t('settings.modelLabel')}
+                  value={cfg.model}
+                  onChangeText={(model) => update({ model })}
+                  placeholder={t('settings.modelPlaceholder')}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              )}
 
-              <PillButton label={t('settings.testConnection')} onPress={() => test(cfg)} loading={status.kind === 'testing'} style={styles.testButton} />
+              <PillButton label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} style={styles.testButton} />
 
               {status.kind === 'ok' || status.kind === 'error' ? <Text style={styles.statusText}>{status.text}</Text> : null}
             </>
@@ -463,6 +478,14 @@ export default function SettingsScreen() {
       <GlassHeader floating>
         <TabTitle>{t('settings.title')}</TabTitle>
       </GlassHeader>
+
+      <ModelSheet
+        visible={pickingModel}
+        onClose={() => setPickingModel(false)}
+        models={models}
+        selected={cfg.model}
+        onSelect={(model) => update({ model })}
+      />
     </View>
   )
 }
@@ -473,11 +496,9 @@ const createStyles = (colors: Colors) =>
     chips: { marginBottom: 16 },
     // Reaches a little past the block, so the tint frames it instead of hugging the text.
     flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 16 },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-    modelChips: { marginTop: -4 },
     rowLabel: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 12 },
-    testButton: { alignSelf: 'flex-start' },
+    testButton: { alignSelf: 'stretch' },
     statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12 },
     buttonPairRow: { flexDirection: 'row', gap: 12 },
     pairButton: { flex: 1 },

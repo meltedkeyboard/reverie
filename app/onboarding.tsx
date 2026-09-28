@@ -15,8 +15,9 @@ import { KeyboardAwareScrollView, useKeyboardState } from 'react-native-keyboard
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Button } from '@/components/Button'
-import { Field } from '@/components/Field'
-import { Group } from '@/components/Group'
+import { Field, FieldLabel } from '@/components/Field'
+import { ModelSheet } from '@/components/ModelSheet'
+import { PickerBox } from '@/components/PickerBox'
 import { SFIcon } from '@/components/SFIcon'
 import { Wordmark } from '@/components/Wordmark'
 import { setOnboardingComplete } from '@/db/onboarding'
@@ -78,6 +79,7 @@ export default function OnboardingScreen() {
   const turn = useRef(new Animated.Value(0)).current
   const [onServer, setOnServer] = useState(false)
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
+  const [pickingModel, setPickingModel] = useState(false)
   const { status, models, test, reset: resetStatus } = useConnectionTest()
   const welcomeScroll = useFitScroll()
   const serverScroll = useFitScroll()
@@ -114,8 +116,9 @@ export default function OnboardingScreen() {
 
   const onTest = async () => {
     const found = await test(cfg)
-    // A single model on the server is the one to talk to.
+    // A single model on the server is the one to talk to; out of several the user picks.
     if (found.length === 1) update({ model: found[0] })
+    else if (found.length > 1 && !found.includes(cfg.model)) setPickingModel(true)
   }
 
   const finish = async (saveServer: boolean) => {
@@ -126,6 +129,15 @@ export default function OnboardingScreen() {
   }
 
   const hasAddress = cfg.baseUrl.trim().length > 0
+  // The one button at the bottom leads through the setup: it tests the server first,
+  // asks for a model while the server has several and none is picked, and then finishes.
+  const connected = status.kind === 'ok'
+  const modelPicked = models.length <= 1 || models.includes(cfg.model)
+  const mainButton = !connected
+    ? { label: t('settings.testConnection'), onPress: onTest, disabled: !hasAddress }
+    : !modelPicked
+      ? { label: t('onboarding.pickModel'), onPress: () => setPickingModel(true), disabled: false }
+      : { label: t('onboarding.done'), onPress: () => finish(true), disabled: false }
   const contentPad = [styles.content, { paddingTop: insets.top + 56 }]
   // Only a transform on the footers: a fading ancestor leaves the Liquid Glass effect
   // unrendered until the app comes back from the background.
@@ -190,65 +202,55 @@ export default function OnboardingScreen() {
               </Text>
               <Text style={styles.pageText}>{t('onboarding.serverText')}</Text>
 
-              <Group>
-                <View style={styles.cardPad}>
-                  <Field
-                    label={t('settings.baseUrlLabel')}
-                    value={cfg.baseUrl}
-                    onChangeText={(baseUrl) => update({ baseUrl })}
-                    placeholder={t('settings.baseUrlPlaceholder')}
-                    keyboardType="url"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <Field
-                    label={t('settings.apiKeyLabel')}
-                    hint={t('settings.apiKeyHint')}
-                    value={cfg.apiKey}
-                    onChangeText={(apiKey) => update({ apiKey })}
-                    placeholder={t('settings.apiKeyPlaceholder')}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+              {/* Straight on the page, as in Settings: glass over a filled card turns into a
+                  grey haze in the dark scheme. */}
+              <Field
+                label={t('settings.baseUrlLabel')}
+                value={cfg.baseUrl}
+                onChangeText={(baseUrl) => update({ baseUrl })}
+                placeholder={t('settings.baseUrlPlaceholder')}
+                keyboardType="url"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Field
+                label={t('settings.apiKeyLabel')}
+                hint={t('settings.apiKeyHint')}
+                value={cfg.apiKey}
+                onChangeText={(apiKey) => update({ apiKey })}
+                placeholder={t('settings.apiKeyPlaceholder')}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
 
-                  {models.length > 1 ? (
-                    <View style={styles.chips}>
-                      {models.map((id) => {
-                        const active = id === cfg.model
-                        return (
-                          <Pressable
-                            key={id}
-                            onPress={() => update({ model: id })}
-                            style={[styles.chip, active && styles.chipActive]}
-                          >
-                            <Text style={[styles.chipText, active && { color: colors.accent }]} numberOfLines={1}>
-                              {id}
-                            </Text>
-                          </Pressable>
-                        )
-                      })}
-                    </View>
-                  ) : null}
-
-                  <Button
-                    variant="soft"
-                    label={t('settings.testConnection')}
-                    onPress={onTest}
-                    loading={status.kind === 'testing'}
-                    disabled={!hasAddress}
+              {models.length > 1 ? (
+                <View style={styles.modelWrap}>
+                  <FieldLabel>{t('settings.modelLabel')}</FieldLabel>
+                  <PickerBox
+                    value={modelPicked ? cfg.model : ''}
+                    placeholder={t('onboarding.pickModel')}
+                    onPress={() => setPickingModel(true)}
+                    accessibilityLabel={t('settings.modelLabel')}
+                    fallbackStyle={styles.modelSolid}
                   />
-
-                  {status.kind === 'ok' || status.kind === 'error' ? (
-                    <Text style={styles.statusText}>{status.text}</Text>
-                  ) : null}
                 </View>
-              </Group>
+              ) : null}
+
+              {status.kind === 'ok' || status.kind === 'error' ? (
+                <Text style={styles.statusText}>{status.text}</Text>
+              ) : null}
               <Text style={styles.later}>{t('onboarding.serverLater')}</Text>
             </View>
           </KeyboardAwareScrollView>
           <Animated.View style={footerStyle}>
-            <Button variant="glass" label={t('onboarding.done')} onPress={() => finish(true)} disabled={!hasAddress} />
+            <Button
+              variant="glass"
+              label={mainButton.label}
+              onPress={mainButton.onPress}
+              disabled={mainButton.disabled}
+              loading={status.kind === 'testing'}
+            />
             <Pressable
               onPress={() => finish(false)}
               hitSlop={8}
@@ -259,6 +261,14 @@ export default function OnboardingScreen() {
           </Animated.View>
         </View>
       </Animated.View>
+
+      <ModelSheet
+        visible={pickingModel}
+        onClose={() => setPickingModel(false)}
+        models={models}
+        selected={cfg.model}
+        onSelect={(model) => update({ model })}
+      />
     </View>
   )
 }
@@ -308,19 +318,9 @@ const createStyles = (colors: Colors) =>
     pageIcon: { alignSelf: 'center', marginBottom: 20 },
     pageTitle: { marginBottom: 12 },
     pageText: { color: colors.textMuted, fontSize: 16, lineHeight: 22, textAlign: 'center', marginBottom: 32 },
-    cardPad: { padding: 16 },
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -6, marginBottom: 16 },
-    chip: {
-      maxWidth: '100%',
-      paddingVertical: 7,
-      paddingHorizontal: 12,
-      borderRadius: 14,
-      backgroundColor: colors.surfaceRaised,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    chipActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-    chipText: { color: colors.textMuted, fontSize: 13 },
+    // Laid out as a Field, so the model sits in line with the address and the key.
+    modelWrap: { marginBottom: 20 },
+    modelSolid: { borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 14 },
     later: { color: colors.textFaint, fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 14, marginHorizontal: 8 },
     footer: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 12 },

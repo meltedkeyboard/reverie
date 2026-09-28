@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 import { GlassSurface } from './Glass'
 
@@ -30,7 +30,7 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
   ) : (
     <>
       {icon ? <Ionicons name={icon} size={variant === 'soft' ? 17 : 18} color={tint} /> : null}
-      <Text style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
+      <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
     </>
   )
 

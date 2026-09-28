@@ -44,11 +44,11 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 | `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder |
 | `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, Continue capsule and where it leads, lock, haptics, private question button, iCloud sync, backup. `?section=` scrolls to a block and flashes it |
 | `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26) |
-| `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character |
+| `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character; the info button opens the character's profile |
 | `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead. `?message=ID` opens it scrolled to that message |
 | `/rooms/:roomId` | `rooms/[roomId].tsx` | Scenes of one room, import of a member's chat |
 | `/room/:id` | `room/[id].tsx` | Room editor: members, floor mode, scene, background |
-| `/character/:id` | `character/[id].tsx` | Character editor: prompt, greeting, sampling, thinking mode, background. The avatar spreads into a full-width photo on a pull (`ExpandingAvatar`, fed the scroll offset by `useAnimatedScrollHandler`), the drawn header giving way and the name moving onto the photo. Transforms only: the photo is laid out full size and scaled into the circle, and `useSpreadPush` moves the form down, since animating sizes re-laid out the form every frame |
+| `/character/:id` | `character/[id].tsx` | Character editor. With `?profile=1` (the info button of the chats list) it opens as a read-only profile, `CharacterProfile`, in the manner of Telegram: the pencil in the header turns into the save checkmark (`BarButton` with `animateChange`), and saving returns to the profile. The editor: prompt, greeting, sampling, thinking mode, background. The avatar spreads into a full-width photo on a pull (`ExpandingAvatar`, fed the scroll offset by `useAnimatedScrollHandler`), the drawn header giving way and the name moving onto the photo. Transforms only: the photo is laid out full size and scaled into the circle, and `useSpreadPush` moves the form down, since animating sizes re-laid out the form every frame |
 | `/background` | `background.tsx` | Background picker, effect and intensity |
 | `/avatar-crop` | `avatar-crop.tsx` | Moving and pinching an avatar picked from Files under a round window; the library and the camera crop in the system editor instead |
 | `/text-editor` | `text-editor.tsx` | A long form text (system prompt, greeting, scene) on the whole screen, like a note; each change goes straight back to the form. Opens without the keyboard; a wrapper takes the JS touch (`onStartShouldSetResponderCapture`), because `TextInput` focuses itself when any touch ends, a scroll included |
@@ -163,9 +163,9 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 ## `src/components`
 
 - **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `TextSheet` (text selection sheet: message bubbles aren't selectable, the long press opens the menu), `AsidePanel` (Private).
-- **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`.
+- **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`. `Check` is the checkmark of a picked sheet row, shared with `ModelSheet`.
 - **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton` (one for both home tabs, drawn by `(tabs)/_layout.tsx` over them as `HomeContinueButton`; slides its content out and in when it comes to lead to another chat; on a switch between Characters and Rooms the content just changes), `EmptyState`.
-- **Forms:** `Field`, `Group`, `ToggleRow`, `Segmented`, `ChipGroup` (a row of `Chip`), `ParamSlider`, `FormScreenHeader`, `PromptGenModal`.
+- **Forms:** `Field`, `ToggleRow`, `Segmented`, `ChipGroup` (a row of `Chip`), `ParamSlider`, `FormScreenHeader`, `PromptGenModal`, `PickerBox` (a field chosen from a sheet rather than typed; `FieldRow` with `onPress`), `ModelSheet` (the server's models, one to a row, in Settings and onboarding once the connection test has listed them).
 - **Chrome and glass:** `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs), `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `PillButton`, `Chip`, `SFIcon`.
 - **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `ExpandingAvatar` (the character editor's), `ImageLink`, `HomePattern`, `Wordmark`.
 - **`motifs/`:** small brand decorations (`Star*`, `Divider`, `Eyebrow`, `FieldRow`).

@@ -7,6 +7,7 @@ import Animated, { useAnimatedReaction, useAnimatedScrollHandler, useSharedValue
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/Avatar'
+import { CharacterProfile } from '@/components/CharacterProfile'
 import { ChatBackground } from '@/components/ChatBackground'
 import { ImageSourceMenu } from '@/components/ImageSourceMenu'
 import { ChipGroup } from '@/components/ChipGroup'
@@ -29,6 +30,7 @@ import {
 } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
+import * as Haptics from '@/lib/haptics'
 import { setAvatarCropDraft } from '@/lib/avatarCrop'
 import {
   avatarUri,
@@ -48,8 +50,12 @@ import { plural } from '@/lib/format'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharacterEditorScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, profile } = useLocalSearchParams<{ id: string; profile?: string }>()
   const isNew = id === 'new'
+  // Opened as the character's profile, it is only looked at until the pencil turns it
+  // into the editor, and saving turns it back.
+  const asProfile = profile === '1' && !isNew
+  const [editing, setEditing] = useState(!asProfile)
   const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('form')
@@ -192,7 +198,17 @@ export default function CharacterEditorScreen() {
       })
       if (storedAvatar.current && storedAvatar.current !== nextAvatar) removeAvatar(storedAvatar.current)
       if (storedBackground.current && storedBackground.current !== nextBackground) removeAvatar(storedBackground.current, 'backgrounds')
-      router.back()
+      if (!asProfile) return router.back()
+      // Back to the profile, now showing what was saved.
+      storedAvatar.current = nextAvatar
+      storedBackground.current = nextBackground
+      setAvatar(nextAvatar)
+      setPickedUri(null)
+      setBackground(nextBackground)
+      setBgPickedUri(null)
+      setSaving(false)
+      setEditing(false)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (err) {
       setSaving(false)
       showMessage(t('editor.saveFailedTitle'), errorMessage(err))
@@ -230,6 +246,11 @@ export default function CharacterEditorScreen() {
   const hasPhoto = Boolean(photoUri)
   // The character's own name heads the screen once it has one.
   const title = name.trim() || (isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle'))
+
+  const thinkingLabel = THINKING_OPTIONS.find((option) => option.value === thinking)?.label ?? ''
+  const replyLengthLabel = replyLimit
+    ? `${replyLimit} ${plural(replyLimit, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`
+    : t('editor.unlimited')
 
   const scrollY = useSharedValue(0)
   const dragging = useSharedValue(false)
@@ -278,156 +299,175 @@ export default function CharacterEditorScreen() {
                 top={padding.paddingTop}
                 side={padding.paddingHorizontal}
               />
-            ) : (
+            ) : editing ? (
               <ImageSourceMenu onPick={onPickAvatar}>
                 <Avatar name={name} file={avatar} uri={pickedUri} size={96} />
               </ImageSourceMenu>
+            ) : (
+              <Avatar name={name} file={avatar} size={96} viewable={false} />
             )}
           </View>
           {/* Pushed down by a transform while the photo spreads: animating the height of
               the block above would lay out the whole form again on every frame. */}
           <Animated.View style={pushed}>
-            <View style={styles.avatarActions}>
-              <ImageSourceMenu onPick={onPickAvatar}>
-                <Text style={styles.link}>{hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')}</Text>
-              </ImageSourceMenu>
-              {hasPhoto ? (
-                <Pressable onPress={onClearAvatar} hitSlop={8}>
-                  <Text style={styles.linkMuted}>{t('editor.removePhoto')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
+            {editing ? (
+              <>
+                <View style={styles.avatarActions}>
+                  <ImageSourceMenu onPick={onPickAvatar}>
+                    <Text style={styles.link}>{hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')}</Text>
+                  </ImageSourceMenu>
+                  {hasPhoto ? (
+                    <Pressable onPress={onClearAvatar} hitSlop={8}>
+                      <Text style={styles.linkMuted}>{t('editor.removePhoto')}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
 
-            <Eyebrow label={t('background.title')} color={colors.accent} />
-            <View style={styles.backgroundRow}>
-              <View style={styles.backgroundThumb}>
-                {backgroundUri ? <ChatBackground uri={backgroundUri} effect={bgEffect} intensity={bgIntensity} /> : null}
-              </View>
-              <View style={styles.backgroundActions}>
-                <ImageSourceMenu onPick={onPickBackground}>
-                  <Text style={styles.link}>{backgroundUri ? t('background.change') : t('background.choose')}</Text>
-                </ImageSourceMenu>
-                {backgroundUri ? (
+                <Eyebrow label={t('background.title')} color={colors.accent} />
+                <View style={styles.backgroundRow}>
+                  <View style={styles.backgroundThumb}>
+                    {backgroundUri ? <ChatBackground uri={backgroundUri} effect={bgEffect} intensity={bgIntensity} /> : null}
+                  </View>
+                  <View style={styles.backgroundActions}>
+                    <ImageSourceMenu onPick={onPickBackground}>
+                      <Text style={styles.link}>{backgroundUri ? t('background.change') : t('background.choose')}</Text>
+                    </ImageSourceMenu>
+                    {backgroundUri ? (
+                      <>
+                        <Pressable onPress={() => openBackground(backgroundUri, false)} hitSlop={8}>
+                          <Text style={styles.link}>{t('background.adjust')}</Text>
+                        </Pressable>
+                        <Pressable onPress={onClearBackground} hitSlop={8}>
+                          <Text style={styles.linkMuted}>{t('background.remove')}</Text>
+                        </Pressable>
+                      </>
+                    ) : null}
+                  </View>
+                </View>
+
+                <Divider />
+
+                <FieldRow
+                  label={t('editor.nameLabel')}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder={t('editor.namePlaceholder')}
+                  autoCapitalize="sentences"
+                />
+
+                <Divider />
+
+                <Eyebrow label={t('editor.genParamsSection')} color={colors.accent} />
+                <ParamSlider
+                  label={t('editor.temperature')}
+                  value={temperature}
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  digits={2}
+                  onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
+                />
+                <ParamSlider label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={setMaxTokens} />
+                <ParamSlider
+                  label={t('editor.topP')}
+                  value={topP}
+                  min={0.1}
+                  max={1}
+                  step={0.01}
+                  digits={2}
+                  onChange={(v) => setTopP(Math.round(v * 100) / 100)}
+                />
+
+                <Divider />
+
+                <Eyebrow label={t('editor.thinkingSection')} color={colors.accent} />
+                <ChipGroup style={styles.chips} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
+                <Text style={styles.note}>{t('editor.thinkingHint')}</Text>
+
+                <Divider />
+
+                <Eyebrow label={t('editor.replyLengthSection')} color={colors.accent} />
+                <ParamSlider
+                  label={t('editor.paragraphLimit')}
+                  value={replyLimit ?? 0}
+                  min={0}
+                  max={6}
+                  step={1}
+                  formatValue={(v) => (v === 0 ? t('editor.unlimited') : `${v} ${plural(v, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`)}
+                  onChange={(v) => setReplyLimit(v === 0 ? null : v)}
+                />
+                <Text style={styles.note}>{t('editor.replyLengthHint')}</Text>
+
+                <Divider />
+
+                <Eyebrow label={t('editor.greetingLabel')} color={colors.accent} />
+                <FieldRow
+                  hint={t('editor.greetingHint')}
+                  value={greeting}
+                  onChangeText={setGreeting}
+                  placeholder={t('editor.greetingPlaceholder')}
+                  multiline
+                  expandTitle={t('editor.greetingLabel')}
+                />
+
+                <Divider />
+
+                <View style={styles.systemPromptHeader}>
+                  <Eyebrow label={t('editor.systemPromptLabel')} color={colors.accent} />
+                  {beforeGen ? (
+                    <Pressable onPress={undoGenerated} hitSlop={8}>
+                      <Text style={styles.linkMuted}>{t('editor.undoGenerated')}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <PillButton
+                  label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
+                  onPress={() => setShowPromptGen(true)}
+                  style={styles.aiButton}
+                />
+                <FieldRow
+                  hint={t('editor.systemPromptHint')}
+                  value={systemPrompt}
+                  onChangeText={(v) => {
+                    setSystemPrompt(v)
+                    setBeforeGen(null)
+                  }}
+                  placeholder={t('editor.systemPromptPlaceholder')}
+                  multiline
+                  minHeight={180}
+                  expandTitle={t('editor.systemPromptLabel')}
+                />
+
+                <PromptGenModal
+                  visible={showPromptGen}
+                  name={name}
+                  currentPrompt={systemPrompt}
+                  currentGreeting={greeting}
+                  onClose={() => setShowPromptGen(false)}
+                  onApply={applyGenerated}
+                />
+
+                {!isNew ? (
                   <>
-                    <Pressable onPress={() => openBackground(backgroundUri, false)} hitSlop={8}>
-                      <Text style={styles.link}>{t('background.adjust')}</Text>
-                    </Pressable>
-                    <Pressable onPress={onClearBackground} hitSlop={8}>
-                      <Text style={styles.linkMuted}>{t('background.remove')}</Text>
-                    </Pressable>
+                    <Divider />
+                    <PillButton filled label={t('editor.deleteCharacter')} onPress={confirmDelete} color={colors.danger} />
                   </>
                 ) : null}
-              </View>
-            </View>
-
-            <Divider />
-
-            <FieldRow
-              label={t('editor.nameLabel')}
-              value={name}
-              onChangeText={setName}
-              placeholder={t('editor.namePlaceholder')}
-              autoCapitalize="sentences"
-            />
-
-            <Divider />
-
-            <Eyebrow label={t('editor.genParamsSection')} color={colors.accent} />
-            <ParamSlider
-              label={t('editor.temperature')}
-              value={temperature}
-              min={0}
-              max={2}
-              step={0.05}
-              digits={2}
-              onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
-            />
-            <ParamSlider label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={setMaxTokens} />
-            <ParamSlider
-              label={t('editor.topP')}
-              value={topP}
-              min={0.1}
-              max={1}
-              step={0.01}
-              digits={2}
-              onChange={(v) => setTopP(Math.round(v * 100) / 100)}
-            />
-
-            <Divider />
-
-            <Eyebrow label={t('editor.thinkingSection')} color={colors.accent} />
-            <ChipGroup style={styles.chips} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
-            <Text style={styles.note}>{t('editor.thinkingHint')}</Text>
-
-            <Divider />
-
-            <Eyebrow label={t('editor.replyLengthSection')} color={colors.accent} />
-            <ParamSlider
-              label={t('editor.paragraphLimit')}
-              value={replyLimit ?? 0}
-              min={0}
-              max={6}
-              step={1}
-              formatValue={(v) => (v === 0 ? t('editor.unlimited') : `${v} ${plural(v, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`)}
-              onChange={(v) => setReplyLimit(v === 0 ? null : v)}
-            />
-            <Text style={styles.note}>{t('editor.replyLengthHint')}</Text>
-
-            <Divider />
-
-            <Eyebrow label={t('editor.greetingLabel')} color={colors.accent} />
-            <FieldRow
-              hint={t('editor.greetingHint')}
-              value={greeting}
-              onChangeText={setGreeting}
-              placeholder={t('editor.greetingPlaceholder')}
-              multiline
-              expandTitle={t('editor.greetingLabel')}
-            />
-
-            <Divider />
-
-            <View style={styles.systemPromptHeader}>
-              <Eyebrow label={t('editor.systemPromptLabel')} color={colors.accent} />
-              {beforeGen ? (
-                <Pressable onPress={undoGenerated} hitSlop={8}>
-                  <Text style={styles.linkMuted}>{t('editor.undoGenerated')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-            <PillButton
-              label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
-              onPress={() => setShowPromptGen(true)}
-              style={styles.aiButton}
-            />
-            <FieldRow
-              hint={t('editor.systemPromptHint')}
-              value={systemPrompt}
-              onChangeText={(v) => {
-                setSystemPrompt(v)
-                setBeforeGen(null)
-              }}
-              placeholder={t('editor.systemPromptPlaceholder')}
-              multiline
-              minHeight={180}
-              expandTitle={t('editor.systemPromptLabel')}
-            />
-
-            <PromptGenModal
-              visible={showPromptGen}
-              name={name}
-              currentPrompt={systemPrompt}
-              currentGreeting={greeting}
-              onClose={() => setShowPromptGen(false)}
-              onApply={applyGenerated}
-            />
-
-            {!isNew ? (
-              <>
-                <Divider />
-                <PillButton filled label={t('editor.deleteCharacter')} onPress={confirmDelete} color={colors.danger} />
               </>
-            ) : null}
+            ) : (
+              <CharacterProfile
+                greeting={greeting}
+                systemPrompt={systemPrompt}
+                params={[
+                  { label: t('editor.temperature'), value: temperature.toFixed(2) },
+                  { label: t('editor.topP'), value: topP.toFixed(2) },
+                  { label: t('editor.maxTokens'), value: String(maxTokens) },
+                  { label: t('editor.thinkingSection'), value: thinkingLabel },
+                  { label: t('editor.paragraphLimit'), value: replyLengthLabel },
+                ]}
+                background={backgroundUri ? { uri: backgroundUri, effect: bgEffect, intensity: bgIntensity } : null}
+              />
+            )}
           </Animated.View>
         </KeyboardAwareScrollView>
       ) : null}
@@ -439,13 +479,16 @@ export default function CharacterEditorScreen() {
         title={title}
         overPhoto={photoSpread}
         right={
+          // One button that turns from the pencil into the checkmark, so the change is
+          // the symbol's own transition rather than a swap.
           <BarButton
-            symbol="checkmark"
-            fallback="checkmark"
-            disabled={!canSave}
-            onPress={onSave}
-            accessibilityLabel={t('common.save')}
-            prominent
+            symbol={editing ? 'checkmark' : 'pencil'}
+            fallback={editing ? 'checkmark' : 'pencil'}
+            disabled={editing ? !canSave : !ready}
+            onPress={editing ? onSave : () => setEditing(true)}
+            accessibilityLabel={editing ? t('common.save') : t('action.edit')}
+            prominent={editing}
+            animateChange
           />
         }
       />

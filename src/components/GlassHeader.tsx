@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { fonts, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
+import { fonts, HEADER_FONT_SCALE, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
 
 import { BlurBar, EdgeFade } from './BarChrome'
 import { IconButton } from './IconButton'
@@ -37,7 +37,7 @@ export function useScreenPadding(kind: 'list' | 'form') {
 export function HeaderTitle({ children }: { children: React.ReactNode }) {
   const styles = useStyles(createStyles)
   return (
-    <Text style={styles.title} numberOfLines={1}>
+    <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1}>
       {children}
     </Text>
   )
@@ -50,7 +50,7 @@ export function TabTitle({ children }: { children: React.ReactNode }) {
   return (
     <View style={styles.tabTitleRow}>
       <Star size={22} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
-      <Text style={styles.tabTitle} numberOfLines={1}>
+      <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.tabTitle} numberOfLines={1}>
         {children}
       </Text>
     </View>

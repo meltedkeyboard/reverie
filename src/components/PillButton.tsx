@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 import { GlassSurface } from './Glass'
 
@@ -43,7 +43,7 @@ export function PillButton({ label, onPress, color, filled = false, disabled, lo
         {loading ? (
           <ActivityIndicator color={ink} />
         ) : (
-          <Text style={[styles.label, { color: ink }]} numberOfLines={1}>
+          <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color: ink }]} numberOfLines={1}>
             {label}
           </Text>
         )}

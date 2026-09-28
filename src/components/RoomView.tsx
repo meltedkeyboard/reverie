@@ -40,7 +40,7 @@ import * as Haptics from '@/lib/haptics'
 import type { MessageAction } from '@/lib/messageActions'
 import { liquidGlass } from '@/lib/nativeUI'
 import { USER } from '@/lib/room/audience'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { CONTROL_FONT_SCALE, fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 const FLOORS: FloorMode[] = ['addressee', 'reactions', 'open']
 const AUTOPLAY_LENGTHS = [3, 5, 10]
@@ -453,13 +453,13 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
             <AvatarStack cast={cast} size={28} viewable={false} />
             <View style={styles.whoText}>
               <View style={styles.nameRow}>
-                <Text style={styles.name} numberOfLines={1}>
+                <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
                   {room.name}
                 </Text>
                 <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
               </View>
               {title || naming ? (
-                <Text style={styles.subtitle} numberOfLines={1}>
+                <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} numberOfLines={1}>
                   {title ?? t('chat.namingInProgress')}
                 </Text>
               ) : null}
@@ -581,7 +581,7 @@ function Status({ phase, draftSpeaker, next, auto }: StatusProps) {
         <View style={styles.statusDots}>
           <TypingIndicator />
         </View>
-        <Text style={styles.statusText} numberOfLines={1}>
+        <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={styles.statusText} numberOfLines={1}>
           {now}
           {then ? <Text style={styles.statusFaint}>{` · ${then}`}</Text> : null}
         </Text>

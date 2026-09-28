@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { Pressable } from 'react-native'
+import { Pressable, type StyleProp, type ViewStyle } from 'react-native'
 
 import { setViewerImages, type ViewerImage } from '@/lib/viewer'
 
@@ -16,11 +16,12 @@ type Props = (
   onLongPress?: () => void
   delayLongPress?: number
   accessibilityLabel?: string
+  style?: StyleProp<ViewStyle>
   children: React.ReactNode
 }
 
 // A picture that opens full screen in the viewer.
-export function ImageLink({ uri, aspect = 1, gallery, onLongPress, delayLongPress, accessibilityLabel, children }: Props) {
+export function ImageLink({ uri, aspect = 1, gallery, onLongPress, delayLongPress, accessibilityLabel, style, children }: Props) {
   const openViewer = useOpenViewer()
   return (
     <Pressable
@@ -29,7 +30,7 @@ export function ImageLink({ uri, aspect = 1, gallery, onLongPress, delayLongPres
       delayLongPress={delayLongPress}
       accessibilityRole="imagebutton"
       accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => pressed && { opacity: 0.8 }}
+      style={({ pressed }) => [style, pressed && { opacity: 0.8 }]}
     >
       {children}
     </Pressable>

@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { FloorMode, RoomMember } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
 import { swiftUI } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 import { AvatarStack } from './AvatarStack'
 import { NativeMenu, type MenuItem } from './NativeMenu'
@@ -58,7 +58,7 @@ export function CastBar({ members, addressees, whisper, narration, onOpen }: Pro
         <AvatarStack cast={faces} size={FACE} max={3} viewable={false} />
       )}
       {hushed ? <Ionicons name="lock-closed" size={13} color={colors.accent} /> : null}
-      <Text style={styles.label} numberOfLines={1}>
+      <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={styles.label} numberOfLines={1}>
         {label}
       </Text>
       <Ionicons name="chevron-expand" size={15} color={colors.textMuted} />

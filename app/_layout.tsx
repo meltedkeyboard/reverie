@@ -1,7 +1,7 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, useWindowDimensions, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 
@@ -33,6 +33,7 @@ export default function RootLayout() {
 
 function ThemedApp() {
   const db = useDatabase()
+  const { fontScale } = useWindowDimensions()
   const [preference, setPreferenceState] = useState<ThemePreference>('system')
   const [localePreference, setLocalePreferenceState] = useState<LocalePreference>('system')
 
@@ -65,7 +66,9 @@ function ThemedApp() {
       <ThemeContextProvider preference={preference} setPreference={setPreference}>
         <CloudSyncProvider>
           <AppLock>
-            <AppShell />
+            {/* A new text size doesn't always reach the layout of screens already shown, so
+                the screens are built anew for it. The database, the lock and sync stay. */}
+            <AppShell key={fontScale} />
           </AppLock>
         </CloudSyncProvider>
       </ThemeContextProvider>

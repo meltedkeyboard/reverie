@@ -86,6 +86,12 @@ export const fonts = {
 
 export const HEADER_ROW_HEIGHT = 52
 
+// Content text (messages, previews, fields) follows Dynamic Type all the way. Controls
+// with a set size stop at the largest regular text size, so the accessibility sizes
+// don't push their labels out of the capsule, and the header rows grow a little less.
+export const CONTROL_FONT_SCALE = 1.35
+export const HEADER_FONT_SCALE = 1.2
+
 type ThemeContextValue = {
   colors: Colors
   scheme: Scheme

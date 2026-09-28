@@ -40,7 +40,7 @@ import { formatWhen } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
 import type { MessageAction } from '@/lib/messageActions'
 import { liquidGlass } from '@/lib/nativeUI'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 type Loaded =
   | { kind: 'character'; chat: Chat; character: Character }
@@ -277,7 +277,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
     ...(avatar.length ? [{ label: t('chat.menuShowAvatar'), systemImage: 'photo', onSelect: () => openViewer(avatar) }] : []),
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
-    { label: t('chat.menuEditCharacter'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}`) },
+    { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) },
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: confirmDelete },
   ]
 
@@ -366,13 +366,13 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
               <Avatar name={character.name} file={character.avatar} size={34} viewable={false} />
               <View style={styles.whoText}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.name} numberOfLines={1}>
+                  <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
                     {character.name}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
                 </View>
                 {title || naming ? (
-                  <Text style={styles.subtitle} numberOfLines={1}>
+                  <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} numberOfLines={1}>
                     {title ?? t('chat.namingInProgress')}
                   </Text>
                 ) : null}

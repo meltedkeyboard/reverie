@@ -10,7 +10,7 @@ import type { ContinueKind } from '@/db/continue'
 import { useLastChatContext } from '@/hooks/useLastChat'
 import { useTranslation } from '@/i18n'
 import { formatWhen } from '@/lib/format'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { GlassSurface } from './Glass'
@@ -129,10 +129,10 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
           <Animated.View style={[styles.content, contentStyle]}>
             <Avatar name={shown.characterName} file={shown.characterAvatar} size={HEIGHT - 16} viewable={false} />
             <View style={styles.text}>
-              <Text style={styles.name} numberOfLines={1}>
+              <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={styles.name} numberOfLines={1}>
                 {shown.characterName}
               </Text>
-              <Text style={styles.title} numberOfLines={1}>
+              <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={styles.title} numberOfLines={1}>
                 {subtitle(shown)}
               </Text>
             </View>

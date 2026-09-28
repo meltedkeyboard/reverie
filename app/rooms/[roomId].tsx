@@ -28,7 +28,7 @@ import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { showMessage, showSheet } from '@/lib/dialogs'
 import { formatWhen } from '@/lib/format'
-import { fonts, useStyles, type Colors } from '@/theme'
+import { fonts, HEADER_FONT_SCALE, useStyles, type Colors } from '@/theme'
 
 const IMPORT_CHOICES = 12
 
@@ -168,7 +168,7 @@ export default function RoomScenesScreen() {
         }
       >
         {room ? (
-          <Text style={styles.name} numberOfLines={1}>
+          <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
             {room.name}
           </Text>
         ) : null}

@@ -4,7 +4,7 @@ import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reani
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
-import { fonts, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
+import { fonts, HEADER_FONT_SCALE, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
 
 import { EdgeFade } from './BarChrome'
 import { GlassButton } from './Glass'
@@ -90,11 +90,14 @@ type BarButtonProps = {
   accessibilityLabel?: string
   // The confirming action (the checkmark that saves): filled with the brand color.
   prominent?: boolean
+  // A change of `symbol` plays the system Replace transition, for a button that turns
+  // into another one in place.
+  animateChange?: boolean
 }
 
 // A bar button of the drawn header: an SF Symbol in the text color, like every other
 // glass button in the app, or white on the accent when prominent.
-export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLabel, prominent = false }: BarButtonProps) {
+export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLabel, prominent = false, animateChange }: BarButtonProps) {
   const colors = useColors()
   const filled = prominent && !disabled
   return (
@@ -105,7 +108,7 @@ export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLa
       accessibilityLabel={accessibilityLabel}
       tint={prominent ? colors.accent : undefined}
     >
-      <SFIcon name={symbol} fallback={fallback} size={19} color={filled ? ON_ACCENT : colors.text} onAccent={filled} />
+      <SFIcon name={symbol} fallback={fallback} size={19} color={filled ? ON_ACCENT : colors.text} onAccent={filled} animateChange={animateChange} />
     </GlassButton>
   )
 }
@@ -117,7 +120,7 @@ function FormTitle({ title }: { title: string }) {
   return (
     <View style={[styles.titleRow, { maxWidth: titleMaxWidth }]}>
       <Star size={22} color={colors.danger} rotation={-14} style={styles.star} />
-      <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+      <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
         {title}
       </Text>
     </View>

@@ -22,6 +22,7 @@ import { useColors, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { BottomSheet, useSheetTones } from './BottomSheet'
+import { Check } from './Check'
 import { StarToggle } from './motifs/StarToggle'
 
 type Props = {
@@ -49,11 +50,6 @@ const GAP = 12
 // Dimming of someone out of the scene, or of a switch that can't be used now.
 const AWAY = 0.45
 const FADE: CSSTransitionProperties = { transitionProperty: 'opacity', transitionDuration: 180 }
-const POP: CSSTransitionProperties = {
-  transitionProperty: ['opacity', 'transform'],
-  transitionDuration: 200,
-  transitionTimingFunction: 'ease-out',
-}
 const DOT: CSSTransitionProperties = { transitionProperty: ['width', 'marginRight', 'opacity'], transitionDuration: 200 }
 
 // Who the next message is for, in a sheet: the whole room, the narrator's voice, or
@@ -249,15 +245,6 @@ function ModeRow({ icon, title, hint, on, onPress }: ModeRowProps) {
 }
 
 // Always in its place, so the row's text keeps its width; it only fades and grows in.
-function Check({ on }: { on: boolean }) {
-  const colors = useColors()
-  return (
-    <Animated.View style={[{ opacity: on ? 1 : 0, transform: [{ scale: on ? 1 : 0.5 }] }, POP]}>
-      <Ionicons name="checkmark" size={24} color={colors.accent} />
-    </Animated.View>
-  )
-}
-
 // Every wording a line can take, stacked in one place: the line keeps the height of the
 // longest one, so nothing below it jumps when it changes, and the change is a crossfade.
 function CrossFade({

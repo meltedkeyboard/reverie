@@ -19,7 +19,7 @@ import { importChatToRoom } from '@/db/rooms'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
-import { fonts, useStyles, type Colors } from '@/theme'
+import { fonts, HEADER_FONT_SCALE, useStyles, type Colors } from '@/theme'
 
 export default function CharacterChatsScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>()
@@ -125,7 +125,11 @@ export default function CharacterChatsScreen() {
         right={
           character ? (
             <GlassGroup>
-              <IconButton name="options-outline" onPress={() => router.push(`/character/${character.id}`)} />
+              <IconButton
+                name="information-circle-outline"
+                onPress={() => router.push(`/character/${character.id}?profile=1`)}
+                accessibilityLabel={t('profile.title')}
+              />
               <Link href={`/chat/new?character=${character.id}`} asChild>
                 <Link.AppleZoom>
                   <IconButton name="add" size={26} />
@@ -136,7 +140,7 @@ export default function CharacterChatsScreen() {
         }
       >
         {character ? (
-          <Text style={styles.name} numberOfLines={1}>
+          <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
             {character.name}
           </Text>
         ) : null}

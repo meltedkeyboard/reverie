@@ -8,7 +8,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { useTranslation } from '@/i18n'
 import { liquidGlass } from '@/lib/nativeUI'
-import { useStyles, useTheme, type Colors } from '@/theme'
+import { HEADER_FONT_SCALE, useStyles, useTheme, type Colors } from '@/theme'
 
 import { GlassButton, GlassSurface } from './Glass'
 
@@ -191,7 +191,7 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
                       <Ionicons name="close" size={24} color={colors.text} />
                     </Pressable>
                   )}
-                  <Text style={styles.title} numberOfLines={1}>
+                  <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1}>
                     {title}
                   </Text>
                   <View style={styles.balance} />

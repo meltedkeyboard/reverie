@@ -118,6 +118,7 @@
   "onboarding.serverText": "Enter the address of your LM Studio, Ollama or llama.cpp server",
   "onboarding.serverLater": "You can change all of this later in settings",
   "onboarding.done": "Done",
+  "onboarding.pickModel": "Choose a Model",
   "onboarding.skip": "Skip",
 
   "editor.thinkingAuto": "Same as server",
@@ -222,6 +223,9 @@
   "editor.deleteConfirmMessage": "The character and all its chats will be gone for good",
   "editor.newCharacterTitle": "New character",
   "editor.characterTitle": "Character",
+  "profile.title": "Profile",
+  "profile.showMore": "more",
+  "profile.showLess": "Show less",
 
   "chat.editingMessage": "Editing message",
   "chat.messagePlaceholder": "Message",
@@ -239,7 +243,7 @@
   "chat.menuShowAvatar": "Show avatar",
   "chat.menuRename": "Rename",
   "chat.menuSuggestTitle": "Suggest a title",
-  "chat.menuEditCharacter": "Edit character",
+  "chat.menuShowProfile": "Show profile",
   "chat.menuMoveToRoom": "Move to a room",
   "chat.menuDuplicate": "Duplicate chat",
   "chat.menuDeleteChat": "Delete chat",

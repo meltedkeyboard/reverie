@@ -4,7 +4,7 @@ import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSprin
 
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 import { GlassSurface } from './Glass'
 
@@ -76,7 +76,7 @@ function Label({ label, index, pos, active }: { label: string; index: number; po
   const colorStyle = useAnimatedStyle(() => ({
     color: interpolateColor(Math.min(1, Math.abs(pos.value - index)), [0, 1], [colors.accent, colors.textMuted]),
   }))
-  return <Animated.Text style={[styles.text, active && styles.textActive, colorStyle]}>{label}</Animated.Text>
+  return <Animated.Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.text, active && styles.textActive, colorStyle]}>{label}</Animated.Text>
 }
 
 const createStyles = (colors: Colors) =>

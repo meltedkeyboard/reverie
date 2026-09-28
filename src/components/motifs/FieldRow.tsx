@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInpu
 
 import { useInputColors } from '@/components/Field'
 import { GlassSurface } from '@/components/Glass'
+import { PickerBox } from '@/components/PickerBox'
 import { SFIcon } from '@/components/SFIcon'
 import { useTranslation } from '@/i18n'
 import { liquidGlass } from '@/lib/nativeUI'
@@ -22,6 +23,9 @@ type Props = Pick<
   star?: boolean
   // The title of the full-screen editor. A multiline field with one is edited only there.
   expandTitle?: string
+  // Makes the field a choice instead of an input: the value in a capsule, and a tap
+  // opens whatever the choice is made in.
+  onPress?: () => void
 }
 
 const LINE_HEIGHT = 21
@@ -36,7 +40,7 @@ const AREA_HEIGHT = 110
 // short enough to see at a glance. With expandTitle the text is only shown there: it
 // scrolls, and a tap opens it for editing on the whole screen (app/text-editor.tsx),
 // zooming out of the field on iOS.
-export function FieldRow({ label, hint, minHeight, multiline, star = true, expandTitle, ...input }: Props) {
+export function FieldRow({ label, hint, minHeight, multiline, star = true, expandTitle, onPress, ...input }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const inputColors = useInputColors()
@@ -68,7 +72,15 @@ export function FieldRow({ label, hint, minHeight, multiline, star = true, expan
       <View style={[styles.box, focused && { borderColor: colors.accent }]}>{body}</View>
     )
 
-  const field = expands ? (
+  const field = onPress ? (
+    <PickerBox
+      value={input.value ?? ''}
+      placeholder={input.placeholder ?? ''}
+      onPress={onPress}
+      accessibilityLabel={label}
+      fallbackStyle={styles.box}
+    />
+  ) : expands ? (
     <Link href="/text-editor" onPress={prepareEditor} asChild>
       <Link.AppleZoom>
         <Pressable accessibilityRole="button" accessibilityLabel={expandTitle} accessibilityHint={t('common.expand')}>
