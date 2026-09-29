@@ -8,8 +8,11 @@ const JOLTS = 2
 const WINDOW_MS = 1200
 const COOLDOWN_MS = 1500
 
+type Options = { threshold?: number; jolts?: number }
+
 // Fires once per shake, followed by a cooldown so one shake doesn't fire it twice.
-export function useShake(onShake: () => void, enabled: boolean) {
+// A higher threshold and more jolts ask for a harder, longer shake.
+export function useShake(onShake: () => void, enabled: boolean, { threshold = THRESHOLD, jolts: needed = JOLTS }: Options = {}) {
   const lastFired = useRef(0)
 
   useEffect(() => {
@@ -21,16 +24,16 @@ export function useShake(onShake: () => void, enabled: boolean) {
       const force = Math.sqrt(x * x + y * y + z * z)
       const now = Date.now()
       // Count only the moment a peak crosses the threshold, so one long jolt is one jolt.
-      const crossed = force > THRESHOLD && !above
-      above = force > THRESHOLD
+      const crossed = force > threshold && !above
+      above = force > threshold
       if (!crossed || now - lastFired.current < COOLDOWN_MS) return
       jolts = [...jolts.filter((t) => now - t < WINDOW_MS), now]
-      if (jolts.length >= JOLTS) {
+      if (jolts.length >= needed) {
         jolts = []
         lastFired.current = now
         onShake()
       }
     })
     return () => sub.remove()
-  }, [enabled, onShake])
+  }, [enabled, onShake, threshold, needed])
 }

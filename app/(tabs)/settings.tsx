@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -12,6 +12,7 @@ import { FieldRow } from '@/components/motifs/FieldRow'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
 import { ModelSheet } from '@/components/ModelSheet'
 import { PillButton } from '@/components/PillButton'
+import { SettingsWheel, type WheelItem } from '@/components/SettingsWheel'
 import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/confirmDelete'
@@ -22,15 +23,22 @@ import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { useCloudSync } from '@/hooks/useCloudSync'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
+import { useShake } from '@/hooks/useShake'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import { formatWhen } from '@/lib/format'
+import { notificationAsync, NotificationFeedbackType } from '@/lib/haptics'
 import type { SettingsSection } from '@/lib/searchScope'
 import { isShownInFiles } from '@/lib/storage'
 import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
+
+// An easter egg: shaking the phone hard on this tab turns the settings into cards on a
+// wheel, and shaking it again brings the list back. Harder and longer than the shake on
+// the About screen, so it does not come up by chance.
+const WHEEL_SHAKE = { threshold: 2.8, jolts: 4 }
 
 export default function SettingsScreen() {
   const db = useDatabase()
@@ -47,6 +55,21 @@ export default function SettingsScreen() {
   const offsets = useRef<Partial<Record<SettingsSection, number>>>({})
   // `n` tells two jumps to the same section apart, so the tint plays again.
   const [flashed, setFlashed] = useState<{ section: SettingsSection; n: number } | null>(null)
+
+  // Listens only while the tab is in front: not under About, which has a shake of its own.
+  const [focused, setFocused] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true)
+      return () => setFocused(false)
+    }, [])
+  )
+  const [wheel, setWheel] = useState(false)
+  const toggleWheel = useCallback(() => {
+    notificationAsync(NotificationFeedbackType.Success)
+    setWheel((on) => !on)
+  }, [])
+  useShake(toggleWheel, focused, WHEEL_SHAKE)
 
   // Runs when the parameter arrives and again as sections are laid out, since on the
   // first visit the one asked for may not have been measured yet. The parameter is
@@ -241,9 +264,277 @@ export default function SettingsScreen() {
     })
   }
 
+  // The sections, laid out either as the plain list or as the wheel below.
+  const appearance = (
+    <>
+      <Eyebrow label={t('settings.appearance')} color={colors.accent} />
+      <ChipGroup options={THEME_OPTIONS} value={preference} onChange={setPreference} />
+    </>
+  )
+
+  const language = (
+    <>
+      <Eyebrow label={t('settings.language')} color={colors.accent} />
+      <ChipGroup options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
+    </>
+  )
+
+  const continueRows = (
+    <>
+      <ToggleRow
+        label={t('settings.continueButton')}
+        note={t('settings.continueButtonNote')}
+        value={continueButton}
+        onValueChange={toggleContinueButton}
+      />
+      {continueButton ? (
+        <ChipGroup
+          options={CONTINUE_OPTIONS}
+          value={continueByVisit ? 'visit' : 'message'}
+          onChange={(v) => setContinueByVisitValue(v === 'visit')}
+          style={styles.chips}
+        />
+      ) : null}
+    </>
+  )
+
+  const privateRow = (
+    <ToggleRow
+      label={t('settings.privateButton')}
+      note={t('settings.privateButtonNote')}
+      value={privateButton}
+      onValueChange={togglePrivateButton}
+    />
+  )
+
+  const confirmDeleteRow = (
+    <ToggleRow
+      label={t('settings.confirmDelete')}
+      note={t('settings.confirmDeleteNote')}
+      value={confirmDelete}
+      onValueChange={toggleConfirmDelete}
+    />
+  )
+
+  const hapticsRow = (
+    <ToggleRow label={t('settings.haptics')} note={t('settings.hapticsNote')} value={haptics} onValueChange={toggleHaptics} />
+  )
+
+  const faceIdRow = (
+    <ToggleRow
+      label={t('settings.requireFaceId')}
+      note={t('settings.requireFaceIdNote')}
+      value={appLock}
+      onValueChange={toggleAppLock}
+    />
+  )
+
+  const filesRow = (
+    <ToggleRow
+      label={t('settings.showInFiles')}
+      note={t('settings.showInFilesNote')}
+      value={showInFiles}
+      onValueChange={toggleShowInFiles}
+      disabled={movingFiles}
+    />
+  )
+
+  const server = (
+    <>
+      <Eyebrow label={t('settings.server')} color={colors.accent} />
+      <FieldRow
+        star={false}
+        label={t('settings.baseUrlLabel')}
+        hint={t('settings.baseUrlHint')}
+        value={cfg.baseUrl}
+        onChangeText={(baseUrl) => update({ baseUrl })}
+        placeholder={t('settings.baseUrlPlaceholder')}
+        keyboardType="url"
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <FieldRow
+        star={false}
+        label={t('settings.apiKeyLabel')}
+        hint={t('settings.apiKeyHint')}
+        value={cfg.apiKey}
+        onChangeText={(apiKey) => update({ apiKey })}
+        placeholder={t('settings.apiKeyPlaceholder')}
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      {/* Typed by hand until the server has listed its models, then picked from them. */}
+      {models.length > 0 ? (
+        <FieldRow
+          star={false}
+          label={t('settings.modelLabel')}
+          value={models.includes(cfg.model) ? cfg.model : ''}
+          placeholder={t('onboarding.pickModel')}
+          onPress={() => setPickingModel(true)}
+        />
+      ) : (
+        <FieldRow
+          star={false}
+          label={t('settings.modelLabel')}
+          value={cfg.model}
+          onChangeText={(model) => update({ model })}
+          placeholder={t('settings.modelPlaceholder')}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      )}
+
+      <PillButton label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} style={styles.testButton} />
+
+      {status.kind === 'ok' || status.kind === 'error' ? <Text style={styles.statusText}>{status.text}</Text> : null}
+    </>
+  )
+
+  const showCloud = cloudSync.available || cloudPreview
+  const icloud = (
+    <>
+      <Eyebrow label={t('settings.icloud')} color={colors.accent} />
+      <ToggleRow
+        label={t('settings.icloudSync')}
+        note={t('settings.icloudSyncNote')}
+        value={cloudSync.enabled}
+        onValueChange={toggleCloudSync}
+        disabled={cloudSync.syncing || cloudAction !== null || backingUp}
+      />
+      {cloudSync.enabled || cloudPreview ? (
+        <>
+          <Text style={styles.note}>{cloudStatus}</Text>
+          <View style={styles.buttonPairRow}>
+            <PillButton
+              filled
+              label={t('settings.icloudPush')}
+              icon={{ name: 'arrow.up', fallback: 'arrow-up', slide: 'up' }}
+              onPress={() => runCloud('push', cloudSync.pushNow)}
+              loading={cloudAction === 'push'}
+              disabled={cloudSync.syncing || cloudAction === 'pull' || backingUp}
+              style={styles.pairButton}
+            />
+            <PillButton
+              filled
+              label={t('settings.icloudPull')}
+              icon={{ name: 'arrow.down', fallback: 'arrow-down', slide: 'down' }}
+              onPress={() => runCloud('pull', cloudSync.pullNow)}
+              loading={cloudAction === 'pull'}
+              disabled={cloudSync.syncing || cloudAction === 'push' || backingUp}
+              style={styles.pairButton}
+            />
+            <PillButton
+              accessibilityLabel={t('settings.icloudChangeFolder')}
+              icon={{ name: 'folder', fallback: 'folder-outline' }}
+              onPress={() => cloudSync.changeFolder().catch((err) => showMessage(t('sync.failedTitle'), errorMessage(err)))}
+              disabled={cloudSync.syncing || cloudAction !== null || backingUp}
+            />
+          </View>
+        </>
+      ) : null}
+    </>
+  )
+
+  const backup = (
+    <>
+      <Eyebrow label={t('settings.backupTitle')} color={colors.accent} />
+      <Text style={styles.note}>{t('settings.backupNote')}</Text>
+      <View style={styles.buttonPairRow}>
+        <PillButton filled label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting || cloudAction !== null} style={styles.pairButton} />
+        <PillButton
+          filled
+          label={t('settings.importJson')}
+          onPress={onImport}
+          loading={importing}
+          disabled={importing || cloudAction !== null}
+          style={styles.pairButton}
+        />
+      </View>
+    </>
+  )
+
+  const aboutRow = (
+    <Pressable onPress={() => router.push('/about')} style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}>
+      <Text style={[styles.rowLabel, styles.linkLabel]}>{t('settings.aboutReverie')}</Text>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  )
+
+  const wipe = (
+    <>
+      <Eyebrow label={t('settings.dangerZone')} color={colors.danger} />
+      <Text style={styles.note}>{t('settings.dangerNote')}</Text>
+      <PillButton filled label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
+    </>
+  )
+
+  const wheelItems: WheelItem[] = [
+    { key: 'appearance', sections: ['appearance'], content: block('appearance', appearance) },
+    { key: 'language', sections: ['language'], content: block('language', language) },
+    {
+      key: 'home',
+      sections: ['continue'],
+      content: (
+        <>
+          <Eyebrow label={t('settings.homeScreen')} color={colors.accent} />
+          {block('continue', continueRows)}
+        </>
+      ),
+    },
+    {
+      key: 'chats',
+      sections: ['private', 'confirmDelete'],
+      content: (
+        <>
+          <Eyebrow label={t('settings.chats')} color={colors.accent} />
+          {block('private', privateRow)}
+          {block('confirmDelete', confirmDeleteRow)}
+        </>
+      ),
+    },
+    {
+      key: 'feedback',
+      sections: ['haptics'],
+      content: (
+        <>
+          <Eyebrow label={t('settings.feedback')} color={colors.accent} />
+          {block('haptics', hapticsRow)}
+        </>
+      ),
+    },
+    {
+      key: 'security',
+      sections: ['faceId', 'files'],
+      content: (
+        <>
+          <Eyebrow label={t('settings.security')} color={colors.accent} />
+          {block('faceId', faceIdRow)}
+          {block('files', filesRow)}
+        </>
+      ),
+    },
+    { key: 'server', sections: ['server'], content: block('server', server) },
+    ...(showCloud ? [{ key: 'icloud', sections: ['icloud'], content: block('icloud', icloud) }] : []),
+    { key: 'backup', sections: ['backup'], content: block('backup', backup) },
+    {
+      key: 'about',
+      sections: [],
+      content: (
+        <>
+          <Eyebrow label={t('settings.aboutTitle')} color={colors.accent} />
+          {aboutRow}
+        </>
+      ),
+    },
+    { key: 'wipe', sections: ['wipe'], content: block('wipe', wipe) },
+  ]
+
   return (
     <View style={styles.screen}>
-      {loaded ? (
+      {loaded && wheel ? <SettingsWheel items={wheelItems} focus={flashed} /> : null}
+
+      {loaded && !wheel ? (
         <KeyboardAwareScrollView
           ref={scrollRef}
           bottomOffset={24}
@@ -251,254 +542,54 @@ export default function SettingsScreen() {
           keyboardDismissMode="interactive"
           contentContainerStyle={padding}
         >
-          {block(
-            'appearance',
-            <>
-              <Eyebrow label={t('settings.appearance')} color={colors.accent} />
-              <ChipGroup options={THEME_OPTIONS} value={preference} onChange={setPreference} />
-            </>,
-            styles.chips
-          )}
-
-          {block(
-            'language',
-            <>
-              <Eyebrow label={t('settings.language')} color={colors.accent} />
-              <ChipGroup options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
-            </>,
-            styles.chips
-          )}
+          {block('appearance', appearance, styles.chips)}
+          {block('language', language, styles.chips)}
 
           <Divider />
 
           <Eyebrow label={t('settings.homeScreen')} color={colors.accent} />
-          {block(
-            'continue',
-            <>
-              <ToggleRow
-                label={t('settings.continueButton')}
-                note={t('settings.continueButtonNote')}
-                value={continueButton}
-                onValueChange={toggleContinueButton}
-              />
-              {continueButton ? (
-                <ChipGroup
-                  options={CONTINUE_OPTIONS}
-                  value={continueByVisit ? 'visit' : 'message'}
-                  onChange={(v) => setContinueByVisitValue(v === 'visit')}
-                  style={styles.chips}
-                />
-              ) : null}
-            </>
-          )}
+          {block('continue', continueRows)}
 
           <Divider />
 
           <Eyebrow label={t('settings.chats')} color={colors.accent} />
-          {block(
-            'private',
-            <ToggleRow
-              label={t('settings.privateButton')}
-              note={t('settings.privateButtonNote')}
-              value={privateButton}
-              onValueChange={togglePrivateButton}
-            />
-          )}
-          {block(
-            'confirmDelete',
-            <ToggleRow
-              label={t('settings.confirmDelete')}
-              note={t('settings.confirmDeleteNote')}
-              value={confirmDelete}
-              onValueChange={toggleConfirmDelete}
-            />
-          )}
+          {block('private', privateRow)}
+          {block('confirmDelete', confirmDeleteRow)}
 
           <Divider />
 
           <Eyebrow label={t('settings.feedback')} color={colors.accent} />
-          {block(
-            'haptics',
-            <ToggleRow
-              label={t('settings.haptics')}
-              note={t('settings.hapticsNote')}
-              value={haptics}
-              onValueChange={toggleHaptics}
-            />
-          )}
+          {block('haptics', hapticsRow)}
 
           <Divider />
 
           <Eyebrow label={t('settings.security')} color={colors.accent} />
-          {block(
-            'faceId',
-            <ToggleRow
-              label={t('settings.requireFaceId')}
-              note={t('settings.requireFaceIdNote')}
-              value={appLock}
-              onValueChange={toggleAppLock}
-            />
-          )}
-          {block(
-            'files',
-            <ToggleRow
-              label={t('settings.showInFiles')}
-              note={t('settings.showInFilesNote')}
-              value={showInFiles}
-              onValueChange={toggleShowInFiles}
-              disabled={movingFiles}
-            />
-          )}
+          {block('faceId', faceIdRow)}
+          {block('files', filesRow)}
 
           <Divider />
 
-          {block(
-            'server',
-            <>
-              <Eyebrow label={t('settings.server')} color={colors.accent} />
-              <FieldRow
-                star={false}
-                label={t('settings.baseUrlLabel')}
-                hint={t('settings.baseUrlHint')}
-                value={cfg.baseUrl}
-                onChangeText={(baseUrl) => update({ baseUrl })}
-                placeholder={t('settings.baseUrlPlaceholder')}
-                keyboardType="url"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <FieldRow
-                star={false}
-                label={t('settings.apiKeyLabel')}
-                hint={t('settings.apiKeyHint')}
-                value={cfg.apiKey}
-                onChangeText={(apiKey) => update({ apiKey })}
-                placeholder={t('settings.apiKeyPlaceholder')}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {/* Typed by hand until the server has listed its models, then picked from them. */}
-              {models.length > 0 ? (
-                <FieldRow
-                  star={false}
-                  label={t('settings.modelLabel')}
-                  value={models.includes(cfg.model) ? cfg.model : ''}
-                  placeholder={t('onboarding.pickModel')}
-                  onPress={() => setPickingModel(true)}
-                />
-              ) : (
-                <FieldRow
-                  star={false}
-                  label={t('settings.modelLabel')}
-                  value={cfg.model}
-                  onChangeText={(model) => update({ model })}
-                  placeholder={t('settings.modelPlaceholder')}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              )}
-
-              <PillButton label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} style={styles.testButton} />
-
-              {status.kind === 'ok' || status.kind === 'error' ? <Text style={styles.statusText}>{status.text}</Text> : null}
-            </>
-          )}
+          {block('server', server)}
 
           <Divider />
 
-          {cloudSync.available || cloudPreview ? (
+          {showCloud ? (
             <>
-              {block(
-                'icloud',
-                <>
-                  <Eyebrow label={t('settings.icloud')} color={colors.accent} />
-                  <ToggleRow
-                    label={t('settings.icloudSync')}
-                    note={t('settings.icloudSyncNote')}
-                    value={cloudSync.enabled}
-                    onValueChange={toggleCloudSync}
-                    disabled={cloudSync.syncing || cloudAction !== null || backingUp}
-                  />
-                  {cloudSync.enabled || cloudPreview ? (
-                    <>
-                      <Text style={styles.note}>{cloudStatus}</Text>
-                      <View style={styles.buttonPairRow}>
-                        <PillButton
-                          filled
-                          label={t('settings.icloudPush')}
-                          icon={{ name: 'arrow.up', fallback: 'arrow-up', slide: 'up' }}
-                          onPress={() => runCloud('push', cloudSync.pushNow)}
-                          loading={cloudAction === 'push'}
-                          disabled={cloudSync.syncing || cloudAction === 'pull' || backingUp}
-                          style={styles.pairButton}
-                        />
-                        <PillButton
-                          filled
-                          label={t('settings.icloudPull')}
-                          icon={{ name: 'arrow.down', fallback: 'arrow-down', slide: 'down' }}
-                          onPress={() => runCloud('pull', cloudSync.pullNow)}
-                          loading={cloudAction === 'pull'}
-                          disabled={cloudSync.syncing || cloudAction === 'push' || backingUp}
-                          style={styles.pairButton}
-                        />
-                        <PillButton
-                          accessibilityLabel={t('settings.icloudChangeFolder')}
-                          icon={{ name: 'folder', fallback: 'folder-outline' }}
-                          onPress={() => cloudSync.changeFolder().catch((err) => showMessage(t('sync.failedTitle'), errorMessage(err)))}
-                          disabled={cloudSync.syncing || cloudAction !== null || backingUp}
-                        />
-                      </View>
-                    </>
-                  ) : null}
-                </>
-              )}
-
+              {block('icloud', icloud)}
               <Divider />
             </>
           ) : null}
 
-          {block(
-            'backup',
-            <>
-              <Eyebrow label={t('settings.backupTitle')} color={colors.accent} />
-              <Text style={styles.note}>{t('settings.backupNote')}</Text>
-              <View style={styles.buttonPairRow}>
-                <PillButton filled label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting || cloudAction !== null} style={styles.pairButton} />
-                <PillButton
-                  filled
-                  label={t('settings.importJson')}
-                  onPress={onImport}
-                  loading={importing}
-                  disabled={importing || cloudAction !== null}
-                  style={styles.pairButton}
-                />
-              </View>
-            </>
-          )}
+          {block('backup', backup)}
 
           <Divider />
 
           <Eyebrow label={t('settings.aboutTitle')} color={colors.accent} />
-          <Pressable
-            onPress={() => router.push('/about')}
-            style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}
-          >
-            <Text style={[styles.rowLabel, styles.linkLabel]}>{t('settings.aboutReverie')}</Text>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
+          {aboutRow}
 
           <Divider />
 
-          {block(
-            'wipe',
-            <>
-              <Eyebrow label={t('settings.dangerZone')} color={colors.danger} />
-              <Text style={styles.note}>{t('settings.dangerNote')}</Text>
-              <PillButton filled label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
-            </>
-          )}
-
+          {block('wipe', wipe)}
         </KeyboardAwareScrollView>
       ) : null}
 
