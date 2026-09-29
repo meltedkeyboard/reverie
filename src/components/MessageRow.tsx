@@ -13,12 +13,12 @@ import { showSheet } from '@/lib/dialogs'
 import * as Haptics from '@/lib/haptics'
 import { imageDataUrl } from '@/lib/images'
 import { messageActions, type MessageAction } from '@/lib/messageActions'
-import { splitRoleplay } from '@/lib/roleplay'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { IconButton } from './IconButton'
 import { ImageLink } from './ImageLink'
+import { Markdown, SelectableText } from './Markdown'
 import { NativeMenu } from './NativeMenu'
 import { Pager } from './Pager'
 import { SFIcon } from './SFIcon'
@@ -51,8 +51,8 @@ type Props = {
   scene?: RowScene
 }
 
-// A long press opens the message menu, which would fight with native text selection,
-// so the bubbles aren't selectable; the menu offers a separate sheet for that instead.
+// A long press on the user's own bubble opens the message menu. Replies have no such
+// menu: a long press there selects text, and their actions sit in the bar below.
 const LONG_PRESS_MS = 350
 
 function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1, scene }: Props) {
@@ -61,7 +61,6 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   const { t } = useTranslation()
   const narration = message.kind === 'narration'
   const isUser = message.role === 'user' && !narration
-  const spans = useMemo(() => (isUser ? [] : splitRoleplay(message.content)), [isUser, message.content])
   const actions = useMemo(
     () => messageActions(message, { canRegenerate, locked }),
     [message, canRegenerate, locked]
@@ -87,22 +86,19 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   )
 
   const text = (
-    <Text style={[styles.botText, narration && styles.narrationText]}>
-      {spans.map((span, i) => (
-        <Text key={i} style={span.action ? styles.action : undefined}>
-          {span.text}
-        </Text>
-      ))}
-    </Text>
+    <Markdown
+      text={message.content}
+      style={narration ? [styles.botText, styles.narrationText] : styles.botText}
+      emStyle={styles.action}
+      streaming={message.streaming}
+    />
   )
 
   if (narration) {
     return (
       <View style={styles.narrationRow}>
         <View style={styles.narrationRule} />
-        <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS}>
-          {text}
-        </Pressable>
+        {text}
         <View style={styles.narrationRule} />
         {bar}
       </View>
@@ -179,9 +175,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
       {waiting && thought ? null : waiting ? (
         <TypingIndicator />
       ) : (
-        <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS}>
-          {text}
-        </Pressable>
+        text
       )}
       {scene?.overheard ? <Overheard names={scene.overheard} /> : null}
       {bar}
@@ -347,9 +341,7 @@ export function ThoughtBlock({ text, ms }: ThoughtProps) {
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
       </Pressable>
       {open ? (
-        <Text selectable style={styles.thoughtText}>
-          {text}
-        </Text>
+        <SelectableText style={styles.thoughtText}>{text}</SelectableText>
       ) : live ? (
         <Text style={styles.thoughtText} numberOfLines={4}>
           {tail}

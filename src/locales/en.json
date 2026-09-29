@@ -266,8 +266,6 @@
   "attach.takePhoto": "Take photo",
   "attach.chooseFile": "Choose file",
 
-  "textSheet.title": "Select text",
-  "textSheet.done": "Done",
 
   "message.thinking": "Thinking...",
   "message.reasoning": "Reasoning",
@@ -287,7 +285,6 @@
   "llm.noStreaming": "The server doesn't support streaming",
 
   "action.copy": "Copy",
-  "action.selectText": "Select text",
   "action.replyAgain": "Reply again",
   "action.regenerate": "Regenerate",
   "action.refine": "Refine...",

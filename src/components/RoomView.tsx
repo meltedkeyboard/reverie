@@ -20,7 +20,6 @@ import { useOpenViewer } from '@/components/ImageLink'
 import { MessageRow, type RowMessage, type RowScene } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { SFIcon } from '@/components/SFIcon'
-import { TextSheet } from '@/components/TextSheet'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { deleteChat, type Chat } from '@/db/chats'
 import { newMessage, type Message } from '@/db/messages'
@@ -99,7 +98,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const listRef = useRef<ConversationHandle>(null)
   const composerHeight = useSharedValue(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
-  const [selecting, setSelecting] = useState<string | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
   const [addressees, setAddressees] = useState<number[]>([])
   const [whisper, setWhisper] = useState(false)
@@ -193,7 +191,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const onAction = useCallback(
     (message: RowMessage, action: MessageAction) => {
       if (action === 'copy') Clipboard.setStringAsync(message.content)
-      else if (action === 'select') setSelecting(message.content)
       else if (action === 'regenerate') regenerate(message.id)
       else if (action === 'refine') {
         promptText({
@@ -385,7 +382,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
       composerHeight={composerHeight}
       onRetry={aside.retry}
       onClose={toggleAside}
-      onSelectText={setSelecting}
     />
   ) : null
 
@@ -552,7 +548,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
         onTogglePresent={togglePresent}
         onMemberMenu={memberMenu}
       />
-      <TextSheet text={selecting} onClose={() => setSelecting(null)} />
     </View>
   )
 }

@@ -82,6 +82,8 @@ const LINE_HEIGHT = 23
 // fading out, as in the App Store. The box then springs open to the whole text, with the
 // link to cut it again laid under it inside the box, so nothing appears in a jump. Two
 // copies laid out out of sight, cut and whole, tell the heights and whether it is cut.
+// The whole text opens and closes on a tap, not only the link; a long press brings the
+// system menu with Copy.
 function ClampedText({ text, lines }: { text: string; lines: number }) {
   const styles = useStyles(createStyles)
   const colors = useColors()
@@ -119,7 +121,14 @@ function ClampedText({ text, lines }: { text: string; lines: number }) {
 
       <Animated.View style={[styles.clip, box]}>
         {/* Cut by the box once both heights are known; until then by its own lines. */}
-        <Text style={styles.text} numberOfLines={measured ? undefined : lines} selectable>
+        <Text
+          style={styles.text}
+          numberOfLines={measured ? undefined : lines}
+          onPress={long ? () => setOpen((o) => !o) : undefined}
+          // The long press belongs to the system menu; handled here only so it isn't also a tap.
+          onLongPress={() => {}}
+          selectable
+        >
           {text}
         </Text>
         {long ? (

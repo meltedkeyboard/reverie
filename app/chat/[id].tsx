@@ -20,7 +20,6 @@ import { MessageRow, type RowMessage } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { RoomView } from '@/components/RoomView'
 import { SFIcon } from '@/components/SFIcon'
-import { TextSheet } from '@/components/TextSheet'
 import { getCharacter, type Character } from '@/db/characters'
 import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { setContinueHidden, setLastOpened } from '@/db/continue'
@@ -163,7 +162,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const listRef = useRef<ConversationHandle>(null)
   const composerHeight = useSharedValue(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
-  const [selecting, setSelecting] = useState<string | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
   const keyboard = useReanimatedKeyboardAnimation()
 
@@ -219,7 +217,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const onAction = useCallback(
     (message: RowMessage, action: MessageAction) => {
       if (action === 'copy') Clipboard.setStringAsync(message.content)
-      else if (action === 'select') setSelecting(message.content)
       else if (action === 'regenerate') regenerate(message.id)
       else if (action === 'refine') {
         promptText({
@@ -291,7 +288,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
       composerHeight={composerHeight}
       onRetry={aside.retry}
       onClose={toggleAside}
-      onSelectText={setSelecting}
     />
   ) : null
 
@@ -416,8 +412,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           onCancelEdit={() => setEditingRow(null)}
         />
       </ComposerSwap>
-
-      <TextSheet text={selecting} onClose={() => setSelecting(null)} />
     </View>
   )
 }

@@ -1,28 +1,13 @@
 import { t } from '@/i18n'
 
-export type Span = { text: string; action: boolean }
-
-export function splitRoleplay(text: string) {
-  const spans: Span[] = []
-  let action = false
-  let buf = ''
-
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] !== '*') {
-      buf += text[i]
-      continue
-    }
-    if (buf) spans.push({ text: buf, action })
-    buf = ''
-    action = !action
-    while (text[i + 1] === '*') i++
-  }
-  if (buf) spans.push({ text: buf, action })
-  return spans
-}
-
+// Markdown marks are dropped, so a list shows the words of a reply, not its markup.
 export function plainPreview(text: string) {
-  return text.replace(/\*+/g, '').replace(/\s+/g, ' ').trim()
+  return text
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^ {0,3}(#{1,6}|>|[-+*]|\d+[.)])\s+/gm, '')
+    .replace(/\*+|~~|`+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 // The line under a character's name in the lists: the latest message, or its prompt

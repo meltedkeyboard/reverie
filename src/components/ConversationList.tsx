@@ -141,6 +141,21 @@ export function ConversationList({
   const holdPosition =
     draftIndex !== -1 && !followTail && (scrolledBack || (listHeight > 0 && draftHeight > room))
 
+  // When the reply is done its row turns into the saved message and gains the action
+  // bar. Letting go of the held row in that same frame shifts the text being read, so
+  // the hold outlasts the stream for a moment. Set during render: an effect would let
+  // go one commit too late.
+  const [held, setHeld] = useState<number | null>(null)
+  const holdIndex = holdPosition ? draftIndex + 1 : null
+  if (draftIndex !== -1 && held !== holdIndex) setHeld(holdIndex)
+  const anchor = draftIndex !== -1 ? holdIndex : held
+
+  useEffect(() => {
+    if (draftIndex !== -1 || held === null) return
+    const timer = setTimeout(() => setHeld(null), 800)
+    return () => clearTimeout(timer)
+  }, [draftIndex, held])
+
   const renderScroll = useCallback(
     (props: ScrollViewProps) => (
       <KeyboardChatScrollView
@@ -183,7 +198,7 @@ export function ConversationList({
       onScrollBeginDrag={() => setFollowTail(false)}
       onScrollToIndexFailed={onScrollToIndexFailed}
       onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
-      maintainVisibleContentPosition={holdPosition ? { minIndexForVisible: draftIndex + 1 } : undefined}
+      maintainVisibleContentPosition={anchor !== null ? { minIndexForVisible: anchor } : undefined}
       scrollEventThrottle={32}
       ListHeaderComponent={header}
       ListFooterComponent={footer}

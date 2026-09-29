@@ -266,8 +266,6 @@
   "attach.takePhoto": "Сделать снимок",
   "attach.chooseFile": "Выбрать файл",
 
-  "textSheet.title": "Выделение текста",
-  "textSheet.done": "Готово",
 
   "message.thinking": "Размышляет...",
   "message.reasoning": "Размышления",
@@ -287,7 +285,6 @@
   "llm.noStreaming": "Сервер не поддерживает потоковую передачу",
 
   "action.copy": "Копировать",
-  "action.selectText": "Выделить текст",
   "action.replyAgain": "Ответить заново",
   "action.regenerate": "Перегенерировать",
   "action.refine": "Уточнить...",

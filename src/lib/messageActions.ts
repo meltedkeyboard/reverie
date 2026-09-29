@@ -3,7 +3,7 @@ import { t } from '@/i18n'
 import type { Role } from '@/db/messages'
 
 // refine regenerates with a wish from the user, like "more surprised" or "sadder".
-export type MessageAction = 'copy' | 'select' | 'regenerate' | 'refine' | 'edit' | 'delete'
+export type MessageAction = 'copy' | 'regenerate' | 'refine' | 'edit' | 'delete'
 
 export type ActionItem = {
   action: MessageAction
@@ -21,10 +21,7 @@ type Options = {
 
 export function messageActions(message: { role: Role; content: string }, { canRegenerate, locked }: Options) {
   const items: ActionItem[] = []
-  if (message.content) {
-    items.push({ action: 'copy', label: t('action.copy'), systemImage: 'doc.on.doc' })
-    items.push({ action: 'select', label: t('action.selectText'), systemImage: 'text.cursor' })
-  }
+  if (message.content) items.push({ action: 'copy', label: t('action.copy'), systemImage: 'doc.on.doc' })
   if (!locked) {
     if (canRegenerate) {
       const label = message.role === 'user' ? t('action.replyAgain') : t('action.regenerate')

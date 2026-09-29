@@ -1,7 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Image } from 'expo-image'
-import { useRef } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { useEffect, useRef } from 'react'
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, {
   useAnimatedStyle,
@@ -22,6 +31,7 @@ import { ErrorCard } from './ConversationList'
 import { GlassSurface } from './Glass'
 import { useHeaderHeight } from './GlassHeader'
 import { ImageLink } from './ImageLink'
+import { Markdown } from './Markdown'
 import { ThoughtBlock } from './MessageRow'
 import { TypingIndicator } from './TypingIndicator'
 
@@ -35,11 +45,10 @@ type Props = {
   composerHeight: SharedValue<number>
   onRetry: () => void
   onClose: () => void
-  // A long press on an answer, to select and copy from it.
-  onSelectText: (text: string) => void
 }
 
-const LONG_PRESS_MS = 350
+// How close to the end of the thread still counts as being at it.
+const END_SLACK = 24
 
 // Rises with its field as one piece (see ComposerSwap) and on the way unfolds from the
 // field's edge, growing from its bottom with a little overshoot. Only transforms, since
@@ -57,7 +66,7 @@ const unfold: EntryExitAnimationFunction = () => {
 
 // The private thread with the model over the chat. It goes in the composer's accessory
 // slot, so it rides the keyboard together with the field.
-export function AsidePanel({ turns, pending, draft, phase, error, composerHeight, onRetry, onClose, onSelectText }: Props) {
+export function AsidePanel({ turns, pending, draft, phase, error, composerHeight, onRetry, onClose }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -66,6 +75,22 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
   const { height: screenHeight } = useWindowDimensions()
   const keyboard = useReanimatedKeyboardAnimation()
   const scrollRef = useRef<ScrollView>(null)
+  // The thread follows a streaming answer only while the user stays at its end: once
+  // they scroll up to read, it lets them be until they come back down.
+  const atEnd = useRef(true)
+  const dragging = useRef(false)
+
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent
+    atEnd.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - END_SLACK
+  }
+
+  // A new question is always shown, wherever the thread was scrolled.
+  useEffect(() => {
+    if (pending === null) return
+    atEnd.current = true
+    scrollRef.current?.scrollToEnd({ animated: true })
+  }, [pending])
 
   // Never taller than the room left between the header and the field, which the keyboard
   // lifts by its height less the home indicator inset the field already pads for.
@@ -96,25 +121,29 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
             style={styles.scroll}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
+            onScroll={onScroll}
+            scrollEventThrottle={32}
+            onScrollBeginDrag={() => (dragging.current = true)}
+            onScrollEndDrag={() => (dragging.current = false)}
             // Not animated: while a reply streams the size changes every frame, and each
             // animated scroll would restart the last one.
-            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+            onContentSizeChange={() => {
+              if (atEnd.current && !dragging.current) scrollRef.current?.scrollToEnd({ animated: false })
+            }}
           >
             {empty ? <Text style={styles.hint}>{t('chat.privateHint')}</Text> : null}
             {turns.map((turn, i) => (
               <View key={i} style={styles.turn}>
                 <Question text={turn.question} />
                 {turn.thought ? <ThoughtBlock text={turn.thought.text} ms={turn.thought.ms} /> : null}
-                <Pressable onLongPress={() => onSelectText(turn.answer)} delayLongPress={LONG_PRESS_MS}>
-                  <Text style={styles.answer}>{turn.answer}</Text>
-                </Pressable>
+                <Markdown text={turn.answer} style={styles.answer} />
               </View>
             ))}
             {pending !== null ? (
               <View style={styles.turn}>
                 <Question text={pending} />
                 {draft?.thought ? <ThoughtBlock text={draft.thought} ms={draft.thinkingMs} /> : null}
-                {draft?.text ? <Text style={styles.answer}>{draft.text.trimStart()}</Text> : null}
+                {draft?.text ? <Markdown text={draft.text.trimStart()} style={styles.answer} streaming /> : null}
                 {waiting && !draft?.thought ? <TypingIndicator /> : null}
               </View>
             ) : null}
