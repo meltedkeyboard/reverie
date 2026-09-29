@@ -175,7 +175,7 @@ export function Composer({
         <SFIcon
           name={ICONS[mode].sf}
           fallback={ICONS[mode].fallback}
-          size={mode === 'stop' ? 13 : 16}
+          size={mode === 'stop' ? 14 : 18}
           color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.text : '#FFFFFF'}
           effect={{ effect: 'bounce' }}
           trigger={mode === 'idle' ? 'send' : mode}
@@ -191,8 +191,8 @@ export function Composer({
 
   const row = (
     <View style={styles.row}>
-      {editing ? null : <AttachButton disabled={picking} onPick={attach} />}
-      <GlassSurface variant="clear" style={[styles.field, hushed && styles.hushed]} fallbackStyle={glass.solid}>
+      {editing ? null : <AttachButton size={FIELD_HEIGHT} disabled={picking} onPick={attach} />}
+      <GlassSurface style={[styles.field, hushed && styles.hushed]} fallbackStyle={glass.solid}>
         {editing ? (
           <View style={styles.banner}>
             <Ionicons name="create-outline" size={15} color={colors.accent} />
@@ -301,6 +301,10 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
   )
 }
 
+// A one-line field: the send button and the field's padding around it. The attach
+// button beside it is as tall, so the two line up.
+const FIELD_HEIGHT = 48
+
 const ICONS = {
   idle: { sf: 'arrow.up', fallback: 'arrow-up' },
   send: { sf: 'arrow.up', fallback: 'arrow-up' },
@@ -322,7 +326,7 @@ const createStyles = (colors: Colors) =>
   // Matches MessageRow's cap so the composer lines up with the message column; a no-op
   // on phone widths.
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', alignSelf: 'center' },
-  field: { flex: 1, borderRadius: 22, padding: 4 },
+  field: { flex: 1, borderRadius: 26, padding: 5 },
   hushed: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong },
   attachment: { margin: 6, marginBottom: 2, marginRight: 4 },
   thumb: { width: 72, height: 72, borderRadius: 14 },
@@ -342,15 +346,16 @@ const createStyles = (colors: Colors) =>
   inputRow: { flexDirection: 'row', alignItems: 'flex-end' },
   input: {
     flex: 1,
-    maxHeight: 132,
+    maxHeight: 180,
     color: colors.text,
-    fontSize: 16,
+    fontSize: 17,
+    lineHeight: 22,
     paddingTop: 8,
     paddingBottom: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
-  inputDocked: { paddingTop: 10, paddingBottom: 6 },
+  inputDocked: { paddingTop: 12, paddingBottom: 8 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolbar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  send: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  send: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 })
