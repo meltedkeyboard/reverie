@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router'
 import { useCallback } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, View } from 'react-native'
 
+import { Daydream, DreamyBlock, DreamyText } from '@/components/Daydream'
 import { FormScreenHeader } from '@/components/FormScreenHeader'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
@@ -34,33 +35,62 @@ export default function AboutScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={padding}>
-        <Wordmark width={220} optical style={styles.wordmark} />
-        <Text style={styles.version}>{t('about.version', { version: APP_VERSION })}</Text>
+      {/* Left alone for a while, the page drifts off: see Daydream. */}
+      <Daydream style={styles.screen}>
+        <ScrollView contentContainerStyle={padding}>
+          <DreamyBlock seed={1} style={styles.wordmark}>
+            <Wordmark width={220} optical />
+          </DreamyBlock>
+          <DreamyText seed={2} style={styles.version}>
+            {t('about.version', { version: APP_VERSION })}
+          </DreamyText>
 
-        <Text style={styles.tagline}>{t('about.tagline')}</Text>
+          <DreamyText seed={3} style={styles.tagline}>
+            {t('about.tagline')}
+          </DreamyText>
 
-        <Divider />
+          <DreamyBlock seed={21}>
+            <Divider />
+          </DreamyBlock>
 
-        <Eyebrow label={t('about.dataTitle')} color={colors.accent} />
-        <Text style={styles.note}>{t('about.dataText')}</Text>
+          <DreamyBlock seed={4}>
+            <Eyebrow label={t('about.dataTitle')} color={colors.accent} />
+          </DreamyBlock>
+          <DreamyText seed={5} style={styles.note}>
+            {t('about.dataText')}
+          </DreamyText>
 
-        <Divider />
+          <DreamyBlock seed={22}>
+            <Divider />
+          </DreamyBlock>
 
-        <Eyebrow label={t('about.serverTitle')} color={colors.accent} />
-        <Text style={styles.note}>{t('about.serverText')}</Text>
+          <DreamyBlock seed={6}>
+            <Eyebrow label={t('about.serverTitle')} color={colors.accent} />
+          </DreamyBlock>
+          <DreamyText seed={7} style={styles.note}>
+            {t('about.serverText')}
+          </DreamyText>
 
-        <Divider />
+          <DreamyBlock seed={23}>
+            <Divider />
+          </DreamyBlock>
 
-        <Eyebrow label={t('about.backupsTitle')} color={colors.accent} />
-        <Text style={styles.note}>{t('about.backupsText')}</Text>
+          <DreamyBlock seed={8}>
+            <Eyebrow label={t('about.backupsTitle')} color={colors.accent} />
+          </DreamyBlock>
+          <DreamyText seed={9} style={styles.note}>
+            {t('about.backupsText')}
+          </DreamyText>
 
-        <Text style={styles.shakeHint}>{t('about.shakeHint')}</Text>
+          <DreamyText seed={10} style={styles.shakeHint}>
+            {t('about.shakeHint')}
+          </DreamyText>
 
-        <View style={styles.footer}>
-          <Star size={14} color={colors.textFaint} filled={false} rotation={12} strokeWidth={70} />
-        </View>
-      </ScrollView>
+          <DreamyBlock seed={11} style={styles.footer}>
+            <Star size={14} color={colors.textFaint} filled={false} rotation={12} strokeWidth={70} />
+          </DreamyBlock>
+        </ScrollView>
+      </Daydream>
 
       <FormScreenHeader title={t('settings.aboutTitle')} />
     </View>
