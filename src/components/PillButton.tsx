@@ -9,7 +9,9 @@ import { GlassSurface } from './Glass'
 import { SFIcon } from './SFIcon'
 
 type Props = {
-  label: string
+  // Without a label the button is a circle around the icon; accessibilityLabel names it then.
+  label?: string
+  accessibilityLabel?: string
   // A symbol before the label, in the label's color. With `slide`, the button shows no
   // spinner while loading: the symbol keeps leaving that way and coming back from the other.
   icon?: Pick<ComponentProps<typeof SFIcon>, 'name' | 'fallback'> & { slide?: 'up' | 'down' }
@@ -26,7 +28,7 @@ type Props = {
 
 // A capsule of Liquid Glass for the secondary actions of a screen, with the label in the
 // action's color. Outside iOS 26 it is the plain surface with a hairline, or a solid fill.
-export function PillButton({ label, icon, onPress, color, filled = false, disabled, loading, style }: Props) {
+export function PillButton({ label, accessibilityLabel, icon, onPress, color, filled = false, disabled, loading, style }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const tint = color ?? colors.accent
@@ -38,13 +40,14 @@ export function PillButton({ label, icon, onPress, color, filled = false, disabl
       onPress={onPress}
       disabled={inactive}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       // Interactive glass springs under the finger by itself; a scale on top would fight it.
       style={({ pressed }) => [style, inactive && !sliding && { opacity: 0.5 }, !liquidGlass && pressed && { transform: [{ scale: 0.97 }] }]}
     >
       <GlassSurface
         interactive={!inactive}
         tintColor={filled ? tint : undefined}
-        style={styles.pill}
+        style={[styles.pill, !label && styles.circle]}
         fallbackStyle={filled ? { backgroundColor: tint } : styles.solid}
       >
         {loading && !sliding ? (
@@ -56,9 +59,11 @@ export function PillButton({ label, icon, onPress, color, filled = false, disabl
                 <SFIcon name={icon.name} fallback={icon.fallback} size={19} color={ink} onAccent={filled} />
               </SlidingIcon>
             ) : null}
-            <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color: ink }]} numberOfLines={1}>
-              {label}
-            </Text>
+            {label ? (
+              <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color: ink }]} numberOfLines={1}>
+                {label}
+              </Text>
+            ) : null}
           </View>
         )}
       </GlassSurface>
@@ -89,8 +94,11 @@ function SlidingIcon({ direction, active, children }: { direction?: 'up' | 'down
       shift.value = withTiming(0, ease)
       return
     }
+    // The same steps as the shift, the instant one included: even a zero-length step takes
+    // a frame, and with one step fewer the fade would run ahead a frame every lap, until
+    // the icon jumps across while still visible.
     fade.value = withRepeat(
-      withSequence(withTiming(0, { duration: OUT_MS }), withTiming(1, ease), withTiming(1, { duration: HOLD_MS })),
+      withSequence(withTiming(0, { duration: OUT_MS }), withTiming(0, { duration: 0 }), withTiming(1, ease), withTiming(1, { duration: HOLD_MS })),
       -1
     )
     shift.value = withRepeat(
@@ -106,7 +114,8 @@ function SlidingIcon({ direction, active, children }: { direction?: 'up' | 'down
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     pill: { minHeight: 44, paddingHorizontal: 20, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-    solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    circle: { width: 44, paddingHorizontal: 0 },
+    solid:{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     content: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     label: { fontSize: 16, fontWeight: '600' },
   })

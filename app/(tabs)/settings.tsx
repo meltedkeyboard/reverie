@@ -98,6 +98,7 @@ export default function SettingsScreen() {
   const [pickingModel, setPickingModel] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
+  const backingUp = exporting || importing
   const [wiping, setWiping] = useState(false)
   const [continueButton, toggleContinueButton] = useStoredFlag(isContinueEnabled, setContinueEnabled, true)
   const [continueByVisit, setContinueByVisitValue] = useStoredFlag(isContinueByVisit, setContinueByVisit, true)
@@ -126,6 +127,9 @@ export default function SettingsScreen() {
   }
 
   const cloudSync = useCloudSync()
+  // Expo Go has no iCloud module. In development the section is still shown there, with
+  // its buttons out and pretending to work, so the layout and animations can be looked at.
+  const cloudPreview = __DEV__ && !cloudSync.available
 
   const toggleCloudSync = async (on: boolean) => {
     try {
@@ -141,7 +145,8 @@ export default function SettingsScreen() {
   const runCloud = async (action: 'push' | 'pull', run: () => Promise<void>) => {
     setCloudAction(action)
     try {
-      await run()
+      if (cloudPreview) await new Promise((resolve) => setTimeout(resolve, 3000))
+      else await run()
     } finally {
       setCloudAction(null)
     }
@@ -402,7 +407,7 @@ export default function SettingsScreen() {
 
           <Divider />
 
-          {cloudSync.available ? (
+          {cloudSync.available || cloudPreview ? (
             <>
               {block(
                 'icloud',
@@ -413,35 +418,37 @@ export default function SettingsScreen() {
                     note={t('settings.icloudSyncNote')}
                     value={cloudSync.enabled}
                     onValueChange={toggleCloudSync}
-                    disabled={cloudSync.syncing}
+                    disabled={cloudSync.syncing || cloudAction !== null || backingUp}
                   />
-                  {cloudSync.enabled ? (
+                  {cloudSync.enabled || cloudPreview ? (
                     <>
                       <Text style={styles.note}>{cloudStatus}</Text>
                       <View style={styles.buttonPairRow}>
                         <PillButton
+                          filled
                           label={t('settings.icloudPush')}
                           icon={{ name: 'arrow.up', fallback: 'arrow-up', slide: 'up' }}
                           onPress={() => runCloud('push', cloudSync.pushNow)}
                           loading={cloudAction === 'push'}
-                          disabled={cloudSync.syncing}
+                          disabled={cloudSync.syncing || cloudAction === 'pull' || backingUp}
                           style={styles.pairButton}
                         />
                         <PillButton
+                          filled
                           label={t('settings.icloudPull')}
                           icon={{ name: 'arrow.down', fallback: 'arrow-down', slide: 'down' }}
                           onPress={() => runCloud('pull', cloudSync.pullNow)}
                           loading={cloudAction === 'pull'}
-                          disabled={cloudSync.syncing}
+                          disabled={cloudSync.syncing || cloudAction === 'push' || backingUp}
                           style={styles.pairButton}
                         />
+                        <PillButton
+                          accessibilityLabel={t('settings.icloudChangeFolder')}
+                          icon={{ name: 'folder', fallback: 'folder-outline' }}
+                          onPress={() => cloudSync.changeFolder().catch((err) => showMessage(t('sync.failedTitle'), errorMessage(err)))}
+                          disabled={cloudSync.syncing || cloudAction !== null || backingUp}
+                        />
                       </View>
-                      <PillButton
-                        label={t('settings.icloudChangeFolder')}
-                        onPress={() => cloudSync.changeFolder().catch((err) => showMessage(t('sync.failedTitle'), errorMessage(err)))}
-                        disabled={cloudSync.syncing}
-                        style={styles.stackedButton}
-                      />
                     </>
                   ) : null}
                 </>
@@ -457,13 +464,13 @@ export default function SettingsScreen() {
               <Eyebrow label={t('settings.backupTitle')} color={colors.accent} />
               <Text style={styles.note}>{t('settings.backupNote')}</Text>
               <View style={styles.buttonPairRow}>
-                <PillButton filled label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting} style={styles.pairButton} />
+                <PillButton filled label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting || cloudAction !== null} style={styles.pairButton} />
                 <PillButton
                   filled
                   label={t('settings.importJson')}
                   onPress={onImport}
                   loading={importing}
-                  disabled={importing}
+                  disabled={importing || cloudAction !== null}
                   style={styles.pairButton}
                 />
               </View>
@@ -522,7 +529,6 @@ const createStyles = (colors: Colors) =>
     statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12 },
     buttonPairRow: { flexDirection: 'row', gap: 12 },
     pairButton: { flex: 1 },
-    stackedButton: { marginTop: 12 },
     linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
     linkLabel: { marginBottom: 0 },
     chevron: { color: colors.textFaint, fontSize: 20 },
