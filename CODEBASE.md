@@ -128,7 +128,8 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 - In the folder: `manifest.json` (the revision, written last), `reverie.db` (a `VACUUM INTO` snapshot with `app_settings` removed under `secure_delete`, so the API key never leaves the device) and `avatars/`, `backgrounds/` by their unique names.
 - A device remembers the revision it last matched (`sync_rev`) and whether anything changed since (`sync_dirty`). Only one side changed: it wins. Both: a sheet asks which one to keep, and if it is iCloud's, the local database is first put aside in `earlier-databases` (`keepCopy` in `storage.ts`).
 - A pull writes the rows straight into the open database from the attached copy (older copies are migrated first, newer ones refused), then `useReloadDatabase` hands the screens a new connection. The database in iCloud is never opened in place.
-- `CloudSyncProvider` syncs on start and on coming to the front, and pushes on going to the background. Quiet runs only log errors; "Sync now" shows them.
+- `CloudSyncProvider` syncs on start and on coming to the front, and pushes on going to the background. Quiet runs only log errors.
+- Settings also has Push and Pull, one way each, like git: a push is refused when iCloud has a revision this device has not seen (`behind`), a pull when this device has changes of its own (`conflict`), and both then ask before going ahead with `local` / `cloud`. Their errors are shown.
 - Sync uses a connection of its own: `ATTACH` fails inside a transaction, and the app's connection may be in one.
 
 ## `src/lib` - logic without UI

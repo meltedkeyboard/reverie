@@ -136,6 +136,17 @@ export default function SettingsScreen() {
     }
   }
 
+  // Which of the two buttons shows the spinner; a quiet sync only dims both.
+  const [cloudAction, setCloudAction] = useState<'push' | 'pull' | null>(null)
+  const runCloud = async (action: 'push' | 'pull', run: () => Promise<void>) => {
+    setCloudAction(action)
+    try {
+      await run()
+    } finally {
+      setCloudAction(null)
+    }
+  }
+
   const cloudStatus = [
     cloudSync.folder ? t('settings.icloudFolder', { folder: cloudSync.folder }) : t('settings.icloudNoFolder'),
     cloudSync.syncedAt ? t('settings.icloudSyncedAt', { when: formatWhen(cloudSync.syncedAt, locale) }) : null,
@@ -409,19 +420,28 @@ export default function SettingsScreen() {
                       <Text style={styles.note}>{cloudStatus}</Text>
                       <View style={styles.buttonPairRow}>
                         <PillButton
-                          label={t('settings.icloudSyncNow')}
-                          onPress={cloudSync.syncNow}
-                          loading={cloudSync.syncing}
+                          label={t('settings.icloudPush')}
+                          icon={{ name: 'arrow.up', fallback: 'arrow-up', slide: 'up' }}
+                          onPress={() => runCloud('push', cloudSync.pushNow)}
+                          loading={cloudAction === 'push'}
                           disabled={cloudSync.syncing}
                           style={styles.pairButton}
                         />
                         <PillButton
-                          label={t('settings.icloudChangeFolder')}
-                          onPress={() => cloudSync.changeFolder().catch((err) => showMessage(t('sync.failedTitle'), errorMessage(err)))}
+                          label={t('settings.icloudPull')}
+                          icon={{ name: 'arrow.down', fallback: 'arrow-down', slide: 'down' }}
+                          onPress={() => runCloud('pull', cloudSync.pullNow)}
+                          loading={cloudAction === 'pull'}
                           disabled={cloudSync.syncing}
                           style={styles.pairButton}
                         />
                       </View>
+                      <PillButton
+                        label={t('settings.icloudChangeFolder')}
+                        onPress={() => cloudSync.changeFolder().catch((err) => showMessage(t('sync.failedTitle'), errorMessage(err)))}
+                        disabled={cloudSync.syncing}
+                        style={styles.stackedButton}
+                      />
                     </>
                   ) : null}
                 </>
@@ -502,6 +522,7 @@ const createStyles = (colors: Colors) =>
     statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12 },
     buttonPairRow: { flexDirection: 'row', gap: 12 },
     pairButton: { flex: 1 },
+    stackedButton: { marginTop: 12 },
     linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
     linkLabel: { marginBottom: 0 },
     chevron: { color: colors.textFaint, fontSize: 20 },

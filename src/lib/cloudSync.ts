@@ -21,11 +21,14 @@ import { cloudFolder } from '../../modules/reverie-cloud-folder'
 
 export const cloudSyncAvailable = cloudFolder !== null
 
-export type SyncOutcome = 'pushed' | 'pulled' | 'unchanged' | 'conflict'
+// 'behind': a push was refused because iCloud has a revision this device has not seen;
+// 'empty': a pull found nothing in the folder.
+export type SyncOutcome = 'pushed' | 'pulled' | 'unchanged' | 'conflict' | 'behind' | 'empty'
 
-// 'local' and 'cloud' settle a conflict; 'push-only' is for going to the background, where
-// there is no time to replace the data under the screens.
-export type SyncMode = 'auto' | 'push-only' | 'local' | 'cloud'
+// 'push' and 'pull' are the buttons: one way only, and they stop where they would throw
+// away changes. 'local' and 'cloud' go ahead anyway, and settle a conflict; 'push-only' is
+// for going to the background, where there is no time to replace the data under the screens.
+export type SyncMode = 'auto' | 'push-only' | 'push' | 'pull' | 'local' | 'cloud'
 
 type Manifest = { app: 'reverie'; rev: string; schema: number; savedAt: number }
 
@@ -210,6 +213,27 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
     // Data from before sync was turned on counts as changed: it has never been anywhere.
     const changedHere = state.dirty || state.rev === null
     const changedThere = manifest !== null && manifest.rev !== state.rev
+
+    if (mode === 'push') {
+      if (changedThere) return 'behind'
+      if (manifest && !changedHere) {
+        await markChecked(db)
+        return 'unchanged'
+      }
+      await push(db)
+      return 'pushed'
+    }
+    if (mode === 'pull') {
+      if (!manifest) return 'empty'
+      if (!changedThere) {
+        await markChecked(db)
+        return 'unchanged'
+      }
+      // Nothing here yet on a fresh device: nothing to lose, so no need to ask.
+      if (changedHere && !(state.rev === null && (await isEmpty(db)))) return 'conflict'
+      await pull(db, manifest)
+      return 'pulled'
+    }
 
     if (!changedThere) {
       if (manifest && !changedHere) {

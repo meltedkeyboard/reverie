@@ -58,7 +58,8 @@
   "settings.icloudFolder": "Папка: {{folder}}",
   "settings.icloudNoFolder": "Папка больше недоступна. Выберите её заново",
   "settings.icloudSyncedAt": "Синхронизировано: {{when}}",
-  "settings.icloudSyncNow": "Синхронизировать",
+  "settings.icloudPush": "Отправить",
+  "settings.icloudPull": "Получить",
   "settings.icloudChangeFolder": "Другая папка",
   "settings.backupTitle": "Резервная копия",
   "settings.backupNote": "Персонажи, переписки и аватары в одном файле JSON. Ключ API не сохраняется",
@@ -446,5 +447,15 @@
   "sync.newerApp": "Данные в iCloud сохранены более новой версией Reverie. Обновите приложение на этом устройстве",
   "sync.conflictTitle": "Переписки изменились и на этом устройстве, и в iCloud. Какие оставить? Другая копия будет заменена; данные этого устройства сначала откладываются в сторону",
   "sync.keepDevice": "С этого устройства",
-  "sync.takeCloud": "Из iCloud"
+  "sync.takeCloud": "Из iCloud",
+  "sync.upToDate": "Всё актуально",
+  "sync.nothingToPush": "С последней синхронизации на этом устройстве ничего не менялось",
+  "sync.nothingToPull": "В iCloud нет ничего новее, чем на этом устройстве",
+  "sync.cloudEmpty": "В папке iCloud пока ничего нет. Сначала отправьте туда данные этого устройства",
+  "sync.pushBehindTitle": "В iCloud есть более новые данные",
+  "sync.pushBehindText": "После последней синхронизации этого устройства другое устройство уже отправило данные. Отправка заменит их данными этого устройства. Чтобы их сохранить, сначала получите их",
+  "sync.pushAnyway": "Всё равно отправить",
+  "sync.pullOverTitle": "На этом устройстве есть изменения",
+  "sync.pullOverText": "Получение заменит переписки на этом устройстве данными из iCloud. Текущие данные сначала откладываются в сторону",
+  "sync.pullAnyway": "Всё равно получить"
 }

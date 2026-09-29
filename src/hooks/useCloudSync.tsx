@@ -5,7 +5,7 @@ import { forgetSyncRev, getSyncState, isCloudSyncEnabled, setCloudSyncEnabled } 
 import { useDatabase, useReloadDatabase } from '@/db/provider'
 import { t } from '@/i18n'
 import { cloudFolderName, cloudSyncAvailable, forgetCloudFolder, pickCloudFolder, syncWithCloud, type SyncMode } from '@/lib/cloudSync'
-import { showMessage, showSheet } from '@/lib/dialogs'
+import { confirm, showMessage, showSheet } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 
 type CloudSync = {
@@ -17,13 +17,14 @@ type CloudSync = {
   enable: () => Promise<void>
   disable: () => Promise<void>
   changeFolder: () => Promise<void>
-  syncNow: () => Promise<void>
+  pushNow: () => Promise<void>
+  pullNow: () => Promise<void>
 }
 
 const CloudSyncContext = createContext<CloudSync | null>(null)
 
 // Syncs when the app starts and comes to the front (both ways) and when it leaves (up
-// only). Errors of those quiet runs are only logged; "Sync now" shows them.
+// only). Errors of those quiet runs are only logged; the push and pull buttons show them.
 export function CloudSyncProvider({ children }: { children: ReactNode }) {
   const db = useDatabase()
   const reload = useReloadDatabase()
@@ -49,15 +50,17 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
 
   const sync = useCallback(
     async (mode: SyncMode, loud: boolean) => {
-      if (!enabledRef.current) return
+      if (!enabledRef.current) return null
       setSyncing(true)
       try {
         const outcome = await syncWithCloud(mode)
         if (outcome === 'pulled') await reloadRef.current()
-        if (outcome === 'conflict' && mode !== 'push-only' && (loud || !conflictDismissed.current)) askConflict()
+        if (outcome === 'conflict' && mode === 'auto' && (loud || !conflictDismissed.current)) askConflict()
+        return outcome
       } catch (err) {
         if (loud) showMessage(t('sync.failedTitle'), errorMessage(err))
         else console.warn('iCloud sync failed', err)
+        return null
       } finally {
         setSyncing(false)
         refresh().catch(() => {})
@@ -125,14 +128,40 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     await sync('auto', true)
   }, [sync])
 
-  const syncNow = useCallback(async () => {
-    conflictDismissed.current = false
-    await sync('auto', true)
+  // Like git: a push that would overwrite what another device sent, or a pull that would
+  // replace changes made here, asks first.
+  const pushNow = useCallback(async () => {
+    const outcome = await sync('push', true)
+    if (outcome === 'unchanged') showMessage(t('sync.upToDate'), t('sync.nothingToPush'))
+    else if (outcome === 'behind') {
+      confirm({
+        title: t('sync.pushBehindTitle'),
+        message: t('sync.pushBehindText'),
+        confirmLabel: t('sync.pushAnyway'),
+        destructive: true,
+        onConfirm: () => sync('local', true),
+      })
+    }
+  }, [sync])
+
+  const pullNow = useCallback(async () => {
+    const outcome = await sync('pull', true)
+    if (outcome === 'unchanged') showMessage(t('sync.upToDate'), t('sync.nothingToPull'))
+    else if (outcome === 'empty') showMessage(t('sync.upToDate'), t('sync.cloudEmpty'))
+    else if (outcome === 'conflict') {
+      confirm({
+        title: t('sync.pullOverTitle'),
+        message: t('sync.pullOverText'),
+        confirmLabel: t('sync.pullAnyway'),
+        destructive: true,
+        onConfirm: () => sync('cloud', true),
+      })
+    }
   }, [sync])
 
   const value = useMemo(
-    () => ({ available: cloudSyncAvailable, enabled, folder, syncing, syncedAt, enable, disable, changeFolder, syncNow }),
-    [enabled, folder, syncing, syncedAt, enable, disable, changeFolder, syncNow]
+    () => ({ available: cloudSyncAvailable, enabled, folder, syncing, syncedAt, enable, disable, changeFolder, pushNow, pullNow }),
+    [enabled, folder, syncing, syncedAt, enable, disable, changeFolder, pushNow, pullNow]
   )
 
   return <CloudSyncContext.Provider value={value}>{children}</CloudSyncContext.Provider>
