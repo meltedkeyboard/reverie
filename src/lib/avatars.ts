@@ -1,8 +1,11 @@
 import * as DocumentPicker from 'expo-document-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
+import { File } from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
 
+import { t } from '@/i18n'
 import { pickUris, requireCamera, resizedJpeg, newAvatarName, type ImageSource } from '@/lib/images'
+import { extensionOf, MAX_ANIMATED_BYTES, movingKind } from '@/lib/media'
 import { readAvatarBase64, removeAvatar, writeAvatarBase64, type ImageKind } from './avatarStore'
 
 // Picking and resizing work the same everywhere; only storage differs per platform. Avatars
@@ -14,19 +17,36 @@ const SIDE = 512
 
 export type CropRect = { originX: number; originY: number; width: number; height: number }
 
-// A photo from the library or the camera, already cropped in the system's own editor.
-export async function pickAvatar(source: 'library' | 'camera') {
-  const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 }
-  if (source === 'camera') await requireCamera()
-  const picked =
-    source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options)
+// A photo from the camera, already cropped in the system's own editor.
+export async function pickAvatarPhoto() {
+  await requireCamera()
+  const picked = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 })
   return picked.canceled ? null : squareAvatar(picked.assets[0].uri)
 }
 
-// A picture file as it is; the Files picker has no editor, so it is framed on /avatar-crop.
-export async function pickAvatarFile() {
-  const picked = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true })
+// A picture, GIF or video from the photo library, as it is. The system editor would flatten
+// a GIF and only trims a video, so nothing is edited here: a still picture is framed on
+// /avatar-crop, while a moving one goes through acceptMoving.
+export async function pickAvatarLibrary() {
+  const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 1 })
   return picked.canceled ? null : picked.assets[0].uri
+}
+
+// A file as it is; same as the library, the Files picker has no editor.
+export async function pickAvatarFile() {
+  const picked = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'video/*'], copyToCacheDirectory: true })
+  return picked.canceled ? null : picked.assets[0].uri
+}
+
+// Whether the file is a moving avatar to be stored untouched. Throws when it is too big.
+export function acceptMoving(uri: string) {
+  const ext = extensionOf(uri)
+  if (ext === 'webm') throw new Error(t('editor.avatarWebm'))
+  if (!movingKind(uri)) return false
+  if ((new File(uri).size ?? 0) > MAX_ANIMATED_BYTES) {
+    throw new Error(t('editor.avatarTooBig', { mb: Math.round(MAX_ANIMATED_BYTES / 1024 / 1024) }))
+  }
+  return true
 }
 
 // Cuts the square out of the picture (the middle one unless given) and shrinks it to the
@@ -55,7 +75,7 @@ export async function copyStoredImage(name: string | null, kind: ImageKind = 'av
   if (!name) return null
   const base64 = await readAvatarBase64(name, kind)
   if (!base64) return null
-  const copy = newAvatarName()
+  const copy = newAvatarName(extensionOf(name) || 'jpg')
   await writeAvatarBase64(copy, base64, kind)
   return copy
 }

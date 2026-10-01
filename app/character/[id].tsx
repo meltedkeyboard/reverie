@@ -35,8 +35,10 @@ import { setAvatarCropDraft } from '@/lib/avatarCrop'
 import {
   avatarUri,
   persistAvatar,
-  pickAvatar,
+  acceptMoving,
   pickAvatarFile,
+  pickAvatarLibrary,
+  pickAvatarPhoto,
   pickBackground,
   removeAvatar,
   removeCharacterImages,
@@ -120,15 +122,17 @@ export default function CharacterEditorScreen() {
 
   const onPickAvatar = async (source: ImageSource) => {
     try {
-      if (source === 'files') {
-        const file = await pickAvatarFile()
-        if (!file) return
-        setAvatarCropDraft({ uri: file, onDone: setPickedUri })
-        router.push('/avatar-crop')
+      if (source === 'camera') {
+        const photo = await pickAvatarPhoto()
+        if (photo) setPickedUri(photo)
         return
       }
-      const uri = await pickAvatar(source)
-      if (uri) setPickedUri(uri)
+      const file = source === 'files' ? await pickAvatarFile() : await pickAvatarLibrary()
+      if (!file) return
+      // A GIF or a video keeps its motion, so it skips the crop and is shown by its middle.
+      if (acceptMoving(file)) return setPickedUri(file)
+      setAvatarCropDraft({ uri: file, onDone: setPickedUri })
+      router.push('/avatar-crop')
     } catch (err) {
       showMessage(t('editor.avatarFailedTitle'), errorMessage(err))
     }
@@ -323,7 +327,7 @@ export default function CharacterEditorScreen() {
                   ) : null}
                 </View>
 
-                <Eyebrow label={t('background.title')} color={colors.accent} />
+                <Eyebrow label={t('background.title')} color={colors.text} />
                 <View style={styles.backgroundRow}>
                   <View style={styles.backgroundThumb}>
                     {backgroundUri ? <ChatBackground uri={backgroundUri} effect={bgEffect} intensity={bgIntensity} /> : null}
@@ -357,7 +361,7 @@ export default function CharacterEditorScreen() {
 
                 <Divider />
 
-                <Eyebrow label={t('editor.genParamsSection')} color={colors.accent} />
+                <Eyebrow label={t('editor.genParamsSection')} color={colors.text} />
                 <ParamSlider
                   label={t('editor.temperature')}
                   value={temperature}
@@ -380,13 +384,13 @@ export default function CharacterEditorScreen() {
 
                 <Divider />
 
-                <Eyebrow label={t('editor.thinkingSection')} color={colors.accent} />
+                <Eyebrow label={t('editor.thinkingSection')} color={colors.text} />
                 <ChipGroup style={styles.chips} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
                 <Text style={styles.note}>{t('editor.thinkingHint')}</Text>
 
                 <Divider />
 
-                <Eyebrow label={t('editor.replyLengthSection')} color={colors.accent} />
+                <Eyebrow label={t('editor.replyLengthSection')} color={colors.text} />
                 <ParamSlider
                   label={t('editor.paragraphLimit')}
                   value={replyLimit ?? 0}
@@ -400,7 +404,7 @@ export default function CharacterEditorScreen() {
 
                 <Divider />
 
-                <Eyebrow label={t('editor.greetingLabel')} color={colors.accent} />
+                <Eyebrow label={t('editor.greetingLabel')} color={colors.text} />
                 <FieldRow
                   hint={t('editor.greetingHint')}
                   value={greeting}
@@ -413,7 +417,7 @@ export default function CharacterEditorScreen() {
                 <Divider />
 
                 <View style={styles.systemPromptHeader}>
-                  <Eyebrow label={t('editor.systemPromptLabel')} color={colors.accent} />
+                  <Eyebrow label={t('editor.systemPromptLabel')} color={colors.text} />
                   {beforeGen ? (
                     <Pressable onPress={undoGenerated} hitSlop={8}>
                       <Text style={styles.linkMuted}>{t('editor.undoGenerated')}</Text>

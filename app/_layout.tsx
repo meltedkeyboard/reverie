@@ -12,6 +12,7 @@ import { isHapticsEnabled } from '@/db/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
 import { CloudSyncProvider } from '@/hooks/useCloudSync'
+import { ChatTextProvider } from '@/lib/chatText'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
 
@@ -65,11 +66,13 @@ function ThemedApp() {
     <LocaleContextProvider preference={localePreference} setPreference={setLocalePreference}>
       <ThemeContextProvider preference={preference} setPreference={setPreference}>
         <CloudSyncProvider>
+          <ChatTextProvider>
           <AppLock>
             {/* A new text size doesn't always reach the layout of screens already shown, so
                 the screens are built anew for it. The database, the lock and sync stay. */}
             <AppShell key={fontScale} />
           </AppLock>
+          </ChatTextProvider>
         </CloudSyncProvider>
       </ThemeContextProvider>
     </LocaleContextProvider>

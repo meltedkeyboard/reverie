@@ -20,6 +20,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Auto chat title | `src/lib/titles.ts` |
 | System prompt / greeting generator | `src/lib/promptGen.ts` and `src/components/PromptGenModal.tsx` |
 | Colors, fonts, light/dark | `src/theme.tsx` |
+| Font and text size of chats | `src/lib/chatText.tsx`, the installed families from `modules/reverie-fonts` (`ChatTextProvider`, `useChatText`), stored by `src/db/settings.ts`; applied in `MessageRow` and `AsidePanel`, chosen on its own screen, `app/chat-text.tsx`, opened from a row in Settings > Chats |
 | Long text fields of the editors and their full-screen editor | `FieldRow` with `expandTitle`, `app/text-editor.tsx`, `src/lib/textDraft.ts` |
 | UI strings | `src/locales/en.json`, `src/locales/ru.json`; lookup in `src/i18n.tsx` |
 | iOS permission texts | `app.json` plugins (English) and `permissions/ru.json` (Russian) |
@@ -40,7 +41,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 
 | Route | File | Purpose |
 |---|---|---|
-| `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice |
+| `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice. Does not scroll while empty (so does Rooms, and Search without results) |
 | `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder |
 | `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, Continue capsule and where it leads, lock, haptics, private question button, iCloud sync, backup. `?section=` scrolls to a block and flashes it |
 | `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26) |
@@ -50,10 +51,11 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 | `/room/:id` | `room/[id].tsx` | Room editor: members, floor mode, scene, background |
 | `/character/:id` | `character/[id].tsx` | Character editor. With `?profile=1` (the info button of the chats list) it opens as a read-only profile, `CharacterProfile`, in the manner of Telegram: the pencil in the header turns into the save checkmark (`BarButton` with `animateChange`), and saving returns to the profile. The editor: prompt, greeting, sampling, thinking mode, background. The avatar spreads into a full-width photo on a pull (`ExpandingAvatar`, fed the scroll offset by `useAnimatedScrollHandler`), the drawn header giving way and the name moving onto the photo. Transforms only: the photo is laid out full size and scaled into the circle, and `useSpreadPush` moves the form down, since animating sizes re-laid out the form every frame |
 | `/background` | `background.tsx` | Background picker, effect and intensity |
-| `/avatar-crop` | `avatar-crop.tsx` | Moving and pinching an avatar picked from Files under a round window; the library and the camera crop in the system editor instead |
+| `/avatar-crop` | `avatar-crop.tsx` | Moving and pinching a still avatar picked from Photos or Files under a round window; the camera crops in the system editor instead |
 | `/text-editor` | `text-editor.tsx` | A long form text (system prompt, greeting, scene) on the whole screen, like a note; each change goes straight back to the form. Opens without the keyboard; a wrapper takes the JS touch (`onStartShouldSetResponderCapture`), because `TextInput` focuses itself when any touch ends, a scroll included |
 | `/onboarding` | `onboarding.tsx` | First-run pages, including server setup |
 | `/viewer` | `viewer.tsx` | Full-screen images: pinch and double-tap zoom, swipe between several (a room's cast) |
+| `/chat-text` | `chat-text.tsx` | Font (a native menu of every installed family) and text size of chats, with a preview |
 | `/about` | `about.tsx` | About page |
 
 ## Search
@@ -67,6 +69,8 @@ A Spotlight-like search over everything, in `(tabs)/search/index.tsx`.
 - A message result opens `/chat/ID?message=ID`; `ConversationList` scrolls to the row (retrying while far rows are not rendered) and tints it with `Flash`. Settings blocks use the same `Flash`.
 
 Some data cannot go through route params (file URIs, callbacks, very long data URLs), so tiny module-level slots carry it between screens: `src/lib/backgroundDraft.ts`, `src/lib/avatarCrop.ts`, `src/lib/textDraft.ts` and `src/lib/viewer.ts`.
+
+Avatars may move: a GIF, animated WebP/APNG (expo-image plays them) or MP4/MOV/M4V (expo-video). A moving file skips the crop and is stored untouched under its own extension (`persistAvatar`, `copyStoredImage` and backup import keep it); `contentFit="cover"` shows its middle. Over `MAX_ANIMATED_BYTES` it is refused, since backups carry avatars as base64. Backgrounds stay still pictures.
 
 Every avatar opens the viewer: `Avatar` and `AvatarStack` (the whole cast, via `castGallery`) wrap themselves in `ImageLink` unless `viewable={false}`. In a list row that opens something, the avatar keeps its own tap (the rest of the row still opens). `viewable={false}` is for places where the tap on the avatar itself must do something else: a header menu trigger, the cast button, a cast sheet row, the Continue capsule, the character picker in the room editor. Where it matters, the photo is offered as a menu item through `useOpenViewer` instead.
 
@@ -136,7 +140,7 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 
 | Group | Files |
 |---|---|
-| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background, `squareAvatar` cuts a given square, copy), `avatarStore.ts` (files, avatars and backgrounds in separate folders) |
+| Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background: `pickAvatarPhoto` camera, `pickAvatarLibrary` and `pickAvatarFile` raw, a still one then framed on `/avatar-crop`, a moving one kept by `acceptMoving`; `squareAvatar` cuts a given square, copy), `avatarStore.ts` (files, avatars and backgrounds in separate folders), `media.ts` (which files are video or a moving picture, by extension and, for WebP/PNG, a header sniff; the size cap) |
 | Backup | `backup.ts` (export, import, wipe), `download.ts` (save JSON through the Files "Save as" sheet from `modules/reverie-save-as`, or to a picked folder without it, an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` |
 | Dialogs | `dialogs.tsx` (native alerts and sheets), `chatDialogs.ts` |
 | Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
@@ -164,12 +168,12 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 ## `src/components`
 
 - **Chat:** `MessageRow`, `Composer`, `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `Markdown` (replies and Private answers: `marked` lexer, rendered to native text; `*emphasis*` is a roleplay action, muted in a reply; text is a read-only `TextInput` (`SelectableText`), since only a UITextView gives the system selection with handles, while a selectable `Text` can only copy all of it. Paragraphs, headings, lists and quotes of a reply are joined into one such view, lists and quotes drawn with characters, so a selection runs through the whole reply and stops only at a code block or a table; a long press on a reply selects text, while the user's own bubble keeps the long-press menu), `AsidePanel` (Private).
-- **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`. `Check` is the checkmark of a picked sheet row, shared with `ModelSheet`.
+- **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`. `Check` is the checkmark of a picked sheet row.
 - **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton` (one for both home tabs, drawn by `(tabs)/_layout.tsx` over them as `HomeContinueButton`; slides its content out and in when it comes to lead to another chat; on a switch between Characters and Rooms the content just changes), `EmptyState`.
-- **Forms:** `Field`, `ToggleRow`, `Segmented`, `ChipGroup` (a row of `Chip`), `ParamSlider`, `FormScreenHeader`, `PromptGenModal`, `PickerBox` (a field chosen from a sheet rather than typed; `FieldRow` with `onPress`), `ModelSheet` (the server's models, one to a row, in Settings and onboarding once the connection test has listed them).
+- **Forms:** `Field`, `ToggleRow`, `Segmented`, `ChipGroup` (a row of `Chip`), `ParamSlider`, `FormScreenHeader`, `PromptGenModal`, `PickerBox` (a field chosen from the system menu rather than typed, `NativeMenu` around the box; `FieldRow` with `menu`). The server's models go through it in Settings and onboarding once the connection test has listed them; in onboarding, while none is picked, the main button is the menu's trigger (a menu cannot be opened from code).
 - **Chrome and glass:** `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs), `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `PillButton`, `Chip`, `SFIcon`.
-- **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `ExpandingAvatar` (the character editor's), `ImageLink`, `HomePattern`, `Wordmark`.
-- **`motifs/`:** small brand decorations (`Star*`, `Divider`, `Eyebrow`, `FieldRow`). `Eyebrow` has a `plain` mode (Georgia 19 pt, regular, no star, no caps, the headings of the first releases) that Settings uses.
+- **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `Picture` (one picture by file: expo-image, or a looping muted `expo-video` player for MP4/MOV/M4V; used by `Avatar`, `ExpandingAvatar` and the viewer), `ExpandingAvatar` (the character editor's), `ImageLink`, `HomePattern`, `Wordmark`.
+- **`motifs/`:** small brand decorations (`Star*`, `Divider`, `Eyebrow`, `FieldRow`). `Eyebrow` is the section heading everywhere: Georgia 19 pt, regular, no star, no caps, as in the first releases.
 
 ### Liquid Glass
 

@@ -54,7 +54,7 @@ export default function AboutScreen() {
           </DreamyBlock>
 
           <DreamyBlock seed={4}>
-            <Eyebrow label={t('about.dataTitle')} color={colors.accent} />
+            <Eyebrow label={t('about.dataTitle')} color={colors.text} />
           </DreamyBlock>
           <DreamyText seed={5} style={styles.note}>
             {t('about.dataText')}
@@ -65,7 +65,7 @@ export default function AboutScreen() {
           </DreamyBlock>
 
           <DreamyBlock seed={6}>
-            <Eyebrow label={t('about.serverTitle')} color={colors.accent} />
+            <Eyebrow label={t('about.serverTitle')} color={colors.text} />
           </DreamyBlock>
           <DreamyText seed={7} style={styles.note}>
             {t('about.serverText')}
@@ -76,7 +76,7 @@ export default function AboutScreen() {
           </DreamyBlock>
 
           <DreamyBlock seed={8}>
-            <Eyebrow label={t('about.backupsTitle')} color={colors.accent} />
+            <Eyebrow label={t('about.backupsTitle')} color={colors.text} />
           </DreamyBlock>
           <DreamyText seed={9} style={styles.note}>
             {t('about.backupsText')}
@@ -85,10 +85,6 @@ export default function AboutScreen() {
           <DreamyText seed={10} style={styles.shakeHint}>
             {t('about.shakeHint')}
           </DreamyText>
-
-          <DreamyBlock seed={11} style={styles.footer}>
-            <Star size={14} color={colors.textFaint} filled={false} rotation={12} strokeWidth={70} />
-          </DreamyBlock>
         </ScrollView>
       </Daydream>
 
@@ -111,6 +107,5 @@ const createStyles = (colors: Colors) =>
     marginHorizontal: 8,
   },
   note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 14 },
-  footer: { alignItems: 'center', marginTop: 24 },
   shakeHint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 24 },
 })

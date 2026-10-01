@@ -107,6 +107,7 @@ export default function SearchScreen() {
       { label: t('settings.continueButton'), keywords: [t('settings.homeScreen')], symbol: 'play.circle', fallback: 'play-circle-outline', href: settingsAt('continue') },
       { label: t('settings.privateButton'), keywords: [t('settings.chats')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('private') },
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
+      { label: t('settings.chatFont'), keywords: [t('settings.chats'), t('settings.chatTextSize')], symbol: 'textformat', fallback: 'text-outline', href: settingsAt('chatText') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
       { label: t('settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
       { label: t('settings.showInFiles'), keywords: [t('settings.security')], symbol: 'folder', fallback: 'folder-outline', href: settingsAt('files') },
@@ -218,6 +219,7 @@ export default function SearchScreen() {
       renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}
       stickySectionHeadersEnabled={false}
       ListEmptyComponent={empty}
+      scrollEnabled={sections.length > 0}
       contentContainerStyle={[styles.content, contentStyle]}
       contentInsetAdjustmentBehavior="automatic"
       keyboardDismissMode="on-drag"

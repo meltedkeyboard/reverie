@@ -30,18 +30,18 @@ export function CharacterProfile({ greeting, systemPrompt, params, background }:
   const sections = [
     systemPrompt.trim() ? (
       <Fragment key="prompt">
-        <Eyebrow label={t('editor.systemPromptLabel')} color={colors.accent} />
+        <Eyebrow label={t('editor.systemPromptLabel')} color={colors.text} />
         <ClampedText text={systemPrompt} lines={6} />
       </Fragment>
     ) : null,
     greeting.trim() ? (
       <Fragment key="greeting">
-        <Eyebrow label={t('editor.greetingLabel')} color={colors.accent} />
+        <Eyebrow label={t('editor.greetingLabel')} color={colors.text} />
         <ClampedText text={greeting} lines={4} />
       </Fragment>
     ) : null,
     <Fragment key="params">
-      <Eyebrow label={t('editor.genParamsSection')} color={colors.accent} />
+      <Eyebrow label={t('editor.genParamsSection')} color={colors.text} />
       <View style={styles.params}>
         {params.map((param, i) => (
           <View key={param.label} style={[styles.param, i > 0 && styles.paramRule]}>
@@ -53,7 +53,7 @@ export function CharacterProfile({ greeting, systemPrompt, params, background }:
     </Fragment>,
     background ? (
       <Fragment key="background">
-        <Eyebrow label={t('background.title')} color={colors.accent} />
+        <Eyebrow label={t('background.title')} color={colors.text} />
         <View style={styles.backgroundThumb}>
           <ChatBackground uri={background.uri} effect={background.effect} intensity={background.intensity} />
         </View>

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Image } from 'expo-image'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import {
   Pressable,
   ScrollView,
@@ -25,7 +25,8 @@ import { useTranslation } from '@/i18n'
 import type { AsideQuestion, AsideTurn } from '@/lib/aside'
 import { imageDataUrl } from '@/lib/images'
 import type { ReplyFrame } from '@/lib/replyStream'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { useChatText } from '@/lib/chatText'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 import { ErrorCard } from './ConversationList'
 import { GlassSurface } from './Glass'
@@ -70,6 +71,11 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
+  const { fontFamily, scaled } = useChatText()
+  const answerStyle = useMemo(
+    () => [styles.answer, { fontFamily, fontSize: scaled(16), lineHeight: scaled(24) }],
+    [styles, fontFamily, scaled]
+  )
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
   const { height: screenHeight } = useWindowDimensions()
@@ -136,14 +142,14 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
               <View key={i} style={styles.turn}>
                 <Question text={turn.question} />
                 {turn.thought ? <ThoughtBlock text={turn.thought.text} ms={turn.thought.ms} /> : null}
-                <Markdown text={turn.answer} style={styles.answer} />
+                <Markdown text={turn.answer} style={answerStyle} />
               </View>
             ))}
             {pending !== null ? (
               <View style={styles.turn}>
                 <Question text={pending} />
                 {draft?.thought ? <ThoughtBlock text={draft.thought} ms={draft.thinkingMs} /> : null}
-                {draft?.text ? <Markdown text={draft.text.trimStart()} style={styles.answer} streaming /> : null}
+                {draft?.text ? <Markdown text={draft.text.trimStart()} style={answerStyle} streaming /> : null}
                 {waiting && !draft?.thought ? <TypingIndicator /> : null}
               </View>
             ) : null}
@@ -200,5 +206,5 @@ const createStyles = (colors: Colors) =>
     questionText: { color: colors.text, fontSize: 15, lineHeight: 20 },
     pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 4 },
     picture: { width: 64, height: 64, borderRadius: 10 },
-    answer: { color: colors.text, fontFamily: fonts.prose, fontSize: 16, lineHeight: 24 },
+    answer: { color: colors.text },
   })

@@ -8,7 +8,7 @@ import { useTheme } from '@/theme'
 export type MenuItem = {
   label: string
   // SF Symbol shown next to the label in the native menu.
-  systemImage: string
+  systemImage?: string
   destructive?: boolean
   onSelect: () => void
 }
@@ -60,7 +60,7 @@ export function NativeMenu({ items, children, style, disabled = false, glassRadi
     <Button
       key={item.label}
       label={item.label}
-      systemImage={item.systemImage as SymbolName}
+      systemImage={item.systemImage as SymbolName | undefined}
       role={item.destructive ? 'destructive' : undefined}
       onPress={item.onSelect}
     />

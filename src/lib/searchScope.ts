@@ -22,6 +22,7 @@ export type SettingsSection =
   | 'continue'
   | 'private'
   | 'confirmDelete'
+  | 'chatText'
   | 'haptics'
   | 'faceId'
   | 'files'

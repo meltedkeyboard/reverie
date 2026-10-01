@@ -88,3 +88,44 @@ export function loadLocalePreference(db: SQLiteDatabase) {
 export function saveLocalePreference(db: SQLiteDatabase, preference: 'system' | 'ru' | 'en') {
   return setSetting(db, LOCALE_KEY, preference)
 }
+
+// A family name as the system knows it, or 'System' for the font of the app's own screens.
+export type ChatFont = string
+
+export const SYSTEM_FONT = 'System'
+export const DEFAULT_CHAT_FONT = 'Georgia'
+
+export const CHAT_TEXT_SCALE_RANGE = { min: 0.8, max: 1.6, default: 1 } as const
+
+const CHAT_FONT_KEY = 'chat_font'
+const CHAT_TEXT_SCALE_KEY = 'chat_text_scale'
+
+// The first versions kept one of a few names for the family.
+const LEGACY_FONTS: Record<string, string> = {
+  georgia: 'Georgia',
+  palatino: 'Palatino',
+  iowan: 'Iowan Old Style',
+  charter: 'Charter',
+  avenir: 'Avenir Next',
+  system: SYSTEM_FONT,
+}
+
+export async function loadChatFont(db: SQLiteDatabase): Promise<ChatFont> {
+  const value = await getSetting(db, CHAT_FONT_KEY)
+  if (!value) return DEFAULT_CHAT_FONT
+  return LEGACY_FONTS[value] ?? value
+}
+
+export function saveChatFont(db: SQLiteDatabase, font: ChatFont) {
+  return setSetting(db, CHAT_FONT_KEY, font)
+}
+
+export async function loadChatTextScale(db: SQLiteDatabase) {
+  const value = Number(await getSetting(db, CHAT_TEXT_SCALE_KEY))
+  const { min, max, default: normal } = CHAT_TEXT_SCALE_RANGE
+  return Number.isFinite(value) && value >= min && value <= max ? value : normal
+}
+
+export function saveChatTextScale(db: SQLiteDatabase, scale: number) {
+  return setSetting(db, CHAT_TEXT_SCALE_KEY, String(scale))
+}

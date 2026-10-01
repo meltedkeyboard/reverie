@@ -72,6 +72,6 @@ export function imageDataUrl(base64: string) {
 
 // Avatars and backgrounds are stored under a name made from the time they were saved; the
 // random part keeps two saved in the same moment apart.
-export function newAvatarName() {
-  return `${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
+export function newAvatarName(extension = 'jpg') {
+  return `${Date.now()}-${Math.round(Math.random() * 1e6)}.${extension}`
 }

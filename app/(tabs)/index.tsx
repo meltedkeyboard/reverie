@@ -59,6 +59,7 @@ export default function CharactersScreen() {
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
         {...reorder}
+        scrollEnabled={!!characters?.length}
         contentContainerStyle={[padding, lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE }]}
         ItemSeparatorComponent={ListSeparator}
         ListHeaderComponent={

@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Button } from '@/components/Button'
 import { Field, FieldLabel } from '@/components/Field'
-import { ModelSheet } from '@/components/ModelSheet'
+import type { MenuItem } from '@/components/NativeMenu'
 import { PickerBox } from '@/components/PickerBox'
 import { SFIcon } from '@/components/SFIcon'
 import { Wordmark } from '@/components/Wordmark'
@@ -25,6 +25,7 @@ import { useDatabase } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useTranslation } from '@/i18n'
+import { NativeMenu } from '@/components/NativeMenu'
 import * as Haptics from '@/lib/haptics'
 import { APP_VERSION } from '@/lib/version'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -79,7 +80,6 @@ export default function OnboardingScreen() {
   const turn = useRef(new Animated.Value(0)).current
   const [onServer, setOnServer] = useState(false)
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
-  const [pickingModel, setPickingModel] = useState(false)
   const { status, models, test, reset: resetStatus } = useConnectionTest()
   const welcomeScroll = useFitScroll()
   const serverScroll = useFitScroll()
@@ -114,11 +114,17 @@ export default function OnboardingScreen() {
     if (patch.baseUrl !== undefined || patch.apiKey !== undefined) resetStatus()
   }
 
+  const modelItems = (list: string[]): MenuItem[] =>
+    list.map((id) => ({
+      label: id,
+      systemImage: id === cfg.model ? 'checkmark' : undefined,
+      onSelect: () => update({ model: id }),
+    }))
+
   const onTest = async () => {
     const found = await test(cfg)
     // A single model on the server is the one to talk to; out of several the user picks.
     if (found.length === 1) update({ model: found[0] })
-    else if (found.length > 1 && !found.includes(cfg.model)) setPickingModel(true)
   }
 
   const finish = async (saveServer: boolean) => {
@@ -136,7 +142,7 @@ export default function OnboardingScreen() {
   const mainButton = !connected
     ? { label: t('settings.testConnection'), onPress: onTest, disabled: !hasAddress }
     : !modelPicked
-      ? { label: t('onboarding.pickModel'), onPress: () => setPickingModel(true), disabled: false }
+      ? { label: t('onboarding.pickModel'), onPress: () => {}, disabled: false }
       : { label: t('onboarding.done'), onPress: () => finish(true), disabled: false }
   const contentPad = [styles.content, { paddingTop: insets.top + 56 }]
   // Only a transform on the footers: a fading ancestor leaves the Liquid Glass effect
@@ -164,7 +170,7 @@ export default function OnboardingScreen() {
                 {FEATURES.map((f) => (
                   <View key={f.titleKey} style={styles.feature}>
                     <View style={styles.featureIcon}>
-                      <SFIcon name={f.icon} fallback={f.fallback} size={28} color={colors.accent} />
+                      <SFIcon name={f.icon} fallback={f.fallback} size={28} color={colors.text} />
                     </View>
                     <View style={styles.featureCopy}>
                       <Text style={styles.featureTitle}>{t(f.titleKey)}</Text>
@@ -195,7 +201,7 @@ export default function OnboardingScreen() {
           >
             <View onLayout={serverScroll.onContentLayout}>
               <View style={styles.pageIcon}>
-                <SFIcon name="server.rack" fallback="server-outline" size={44} color={colors.accent} />
+                <SFIcon name="server.rack" fallback="server-outline" size={44} color={colors.text} />
               </View>
               <Text style={[styles.title, styles.pageTitle]} accessibilityRole="header">
                 {t('onboarding.serverTitle')}
@@ -230,7 +236,7 @@ export default function OnboardingScreen() {
                   <PickerBox
                     value={modelPicked ? cfg.model : ''}
                     placeholder={t('onboarding.pickModel')}
-                    onPress={() => setPickingModel(true)}
+                    items={modelItems(models)}
                     accessibilityLabel={t('settings.modelLabel')}
                     fallbackStyle={styles.modelSolid}
                   />
@@ -244,13 +250,20 @@ export default function OnboardingScreen() {
             </View>
           </KeyboardAwareScrollView>
           <Animated.View style={footerStyle}>
-            <Button
-              variant="glass"
-              label={mainButton.label}
-              onPress={mainButton.onPress}
-              disabled={mainButton.disabled}
-              loading={status.kind === 'testing'}
-            />
+            {/* While a model is to be picked the button is the menu's trigger, which opens on the tap. */}
+            {connected && !modelPicked ? (
+              <NativeMenu items={modelItems(models)}>
+                <Button variant="glass" label={mainButton.label} onPress={mainButton.onPress} />
+              </NativeMenu>
+            ) : (
+              <Button
+                variant="glass"
+                label={mainButton.label}
+                onPress={mainButton.onPress}
+                disabled={mainButton.disabled}
+                loading={status.kind === 'testing'}
+              />
+            )}
             <Pressable
               onPress={() => finish(false)}
               hitSlop={8}
@@ -261,14 +274,6 @@ export default function OnboardingScreen() {
           </Animated.View>
         </View>
       </Animated.View>
-
-      <ModelSheet
-        visible={pickingModel}
-        onClose={() => setPickingModel(false)}
-        models={models}
-        selected={cfg.model}
-        onSelect={(model) => update({ model })}
-      />
     </View>
   )
 }

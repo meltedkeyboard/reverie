@@ -3,7 +3,7 @@
     "name": "Reverie",
     "slug": "reverie",
     "platforms": ["ios"],
-    "version": "3.7.0",
+    "version": "3.8.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "reverie",

@@ -194,7 +194,7 @@ export default function RoomEditorScreen() {
           <Divider />
 
           <View style={styles.sectionHeader}>
-            <Eyebrow label={t('roomEditor.membersSection')} color={colors.accent} />
+            <Eyebrow label={t('roomEditor.membersSection')} color={colors.text} />
             <Pressable onPress={() => setPicking(true)} hitSlop={8}>
               <Text style={styles.link}>{t('roomEditor.addMembers')}</Text>
             </Pressable>
@@ -281,7 +281,7 @@ export default function RoomEditorScreen() {
 
           <Divider />
 
-          <Eyebrow label={t('roomEditor.floorSection')} color={colors.accent} />
+          <Eyebrow label={t('roomEditor.floorSection')} color={colors.text} />
           <ChipGroup style={styles.chips} options={FLOOR_OPTIONS} value={fields.floor} onChange={(v) => set('floor', v)} />
           <Text style={styles.note}>{t(`room.floorHint.${fields.floor}`)}</Text>
           <View style={styles.gap} />
@@ -303,7 +303,7 @@ export default function RoomEditorScreen() {
 
           <Divider />
 
-          <Eyebrow label={t('roomEditor.sceneSection')} color={colors.accent} />
+          <Eyebrow label={t('roomEditor.sceneSection')} color={colors.text} />
           <FieldRow
             label={t('roomEditor.scenario')}
             hint={t('roomEditor.scenarioHint')}
@@ -333,7 +333,7 @@ export default function RoomEditorScreen() {
 
           <Divider />
 
-          <Eyebrow label={t('background.title')} color={colors.accent} />
+          <Eyebrow label={t('background.title')} color={colors.text} />
           <View style={styles.backgroundRow}>
             <View style={styles.backgroundThumb}>
               {backgroundUri ? (

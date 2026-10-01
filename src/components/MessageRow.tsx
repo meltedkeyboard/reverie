@@ -12,8 +12,9 @@ import { withAlpha } from '@/lib/color'
 import { showSheet } from '@/lib/dialogs'
 import * as Haptics from '@/lib/haptics'
 import { imageDataUrl } from '@/lib/images'
+import { CHAT_METRICS, useChatText } from '@/lib/chatText'
 import { messageActions, type MessageAction } from '@/lib/messageActions'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { IconButton } from './IconButton'
@@ -51,6 +52,11 @@ type Props = {
   scene?: RowScene
 }
 
+// The family and scaled size a line of chat text takes from the settings.
+function textSize({ fontFamily, scaled }: ReturnType<typeof useChatText>, metrics: { size: number; line: number }) {
+  return { fontFamily, fontSize: scaled(metrics.size), lineHeight: scaled(metrics.line) }
+}
+
 // A long press on the user's own bubble opens the message menu. Replies have no such
 // menu: a long press there selects text, and their actions sit in the bar below.
 const LONG_PRESS_MS = 350
@@ -59,6 +65,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
+  const chatText = useChatText()
   const narration = message.kind === 'narration'
   const isUser = message.role === 'user' && !narration
   const actions = useMemo(
@@ -88,7 +95,11 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   const text = (
     <Markdown
       text={message.content}
-      style={narration ? [styles.botText, styles.narrationText] : styles.botText}
+      style={
+        narration
+          ? [styles.botText, styles.narrationText, textSize(chatText, CHAT_METRICS.narration)]
+          : [styles.botText, textSize(chatText, CHAT_METRICS.bot)]
+      }
       emStyle={styles.action}
       streaming={message.streaming}
     />
@@ -127,7 +138,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
               scene?.whisper ? styles.whisperBubble : null,
             ]}
           >
-            <Text style={styles.userText}>
+            <Text style={[styles.userText, textSize(chatText, CHAT_METRICS.user)]}>
               {message.content}
             </Text>
           </Pressable>
@@ -382,9 +393,9 @@ const createStyles = (colors: Colors) =>
     paddingVertical: 10,
   },
   picture: { borderRadius: 18, marginBottom: 4, backgroundColor: colors.surface },
-  userText: { color: colors.text, fontSize: 16, lineHeight: 22 },
+  userText: { color: colors.text },
   botRow: { alignItems: 'flex-start', paddingHorizontal: 20, marginVertical: 12, width: '100%', alignSelf: 'center' },
-  botText: { color: colors.text, fontFamily: fonts.prose, fontSize: 17, lineHeight: 27, letterSpacing: 0.1 },
+  botText: { color: colors.text, letterSpacing: 0.1 },
   action: { fontStyle: 'italic', color: colors.textMuted },
   reactionRow: { marginVertical: 6 },
   speaker: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, maxWidth: '100%' },
@@ -415,7 +426,7 @@ const createStyles = (colors: Colors) =>
     alignSelf: 'center',
   },
   narrationRule: { width: 36, height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong, marginVertical: 10 },
-  narrationText: { fontStyle: 'italic', color: colors.textMuted, textAlign: 'center', fontSize: 16, lineHeight: 25 },
+  narrationText: { fontStyle: 'italic', color: colors.textMuted, textAlign: 'center' },
   thought: {
     alignSelf: 'stretch',
     marginBottom: 10,

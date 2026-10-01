@@ -10,7 +10,7 @@ import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/comp
 import { Divider } from '@/components/motifs/Divider'
 import { FieldRow } from '@/components/motifs/FieldRow'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
-import { ModelSheet } from '@/components/ModelSheet'
+import type { MenuItem } from '@/components/NativeMenu'
 import { PillButton } from '@/components/PillButton'
 import { SettingsWheel, type WheelItem } from '@/components/SettingsWheel'
 import { ToggleRow } from '@/components/ToggleRow'
@@ -28,6 +28,7 @@ import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { confirm, showMessage } from '@/lib/dialogs'
+import { useChatTextSettings } from '@/lib/chatText'
 import { errorMessage } from '@/lib/errors'
 import { formatWhen } from '@/lib/format'
 import { notificationAsync, NotificationFeedbackType } from '@/lib/haptics'
@@ -118,7 +119,6 @@ export default function SettingsScreen() {
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
   const { status, models, test, reset: resetStatus } = useConnectionTest()
-  const [pickingModel, setPickingModel] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const backingUp = exporting || importing
@@ -211,12 +211,18 @@ export default function SettingsScreen() {
     if (patch.baseUrl !== undefined || patch.apiKey !== undefined) resetStatus()
   }
 
-  // The models the server lists are picked from a sheet; one alone is taken as it is.
+  // The models the server lists are picked from a system menu, the chosen one checked.
+  const modelItems = (list: string[]): MenuItem[] =>
+    list.map((id) => ({
+      label: id,
+      systemImage: id === cfg.model ? 'checkmark' : undefined,
+      onSelect: () => update({ model: id }),
+    }))
+
+  // One model alone is taken as it is; out of several the user picks from the field.
   const onTest = async () => {
     const found = await test(cfg)
-    if (found.includes(cfg.model)) return
-    if (found.length === 1) update({ model: found[0] })
-    else if (found.length > 1) setPickingModel(true)
+    if (found.length === 1 && !found.includes(cfg.model)) update({ model: found[0] })
   }
 
   const onExport = async () => {
@@ -267,14 +273,14 @@ export default function SettingsScreen() {
   // The sections, laid out either as the plain list or as the wheel below.
   const appearance = (
     <>
-      <Eyebrow plain star={false} label={t('settings.appearance')} color={colors.text} />
+      <Eyebrow label={t('settings.appearance')} color={colors.text} />
       <ChipGroup options={THEME_OPTIONS} value={preference} onChange={setPreference} />
     </>
   )
 
   const language = (
     <>
-      <Eyebrow plain star={false} label={t('settings.language')} color={colors.text} />
+      <Eyebrow label={t('settings.language')} color={colors.text} />
       <ChipGroup options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
     </>
   )
@@ -316,6 +322,19 @@ export default function SettingsScreen() {
     />
   )
 
+  const chatText = useChatTextSettings()
+  const chatTextRows = (
+    <Pressable onPress={() => router.push('/chat-text')} style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}>
+      <View style={styles.linkText}>
+        <Text style={[styles.rowLabel, styles.linkLabel]}>{t('settings.chatFont')}</Text>
+        <Text style={styles.linkValue}>
+          {chatText.font === 'System' ? t('chatFont.system') : chatText.font}, {Math.round(chatText.scale * 100)}%
+        </Text>
+      </View>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  )
+
   const hapticsRow = (
     <ToggleRow label={t('settings.haptics')} note={t('settings.hapticsNote')} value={haptics} onValueChange={toggleHaptics} />
   )
@@ -341,7 +360,7 @@ export default function SettingsScreen() {
 
   const server = (
     <>
-      <Eyebrow plain star={false} label={t('settings.server')} color={colors.text} />
+      <Eyebrow label={t('settings.server')} color={colors.text} />
       <FieldRow
         star={false}
         label={t('settings.baseUrlLabel')}
@@ -371,7 +390,7 @@ export default function SettingsScreen() {
           label={t('settings.modelLabel')}
           value={models.includes(cfg.model) ? cfg.model : ''}
           placeholder={t('onboarding.pickModel')}
-          onPress={() => setPickingModel(true)}
+          menu={modelItems(models)}
         />
       ) : (
         <FieldRow
@@ -394,7 +413,7 @@ export default function SettingsScreen() {
   const showCloud = cloudSync.available || cloudPreview
   const icloud = (
     <>
-      <Eyebrow plain star={false} label={t('settings.icloud')} color={colors.text} />
+      <Eyebrow label={t('settings.icloud')} color={colors.text} />
       <ToggleRow
         label={t('settings.icloudSync')}
         note={t('settings.icloudSyncNote')}
@@ -438,7 +457,7 @@ export default function SettingsScreen() {
 
   const backup = (
     <>
-      <Eyebrow plain star={false} label={t('settings.backupTitle')} color={colors.text} />
+      <Eyebrow label={t('settings.backupTitle')} color={colors.text} />
       <Text style={styles.note}>{t('settings.backupNote')}</Text>
       <View style={styles.buttonPairRow}>
         <PillButton filled label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting || cloudAction !== null} style={styles.pairButton} />
@@ -463,7 +482,7 @@ export default function SettingsScreen() {
 
   const wipe = (
     <>
-      <Eyebrow plain star={false} label={t('settings.dangerZone')} color={colors.danger} />
+      <Eyebrow label={t('settings.dangerZone')} color={colors.danger} />
       <Text style={styles.note}>{t('settings.dangerNote')}</Text>
       <PillButton filled label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
     </>
@@ -477,19 +496,20 @@ export default function SettingsScreen() {
       sections: ['continue'],
       content: (
         <>
-          <Eyebrow plain star={false} label={t('settings.homeScreen')} color={colors.text} />
+          <Eyebrow label={t('settings.homeScreen')} color={colors.text} />
           {block('continue', continueRows)}
         </>
       ),
     },
     {
       key: 'chats',
-      sections: ['private', 'confirmDelete'],
+      sections: ['private', 'confirmDelete', 'chatText'],
       content: (
         <>
-          <Eyebrow plain star={false} label={t('settings.chats')} color={colors.text} />
+          <Eyebrow label={t('settings.chats')} color={colors.text} />
           {block('private', privateRow)}
           {block('confirmDelete', confirmDeleteRow)}
+          {block('chatText', chatTextRows)}
         </>
       ),
     },
@@ -498,7 +518,7 @@ export default function SettingsScreen() {
       sections: ['haptics'],
       content: (
         <>
-          <Eyebrow plain star={false} label={t('settings.feedback')} color={colors.text} />
+          <Eyebrow label={t('settings.feedback')} color={colors.text} />
           {block('haptics', hapticsRow)}
         </>
       ),
@@ -508,7 +528,7 @@ export default function SettingsScreen() {
       sections: ['faceId', 'files'],
       content: (
         <>
-          <Eyebrow plain star={false} label={t('settings.security')} color={colors.text} />
+          <Eyebrow label={t('settings.security')} color={colors.text} />
           {block('faceId', faceIdRow)}
           {block('files', filesRow)}
         </>
@@ -522,7 +542,7 @@ export default function SettingsScreen() {
       sections: [],
       content: (
         <>
-          <Eyebrow plain star={false} label={t('settings.aboutTitle')} color={colors.text} />
+          <Eyebrow label={t('settings.aboutTitle')} color={colors.text} />
           {aboutRow}
         </>
       ),
@@ -547,23 +567,24 @@ export default function SettingsScreen() {
 
           <Divider />
 
-          <Eyebrow plain star={false} label={t('settings.homeScreen')} color={colors.text} />
+          <Eyebrow label={t('settings.homeScreen')} color={colors.text} />
           {block('continue', continueRows)}
 
           <Divider />
 
-          <Eyebrow plain star={false} label={t('settings.chats')} color={colors.text} />
+          <Eyebrow label={t('settings.chats')} color={colors.text} />
           {block('private', privateRow)}
           {block('confirmDelete', confirmDeleteRow)}
+          {block('chatText', chatTextRows)}
 
           <Divider />
 
-          <Eyebrow plain star={false} label={t('settings.feedback')} color={colors.text} />
+          <Eyebrow label={t('settings.feedback')} color={colors.text} />
           {block('haptics', hapticsRow)}
 
           <Divider />
 
-          <Eyebrow plain star={false} label={t('settings.security')} color={colors.text} />
+          <Eyebrow label={t('settings.security')} color={colors.text} />
           {block('faceId', faceIdRow)}
           {block('files', filesRow)}
 
@@ -584,7 +605,7 @@ export default function SettingsScreen() {
 
           <Divider />
 
-          <Eyebrow plain star={false} label={t('settings.aboutTitle')} color={colors.text} />
+          <Eyebrow label={t('settings.aboutTitle')} color={colors.text} />
           {aboutRow}
 
           <Divider />
@@ -596,14 +617,6 @@ export default function SettingsScreen() {
       <GlassHeader floating>
         <TabTitle>{t('settings.title')}</TabTitle>
       </GlassHeader>
-
-      <ModelSheet
-        visible={pickingModel}
-        onClose={() => setPickingModel(false)}
-        models={models}
-        selected={cfg.model}
-        onSelect={(model) => update({ model })}
-      />
     </View>
   )
 }
@@ -622,5 +635,7 @@ const createStyles = (colors: Colors) =>
     pairButton: { flex: 1 },
     linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
     linkLabel: { marginBottom: 0 },
+    linkText: { flex: 1 },
+    linkValue: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
     chevron: { color: colors.textFaint, fontSize: 20 },
   })

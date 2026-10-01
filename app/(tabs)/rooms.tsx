@@ -77,6 +77,7 @@ export default function RoomsScreen() {
         data={rooms ?? []}
         keyExtractor={(r) => String(r.id)}
         {...reorder}
+        scrollEnabled={!!rooms?.length}
         contentContainerStyle={[padding, lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE }]}
         ItemSeparatorComponent={ListSeparator}
         ListEmptyComponent={

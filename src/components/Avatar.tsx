@@ -1,10 +1,10 @@
-import { Image } from 'expo-image'
 import { Text, View } from 'react-native'
 
 import { avatarUri } from '@/lib/avatars'
 import { fonts } from '@/theme'
 
 import { ImageLink } from './ImageLink'
+import { Picture } from './Picture'
 
 const TINTS = ['#3B2F5C', '#2F4A5C', '#5C3B47', '#365C48', '#5C4F2F', '#40406B']
 
@@ -30,7 +30,7 @@ export function Avatar({ name, file, uri, size, square = false, fill = false, vi
     : { width: size, height: size, borderRadius: square ? 0 : size / 2, overflow: 'hidden' as const }
 
   if (source) {
-    const image = <Image source={{ uri: source }} style={box} contentFit="cover" transition={150} />
+    const image = <Picture uri={source} style={box} transition={150} />
     if (!viewable) return image
     return (
       <ImageLink uri={source} accessibilityLabel={name} style={fill ? { flex: 1 } : undefined}>

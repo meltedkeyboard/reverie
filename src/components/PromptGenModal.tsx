@@ -220,7 +220,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
       <Eyebrow
         label={effectiveMode === 'improve' ? t('promptGen.changesLabel') : t('promptGen.descriptionLabel')}
-        color={colors.accent}
+        color={colors.text}
       />
       <FieldRow
         value={description}
@@ -233,14 +233,14 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
       {effectiveMode === 'new' && !description.trim() ? (
         <View style={styles.block}>
-          <Eyebrow label={t('promptGen.ideas')} color={colors.accent} />
+          <Eyebrow label={t('promptGen.ideas')} color={colors.text} />
           <View style={styles.chips}>{IDEA_KEYS.map((key) => chip(t(`${key}.title`), () => setDescription(t(key)), key))}</View>
         </View>
       ) : null}
 
       <Divider />
 
-      <Eyebrow label={t('promptGen.lengthLabel')} color={colors.accent} />
+      <Eyebrow label={t('promptGen.lengthLabel')} color={colors.text} />
       <View style={styles.block}>
         <ChipGroup
           options={[
@@ -253,7 +253,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
         />
       </View>
 
-      <Eyebrow label={t('promptGen.formatLabel')} color={colors.accent} />
+      <Eyebrow label={t('promptGen.formatLabel')} color={colors.text} />
       <View style={styles.block}>
         <ChipGroup
           options={[
@@ -330,7 +330,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
 
       {current && !busy ? (
         <View style={styles.block}>
-          <Eyebrow label={t('promptGen.reviseLabel')} color={colors.accent} />
+          <Eyebrow label={t('promptGen.reviseLabel')} color={colors.text} />
           <View style={styles.chips}>{TWEAK_KEYS.map((key) => chip(t(key), () => revise(t(`${key}.note`)), key))}</View>
           <View style={styles.noteRow}>
             <TextInput

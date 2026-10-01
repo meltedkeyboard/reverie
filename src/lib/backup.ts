@@ -8,6 +8,7 @@ import { t } from '@/i18n'
 import { pickJsonFile } from '@/lib/pickJson'
 import { readAvatarBase64, removeAllAvatars, writeAvatarBase64, type ImageKind } from '@/lib/avatars'
 import { saveJson } from '@/lib/download'
+import { extensionOf } from '@/lib/media'
 
 const BACKUP_VERSION = 7
 
@@ -169,7 +170,7 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
       if (!name || !dump.avatars[name]) return null
       let stored = avatarNames.get(name) ?? null
       if (!stored) {
-        stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
+        stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.${extensionOf(name) || 'jpg'}`
         await writeAvatarBase64(stored, dump.avatars[name], kind)
         avatarNames.set(name, stored)
       }

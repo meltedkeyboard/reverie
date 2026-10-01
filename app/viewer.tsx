@@ -1,4 +1,3 @@
-import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Alert, FlatList, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
@@ -8,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { GlassButton } from '@/components/Glass'
+import { Picture } from '@/components/Picture'
 import { SFIcon } from '@/components/SFIcon'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
@@ -226,7 +226,7 @@ function ZoomableImage({ image, width, height, onZoomChange, onTap }: ZoomablePr
     <GestureDetector gesture={gesture}>
       <View style={{ width, height, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         <Animated.View style={[{ width: frameWidth, height: frameHeight }, imageStyle]}>
-          <Image source={{ uri: image.uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+          <Picture uri={image.uri} style={StyleSheet.absoluteFill} contentFit="contain" />
         </Animated.View>
       </View>
     </GestureDetector>

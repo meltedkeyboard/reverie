@@ -1,6 +1,6 @@
 {
   "name": "reverie",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -36,6 +36,7 @@
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
+    "expo-video": "~57.0.5",
     "marked": "^16.4.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",

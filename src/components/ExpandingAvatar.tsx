@@ -1,4 +1,3 @@
-import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect } from 'react'
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
@@ -16,6 +15,7 @@ import * as Haptics from '@/lib/haptics'
 import { fonts } from '@/theme'
 
 import { useOpenViewer } from './ImageLink'
+import { Picture } from './Picture'
 
 type Props = {
   name: string
@@ -109,7 +109,7 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, top, s
           accessibilityLabel={name}
           style={StyleSheet.absoluteFill}
         >
-          <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          <Picture uri={uri} style={StyleSheet.absoluteFill} transition={150} />
         </Pressable>
         <Animated.View style={[StyleSheet.absoluteFill, overlay]} pointerEvents="none">
           <LinearGradient colors={TOP_SHADE} style={[styles.topShade, { height: top }]} />

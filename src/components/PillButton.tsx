@@ -1,4 +1,4 @@
-import { useEffect, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
 
@@ -33,8 +33,8 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
   const styles = useStyles(createStyles)
   const tint = color ?? colors.accent
   const ink = filled ? ON_FILL : tint
-  const inactive = disabled || loading
-  const sliding = !!loading && !!icon?.slide
+  const sliding = useAtLeastOneLap(!!loading && !!icon?.slide)
+  const inactive = disabled || loading || sliding
   return (
     <Pressable
       onPress={onPress}
@@ -56,7 +56,7 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
           <View style={styles.content}>
             {icon ? (
               <SlidingIcon direction={icon.slide} active={sliding}>
-                <SFIcon name={icon.name} fallback={icon.fallback} size={19} color={ink} onAccent={filled} />
+                <SFIcon name={icon.name} fallback={icon.fallback} size={19} color={filled ? ink : color ?? colors.text} onAccent={filled} />
               </SlidingIcon>
             ) : null}
             {label ? (
@@ -78,6 +78,25 @@ const OUT_MS = 140
 const IN_MS = 260
 const HOLD_MS = 240
 const SHIFT = 8
+
+const LAP_MS = OUT_MS + IN_MS + HOLD_MS + 60
+
+// Stays true for one full lap of the sliding icon after it starts, even when the work
+// behind it ends sooner, so a quick push or pull still shows the animation once.
+function useAtLeastOneLap(active: boolean) {
+  const [held, setHeld] = useState(false)
+  const startedAt = useRef(0)
+  useEffect(() => {
+    if (active) {
+      startedAt.current = Date.now()
+      setHeld(true)
+      return
+    }
+    const timer = setTimeout(() => setHeld(false), Math.max(0, startedAt.current + LAP_MS - Date.now()))
+    return () => clearTimeout(timer)
+  }, [active])
+  return active || held
+}
 
 // While active, the icon fades out moving `direction` and slides back in from the other
 // side, over and over; when it stops, it settles where it belongs.
