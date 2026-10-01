@@ -3,11 +3,9 @@ import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
 
 import { useInputColors } from '@/components/Field'
-import { GlassSurface } from '@/components/Glass'
 import { PickerBox } from '@/components/PickerBox'
 import { SFIcon } from '@/components/SFIcon'
 import { useTranslation } from '@/i18n'
-import { liquidGlass } from '@/lib/nativeUI'
 import { setTextDraft } from '@/lib/textDraft'
 import { useColors, useStyles, type Colors } from '@/theme'
 
@@ -33,8 +31,7 @@ const LINE_HEIGHT = 21
 const AREA_HEIGHT = 110
 
 // A caps label with a tiny star mark, the input, and an optional helper line below.
-// On iOS 26 the input is Liquid Glass, tinted while it has focus: a capsule for one line,
-// a rounded box for several. Without Liquid Glass it is a box with a hairline.
+// The input is a rounded box with a hairline, as in the first releases.
 //
 // A multiline input has a set height and scrolls inside, so a form of long texts stays
 // short enough to see at a glance. With expandTitle the text is only shown there: it
@@ -59,18 +56,9 @@ export function FieldRow({ label, hint, minHeight, multiline, star = true, expan
     })
   }
 
-  const frame = (body: React.ReactNode) =>
-    liquidGlass ? (
-      <GlassSurface
-        variant="clear"
-        tintColor={focused ? colors.accentSoft : undefined}
-        style={multiline ? styles.glassArea : styles.glassBox}
-      >
-        {body}
-      </GlassSurface>
-    ) : (
-      <View style={[styles.box, focused && { borderColor: colors.accent }]}>{body}</View>
-    )
+  const frame = (body: React.ReactNode) => (
+    <View style={[styles.box, focused && { borderColor: colors.accent }]}>{body}</View>
+  )
 
   const field = onPress ? (
     <PickerBox
@@ -87,7 +75,7 @@ export function FieldRow({ label, hint, minHeight, multiline, star = true, expan
           {frame(
             <>
               {/* A drag scrolls the text; only a tap opens the editor. */}
-              <ScrollView style={{ height }} contentContainerStyle={[styles.readerContent, liquidGlass && styles.glassReader]}>
+              <ScrollView style={{ height }} contentContainerStyle={styles.readerContent}>
                 <Text style={[styles.reader, !input.value && { color: colors.textFaint }]}>
                   {input.value || input.placeholder}
                 </Text>
@@ -108,12 +96,7 @@ export function FieldRow({ label, hint, minHeight, multiline, star = true, expan
         multiline={multiline}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        style={[
-          styles.fieldInput,
-          liquidGlass && styles.glassInput,
-          multiline && styles.multilineInput,
-          multiline && { height },
-        ]}
+        style={[styles.fieldInput, multiline && styles.multilineInput, multiline && { height }]}
       />
     )
   )
@@ -138,21 +121,18 @@ const createStyles = (colors: Colors) =>
     fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginLeft: 4 },
     fieldLabel: { color: colors.textFaint, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
     box: {
-      borderWidth: 1.5,
-      borderColor: colors.borderStrong,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      borderCurve: 'continuous',
       backgroundColor: colors.surface,
       overflow: 'hidden',
     },
-    glassBox: { borderRadius: 23, borderCurve: 'continuous' },
-    // A capsule's radius on a tall box would round it into a pill.
-    glassArea: { borderRadius: 20, borderCurve: 'continuous' },
-    glassInput: { minHeight: 46, paddingHorizontal: 18 },
     fieldInput: { color: colors.text, fontSize: 16, paddingVertical: 12, paddingHorizontal: 14 },
     multilineInput: { lineHeight: LINE_HEIGHT, textAlignVertical: 'top' },
     // The text of an expanding field, laid out like the input it stands in for, with
     // room on the right for the expand mark.
     readerContent: { paddingVertical: 12, paddingLeft: 14, paddingRight: 40 },
-    glassReader: { paddingLeft: 18 },
     reader: { color: colors.text, fontSize: 16, lineHeight: LINE_HEIGHT },
     expand: { position: 'absolute', top: 10, right: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
     fieldHint: { color: colors.textFaint, fontSize: 12, lineHeight: 17, marginTop: 6, marginHorizontal: 4 },

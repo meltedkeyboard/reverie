@@ -267,14 +267,14 @@ export default function SettingsScreen() {
   // The sections, laid out either as the plain list or as the wheel below.
   const appearance = (
     <>
-      <Eyebrow label={t('settings.appearance')} color={colors.accent} />
+      <Eyebrow plain star={false} label={t('settings.appearance')} color={colors.text} />
       <ChipGroup options={THEME_OPTIONS} value={preference} onChange={setPreference} />
     </>
   )
 
   const language = (
     <>
-      <Eyebrow label={t('settings.language')} color={colors.accent} />
+      <Eyebrow plain star={false} label={t('settings.language')} color={colors.text} />
       <ChipGroup options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
     </>
   )
@@ -341,7 +341,7 @@ export default function SettingsScreen() {
 
   const server = (
     <>
-      <Eyebrow label={t('settings.server')} color={colors.accent} />
+      <Eyebrow plain star={false} label={t('settings.server')} color={colors.text} />
       <FieldRow
         star={false}
         label={t('settings.baseUrlLabel')}
@@ -394,7 +394,7 @@ export default function SettingsScreen() {
   const showCloud = cloudSync.available || cloudPreview
   const icloud = (
     <>
-      <Eyebrow label={t('settings.icloud')} color={colors.accent} />
+      <Eyebrow plain star={false} label={t('settings.icloud')} color={colors.text} />
       <ToggleRow
         label={t('settings.icloudSync')}
         note={t('settings.icloudSyncNote')}
@@ -438,7 +438,7 @@ export default function SettingsScreen() {
 
   const backup = (
     <>
-      <Eyebrow label={t('settings.backupTitle')} color={colors.accent} />
+      <Eyebrow plain star={false} label={t('settings.backupTitle')} color={colors.text} />
       <Text style={styles.note}>{t('settings.backupNote')}</Text>
       <View style={styles.buttonPairRow}>
         <PillButton filled label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting || cloudAction !== null} style={styles.pairButton} />
@@ -463,7 +463,7 @@ export default function SettingsScreen() {
 
   const wipe = (
     <>
-      <Eyebrow label={t('settings.dangerZone')} color={colors.danger} />
+      <Eyebrow plain star={false} label={t('settings.dangerZone')} color={colors.danger} />
       <Text style={styles.note}>{t('settings.dangerNote')}</Text>
       <PillButton filled label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
     </>
@@ -477,7 +477,7 @@ export default function SettingsScreen() {
       sections: ['continue'],
       content: (
         <>
-          <Eyebrow label={t('settings.homeScreen')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.homeScreen')} color={colors.text} />
           {block('continue', continueRows)}
         </>
       ),
@@ -487,7 +487,7 @@ export default function SettingsScreen() {
       sections: ['private', 'confirmDelete'],
       content: (
         <>
-          <Eyebrow label={t('settings.chats')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.chats')} color={colors.text} />
           {block('private', privateRow)}
           {block('confirmDelete', confirmDeleteRow)}
         </>
@@ -498,7 +498,7 @@ export default function SettingsScreen() {
       sections: ['haptics'],
       content: (
         <>
-          <Eyebrow label={t('settings.feedback')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.feedback')} color={colors.text} />
           {block('haptics', hapticsRow)}
         </>
       ),
@@ -508,7 +508,7 @@ export default function SettingsScreen() {
       sections: ['faceId', 'files'],
       content: (
         <>
-          <Eyebrow label={t('settings.security')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.security')} color={colors.text} />
           {block('faceId', faceIdRow)}
           {block('files', filesRow)}
         </>
@@ -522,7 +522,7 @@ export default function SettingsScreen() {
       sections: [],
       content: (
         <>
-          <Eyebrow label={t('settings.aboutTitle')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.aboutTitle')} color={colors.text} />
           {aboutRow}
         </>
       ),
@@ -547,23 +547,23 @@ export default function SettingsScreen() {
 
           <Divider />
 
-          <Eyebrow label={t('settings.homeScreen')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.homeScreen')} color={colors.text} />
           {block('continue', continueRows)}
 
           <Divider />
 
-          <Eyebrow label={t('settings.chats')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.chats')} color={colors.text} />
           {block('private', privateRow)}
           {block('confirmDelete', confirmDeleteRow)}
 
           <Divider />
 
-          <Eyebrow label={t('settings.feedback')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.feedback')} color={colors.text} />
           {block('haptics', hapticsRow)}
 
           <Divider />
 
-          <Eyebrow label={t('settings.security')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.security')} color={colors.text} />
           {block('faceId', faceIdRow)}
           {block('files', filesRow)}
 
@@ -584,7 +584,7 @@ export default function SettingsScreen() {
 
           <Divider />
 
-          <Eyebrow label={t('settings.aboutTitle')} color={colors.accent} />
+          <Eyebrow plain star={false} label={t('settings.aboutTitle')} color={colors.text} />
           {aboutRow}
 
           <Divider />
