@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Slider from '@react-native-community/slider'
 import { useMemo } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { FormScreenHeader } from '@/components/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/Glass'
@@ -18,7 +18,10 @@ import { useColors, useStyles, type Colors } from '@/theme'
 
 const FIELD_HEIGHT = 48
 
-const FALLBACK_FAMILIES = ['Georgia', 'Palatino', 'Iowan Old Style', 'Charter', 'Avenir Next', 'Times New Roman', 'Helvetica Neue', 'Menlo']
+const FALLBACK_FAMILIES =
+  Platform.OS === 'android'
+    ? ['serif', 'sans-serif', 'sans-serif-light', 'sans-serif-condensed', 'serif-monospace', 'monospace', 'casual', 'cursive']
+    : ['Georgia', 'Palatino', 'Iowan Old Style', 'Charter', 'Avenir Next', 'Times New Roman', 'Helvetica Neue', 'Menlo']
 
 // Rounded to a percent, and caught by the regular size when the slider passes near it.
 function snap(value: number) {
@@ -37,8 +40,8 @@ export default function ChatTextScreen() {
   const fontFamily = font
   const scaled = (value: number) => value * scale
 
-  // Everything installed, the system font first. Without the native module (Expo Go) a
-  // few that every iPhone has.
+  // Everything installed, the system font first. Without the native module (Expo Go,
+  // and Android always) a few that every device has.
   const families = useMemo(() => {
     const installed = installedFontFamilies()
     return [SYSTEM_FONT, ...(installed.length ? installed : FALLBACK_FAMILIES)]

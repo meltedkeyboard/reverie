@@ -1,6 +1,6 @@
 import { Lexer, type Token, type Tokens } from 'marked'
 import { Fragment, memo, useMemo, type ReactNode } from 'react'
-import { ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle } from 'react-native'
+import { Platform, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle } from 'react-native'
 
 import { useColors, useStyles, type Colors } from '@/theme'
 
@@ -13,7 +13,7 @@ type Props = {
 }
 
 const HEADING_SCALE = [1.35, 1.2, 1.1, 1, 1, 1]
-const CODE_FONT = 'Menlo'
+const CODE_FONT = Platform.OS === 'android' ? 'monospace' : 'Menlo'
 const INDENT = '    '
 
 // A selectable Text on iOS only offers to copy all of it. A read-only UITextView gives

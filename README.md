@@ -2,7 +2,7 @@
   <img src="assets/brand/wordmark.svg" alt="Reverie" width="420" />
 </p>
 
-Roleplay chat client for iOS, built with Expo. It talks directly to a local model server over an OpenAI-compatible API (LM Studio, llama.cpp, Ollama). All data stays on the device.
+Roleplay chat client for iOS and Android, built with Expo. It talks directly to a local model server over an OpenAI-compatible API (LM Studio, llama.cpp, Ollama). All data stays on the device.
 
 ## Features
 
@@ -21,7 +21,8 @@ Roleplay chat client for iOS, built with Expo. It talks directly to a local mode
 - Backup export and import as JSON (the API key is not included).
 - iCloud sync (not in Expo Go): the data is kept in a folder picked in iCloud Drive and picked up by the other devices. Works with an app signed by a free Apple ID, see below.
 - English and Russian UI.
-- iOS 26 Liquid Glass UI where available, with a plain fallback on older iOS.
+- iOS 26 Liquid Glass UI where available, with a plain fallback on older iOS and on Android.
+- Android: the same app without the iOS-only parts. Face ID becomes the system biometric prompt, the iOS menus and action sheets are drawn in React Native, and iCloud sync and the "show in Files" toggle are absent.
 
 ## Quick start
 
@@ -33,6 +34,12 @@ npx expo start
 Open the app in Expo Go and set the server address in settings, for example `http://192.168.1.10:1234`. A trailing `/v1` is stripped. The API key is optional.
 
 Other scripts: `npm run typecheck`, `npm run icons` (renders icons from `assets/brand` into `assets/images/`; also runs on `postinstall`).
+
+## Building an .apk
+
+GitHub Actions builds `Reverie.apk` (`.github/workflows/android.yml`) the same way: run it from Actions > Android build, or push a `v*` tag. The file is signed with the debug key of the Expo template, which is enough to install it by hand. Locally: `npx expo prebuild -p android`, then `npx expo run:android` (needs the Android SDK and JDK 17 or 21).
+
+Plain `http://` addresses of a model server on the local network work, cleartext traffic is allowed in the build.
 
 ## Building an .ipa
 

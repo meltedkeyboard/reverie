@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
+import { Platform } from 'react-native'
 
 export type ServerSettings = {
   baseUrl: string
@@ -93,7 +94,7 @@ export function saveLocalePreference(db: SQLiteDatabase, preference: 'system' | 
 export type ChatFont = string
 
 export const SYSTEM_FONT = 'System'
-export const DEFAULT_CHAT_FONT = 'Georgia'
+export const DEFAULT_CHAT_FONT = Platform.OS === 'android' ? 'serif' : 'Georgia'
 
 export const CHAT_TEXT_SCALE_RANGE = { min: 0.8, max: 1.6, default: 1 } as const
 

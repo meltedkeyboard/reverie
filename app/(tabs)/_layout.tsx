@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router'
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
 import { useEffect, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
 
 import { HomeContinueButton } from '@/components/ContinueButton'
 import type { ContinueKind } from '@/db/continue'
@@ -58,26 +58,39 @@ export default function TabsLayout() {
 function AppTabs({ listeners }: { listeners: TabListeners }) {
   const colors = useColors()
   const { t } = useTranslation()
-  // The screens draw their own insets from the safe area, which already takes in the
-  // tab bar; left automatic, scroll views would get them a second time.
+  // On iOS the screens draw their own insets from the safe area, which already takes in
+  // the tab bar; left automatic, scroll views would get them a second time. The Android
+  // bar is opaque and does not float over the content, so there the tabs inset it.
+  const own = Platform.OS === 'ios'
+  // Material You tints the Android bar with the wallpaper's color, so it is set to the app's.
+  const material =
+    Platform.OS === 'android'
+      ? {
+          backgroundColor: colors.surface,
+          indicatorColor: colors.accentSoft,
+          rippleColor: colors.accentSoft,
+          iconColor: { default: colors.textFaint, selected: colors.accent },
+          labelStyle: { default: { color: colors.textFaint }, selected: { color: colors.accent } },
+        }
+      : {}
   return (
-    <NativeTabs tintColor={colors.accent} screenListeners={listeners}>
-      <NativeTabs.Trigger name="index" disableAutomaticContentInsets>
+    <NativeTabs tintColor={colors.accent} screenListeners={listeners} {...material}>
+      <NativeTabs.Trigger name="index" disableAutomaticContentInsets={own}>
         <NativeTabs.Trigger.Label>{t('characters.title')}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
+        <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} md="group" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="rooms" disableAutomaticContentInsets>
+      <NativeTabs.Trigger name="rooms" disableAutomaticContentInsets={own}>
         <NativeTabs.Trigger.Label>{t('rooms.title')}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />
+        <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} md="forum" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings" disableAutomaticContentInsets>
+      <NativeTabs.Trigger name="settings" disableAutomaticContentInsets={own}>
         <NativeTabs.Trigger.Label>{t('settings.title')}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} />
+        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
       </NativeTabs.Trigger>
       {/* On iOS 26 the search tab stands apart from the others, as its own glass button. */}
       <NativeTabs.Trigger name="search" role="search">
         <NativeTabs.Trigger.Label>{t('search.title')}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="magnifyingglass" />
+        <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
       </NativeTabs.Trigger>
     </NativeTabs>
   )

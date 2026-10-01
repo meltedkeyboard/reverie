@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system'
+import { Platform } from 'react-native'
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 // Everything Reverie keeps on disk (the database and the images) lives in one of two
@@ -18,6 +19,12 @@ const library = new Directory(Paths.document.parentDirectory, 'Library')
 // Expo Go only lets an app touch its own sandbox folder, so there the private place falls
 // back to a dot-folder inside Documents, which Files doesn't list either.
 function pickHiddenRoot() {
+  // Android keeps the app's files private anyway, and has no Library folder.
+  if (Platform.OS === 'android') {
+    const dir = new Directory(Paths.document, 'Reverie')
+    dir.create({ intermediates: true, idempotent: true })
+    return dir
+  }
   try {
     const dir = new Directory(library, 'Reverie')
     dir.create({ intermediates: true, idempotent: true })

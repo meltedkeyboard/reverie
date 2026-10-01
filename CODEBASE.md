@@ -2,7 +2,7 @@
 
 Where things live and how they connect. For setup and features see the [README](README.md).
 
-Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict). iOS only. Path alias `@/*` points to `src/`.
+Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict). iOS and Android. Path alias `@/*` points to `src/`.
 
 ## Find it fast
 
@@ -30,7 +30,8 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | iCloud sync: when it runs, what goes up, conflicts | `src/lib/cloudSync.ts`, the provider in `src/hooks/useCloudSync.tsx`, the native folder in `modules/reverie-cloud-folder` |
 | Where the data lives, the "show in Files" toggle | `src/lib/storage.ts` (folders, startup settling) and `src/db/provider.tsx` (live switch) |
 | Brand assets and generated icons | `assets/brand/`, `scripts/build-icons.mjs` |
-| CI build | `.github/workflows/ios.yml`, `build-ipa.sh` |
+| CI build | `.github/workflows/ios.yml`, `build-ipa.sh`, `.github/workflows/android.yml` |
+| Android differences | `Platform.OS === 'android'` checks: `src/lib/dialogs.tsx` + `DialogHost`, `src/lib/storage.ts`, `BarChrome.tsx`, `AppLock.tsx`, the tabs layout, fonts in `theme.tsx` and `db/settings.ts`; see the Android section below |
 
 ## Screens (`app/`)
 
@@ -196,3 +197,17 @@ On iOS 26 the controls are Liquid Glass through `GlassSurface` in `Glass.tsx`; i
 - New setting flag: new `src/db/<name>.ts` with `getFlag`/`setFlag`, a row in `(tabs)/settings.tsx`, strings in both locales. To make it findable, wrap the row in `block('<section>', …)`, add the id to `SettingsSection` and an entry to the settings list in `(tabs)/search/index.tsx`.
 - New column: append a migration, extend the `*_COLUMNS` constant and the type, and bump `BACKUP_VERSION` in `backup.ts` if the backup should carry it (older backups must still import).
 - Check types with `npm run typecheck`.
+
+## Android
+
+The same code base, with the iOS-only parts replaced or left out.
+
+- `nativeUI.ts` loads `@expo/ui` (SwiftUI) and `expo-glass-effect` only on iOS, so `swiftUI` and `liquidGlass` are null on Android and every component takes its fallback path. `ExpoUI` registers a module on Android too, which is why the platform is checked and not only the module.
+- `ActionSheetIOS` and `Alert.prompt` do not exist on Android. `showSheet` and `promptText` in `src/lib/dialogs.tsx` hand the request to `src/lib/androidDialog.ts`, and `DialogHost` (mounted in `app/_layout.tsx`) draws it in a `Modal`. `NativeMenu` falls back to `showSheet`, so its menus are a bottom sheet there.
+- Tabs: `NativeTabs` has Material icons (`md`) next to the SF Symbols and, unlike iOS, insets the content by the tab bar itself.
+- Storage: no `Library` folder and no Files app. The data sits in `files/Reverie` and the "show in Files" toggle is hidden (`settings.tsx`, search entries).
+- No blur on Android (it costs a copy of the screen per frame): `BlurBar` is a nearly opaque tint, the app lock shield a solid color.
+- `modules/reverie-*` are Swift only. Missing there, so: saving a backup uses the folder picker, iCloud sync is hidden (`cloudSyncAvailable`), and the font menu lists the Android system families (`serif`, `monospace`, ...). The default chat font is `serif` instead of Georgia.
+- The lock row says "screen lock" (`settings.requireBiometrics`) instead of Face ID.
+- The search screen has a solid header on Android: `contentInsetAdjustmentBehavior` is iOS only.
+- Icons: `scripts/build-icons.mjs` also renders the adaptive and monochrome Android icons.

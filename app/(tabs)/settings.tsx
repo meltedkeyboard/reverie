@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ChipGroup } from '@/components/ChipGroup'
@@ -35,6 +35,8 @@ import { notificationAsync, NotificationFeedbackType } from '@/lib/haptics'
 import type { SettingsSection } from '@/lib/searchScope'
 import { isShownInFiles } from '@/lib/storage'
 import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
+
+const android = Platform.OS === 'android'
 
 // An easter egg: shaking the phone hard on this tab turns the settings into cards on a
 // wheel, and shaking it again brings the list back. Harder and longer than the shake on
@@ -186,7 +188,7 @@ export default function SettingsScreen() {
     if (enabled) {
       // Verify it works before turning it on, so the app can't lock the user out.
       if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) {
-        showMessage(t('settings.requireFaceId'), t('settings.faceIdUnavailable'))
+        showMessage(t(android ? 'settings.requireBiometrics' : 'settings.requireFaceId'), t(`settings.${android ? 'biometricsUnavailable' : 'faceIdUnavailable'}`))
         return
       }
       const result = await LocalAuthentication.authenticateAsync({ promptMessage: t('lock.prompt') })
@@ -341,8 +343,8 @@ export default function SettingsScreen() {
 
   const faceIdRow = (
     <ToggleRow
-      label={t('settings.requireFaceId')}
-      note={t('settings.requireFaceIdNote')}
+      label={t(android ? 'settings.requireBiometrics' : 'settings.requireFaceId')}
+      note={t(android ? 'settings.requireBiometricsNote' : 'settings.requireFaceIdNote')}
       value={appLock}
       onValueChange={toggleAppLock}
     />
@@ -530,7 +532,7 @@ export default function SettingsScreen() {
         <>
           <Eyebrow label={t('settings.security')} color={colors.text} />
           {block('faceId', faceIdRow)}
-          {block('files', filesRow)}
+          {android ? null : block('files', filesRow)}
         </>
       ),
     },
@@ -586,7 +588,7 @@ export default function SettingsScreen() {
 
           <Eyebrow label={t('settings.security')} color={colors.text} />
           {block('faceId', faceIdRow)}
-          {block('files', filesRow)}
+          {android ? null : block('files', filesRow)}
 
           <Divider />
 

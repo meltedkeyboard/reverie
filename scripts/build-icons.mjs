@@ -37,10 +37,22 @@ function png(svg, file, width = 1024) {
   console.log(`${file} ${width}px`)
 }
 
+// Android adaptive icon: the glyph alone on a transparent canvas, shrunk into the inner
+// two thirds that no launcher mask cuts. The background color comes from app.json. The
+// glyph's box in the 1024 icon is about x 79..788, y 127..763, centered on (433, 445).
+function glyphOnly(svg, recolor) {
+  const paths = body(svg).match(/<path[\s\S]*?\/>/g).join('')
+  const art = recolor ? paths.replace(/fill="#[0-9A-Fa-f]{6}"/g, `fill="${recolor}"`) : paths
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<g transform="translate(512 512) scale(0.62) translate(-433 -445)">${art}</g></svg>`
+}
+
 mkdirSync('assets/images', { recursive: true })
 png(light, 'assets/images/icon.png')
 png(dark, 'assets/images/icon-dark.png')
 png(tinted, 'assets/images/icon-tinted.png')
+png(glyphOnly(dark), 'assets/images/adaptive-icon.png')
+png(glyphOnly(dark, '#FFFFFF'), 'assets/images/adaptive-icon-mono.png')
 png(rounded(light, 'splash_light'), 'assets/images/splash-icon.png', 512)
 png(rounded(dark, 'splash_dark'), 'assets/images/splash-icon-dark.png', 512)
 

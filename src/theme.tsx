@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo } from 'react'
-import { Appearance, useColorScheme } from 'react-native'
+import { Appearance, Platform, useColorScheme } from 'react-native'
 
 export type Scheme = 'light' | 'dark'
 export type ThemePreference = Scheme | 'system'
@@ -81,7 +81,8 @@ const palettes: Record<Scheme, Colors> = { dark: darkColors, light: lightColors 
 export const colors = darkColors
 
 export const fonts = {
-  prose: 'Georgia',
+  // Android has no Georgia; its serif is the closest system face.
+  prose: Platform.OS === 'android' ? 'serif' : 'Georgia',
 } as const
 
 export const HEADER_ROW_HEIGHT = 52

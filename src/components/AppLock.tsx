@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, AppState, StyleSheet, Text, View } from 'react-native'
+import { Animated, AppState, Platform, StyleSheet, Text, View } from 'react-native'
 
 import { PillButton } from '@/components/PillButton'
 import { Star } from '@/components/motifs/Star'
@@ -10,7 +10,7 @@ import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { fonts, useColors, useTheme } from '@/theme'
 
-// Covers the app with a lock screen until Face ID (or the passcode) succeeds — on launch
+// Covers the app with a lock screen until Face ID, a fingerprint or the passcode succeeds — on launch
 // and after the app has been in the background. It also blurs the app in the app
 // switcher while the lock is on.
 export function AppLock({ children }: { children: ReactNode }) {
@@ -84,7 +84,11 @@ export function AppLock({ children }: { children: ReactNode }) {
       {children}
       {shielded && !locked ? (
         <Animated.View pointerEvents="none" style={[styles.cover, { opacity: shieldOpacity }]}>
-          <BlurView tint={scheme} intensity={100} style={StyleSheet.absoluteFill} />
+          {Platform.OS === 'android' ? (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
+          ) : (
+            <BlurView tint={scheme} intensity={100} style={StyleSheet.absoluteFill} />
+          )}
         </Animated.View>
       ) : null}
       {locked ? (

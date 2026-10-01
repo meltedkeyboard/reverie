@@ -2,7 +2,7 @@
   "expo": {
     "name": "Reverie",
     "slug": "reverie",
-    "platforms": ["ios"],
+    "platforms": ["ios", "android"],
     "version": "3.8.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -26,6 +26,17 @@
         "tinted": "./assets/images/icon-tinted.png"
       }
     },
+    "android": {
+      "package": "reverie.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "monochromeImage": "./assets/images/adaptive-icon-mono.png",
+        "backgroundColor": "#0F0F12"
+      },
+      "predictiveBackGestureEnabled": true,
+      "permissions": ["USE_BIOMETRIC", "VIBRATE"],
+      "blockedPermissions": ["android.permission.RECORD_AUDIO", "android.permission.SYSTEM_ALERT_WINDOW"]
+    },
     "plugins": [
       "expo-router",
       "expo-sqlite",
@@ -45,7 +56,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Reverie uses your photos for character avatars and messages.",
-          "cameraPermission": "Reverie uses the camera to send a photo in chat."
+          "cameraPermission": "Reverie uses the camera to send a photo in chat.",
+          "microphonePermission": false
         }
       ],
       [
@@ -62,7 +74,9 @@
           "faceIDPermission": "Reverie uses Face ID to protect your chats."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "./plugins/android-lint",
+      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
     ],
     "locales": {
       "ru": "./permissions/ru.json"

@@ -1,7 +1,7 @@
 import type Ionicons from '@expo/vector-icons/Ionicons'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, SectionList, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
+import { Platform, Pressable, SectionList, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
 import type { SearchBarCommands } from 'react-native-screens'
 
 import { Avatar } from '@/components/Avatar'
@@ -19,6 +19,8 @@ import { formatWhen } from '@/lib/format'
 import { characterPreview } from '@/lib/roleplay'
 import { getSearchScope, type SearchScope, type SettingsSection } from '@/lib/searchScope'
 import { useColors, useStyles, type Colors } from '@/theme'
+
+const android = Platform.OS === 'android'
 
 type SettingEntry = {
   label: string
@@ -109,7 +111,7 @@ export default function SearchScreen() {
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
       { label: t('settings.chatFont'), keywords: [t('settings.chats'), t('settings.chatTextSize')], symbol: 'textformat', fallback: 'text-outline', href: settingsAt('chatText') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
-      { label: t('settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
+      { label: t(android ? 'settings.requireBiometrics' : 'settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
       { label: t('settings.showInFiles'), keywords: [t('settings.security')], symbol: 'folder', fallback: 'folder-outline', href: settingsAt('files') },
       {
         label: t('settings.server'),
@@ -126,7 +128,7 @@ export default function SearchScreen() {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
       entries.splice(backup, 0, { label: t('settings.icloud'), keywords: [t('settings.icloudSync'), 'iCloud'], symbol: 'icloud', fallback: 'cloud-outline', href: settingsAt('icloud') })
     }
-    return entries
+    return android ? entries.filter((entry) => entry.label !== t('settings.showInFiles')) : entries
   }, [t])
 
   const sections = useMemo<Section[]>(() => {
@@ -232,8 +234,10 @@ export default function SearchScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          // The scroll edge effect is drawn under a transparent bar.
-          headerTransparent: true,
+          // The scroll edge effect is drawn under a transparent bar. Android does not inset
+          // the list by an automatic content inset, so there the bar is solid and pushes it down.
+          headerTransparent: !android,
+          headerStyle: { backgroundColor: colors.bg },
           headerShadowVisible: false,
           headerTitleAlign: 'left',
           headerTitle: () => <TabTitle>{t('search.title')}</TabTitle>,

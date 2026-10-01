@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 
 import { AppLock } from '@/components/AppLock'
+import { DialogHost } from '@/components/DialogHost'
 import { StartupBoundary } from '@/components/StartupBoundary'
 import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { isHapticsEnabled } from '@/db/haptics'
@@ -105,6 +106,7 @@ function AppShell() {
           <Stack.Screen name="background" options={{ animation: 'fade' }} />
           <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
         </Stack>
+        <DialogHost />
       </ThemeProvider>
     </>
   )

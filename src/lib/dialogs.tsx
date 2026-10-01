@@ -1,6 +1,8 @@
-import { ActionSheetIOS, Alert } from 'react-native'
+import { ActionSheetIOS, Alert, Platform } from 'react-native'
 
 import { t } from '@/i18n'
+
+import { openAndroidDialog } from './androidDialog'
 
 export type SheetAction = {
   label: string
@@ -25,6 +27,7 @@ export type TextPrompt = {
 }
 
 export function showSheet(title: string | undefined, actions: SheetAction[]) {
+  if (Platform.OS === 'android') return openAndroidDialog({ kind: 'sheet', title, actions })
   const destructive = actions.findIndex((action) => action.destructive)
   ActionSheetIOS.showActionSheetWithOptions(
     {
@@ -44,7 +47,9 @@ export function confirm({ title, message, confirmLabel, destructive, onConfirm }
   ])
 }
 
-export function promptText({ title, message, initial, confirmLabel, onSubmit }: TextPrompt) {
+export function promptText(prompt: TextPrompt) {
+  if (Platform.OS === 'android') return openAndroidDialog({ kind: 'prompt', prompt })
+  const { title, message, initial, confirmLabel, onSubmit } = prompt
   Alert.prompt(
     title,
     message,
