@@ -14,6 +14,7 @@ import { useDatabase } from '@/db/provider'
 import { listRooms, type RoomPreview } from '@/db/rooms'
 import { listSearchChats, searchMessages, type SearchChat, type SearchMessage } from '@/db/search'
 import { useTranslation } from '@/i18n'
+import { alternateIconsAvailable } from '@/lib/appIcons'
 import { cloudSyncAvailable } from '@/lib/cloudSync'
 import { formatWhen } from '@/lib/format'
 import { characterPreview } from '@/lib/roleplay'
@@ -125,6 +126,10 @@ export default function SearchScreen() {
       { label: t('settings.aboutReverie'), keywords: [t('settings.aboutTitle')], symbol: 'info.circle', fallback: 'information-circle-outline', href: '/about' },
       { label: t('settings.wipeAll'), keywords: [t('settings.dangerZone')], symbol: 'exclamationmark.triangle', fallback: 'warning-outline', href: settingsAt('wipe'), danger: true },
     ]
+    if (alternateIconsAvailable) {
+      const language = entries.findIndex((entry) => entry.label === t('settings.language'))
+      entries.splice(language + 1, 0, { label: t('settings.appIcon'), keywords: [t('settings.appearance')], symbol: 'app', fallback: 'apps-outline', href: settingsAt('appIcon') })
+    }
     if (cloudSyncAvailable) {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
       entries.splice(backup, 0, { label: t('settings.icloud'), keywords: [t('settings.icloudSync'), 'iCloud'], symbol: 'icloud', fallback: 'cloud-outline', href: settingsAt('icloud') })

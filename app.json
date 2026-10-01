@@ -3,7 +3,7 @@
     "name": "Reverie",
     "slug": "reverie",
     "platforms": ["ios", "android"],
-    "version": "3.9.1",
+    "version": "3.10.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "reverie",
@@ -76,7 +76,57 @@
       ],
       "expo-font",
       "./plugins/android-lint",
-      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
+      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }],
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "VioletGradient",
+            "ios": "./assets/images/alt/icon-02-violet-gradient.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-02-violet-gradient-foreground.png", "backgroundColor": "#6D3FC4" }
+          },
+          {
+            "name": "CoralSunrise",
+            "ios": "./assets/images/alt/icon-03-coral-sunrise.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-03-coral-sunrise-foreground.png", "backgroundColor": "#FA7A43" }
+          },
+          {
+            "name": "PaperLight",
+            "ios": "./assets/images/alt/icon-04-paper-light.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-04-paper-light-foreground.png", "backgroundColor": "#F5F1EA" }
+          },
+          {
+            "name": "VioletSun",
+            "ios": "./assets/images/alt/icon-05-violet-solid-sun.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-05-violet-solid-sun-foreground.png", "backgroundColor": "#8B5CF6" }
+          },
+          {
+            "name": "Outline",
+            "ios": "./assets/images/alt/icon-06-outline.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-06-outline-foreground.png", "backgroundColor": "#0B0D17" }
+          },
+          {
+            "name": "NeonGlow",
+            "ios": "./assets/images/alt/icon-07-neon-glow.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-07-neon-glow-foreground.png", "backgroundColor": "#0D0A1F" }
+          },
+          {
+            "name": "Metal",
+            "ios": "./assets/images/alt/icon-08-metal.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-08-metal-foreground.png", "backgroundColor": "#8A1A5C" }
+          },
+          {
+            "name": "RetroSticker",
+            "ios": "./assets/images/alt/icon-09-retro-sticker.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-09-retro-sticker-foreground.png", "backgroundColor": "#FFF1D6" }
+          },
+          {
+            "name": "ToneOnTone",
+            "ios": "./assets/images/alt/icon-10-tone-on-tone.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-10-tone-on-tone-foreground.png", "backgroundColor": "#8B5CF6" }
+          }
+        ]
+      ]
     ],
     "locales": {
       "ru": "./permissions/ru.json"

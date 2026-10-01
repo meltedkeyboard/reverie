@@ -1,6 +1,6 @@
 {
   "name": "reverie",
-  "version": "3.9.1",
+  "version": "3.10.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -16,6 +16,7 @@
     "@react-native-community/slider": "5.2.0",
     "base64-js": "^1.5.1",
     "expo": "^57.0.24",
+    "expo-alternate-app-icons": "^8.0.0",
     "expo-blur": "~57.0.3",
     "expo-build-properties": "~57.0.21",
     "expo-clipboard": "~57.0.2",

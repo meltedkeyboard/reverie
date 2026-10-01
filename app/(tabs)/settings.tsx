@@ -33,6 +33,7 @@ import { useShake } from '@/hooks/useShake'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
+import { alternateIconsAvailable, currentAppIcon } from '@/lib/appIcons'
 import { confirm } from '@/lib/dialogs'
 import { showToast } from '@/lib/toast'
 import { useChatTextSettings } from '@/lib/chatText'
@@ -312,6 +313,19 @@ export default function SettingsScreen() {
     </>
   )
 
+  // The row that opens the app icon picker; the picker needs a build with the native module.
+  const [appIcon, setAppIconName] = useState(currentAppIcon)
+  useFocusEffect(useCallback(() => setAppIconName(currentAppIcon()), []))
+  const appIconRows = alternateIconsAvailable ? (
+    <>
+      <Eyebrow label={t('settings.appIcon')} color={colors.text} />
+      <Pressable onPress={() => router.push('/app-icon')} style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}>
+        <Text style={[styles.rowLabel, styles.linkLabel]}>{t(`appIcon.${appIcon ?? 'default'}`)}</Text>
+        <Text style={styles.chevron}>›</Text>
+      </Pressable>
+    </>
+  ) : null
+
   const continueRows = (
     <>
       <ToggleRow
@@ -534,6 +548,7 @@ export default function SettingsScreen() {
   const wheelItems: WheelItem[] = [
     { key: 'appearance', sections: ['appearance'], content: block('appearance', appearance) },
     { key: 'language', sections: ['language'], content: block('language', language) },
+    ...(appIconRows ? [{ key: 'appIcon', sections: ['appIcon' as const], content: block('appIcon', appIconRows) }] : []),
     {
       key: 'home',
       sections: ['continue'],
@@ -608,6 +623,7 @@ export default function SettingsScreen() {
         >
           {block('appearance', appearance, styles.chips)}
           {block('language', language, styles.chips)}
+          {appIconRows ? block('appIcon', appIconRows) : null}
 
           <Divider />
 

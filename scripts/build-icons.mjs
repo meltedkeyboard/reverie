@@ -2,7 +2,7 @@
 // assets/brand. The output is not committed: it is rebuilt on every npm install/ci, or
 // by hand after changing the SVGs: npm run icons
 import { Resvg } from '@resvg/resvg-js'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 const BRAND = 'assets/brand'
 const light = readFileSync(`${BRAND}/icon-light.svg`, 'utf8')
@@ -55,6 +55,38 @@ png(glyphOnly(dark), 'assets/images/adaptive-icon.png')
 png(glyphOnly(dark, '#FFFFFF'), 'assets/images/adaptive-icon-mono.png')
 png(rounded(light, 'splash_light'), 'assets/images/splash-icon.png', 512)
 png(rounded(dark, 'splash_dark'), 'assets/images/splash-icon-dark.png', 512)
+
+// Alternate app icons, drawn in Penpot and kept in assets/brand/alt, each with a 'bg' and a
+// 'glyph' group (the letter and the spark). iOS takes the whole picture. A launcher cuts an
+// Android adaptive icon with its mask, so there the background is stretched past the edges
+// and the glyph shrunk into the middle, as with the main icon. Where the glyph sits in the
+// 1024 art (its box's center) is the same in all of them but the cropped one.
+const GLYPH = { x: 412, y: 445, scale: 0.62 }
+const GLYPH_OF = { 'icon-10-tone-on-tone': { x: 532, y: 617, scale: 0.47 } }
+
+function adaptive(svg, glyph) {
+  const [left, top] = svg.match(/viewBox='(\S+) (\S+) /).slice(1).map(Number)
+  const defs = svg.match(/<defs>[\s\S]*?<\/defs>/)[0]
+  const bg = svg.match(/<g id='bg'>([\s\S]*?)<\/g>/)[1]
+  const art = svg.match(/<g id='glyph'>([\s\S]*?)<\/g>/)[1]
+  const cx = left + 512
+  const cy = top + 512
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="${left} ${top} 1024 1024" fill="none">${defs}
+<g transform="translate(${cx} ${cy}) scale(1.8) translate(${-cx} ${-cy})">${bg}</g>
+<g transform="translate(${cx} ${cy}) scale(${glyph.scale}) translate(${-(left + glyph.x)} ${-(top + glyph.y)})">${art}</g></svg>`
+}
+
+// The previews are what the picker in Settings shows.
+mkdirSync('assets/images/alt', { recursive: true })
+png(light, 'assets/images/alt/default-light-preview.png', 256)
+png(dark, 'assets/images/alt/default-dark-preview.png', 256)
+for (const file of readdirSync(`${BRAND}/alt`).filter((f) => f.endsWith('.svg')).sort()) {
+  const slug = file.replace(/\.svg$/, '')
+  const svg = readFileSync(`${BRAND}/alt/${file}`, 'utf8')
+  png(svg, `assets/images/alt/${slug}.png`)
+  png(svg, `assets/images/alt/${slug}-preview.png`, 256)
+  png(adaptive(svg, GLYPH_OF[slug] ?? GLYPH), `assets/images/alt/${slug}-foreground.png`)
+}
 
 // The home screen's background tile, at every density the app picks from.
 for (const theme of ['light', 'dark']) {

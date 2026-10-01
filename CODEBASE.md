@@ -32,6 +32,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | iCloud sync: when it runs, what goes up, conflicts | `src/lib/cloudSync.ts`, the provider in `src/hooks/useCloudSync.tsx`, the native folder in `modules/reverie-cloud-folder` |
 | Where the data lives, the "show in Files" toggle | `src/lib/storage.ts` (folders, startup settling) and `src/db/provider.tsx` (live switch) |
 | Brand assets and generated icons | `assets/brand/`, `scripts/build-icons.mjs` |
+| The alternate app icons and their picker | the SVGs in `assets/brand/alt/` (drawn in Penpot), their list in `app.json` (the `expo-alternate-app-icons` plugin) and in `src/lib/appIcons.ts`, the picker `app/app-icon.tsx`; see Alternate app icons below |
 | CI build | `.github/workflows/ios.yml`, `build-ipa.sh`, `.github/workflows/android.yml` |
 | Android differences | `Platform.OS === 'android'` checks: `src/lib/dialogs.tsx` + `DialogHost`, `src/lib/storage.ts`, `BarChrome.tsx`, `AppLock.tsx`, the tabs layout, fonts in `theme.tsx` and `db/settings.ts`; see the Android section below |
 
@@ -59,6 +60,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 | `/onboarding` | `onboarding.tsx` | First-run pages, including server setup |
 | `/viewer` | `viewer.tsx` | Full-screen images: pinch and double-tap zoom, swipe between several (a room's cast) |
 | `/chat-text` | `chat-text.tsx` | Font (a native menu of every installed family) and text size of chats, with a preview |
+| `/app-icon` | `app-icon.tsx` | The app icon picker: the standard icon and nine alternates in a grid, the chosen one ringed. Opened from the App icon row in Settings, which exists only where the native module does |
 | `/about` | `about.tsx` | About page |
 
 ## Search
@@ -194,6 +196,16 @@ On iOS 26 the controls are Liquid Glass through `GlassSurface` in `Glass.tsx`; i
 - **Tint changes:** `patches/expo-glass-effect+*.patch` (applied by `patch-package` on `postinstall`) makes a change of `tintColor` on a mounted glass view fade over 0.3 s instead of snapping: UIKit animates only a switch to a new effect object, so the patch builds a fresh `UIGlassEffect` and sets it in `UIView.animate`, after the mount pass. Re-create the patch when updating `expo-glass-effect`.
 - **Corners:** glass draws continuous (squircle) corners, so anything that sits on it or clips next to it uses `borderCurve: 'continuous'`.
 - **Icons on the accent:** `SFIcon` with `onAccent`. SwiftUI draws a symbol dark in the light scheme even with an explicit white color, so the hosted view gets the dark scheme instead.
+
+## Alternate app icons
+
+Nine icons besides the standard one (which follows the light and dark look from `app.json`), chosen in Settings > App icon.
+
+- Source: `assets/brand/alt/icon-NN-name.svg`, exported from the Penpot file "Reverie - App Icon", page "Final Logos". Each is a flat SVG in the page's coordinates (the `viewBox` starts at the board's corner), with two groups: `bg` and `glyph` (the letter and the spark). Penpot's own markup repeats the tree and carries invisible strokes, so these were cleaned by hand; do not paste a fresh export over them.
+- `scripts/build-icons.mjs` renders each to `assets/images/alt/`: the 1024 icon (iOS), a 256 preview (the picker) and a `-foreground` layer (Android). For Android the background is stretched past the edges and the glyph shrunk into the middle two thirds, as a launcher's mask cuts the rest (`GLYPH` and `GLYPH_OF` say where the glyph sits).
+- `expo-alternate-app-icons` (a plugin entry in `app.json`: name, iOS image, Android foreground and background color) puts them into the native projects on `expo prebuild`: `CFBundleAlternateIcons` on iOS, one `activity-alias` per icon on Android. The names there, in `src/lib/appIcons.ts` and in the `appIcon.*` strings must match.
+- `appIcons.ts` reaches the native module with `requireOptionalNativeModule`, since the package's own entry throws on import in Expo Go, which has no such module; then the Settings row is hidden (`alternateIconsAvailable`).
+- A new icon: add the SVG (with `bg` and `glyph`), a plugin entry, a line in `APP_ICONS` and a name in both locales.
 
 ## Conventions
 
