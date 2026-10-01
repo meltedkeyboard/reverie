@@ -20,7 +20,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Auto chat title | `src/lib/titles.ts` |
 | System prompt / greeting generator | `src/lib/promptGen.ts` and `src/components/PromptGenModal.tsx` |
 | Colors, fonts, light/dark | `src/theme.tsx` |
-| Font and text size of chats | `src/lib/chatText.tsx`, the installed families from `modules/reverie-fonts` (`ChatTextProvider`, `useChatText`), stored by `src/db/settings.ts`; applied in `MessageRow` and `AsidePanel`, chosen on its own screen, `app/chat-text.tsx`, opened from a row in Settings > Chats |
+| Font and text size of chats | `src/lib/chatText.tsx`, the installed families from `modules/reverie-fonts` (`ChatTextProvider`, `useChatText`), stored by `src/db/settings.ts`; applied in `MessageRow` and `AsidePanel` (the user's own messages keep the system font unless `userFont` is on, a switch on the same screen), chosen on its own screen, `app/chat-text.tsx`, opened from a row in Settings > Chats |
 | Long text fields of the editors and their full-screen editor | `FieldRow` with `expandTitle`, `app/text-editor.tsx`, `src/lib/textDraft.ts` |
 | UI strings | `src/locales/en.json`, `src/locales/ru.json`; lookup in `src/i18n.tsx` |
 | iOS permission texts | `app.json` plugins (English) and `permissions/ru.json` (Russian) |

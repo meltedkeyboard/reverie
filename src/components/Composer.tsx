@@ -129,6 +129,16 @@ export function Composer({
 
   const value = text.trim()
   const suggesting = !editing && !value && !images.length && !!suggestion
+  // Height of the suggestion as drawn over the field. It is not the placeholder: on iOS a
+  // multiline field grows to fit a long placeholder and never shrinks back after it.
+  const [ghostHeight, setGhostHeight] = useState(0)
+  // A long text put into the field from code leaves a multiline field on iOS at that
+  // height after it is cleared. The field is made anew after such a message is sent.
+  const [inputKey, setInputKey] = useState(0)
+  const inserted = useRef(false)
+  useEffect(() => {
+    if (inputKey) inputRef.current?.focus()
+  }, [inputKey])
 
   // Every 5 seconds the arrows fly out, the gray one to the right (take it) and the red
   // one under it to the left (dismiss), and come back in from the opposite side. They take
@@ -167,6 +177,7 @@ export function Composer({
     if (!suggestion) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     setText(suggestion)
+    inserted.current = true
     onSuggestionTaken?.()
     inputRef.current?.focus()
   }
@@ -215,6 +226,10 @@ export function Composer({
       onSend(value, images)
       setText('')
       setImages([])
+      if (inserted.current) {
+        inserted.current = false
+        setInputKey((key) => key + 1)
+      }
     }
   }
 
@@ -293,17 +308,27 @@ export function Composer({
           <GestureDetector gesture={swipe}>
             <View style={docked ? undefined : styles.inputWrap}>
               <TextInput
+                key={inputKey}
                 ref={inputRef}
                 value={text}
                 onChangeText={setText}
-                placeholder={suggesting ? suggestion : (placeholder ?? t('chat.messagePlaceholder'))}
+                placeholder={suggesting ? '' : (placeholder ?? t('chat.messagePlaceholder'))}
                 {...inputColors}
-                placeholderTextColor={suggesting ? colors.textMuted : inputColors.placeholderTextColor}
                 multiline
                 autoFocus={autoFocus}
                 accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
-                style={[styles.input, docked && styles.inputDocked, suggesting && suggestionHints && styles.inputSuggesting]}
+                style={[
+                  styles.input,
+                  docked && styles.inputDocked,
+                  suggesting && suggestionHints && styles.inputSuggesting,
+                  suggesting && { minHeight: ghostHeight },
+                ]}
               />
+              {suggesting ? (
+                <View style={styles.ghost} pointerEvents="none" onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}>
+                  <Text style={[styles.ghostText, docked && styles.inputDocked, suggestionHints && styles.inputSuggesting]}>{suggestion}</Text>
+                </View>
+              ) : null}
               {suggesting && suggestionHints ? (
                 <View style={[styles.suggestMarks, docked && styles.suggestMarksDocked]} pointerEvents="none">
                   <Animated.View style={takeStyle}>
@@ -449,6 +474,8 @@ const createStyles = (colors: Colors) =>
     paddingHorizontal: 14,
   },
   inputSuggesting: { paddingRight: 34 },
+  ghost: { position: 'absolute', top: 0, left: 0, right: 0, maxHeight: 180, overflow: 'hidden' },
+  ghostText: { color: colors.textMuted, fontSize: 17, lineHeight: 22, paddingTop: 8, paddingBottom: 8, paddingHorizontal: 14 },
   suggestMarks: { position: 'absolute', right: 14, top: 6, gap: 3, alignItems: 'center' },
   suggestMarksDocked: { top: 10 },
   inputDocked: { paddingTop: 12, paddingBottom: 8 },

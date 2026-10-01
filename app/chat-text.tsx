@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Slider from '@react-native-community/slider'
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { FormScreenHeader } from '@/components/FormScreenHeader'
@@ -10,9 +10,11 @@ import { Markdown } from '@/components/Markdown'
 import { FieldRow } from '@/components/motifs/FieldRow'
 import type { MenuItem } from '@/components/NativeMenu'
 import { PillButton } from '@/components/PillButton'
+import { ToggleRow } from '@/components/ToggleRow'
 import { CHAT_TEXT_SCALE_RANGE, DEFAULT_CHAT_FONT, SYSTEM_FONT } from '@/db/settings'
 import { useTranslation } from '@/i18n'
 import { CHAT_METRICS, useChatTextSettings } from '@/lib/chatText'
+import * as Haptics from '@/lib/haptics'
 import { installedFontFamilies } from '../modules/reverie-fonts'
 import { useColors, useStyles, type Colors } from '@/theme'
 
@@ -35,10 +37,19 @@ export default function ChatTextScreen() {
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const { font, scale, setFont, setScale, reset } = useChatTextSettings()
-  const untouched = font === DEFAULT_CHAT_FONT && scale === CHAT_TEXT_SCALE_RANGE.default
+  const { font, userFont, setUserFont, scale, setFont, setScale, reset } = useChatTextSettings()
+  const untouched = font === DEFAULT_CHAT_FONT && !userFont && scale === CHAT_TEXT_SCALE_RANGE.default
   const fontFamily = font
   const scaled = (value: number) => value * scale
+  // The regular size is felt, not drawn: the thumb clicks as it reaches it.
+  const atNormal = useRef(scale === CHAT_TEXT_SCALE_RANGE.default)
+  const drag = (value: number) => {
+    const next = snap(value)
+    const onNormal = next === CHAT_TEXT_SCALE_RANGE.default
+    if (onNormal && !atNormal.current) Haptics.selectionAsync()
+    atNormal.current = onNormal
+    setScale(next, false)
+  }
 
   // Everything installed, the system font first. Without the native module (Expo Go,
   // and Android always) a few that every device has.
@@ -74,7 +85,7 @@ export default function ChatTextScreen() {
               <Text
                 style={{
                   color: colors.text,
-                  fontFamily,
+                  fontFamily: userFont ? fontFamily : undefined,
                   fontSize: scaled(CHAT_METRICS.user.size),
                   lineHeight: scaled(CHAT_METRICS.user.line),
                 }}
@@ -105,7 +116,7 @@ export default function ChatTextScreen() {
             value={scale}
             minimumValue={CHAT_TEXT_SCALE_RANGE.min}
             maximumValue={CHAT_TEXT_SCALE_RANGE.max}
-            onValueChange={(v) => setScale(snap(v), false)}
+            onValueChange={drag}
             onSlidingComplete={(v) => setScale(snap(v))}
             minimumTrackTintColor={colors.accent}
             maximumTrackTintColor={colors.borderStrong}
@@ -121,6 +132,13 @@ export default function ChatTextScreen() {
           label={t('settings.chatFont')}
           value={font === SYSTEM_FONT ? t('chatFont.system') : font}
           menu={items}
+        />
+
+        <ToggleRow
+          label={t('settings.chatUserFont')}
+          note={t('settings.chatUserFontNote')}
+          value={userFont}
+          onValueChange={setUserFont}
         />
 
         <PillButton label={t('settings.chatReset')} onPress={reset} disabled={untouched} style={styles.reset} />

@@ -121,6 +121,17 @@ export function saveChatFont(db: SQLiteDatabase, font: ChatFont) {
   return setSetting(db, CHAT_FONT_KEY, font)
 }
 
+// Whether my own messages are set in the chat font too. Off: they use the system font.
+const USER_FONT_KEY = 'chat_font_user'
+
+export function loadChatUserFont(db: SQLiteDatabase) {
+  return getFlag(db, USER_FONT_KEY, false)
+}
+
+export function saveChatUserFont(db: SQLiteDatabase, on: boolean) {
+  return setFlag(db, USER_FONT_KEY, on)
+}
+
 export async function loadChatTextScale(db: SQLiteDatabase) {
   const value = Number(await getSetting(db, CHAT_TEXT_SCALE_KEY))
   const { min, max, default: normal } = CHAT_TEXT_SCALE_RANGE

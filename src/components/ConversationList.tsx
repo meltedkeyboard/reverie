@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   View,
-  type LayoutChangeEvent,
   type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -69,8 +68,6 @@ export function ConversationList({
   const listRef = useRef<FlatList<RowMessage>>(null)
   const restInset = useRef(0)
   const [scrolledBack, setScrolledBack] = useState(false)
-  const [listHeight, setListHeight] = useState(0)
-  const [draftHeight, setDraftHeight] = useState(0)
   // Set by the jump button while a reply streams: the user asked to watch it come in.
   const [followTail, setFollowTail] = useState(false)
   const draftIndex = rows.findIndex((row) => row.streaming)
@@ -130,17 +127,12 @@ export function ConversationList({
     [onAwayChange]
   )
 
-  const onDraftLayout = useCallback((event: LayoutChangeEvent) => {
-    setDraftHeight(event.nativeEvent.layout.height)
-  }, [])
-
-  // A streaming reply follows its tail only while all of it fits between the header and
-  // the composer. Once its start reaches the header, or the user has scrolled back, the
-  // row above it is held in place and the reply grows off the bottom of the screen
-  // instead of dragging the text being read along with it.
-  const room = listHeight - restInset.current - headerHeight - 20
-  const holdPosition =
-    draftIndex !== -1 && !followTail && (scrolledBack || (listHeight > 0 && draftHeight > room))
+  // A streaming reply follows its tail until the user scrolls back; then the row above it
+  // is held in place and the reply grows off the bottom of the screen instead of dragging
+  // the text being read along with it. A reply that merely outgrows the screen does not
+  // count: holding the row above it at that moment threw the view back to the user's own
+  // message halfway through the reply.
+  const holdPosition = draftIndex !== -1 && !followTail && scrolledBack
 
   // When the reply is done its row turns into the saved message and gains the action
   // bar. Letting go of the held row in that same frame shifts the text being read, so
@@ -174,7 +166,6 @@ export function ConversationList({
   const renderItem = useCallback(
     ({ item: row }: ListRenderItemInfo<RowMessage>) => {
       const content = renderRow(row)
-      if (row.streaming) return <View onLayout={onDraftLayout}>{content}</View>
       if (row.id !== focusId) return content
       return (
         <View>
@@ -183,7 +174,7 @@ export function ConversationList({
         </View>
       )
     },
-    [renderRow, onDraftLayout, focusId]
+    [renderRow, focusId, styles]
   )
 
   return (
@@ -198,7 +189,6 @@ export function ConversationList({
       onScroll={onScroll}
       onScrollBeginDrag={() => setFollowTail(false)}
       onScrollToIndexFailed={onScrollToIndexFailed}
-      onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
       maintainVisibleContentPosition={anchor !== null ? { minIndexForVisible: anchor } : undefined}
       scrollEventThrottle={32}
       ListHeaderComponent={header}

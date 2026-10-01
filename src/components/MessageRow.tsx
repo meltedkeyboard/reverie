@@ -140,7 +140,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
               scene?.whisper ? styles.whisperBubble : null,
             ]}
           >
-            <Text style={[styles.userText, textSize(chatText, CHAT_METRICS.user)]}>
+            <Text style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}>
               {message.content}
             </Text>
           </Pressable>

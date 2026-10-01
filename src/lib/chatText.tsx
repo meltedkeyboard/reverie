@@ -6,8 +6,10 @@ import {
   DEFAULT_CHAT_FONT,
   loadChatFont,
   loadChatTextScale,
+  loadChatUserFont,
   saveChatFont,
   saveChatTextScale,
+  saveChatUserFont,
   type ChatFont,
 } from '@/db/settings'
 
@@ -20,6 +22,9 @@ export const CHAT_METRICS = {
 
 type ChatTextValue = {
   font: ChatFont
+  // Whether the user's own messages use the font too, not the system one.
+  userFont: boolean
+  setUserFont: (on: boolean) => void
   // How much the chat text is enlarged: 1 is the regular size.
   scale: number
   setFont: (font: ChatFont) => void
@@ -34,10 +39,12 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   const db = useDatabase()
   const [font, setFontState] = useState<ChatFont>(DEFAULT_CHAT_FONT)
   const [scale, setScaleState] = useState<number>(CHAT_TEXT_SCALE_RANGE.default)
+  const [userFont, setUserFontState] = useState(false)
 
   useEffect(() => {
     loadChatFont(db).then(setFontState)
     loadChatTextScale(db).then(setScaleState)
+    loadChatUserFont(db).then(setUserFontState)
   }, [db])
 
   const setFont = useCallback(
@@ -54,12 +61,23 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     },
     [db]
   )
+  const setUserFont = useCallback(
+    (on: boolean) => {
+      setUserFontState(on)
+      saveChatUserFont(db, on)
+    },
+    [db]
+  )
   const reset = useCallback(() => {
     setFont(DEFAULT_CHAT_FONT)
+    setUserFont(false)
     setScale(CHAT_TEXT_SCALE_RANGE.default)
-  }, [setFont, setScale])
+  }, [setFont, setScale, setUserFont])
 
-  const value = useMemo(() => ({ font, scale, setFont, setScale, reset }), [font, scale, setFont, setScale, reset])
+  const value = useMemo(
+    () => ({ font, userFont, setUserFont, scale, setFont, setScale, reset }),
+    [font, userFont, setUserFont, scale, setFont, setScale, reset]
+  )
   return <ChatTextContext.Provider value={value}>{children}</ChatTextContext.Provider>
 }
 
@@ -72,12 +90,14 @@ export function useChatTextSettings() {
 // What a style of chat text takes from the settings: the family, and sizes that are
 // multiplied by the chosen scale. `scaled(17)` is a font size, `scaled(27)` a line height.
 export function useChatText() {
-  const { font, scale } = useChatTextSettings()
+  const { font, userFont, scale } = useChatTextSettings()
   return useMemo(
     () => ({
       fontFamily: font,
+      // undefined is the system font.
+      userFontFamily: userFont ? font : undefined,
       scaled: (value: number) => Math.round(value * scale * 100) / 100,
     }),
-    [font, scale]
+    [font, userFont, scale]
   )
 }

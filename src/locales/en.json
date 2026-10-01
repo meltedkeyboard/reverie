@@ -42,6 +42,8 @@
   "settings.confirmDeleteNote": "Ask before deleting a chat or a character",
   "settings.chatFont": "Chat font",
   "settings.chatTextSize": "Text size in chats",
+  "settings.chatUserFont": "Use this font for my messages too",
+  "settings.chatUserFontNote": "Off: my messages use the system font; the size is shared",
   "settings.chatReset": "Reset to default",
   "chatPreview.user": "Tell me how the evening went.",
   "chatPreview.reply": "She set the cup down and smiled. *The candle had burned low.*\n\n“Quiet, mostly. I kept thinking you would come back.”",
