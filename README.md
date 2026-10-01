@@ -17,6 +17,8 @@ Roleplay chat client for iOS and Android, built with Expo. It talks directly to 
 - Animated avatars: GIF, animated WebP/APNG and MP4/MOV/M4V (looping, muted), up to 15 MB. Picked from Photos or Files like any picture; kept as they are and shown by their middle.
 - Per-character chat backgrounds with effects and adjustable bubble transparency.
 - Private questions: the eye in a chat or a scene asks the model about it aside, like `/btw` — it reads the chat and answers out of character, and nothing is saved or seen by the characters.
+- Reply suggestions (off by default, Settings > Chats): after a reply the model drafts your next message in gray in the field, streaming as it is written. Swipe the field right to type it in, left to dismiss it until you reopen the chat; the arrows that show the swipes can be switched off.
+- Toasts: notices in Settings (backup, iCloud push and pull, errors) slide in from the top over the screen instead of blocking it with an alert.
 - App lock with Face ID, haptics toggle, "Continue" capsule on the home screen that jumps to the last active chat.
 - Backup export and import as JSON (the API key is not included).
 - iCloud sync (not in Expo Go): the data is kept in a folder picked in iCloud Drive and picked up by the other devices. Works with an app signed by a free Apple ID, see below.

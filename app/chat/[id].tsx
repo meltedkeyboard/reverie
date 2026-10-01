@@ -27,8 +27,10 @@ import { newMessage } from '@/db/messages'
 import { isPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase } from '@/db/provider'
 import { createRoomChat, getRoom, listRoomMembers, type Room, type RoomMember } from '@/db/rooms'
+import { areSuggestionHintsEnabled, isSuggestionsEnabled } from '@/db/suggestions'
 import { useAside } from '@/hooks/useAside'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
+import { useSuggestion } from '@/hooks/useSuggestion'
 import { useTranslation } from '@/i18n'
 import { characterScene } from '@/lib/aside'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
@@ -125,8 +127,12 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [privateEnabled, setPrivateEnabled] = useState(true)
+  const [suggestEnabled, setSuggestEnabled] = useState(false)
+  const [suggestHints, setSuggestHints] = useState(true)
   useEffect(() => {
     isPrivateChatEnabled(db).then(setPrivateEnabled)
+    isSuggestionsEnabled(db).then(setSuggestEnabled)
+    areSuggestionHintsEnabled(db).then(setSuggestHints)
   }, [db])
   const {
     messages,
@@ -182,6 +188,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   }))
 
   const idle = phase === 'idle'
+  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(scene, messages, suggestEnabled && idle && !asideOpen && !editingRow)
   // Changing the conversation while a reply streams or a message is edited would pull
   // the context out from under it, so only reading actions stay available then.
   const locked = !idle || editingRow !== null
@@ -391,6 +398,10 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           accessory={asidePanel ?? (awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null)}
           placeholder={asideOpen ? t('chat.privatePlaceholder') : undefined}
           hushed={asideOpen}
+          suggestion={suggestion}
+          onSuggestionTaken={clearSuggestion}
+          onSuggestionDismissed={dismissSuggestion}
+          suggestionHints={suggestHints}
           onSend={(text, image) => {
             if (asideOpen) return void aside.ask(text, image)
             send(text, image)

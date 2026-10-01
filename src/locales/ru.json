@@ -35,6 +35,9 @@
   "settings.hapticsNote": "Тактильный отклик при нажатиях, свайпах и других действиях",
   "settings.privateButton": "Кнопка приватного вопроса",
   "settings.privateButtonNote": "Глаз в шапке чата: спросить модель о чате в стороне, так что персонажи не услышат",
+  "settings.suggestButton": "Подсказка ответа",
+  "settings.suggestHints": "Отключить стрелки-подсказки свайпов",
+  "settings.suggestButtonNote": "После реплики модель предлагает ваш ответ серым в поле ввода: проведите по полю вправо, чтобы вставить его, или влево, чтобы убрать до следующего входа в чат",
   "settings.confirmDelete": "Подтверждать удаление",
   "settings.confirmDeleteNote": "Спрашивать перед удалением чата или персонажа",
   "settings.chatFont": "Шрифт чатов",
@@ -242,6 +245,7 @@
 
   "chat.editingMessage": "Редактирование сообщения",
   "chat.messagePlaceholder": "Сообщение",
+  "chat.suggestionHint": "Проведите вправо, чтобы вставить",
   "chat.continueAccessibility": "Продолжить",
   "chat.refineTitle": "Уточнить ответ",
   "chat.refineMessage": "Как переписать ответ? Например: «грустнее», «короче, без описаний»",

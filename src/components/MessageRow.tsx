@@ -24,6 +24,7 @@ import { Markdown, SelectableText } from './Markdown'
 import { NativeMenu } from './NativeMenu'
 import { Pager } from './Pager'
 import { SFIcon } from './SFIcon'
+import { ShimmerText } from './ShimmerText'
 import { TypingIndicator } from './TypingIndicator'
 
 // The live draft also carries what a reasoning model is thinking; reasoningMs is set
@@ -349,7 +350,11 @@ export function ThoughtBlock({ text, ms }: ThoughtProps) {
           effect={{ effect: 'breathe' }}
           active={live}
         />
-        <Text style={styles.thoughtLabel}>{live ? t('message.thinking') : t('message.reasoning')}</Text>
+        {live ? (
+          <ShimmerText text={t('message.thinking')} style={styles.thoughtLabel} />
+        ) : (
+          <Text style={styles.thoughtLabel}>{t('message.reasoning')}</Text>
+        )}
         {shown > 0 ? <Text style={styles.thoughtTime}>{shown} {t('message.secondsShort')}</Text> : null}
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
       </Pressable>

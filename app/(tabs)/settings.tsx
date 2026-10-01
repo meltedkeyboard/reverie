@@ -21,13 +21,20 @@ import { isHapticsEnabled, setHapticsEnabled } from '@/db/haptics'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
+import {
+  areSuggestionHintsEnabled,
+  isSuggestionsEnabled,
+  setSuggestionHintsEnabled,
+  setSuggestionsEnabled,
+} from '@/db/suggestions'
 import { useCloudSync } from '@/hooks/useCloudSync'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useShake } from '@/hooks/useShake'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
-import { confirm, showMessage } from '@/lib/dialogs'
+import { confirm } from '@/lib/dialogs'
+import { showToast } from '@/lib/toast'
 import { useChatTextSettings } from '@/lib/chatText'
 import { errorMessage } from '@/lib/errors'
 import { formatWhen } from '@/lib/format'
@@ -128,6 +135,8 @@ export default function SettingsScreen() {
   const [continueButton, toggleContinueButton] = useStoredFlag(isContinueEnabled, setContinueEnabled, true)
   const [continueByVisit, setContinueByVisitValue] = useStoredFlag(isContinueByVisit, setContinueByVisit, true)
   const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
+  const [suggestions, toggleSuggestions] = useStoredFlag(isSuggestionsEnabled, setSuggestionsEnabled, false)
+  const [suggestHints, toggleSuggestHints] = useStoredFlag(areSuggestionHintsEnabled, setSuggestionHintsEnabled, true)
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
   const [appLock, setAppLock] = useStoredFlag(isAppLockEnabled, setAppLockEnabled, false)
@@ -145,7 +154,7 @@ export default function SettingsScreen() {
       await moveFiles(shown)
     } catch (err) {
       setShowInFiles(isShownInFiles())
-      showMessage(t('settings.showInFilesFailedTitle'), errorMessage(err))
+      showToast({ tone: 'error', title: t('settings.showInFilesFailedTitle'), message: errorMessage(err) })
     } finally {
       setMovingFiles(false)
     }
@@ -161,7 +170,7 @@ export default function SettingsScreen() {
       if (on) await cloudSync.enable()
       else await cloudSync.disable()
     } catch (err) {
-      showMessage(t('sync.failedTitle'), errorMessage(err))
+      showToast({ tone: 'error', title: t('sync.failedTitle'), message: errorMessage(err) })
     }
   }
 
@@ -188,7 +197,11 @@ export default function SettingsScreen() {
     if (enabled) {
       // Verify it works before turning it on, so the app can't lock the user out.
       if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) {
-        showMessage(t(android ? 'settings.requireBiometrics' : 'settings.requireFaceId'), t(`settings.${android ? 'biometricsUnavailable' : 'faceIdUnavailable'}`))
+        showToast({
+          tone: 'error',
+          title: t(android ? 'settings.requireBiometrics' : 'settings.requireFaceId'),
+          message: t(`settings.${android ? 'biometricsUnavailable' : 'faceIdUnavailable'}`),
+        })
         return
       }
       const result = await LocalAuthentication.authenticateAsync({ promptMessage: t('lock.prompt') })
@@ -231,9 +244,15 @@ export default function SettingsScreen() {
     setExporting(true)
     try {
       const saved = await exportBackup(db)
-      if (saved) showMessage(t('settings.exportDoneTitle'), t('settings.exportDoneMessage', { name: saved.name, folder: saved.folder }))
+      if (saved) {
+        showToast({
+          tone: 'success',
+          title: t('settings.exportDoneTitle'),
+          message: t('settings.exportDoneMessage', { name: saved.name, folder: saved.folder }),
+        })
+      }
     } catch (err) {
-      showMessage(t('settings.exportFailedTitle'), errorMessage(err))
+      showToast({ tone: 'error', title: t('settings.exportFailedTitle'), message: errorMessage(err) })
     } finally {
       setExporting(false)
     }
@@ -243,9 +262,15 @@ export default function SettingsScreen() {
     setImporting(true)
     try {
       const result = await importBackup(db)
-      if (result) showMessage(t('settings.importDoneTitle'), t('settings.importDoneMessage', { count: result.characters }))
+      if (result) {
+        showToast({
+          tone: 'success',
+          title: t('settings.importDoneTitle'),
+          message: t('settings.importDoneMessage', { count: result.characters }),
+        })
+      }
     } catch (err) {
-      showMessage(t('settings.importFailedTitle'), errorMessage(err))
+      showToast({ tone: 'error', title: t('settings.importFailedTitle'), message: errorMessage(err) })
     } finally {
       setImporting(false)
     }
@@ -264,7 +289,7 @@ export default function SettingsScreen() {
           setCfg(DEFAULT_SETTINGS)
           router.replace('/onboarding')
         } catch (err) {
-          showMessage(t('settings.wipeFailedTitle'), errorMessage(err))
+          showToast({ tone: 'error', title: t('settings.wipeFailedTitle'), message: errorMessage(err) })
         } finally {
           setWiping(false)
         }
@@ -303,6 +328,22 @@ export default function SettingsScreen() {
           style={styles.chips}
         />
       ) : null}
+    </>
+  )
+
+  const suggestRow = (
+    <>
+      <ToggleRow
+        label={t('settings.suggestButton')}
+        note={t('settings.suggestButtonNote')}
+        value={suggestions}
+        onValueChange={toggleSuggestions}
+      />
+      <ToggleRow
+        label={t('settings.suggestHints')}
+        value={!suggestHints}
+        onValueChange={(off) => toggleSuggestHints(!off)}
+      />
     </>
   )
 
@@ -448,7 +489,7 @@ export default function SettingsScreen() {
             <PillButton
               accessibilityLabel={t('settings.icloudChangeFolder')}
               icon={{ name: 'folder', fallback: 'folder-outline' }}
-              onPress={() => cloudSync.changeFolder().catch((err) => showMessage(t('sync.failedTitle'), errorMessage(err)))}
+              onPress={() => cloudSync.changeFolder().catch((err) => showToast({ tone: 'error', title: t('sync.failedTitle'), message: errorMessage(err) }))}
               disabled={cloudSync.syncing || cloudAction !== null || backingUp}
             />
           </View>
@@ -505,11 +546,12 @@ export default function SettingsScreen() {
     },
     {
       key: 'chats',
-      sections: ['private', 'confirmDelete', 'chatText'],
+      sections: ['private', 'suggest', 'confirmDelete', 'chatText'],
       content: (
         <>
           <Eyebrow label={t('settings.chats')} color={colors.text} />
           {block('private', privateRow)}
+          {block('suggest', suggestRow)}
           {block('confirmDelete', confirmDeleteRow)}
           {block('chatText', chatTextRows)}
         </>
@@ -576,6 +618,7 @@ export default function SettingsScreen() {
 
           <Eyebrow label={t('settings.chats')} color={colors.text} />
           {block('private', privateRow)}
+          {block('suggest', suggestRow)}
           {block('confirmDelete', confirmDeleteRow)}
           {block('chatText', chatTextRows)}
 

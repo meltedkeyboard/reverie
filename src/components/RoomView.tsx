@@ -26,7 +26,9 @@ import { newMessage, type Message } from '@/db/messages'
 import { isPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase } from '@/db/provider'
 import { setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
+import { areSuggestionHintsEnabled, isSuggestionsEnabled } from '@/db/suggestions'
 import { useAside } from '@/hooks/useAside'
+import { useSuggestion } from '@/hooks/useSuggestion'
 import { useRoom, type RoomPhase } from '@/hooks/useRoom'
 import { useTranslation } from '@/i18n'
 import { roomScene } from '@/lib/aside'
@@ -104,8 +106,12 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const [narration, setNarration] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
   const [privateEnabled, setPrivateEnabled] = useState(true)
+  const [suggestEnabled, setSuggestEnabled] = useState(false)
+  const [suggestHints, setSuggestHints] = useState(true)
   useEffect(() => {
     isPrivateChatEnabled(db).then(setPrivateEnabled)
+    isSuggestionsEnabled(db).then(setSuggestEnabled)
+    areSuggestionHintsEnabled(db).then(setSuggestHints)
   }, [db])
 
   // A private thread with the model about the scene, as in a one-on-one chat. While it is
@@ -128,6 +134,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   }, [members])
 
   const idle = phase === 'idle'
+  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(scene, messages, suggestEnabled && idle && !asideOpen && !editingRow)
   const locked = !idle || editingRow !== null
   const byId = useMemo(() => new Map(members.map((m) => [m.characterId, m])), [members])
   const nameOf = useCallback((id: number) => byId.get(id)?.character.name ?? t('room.leftRoom'), [byId, t])
@@ -473,6 +480,10 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
           generating={asideOpen ? aside.phase !== 'idle' : !idle}
           editing={asideOpen ? null : editing}
           placeholder={asideOpen ? t('chat.privatePlaceholder') : placeholder}
+          suggestion={suggestion}
+          onSuggestionTaken={clearSuggestion}
+          onSuggestionDismissed={dismissSuggestion}
+          suggestionHints={suggestHints}
           hushed={asideOpen || (whisper && addressees.length > 0 && !narration)}
           toolbar={
             members.length && !asideOpen ? (

@@ -24,6 +24,8 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Long text fields of the editors and their full-screen editor | `FieldRow` with `expandTitle`, `app/text-editor.tsx`, `src/lib/textDraft.ts` |
 | UI strings | `src/locales/en.json`, `src/locales/ru.json`; lookup in `src/i18n.tsx` |
 | iOS permission texts | `app.json` plugins (English) and `permissions/ru.json` (Russian) |
+| A short message over the screen (done, failed, push/pull answers) | `showToast` in `src/lib/toast.ts`, drawn by `ToastHost` (mounted in `app/_layout.tsx`) |
+| The shimmering "Thinking..." label | `src/components/ShimmerText.tsx`, used by `ThoughtBlock` in `MessageRow.tsx` |
 | Tab bar: tabs, icons | `app/(tabs)/_layout.tsx` |
 | What search finds and in which order | `app/(tabs)/search/index.tsx` (`ORDER`, settings entries), queries in `src/db/search.ts` |
 | Opening a chat at a message / Settings at a section | `?message=ID` in `chat/[id].tsx` → `focusId` in `ConversationList`; `?section=` in `(tabs)/settings.tsx` |
@@ -85,6 +87,8 @@ Every avatar opens the viewer: `Avatar` and `AvatarStack` (the whole cast, via `
 
 The eye in the header of a chat or a scene opens Private: a question to the model beside the story, like `/btw`. `useAside` keeps the thread in memory, `buildAsideRequest` (`src/lib/aside.ts`) sends the scene brief and a text transcript of the latest lines (text, not assistant/user turns, so the model does not carry on in character), and `AsidePanel` shows it in the composer's `accessory` slot, so it rides the keyboard with the field. Opening and closing swaps the whole field through `ComposerSwap` (`Composer.tsx`): the old one sinks, the new one springs up, and the chat's draft is kept in `initialText`/`onTextChange`. Nothing of it is saved or reaches the characters; closing the eye throws it away. The button is toggled by `src/db/privateChat.ts`.
 
+After every finished reply `useSuggestion` (`src/hooks/useSuggestion.ts`) asks `suggestReply` (`src/lib/suggest.ts`, thinking off, the last six lines plus the scene brief from `AsideScene`) for the user's likely next message and hands it to `Composer` as `suggestion`. While the field is empty it replaces the placeholder, and a swipe to the right across the field types it in (a `Pan` in `Composer`). A swipe to the left dismisses it and `useSuggestion` asks for no more until the screen is left (its state lives with the chat). It streams in through `runReplyStream`, so the text appears as it is written; taking or dismissing it mid-stream aborts the request. Two arrows in the field show the swipes (gray right, red left, flying out in turns every 5 seconds). Any new message, edit or open Private thread drops the suggestion. `src/db/suggestions.ts` holds two flags set in Settings > Chats: the suggestions (off by default) and the arrows (on, shown as "Disable swipe guiding arrows"). Rooms work the same way.
+
 The streaming loop itself (reasoning, per-frame batching) is `runReplyStream` in `src/lib/replyStream.ts`, shared with rooms.
 
 ## Rooms
@@ -112,7 +116,7 @@ Everything goes through `expo-sqlite`. Components get the database from `useData
 | `search.ts` | `listSearchChats` (every chat with its owner's name and avatar), `searchMessages` |
 | `messages.ts` | Message CRUD, variants (`withNewVariant`, `withVariant`), images and thoughts as JSON columns |
 | `settings.ts` | Key/value helpers (`getSetting`, `getFlag`), server settings, theme and locale preference |
-| `appLock.ts`, `confirmDelete.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts` | One feature flag each, stored as `'1'`/`'0'` in `app_settings` via `getFlag`/`setFlag` |
+| `appLock.ts`, `confirmDelete.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts`, `suggestions.ts` | One feature flag each, stored as `'1'`/`'0'` in `app_settings` via `getFlag`/`setFlag` |
 | `cloudSync.ts` | iCloud sync state, local only: on/off, `sync_dirty` (set by triggers on the synced tables, see the last migration), the revision last synced and when |
 | `continue.ts` | The Continue capsule: on/off, last visited or last message (`isContinueByVisit`), swiped away per kind, and the id of the chat opened last per kind (`setLastOpened`, written by `chat/[id].tsx`) |
 
@@ -143,7 +147,8 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 |---|---|
 | Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background: `pickAvatarPhoto` camera, `pickAvatarLibrary` and `pickAvatarFile` raw, a still one then framed on `/avatar-crop`, a moving one kept by `acceptMoving`; `squareAvatar` cuts a given square, copy), `avatarStore.ts` (files, avatars and backgrounds in separate folders), `media.ts` (which files are video or a moving picture, by extension and, for WebP/PNG, a header sniff; the size cap) |
 | Backup | `backup.ts` (export, import, wipe), `download.ts` (save JSON through the Files "Save as" sheet from `modules/reverie-save-as`, or to a picked folder without it, an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` |
-| Dialogs | `dialogs.tsx` (native alerts and sheets), `chatDialogs.ts` |
+| Dialogs | `dialogs.tsx` (native alerts and sheets, for choices that must block), `chatDialogs.ts` |
+| Toasts | `toast.ts`: one message at a time with a tone (`success`, `error`, `info`) and optional buttons, gone after a few seconds. `ToastHost` drops it in from the top on a spring over the screen, on glass like the other controls; a tap or a swipe up sends it back. It takes no touches outside itself, unlike an alert. Settings and iCloud sync use it for every notice; only the wipe confirmation stays an `Alert`, and so does a conflict found by a quiet sync on another screen (a sheet) |
 | Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
 | AI helpers | `promptGen.ts`, `titles.ts`, `aside.ts` (the Private request, `characterScene`/`roomScene`) |
 | Platform | `haptics.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` (where the data lives, the "show in Files" toggle, see below) |

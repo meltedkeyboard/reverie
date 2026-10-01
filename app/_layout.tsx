@@ -8,6 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { AppLock } from '@/components/AppLock'
 import { DialogHost } from '@/components/DialogHost'
 import { StartupBoundary } from '@/components/StartupBoundary'
+import { ToastHost } from '@/components/ToastHost'
 import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { isHapticsEnabled } from '@/db/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
@@ -107,6 +108,7 @@ function AppShell() {
           <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
         </Stack>
         <DialogHost />
+        <ToastHost />
       </ThemeProvider>
     </>
   )

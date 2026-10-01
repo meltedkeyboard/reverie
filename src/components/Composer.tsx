@@ -11,12 +11,16 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
   Easing,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
   withSpring,
   withTiming,
   type SharedValue,
@@ -35,6 +39,7 @@ import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import { imageDataUrl, pickMessageImages, type ImageSource } from '@/lib/images'
+import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
 import { useColors, useStyles, type Colors } from '@/theme'
 
@@ -63,6 +68,14 @@ type Props = {
   initialText?: string
   onTextChange?: (text: string) => void
   autoFocus?: boolean
+  // A guess at the next message, shown in place of the placeholder while the field is
+  // empty. A swipe to the right across the field types it in.
+  suggestion?: string | null
+  onSuggestionTaken?: () => void
+  // A swipe to the left turns the suggestion down.
+  onSuggestionDismissed?: () => void
+  // The flying arrows that show the two swipes.
+  suggestionHints?: boolean
 }
 
 export function Composer({
@@ -82,6 +95,10 @@ export function Composer({
   autoFocus = false,
   onContinueLongPress,
   hushed = false,
+  suggestion,
+  onSuggestionTaken,
+  onSuggestionDismissed,
+  suggestionHints = true,
 }: Props) {
   const insets = useSafeAreaInsets()
   const colors = useColors()
@@ -111,6 +128,62 @@ export function Composer({
   }, [editing?.id])
 
   const value = text.trim()
+  const suggesting = !editing && !value && !images.length && !!suggestion
+
+  // Every 5 seconds the arrows fly out, the gray one to the right (take it) and the red
+  // one under it to the left (dismiss), and come back in from the opposite side. They take
+  // turns, so it reads as swipes, not as buttons.
+  const nudgeTake = useSharedValue(0)
+  const nudgeDismiss = useSharedValue(0)
+  useEffect(() => {
+    if (!suggesting || !suggestionHints) {
+      nudgeTake.value = 0
+      nudgeDismiss.value = 0
+      return
+    }
+    const lap = (dir: 1 | -1) =>
+      withRepeat(
+        withSequence(
+          withTiming(dir * ARROW_TRAVEL, { duration: 260, easing: Easing.in(Easing.cubic) }),
+          withTiming(-dir * ARROW_TRAVEL, { duration: 0 }),
+          withTiming(0, { duration: 380, easing: Easing.out(Easing.cubic) }),
+          withTiming(0, { duration: 4360 })
+        ),
+        -1
+      )
+    nudgeTake.value = lap(1)
+    nudgeDismiss.value = withDelay(ARROW_STAGGER, lap(-1))
+  }, [suggesting, suggestionHints, nudgeTake, nudgeDismiss])
+  const takeStyle = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(1, Math.abs(nudgeTake.value) / ARROW_TRAVEL),
+    transform: [{ translateX: nudgeTake.value }],
+  }))
+  const dismissStyle = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(1, Math.abs(nudgeDismiss.value) / ARROW_TRAVEL),
+    transform: [{ translateX: nudgeDismiss.value }],
+  }))
+
+  const takeSuggestion = () => {
+    if (!suggestion) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setText(suggestion)
+    onSuggestionTaken?.()
+    inputRef.current?.focus()
+  }
+  const dismissSuggestion = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    onSuggestionDismissed?.()
+  }
+  // Stays out of the way of taps, which focus the field, and of vertical scrolling.
+  const swipe = Gesture.Pan()
+    .runOnJS(true)
+    .enabled(suggesting)
+    .activeOffsetX([-18, 18])
+    .failOffsetY([-14, 14])
+    .onEnd((e) => {
+      if (e.translationX > 48) takeSuggestion()
+      else if (e.translationX < -48) dismissSuggestion()
+    })
   const mode = editing
     ? value
       ? 'save'
@@ -217,16 +290,32 @@ export function Composer({
           </ScrollView>
         ) : null}
         <View style={docked ? undefined : styles.inputRow}>
-          <TextInput
-            ref={inputRef}
-            value={text}
-            onChangeText={setText}
-            placeholder={placeholder ?? t('chat.messagePlaceholder')}
-            {...inputColors}
-            multiline
-            autoFocus={autoFocus}
-            style={[styles.input, docked && styles.inputDocked]}
-          />
+          <GestureDetector gesture={swipe}>
+            <View style={docked ? undefined : styles.inputWrap}>
+              <TextInput
+                ref={inputRef}
+                value={text}
+                onChangeText={setText}
+                placeholder={suggesting ? suggestion : (placeholder ?? t('chat.messagePlaceholder'))}
+                {...inputColors}
+                placeholderTextColor={suggesting ? colors.textMuted : inputColors.placeholderTextColor}
+                multiline
+                autoFocus={autoFocus}
+                accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
+                style={[styles.input, docked && styles.inputDocked, suggesting && suggestionHints && styles.inputSuggesting]}
+              />
+              {suggesting && suggestionHints ? (
+                <View style={[styles.suggestMarks, docked && styles.suggestMarksDocked]} pointerEvents="none">
+                  <Animated.View style={takeStyle}>
+                    <Ionicons name="arrow-forward" size={12} color={colors.textMuted} />
+                  </Animated.View>
+                  <Animated.View style={dismissStyle}>
+                    <Ionicons name="arrow-back" size={12} color={colors.danger} />
+                  </Animated.View>
+                </View>
+              ) : null}
+            </View>
+          </GestureDetector>
           {docked ? (
             <View style={styles.tools}>
               <View style={styles.toolbar}>{toolbar}</View>
@@ -305,6 +394,10 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
 // button beside it is as tall, so the two line up.
 const FIELD_HEIGHT = 48
 
+const ARROW_TRAVEL = 36
+// The second arrow starts half a lap after the first.
+const ARROW_STAGGER = 2500
+
 const ICONS = {
   idle: { sf: 'arrow.up', fallback: 'arrow-up' },
   send: { sf: 'arrow.up', fallback: 'arrow-up' },
@@ -344,6 +437,7 @@ const createStyles = (colors: Colors) =>
     borderColor: colors.border,
   },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  inputWrap: { flex: 1 },
   input: {
     flex: 1,
     maxHeight: 180,
@@ -354,6 +448,9 @@ const createStyles = (colors: Colors) =>
     paddingBottom: 8,
     paddingHorizontal: 14,
   },
+  inputSuggesting: { paddingRight: 34 },
+  suggestMarks: { position: 'absolute', right: 14, top: 6, gap: 3, alignItems: 'center' },
+  suggestMarksDocked: { top: 10 },
   inputDocked: { paddingTop: 12, paddingBottom: 8 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolbar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },

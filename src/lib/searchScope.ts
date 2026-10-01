@@ -21,6 +21,7 @@ export type SettingsSection =
   | 'language'
   | 'continue'
   | 'private'
+  | 'suggest'
   | 'confirmDelete'
   | 'chatText'
   | 'haptics'

@@ -35,6 +35,9 @@
   "settings.hapticsNote": "Vibration feedback on taps, swipes and other actions",
   "settings.privateButton": "Private question button",
   "settings.privateButtonNote": "The eye icon in a chat's header: ask the model about the chat aside, without the characters hearing",
+  "settings.suggestButton": "Reply suggestion",
+  "settings.suggestHints": "Disable swipe guiding arrows",
+  "settings.suggestButtonNote": "After a reply the model proposes your answer in gray in the field: swipe the field right to insert it, or left to dismiss it until you reopen the chat",
   "settings.confirmDelete": "Confirm deletion",
   "settings.confirmDeleteNote": "Ask before deleting a chat or a character",
   "settings.chatFont": "Chat font",
@@ -242,6 +245,7 @@
 
   "chat.editingMessage": "Editing message",
   "chat.messagePlaceholder": "Message",
+  "chat.suggestionHint": "Swipe right to insert",
   "chat.continueAccessibility": "Continue",
   "chat.refineTitle": "Refine reply",
   "chat.refineMessage": "How should the reply change? For example: “sadder”, “shorter, less description”",

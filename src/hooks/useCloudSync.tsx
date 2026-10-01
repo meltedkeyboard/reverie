@@ -5,8 +5,9 @@ import { forgetSyncRev, getSyncState, isCloudSyncEnabled, setCloudSyncEnabled } 
 import { useDatabase, useReloadDatabase } from '@/db/provider'
 import { t } from '@/i18n'
 import { cloudFolderName, cloudSyncAvailable, forgetCloudFolder, pickCloudFolder, syncWithCloud, type SyncMode } from '@/lib/cloudSync'
-import { confirm, showMessage, showSheet } from '@/lib/dialogs'
+import { showSheet } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
+import { showToast } from '@/lib/toast'
 
 type CloudSync = {
   available: boolean
@@ -55,10 +56,10 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       try {
         const outcome = await syncWithCloud(mode)
         if (outcome === 'pulled') await reloadRef.current()
-        if (outcome === 'conflict' && mode === 'auto' && (loud || !conflictDismissed.current)) askConflict()
+        if (outcome === 'conflict' && mode === 'auto' && (loud || !conflictDismissed.current)) askConflict(loud)
         return outcome
       } catch (err) {
-        if (loud) showMessage(t('sync.failedTitle'), errorMessage(err))
+        if (loud) showToast({ tone: 'error', title: t('sync.failedTitle'), message: errorMessage(err) })
         else console.warn('iCloud sync failed', err)
         return null
       } finally {
@@ -71,12 +72,16 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     [refresh]
   )
 
-  const askConflict = () => {
+  // Asked from Settings it is a toast; a quiet sync can hit it on any screen, where a
+  // toast with two buttons is easy to miss, so that one stays a sheet.
+  const askConflict = (loud: boolean) => {
     conflictDismissed.current = true
-    showSheet(t('sync.conflictTitle'), [
-      { label: t('sync.keepDevice'), onSelect: () => sync('local', true) },
-      { label: t('sync.takeCloud'), onSelect: () => sync('cloud', true) },
-    ])
+    const choices = [
+      { label: t('sync.keepDevice'), onPress: () => sync('local', true) },
+      { label: t('sync.takeCloud'), onPress: () => sync('cloud', true) },
+    ]
+    if (loud) showToast({ tone: 'info', title: t('sync.conflictTitle'), actions: choices })
+    else showSheet(t('sync.conflictTitle'), choices.map(({ label, onPress }) => ({ label, onSelect: onPress })))
   }
 
   useEffect(() => {
@@ -132,29 +137,27 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
   // replace changes made here, asks first.
   const pushNow = useCallback(async () => {
     const outcome = await sync('push', true)
-    if (outcome === 'unchanged') showMessage(t('sync.upToDate'), t('sync.nothingToPush'))
+    if (outcome === 'unchanged') showToast({ tone: 'info', title: t('sync.upToDate'), message: t('sync.nothingToPush') })
     else if (outcome === 'behind') {
-      confirm({
+      showToast({
+        tone: 'info',
         title: t('sync.pushBehindTitle'),
         message: t('sync.pushBehindText'),
-        confirmLabel: t('sync.pushAnyway'),
-        destructive: true,
-        onConfirm: () => sync('local', true),
+        actions: [{ label: t('sync.pushAnyway'), destructive: true, onPress: () => sync('local', true) }],
       })
     }
   }, [sync])
 
   const pullNow = useCallback(async () => {
     const outcome = await sync('pull', true)
-    if (outcome === 'unchanged') showMessage(t('sync.upToDate'), t('sync.nothingToPull'))
-    else if (outcome === 'empty') showMessage(t('sync.upToDate'), t('sync.cloudEmpty'))
+    if (outcome === 'unchanged') showToast({ tone: 'info', title: t('sync.upToDate'), message: t('sync.nothingToPull') })
+    else if (outcome === 'empty') showToast({ tone: 'info', title: t('sync.upToDate'), message: t('sync.cloudEmpty') })
     else if (outcome === 'conflict') {
-      confirm({
+      showToast({
+        tone: 'info',
         title: t('sync.pullOverTitle'),
         message: t('sync.pullOverText'),
-        confirmLabel: t('sync.pullAnyway'),
-        destructive: true,
-        onConfirm: () => sync('cloud', true),
+        actions: [{ label: t('sync.pullAnyway'), destructive: true, onPress: () => sync('cloud', true) }],
       })
     }
   }, [sync])
