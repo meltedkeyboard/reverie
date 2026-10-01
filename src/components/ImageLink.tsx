@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router'
 import { Pressable, type StyleProp, type ViewStyle } from 'react-native'
 
+import { PRESS_ANYWHERE } from '@/lib/press'
 import { setViewerImages, type ViewerImage } from '@/lib/viewer'
 
 type Props = (
@@ -27,6 +28,7 @@ export function ImageLink({ uri, aspect = 1, gallery, onLongPress, delayLongPres
     <Pressable
       onPress={() => openViewer(gallery ?? [{ uri: uri!, aspect }])}
       onLongPress={onLongPress}
+      pressRetentionOffset={PRESS_ANYWHERE}
       delayLongPress={delayLongPress}
       accessibilityRole="imagebutton"
       accessibilityLabel={accessibilityLabel}

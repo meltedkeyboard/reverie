@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Pressable, type StyleProp, type ViewStyle } from 'react-native'
 
+import { PRESS_ANYWHERE } from '@/lib/press'
 import { useColors } from '@/theme'
 
 type Props = {
@@ -25,6 +26,7 @@ export function IconButton({ name, onPress, size = 22, color, style, disabled, a
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       hitSlop={8}
+      pressRetentionOffset={PRESS_ANYWHERE}
       style={({ pressed }) => [
         { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
         pressed && { opacity: 0.55, transform: [{ scale: 0.92 }] },

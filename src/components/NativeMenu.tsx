@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, ty
 
 import { showSheet } from '@/lib/dialogs'
 import { liquidGlass, swiftUI } from '@/lib/nativeUI'
+import { PRESS_ANYWHERE } from '@/lib/press'
 import { useTheme } from '@/theme'
 
 export type MenuItem = {
@@ -42,6 +43,7 @@ export function NativeMenu({ items, children, style, disabled = false, glassRadi
         onPress={() => showSheet(undefined, items)}
         disabled={disabled}
         hitSlop={4}
+        pressRetentionOffset={PRESS_ANYWHERE}
         style={({ pressed }) => [style, pressed && { opacity: 0.6 }]}
       >
         {children}

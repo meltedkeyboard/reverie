@@ -10,6 +10,7 @@ import { useTranslation } from '@/i18n'
 import type { MessageImage } from '@/db/messages'
 import { withAlpha } from '@/lib/color'
 import { showSheet } from '@/lib/dialogs'
+import { PRESS_ANYWHERE } from '@/lib/press'
 import * as Haptics from '@/lib/haptics'
 import { imageDataUrl } from '@/lib/images'
 import { CHAT_METRICS, useChatText } from '@/lib/chatText'
@@ -131,7 +132,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           <Picture key={index} image={image} onLongPress={openSheet} />
         ))}
         {message.content ? (
-          <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS}
+          <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS} pressRetentionOffset={PRESS_ANYWHERE}
             style={[
               styles.bubble,
               bubbleOpacity < 1 && { backgroundColor: withAlpha(colors.bubble, bubbleOpacity) },
@@ -336,6 +337,7 @@ export function ThoughtBlock({ text, ms }: ThoughtProps) {
       <Pressable
         onPress={() => setOpen((prev) => !prev)}
         hitSlop={8}
+        pressRetentionOffset={PRESS_ANYWHERE}
         style={({ pressed }) => [styles.thoughtHead, pressed && { opacity: 0.6 }]}
       >
         {/* The symbol breathes while the model thinks and settles once the reply starts. */}

@@ -22,6 +22,7 @@ import { useHeaderHeight } from '@/components/GlassHeader'
 import type { RowMessage } from '@/components/MessageRow'
 import { useTranslation } from '@/i18n'
 import { liquidGlass } from '@/lib/nativeUI'
+import { PRESS_ANYWHERE } from '@/lib/press'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 // How far above the newest message the list has to be before the jump button shows up.
@@ -237,7 +238,7 @@ export function ErrorCard({ message, onRetry }: { message: string; onRetry: () =
   return (
     <View style={styles.error}>
       <Text style={styles.errorText}>{message}</Text>
-      <Pressable onPress={onRetry} style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}>
+      <Pressable onPress={onRetry} pressRetentionOffset={PRESS_ANYWHERE} style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}>
         <Text style={styles.retryText}>{t('chat.retry')}</Text>
       </Pressable>
     </View>
