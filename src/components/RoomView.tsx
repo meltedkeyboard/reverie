@@ -12,7 +12,7 @@ import { AvatarStack, castGallery } from '@/components/AvatarStack'
 import { CastBar, FloorButton } from '@/components/CastBar'
 import { CastSheet } from '@/components/CastSheet'
 import { ChatBackground } from '@/components/ChatBackground'
-import { Composer, ComposerSwap } from '@/components/Composer'
+import { Composer, ComposerFloat, ComposerSwap } from '@/components/Composer'
 import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
@@ -100,6 +100,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
   const listRef = useRef<ConversationHandle>(null)
   const composerHeight = useSharedValue(0)
+  const composerTop = useSharedValue(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
   const [addressees, setAddressees] = useState<number[]>([])
@@ -504,10 +505,10 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
               </>
             ) : null
           }
+          top={composerTop}
           accessory={
             asidePanel ?? (
               <View style={styles.accessory} pointerEvents="box-none">
-                {awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null}
                 {idle ? null : status}
               </View>
             )
@@ -536,6 +537,11 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
           onCancelEdit={() => setEditingRow(null)}
         />
       </ComposerSwap>
+      {awayFromEnd ? (
+        <ComposerFloat top={composerTop}>
+          <JumpButton onPress={() => listRef.current?.jumpToNewest()} />
+        </ComposerFloat>
+      ) : null}
 
       <CastSheet
         visible={castOpen}

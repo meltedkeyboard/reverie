@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AsidePanel } from '@/components/AsidePanel'
 import { Avatar } from '@/components/Avatar'
 import { ChatBackground } from '@/components/ChatBackground'
-import { Composer, ComposerSwap } from '@/components/Composer'
+import { Composer, ComposerFloat, ComposerSwap } from '@/components/Composer'
 import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
@@ -163,6 +163,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
 
   const listRef = useRef<ConversationHandle>(null)
   const composerHeight = useSharedValue(0)
+  const composerTop = useSharedValue(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
   const keyboard = useReanimatedKeyboardAnimation()
@@ -394,7 +395,8 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           autoFocus={asideOpen}
           generating={asideOpen ? aside.phase !== 'idle' : !idle}
           editing={asideOpen ? null : editing}
-          accessory={asidePanel ?? (awayFromEnd ? <JumpButton onPress={() => listRef.current?.jumpToNewest()} /> : null)}
+          top={composerTop}
+          accessory={asidePanel}
           placeholder={asideOpen ? t('chat.privatePlaceholder') : undefined}
           hushed={asideOpen}
           suggestion={suggestion}
@@ -421,6 +423,12 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           onCancelEdit={() => setEditingRow(null)}
         />
       </ComposerSwap>
+      {/* Outside the swap, so it neither sinks with the field nor goes missing in Private. */}
+      {awayFromEnd ? (
+        <ComposerFloat top={composerTop}>
+          <JumpButton onPress={() => listRef.current?.jumpToNewest()} />
+        </ComposerFloat>
+      ) : null}
     </View>
   )
 }

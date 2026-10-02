@@ -18,6 +18,7 @@ import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
   Easing,
   interpolateColor,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -44,6 +45,9 @@ import { useColors, useStyles, type Colors } from '@/theme'
 
 type Props = {
   height: SharedValue<number>
+  // Told where the top of the field and its accessory is (from the bottom of the screen), for
+  // what floats above them in a `ComposerFloat`.
+  top?: SharedValue<number>
   generating: boolean
   editing: { id: number; text: string } | null
   // Floats centered above the bar and follows it with the keyboard.
@@ -77,6 +81,7 @@ type Props = {
 
 export function Composer({
   height,
+  top,
   generating,
   editing,
   accessory,
@@ -389,9 +394,19 @@ export function Composer({
     height.value = reserve
   }, [reserve, height])
 
-  // The accessory sits on the height the list reserves, not on the bar itself, so it stays
-  // where it is while the field grows over it.
-  const accessoryStyle = useAnimatedStyle(() => ({ bottom: height.value }))
+  // The accessory sits on the height the list reserves, not on the bar itself, so it does not
+  // follow every line the field gains.
+  // It rises when the field is taller than that (an opened field, one with pictures), so
+  // the field never covers it.
+  const accessoryStyle = useAnimatedStyle(() => ({ bottom: Math.max(height.value, barExtra + boxHeight.value) }))
+  const accessoryH = useSharedValue(0)
+  useAnimatedReaction(
+    () => Math.max(height.value, barExtra + boxHeight.value) + accessoryH.value,
+    (value) => {
+      if (top) top.value = value
+    },
+    [barExtra, top]
+  )
   const boxStyle = useAnimatedStyle(() => ({ height: boxHeight.value }))
 
   // The fades only exist in the opened field: in the one-line capsule nothing scrolls, and a
@@ -552,7 +567,13 @@ export function Composer({
       offset={{ closed: 0, opened: insets.bottom }}
       pointerEvents="box-none"
     >
-      <Animated.View style={[styles.accessory, accessoryStyle]} pointerEvents="box-none">
+      <Animated.View
+        style={[styles.accessory, accessoryStyle]}
+        pointerEvents="box-none"
+        onLayout={(e) => {
+          accessoryH.value = e.nativeEvent.layout.height
+        }}
+      >
         {accessory}
       </Animated.View>
       {liquidGlass ? (
@@ -589,6 +610,21 @@ export function Composer({
           </Animated.View>
         </>
       ) : null}
+    </KeyboardStickyView>
+  )
+}
+
+// Floats above the composer and whatever it carries, and stays when the composer is swapped
+// (the jump button in a chat). `top` is the one given to the `Composer`.
+export function ComposerFloat({ top, children }: { top: SharedValue<number>; children: React.ReactNode }) {
+  const insets = useSafeAreaInsets()
+  const styles = useStyles(createStyles)
+  const style = useAnimatedStyle(() => ({ bottom: withTiming(top.value, { duration: 180, easing: Easing.out(Easing.cubic) }) }))
+  return (
+    <KeyboardStickyView style={styles.dock} offset={{ closed: 0, opened: insets.bottom }} pointerEvents="box-none">
+      <Animated.View style={[styles.accessory, style]} pointerEvents="box-none">
+        {children}
+      </Animated.View>
     </KeyboardStickyView>
   )
 }
