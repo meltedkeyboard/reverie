@@ -21,7 +21,7 @@ import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
 import { useAbortable } from '@/hooks/useAbortable'
 import { t } from '@/i18n'
-import { CHAT_MESSAGES, selectHistory, turnTokens } from '@/lib/context'
+import { selectHistory, turnTokens } from '@/lib/context'
 import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
 import { CONTINUE_NOTE, emptyReplyReason, runReplyStream, toTurn, withReplyLimit } from '@/lib/replyStream'
@@ -176,7 +176,7 @@ export function useChat(chat: Chat, character: Character) {
         const cfg = await loadSettings(db)
         const system = withReplyLimit(target.systemPrompt.trim(), target.replyLimit)
         const turns = selectHistory(history.map(toTurn), turnTokens, cfg, {
-          messages: CHAT_MESSAGES,
+          messages: cfg.chatMessages,
           system,
           maxTokens: target.maxTokens,
         })

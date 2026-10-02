@@ -1,7 +1,14 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { Platform } from 'react-native'
 
-import { CONTEXT_MODES, CONTEXT_STEPS, DEFAULT_CONTEXT_TOKENS, type ContextMode } from '@/lib/context'
+import {
+  CHAT_MESSAGES,
+  CONTEXT_MODES,
+  CONTEXT_STEPS,
+  DEFAULT_CONTEXT_TOKENS,
+  ROOM_MESSAGES,
+  type ContextMode,
+} from '@/lib/context'
 
 export type ServerSettings = {
   baseUrl: string
@@ -10,6 +17,9 @@ export type ServerSettings = {
   // The model's context window, as set by hand: it changes with the model, so it is not per character.
   contextTokens: number
   contextMode: ContextMode
+  // How many of the latest messages the 'messages' mode sends, in chats and in rooms separately.
+  chatMessages: number
+  roomMessages: number
 }
 
 export const DEFAULT_SETTINGS: ServerSettings = {
@@ -18,9 +28,19 @@ export const DEFAULT_SETTINGS: ServerSettings = {
   model: '',
   contextTokens: DEFAULT_CONTEXT_TOKENS,
   contextMode: 'messages',
+  chatMessages: CHAT_MESSAGES,
+  roomMessages: ROOM_MESSAGES,
 }
 
-const KEYS = { baseUrl: 'base_url', apiKey: 'api_key', model: 'model', contextTokens: 'context_tokens', contextMode: 'context_mode' } as const
+const KEYS = {
+  baseUrl: 'base_url',
+  apiKey: 'api_key',
+  model: 'model',
+  contextTokens: 'context_tokens',
+  contextMode: 'context_mode',
+  chatMessages: 'context_chat_messages',
+  roomMessages: 'context_room_messages',
+} as const
 
 export async function getSetting(db: SQLiteDatabase, key: string) {
   const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', key)
@@ -55,6 +75,11 @@ function storedContext(value: string | undefined) {
   return (CONTEXT_STEPS as readonly number[]).includes(n) ? n : DEFAULT_SETTINGS.contextTokens
 }
 
+function storedMessages(value: string | undefined, fallback: number) {
+  const n = Number(value)
+  return Number.isSafeInteger(n) && n >= 1 ? n : fallback
+}
+
 export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> {
   const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM app_settings')
   const stored = new Map(rows.map((r) => [r.key, r.value]))
@@ -64,6 +89,8 @@ export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> 
     model: stored.get(KEYS.model) ?? DEFAULT_SETTINGS.model,
     contextTokens: storedContext(stored.get(KEYS.contextTokens)),
     contextMode: CONTEXT_MODES.find((m) => m === stored.get(KEYS.contextMode)) ?? DEFAULT_SETTINGS.contextMode,
+    chatMessages: storedMessages(stored.get(KEYS.chatMessages), DEFAULT_SETTINGS.chatMessages),
+    roomMessages: storedMessages(stored.get(KEYS.roomMessages), DEFAULT_SETTINGS.roomMessages),
   }
 }
 

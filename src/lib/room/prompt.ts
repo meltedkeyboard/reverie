@@ -1,7 +1,7 @@
 import type { ChatRequest, ChatTurn, ContentPart } from '@/api/llm'
 import type { Message } from '@/db/messages'
 import type { Room, RoomMember } from '@/db/rooms'
-import { ROOM_MESSAGES, selectHistory, turnTokens } from '@/lib/context'
+import { selectHistory, turnTokens } from '@/lib/context'
 import { toTurn, withReplyLimit } from '@/lib/replyStream'
 
 import { hearing, USER } from './audience'
@@ -16,7 +16,7 @@ function list(names: string[]) {
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
-type Window = Parameters<typeof selectHistory>[2]
+type Window = Parameters<typeof selectHistory>[2] & { roomMessages: number }
 
 type Context = {
   speaker: RoomMember
@@ -73,7 +73,7 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
     history.filter((m) => hearing(m, me)),
     (m) => turnTokens(toTurn(m)) + 12,
     window,
-    { messages: ROOM_MESSAGES, system, maxTokens: speaker.character.maxTokens }
+    { messages: window.roomMessages, system, maxTokens: speaker.character.maxTokens }
   )
   for (const m of visible) {
     if (m.kind === 'narration') {

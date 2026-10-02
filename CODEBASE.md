@@ -9,7 +9,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | I want to change... | Go to |
 |---|---|
 | A request to the model, SSE parsing, thinking mode | `src/api/llm.ts` |
-| How much history is sent as context | `fitHistory` in `src/lib/context.ts` (the token estimate, the slider's steps); `selectHistory` picks by the mode (`contextMode`: the last 20 messages of a chat or 30 of a room, or the token window); the window `contextTokens` is a slider in Settings > Server, shown in tokens mode once the Play button has loaded the model |
+| How much history is sent as context | `fitHistory` in `src/lib/context.ts` (the token estimate, the slider's steps); `selectHistory` picks by the mode (`contextMode`: the last `chatMessages` messages of a chat and `roomMessages` of a room, 20 and 30 by default and typed in Settings > Server, or the token window); the window `contextTokens` is a slider in Settings > Server, shown in tokens mode once the Play button has loaded the model |
 | Send / regenerate / variants / edit / delete logic | `src/hooks/useChat.ts` (rooms: `src/hooks/useRoom.ts`) |
 | Who speaks next in a room, whispers, eavesdropping | `src/lib/room/floor.ts`, `src/lib/room/audience.ts` |
 | What a room character sees of the scene | `src/lib/room/prompt.ts` |

@@ -27,7 +27,7 @@ import { useCloudSync } from '@/hooks/useCloudSync'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
-import { CHAT_MESSAGES, CONTEXT_STEPS, ROOM_MESSAGES, type ContextMode } from '@/lib/context'
+import { CONTEXT_STEPS, type ContextMode } from '@/lib/context'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { alternateIconsAvailable, currentAppIcon } from '@/lib/appIcons'
 import { confirm } from '@/lib/dialogs'
@@ -108,6 +108,14 @@ export default function SettingsScreen() {
 
   const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
+  // What is typed in the message-count fields: it may be empty on the way to a new number.
+  const [messageDrafts, setMessageDrafts] = useState<{ chatMessages?: string; roomMessages?: string }>({})
+  const setMessages = (field: 'chatMessages' | 'roomMessages', text: string) => {
+    const digits = text.replace(/\D/g, '')
+    setMessageDrafts((d) => ({ ...d, [field]: digits }))
+    const n = Number(digits)
+    if (Number.isSafeInteger(n) && n >= 1) update({ [field]: n })
+  }
   const { status, models, test, reset: resetStatus } = useConnectionTest()
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -470,7 +478,27 @@ export default function SettingsScreen() {
         onChange={(contextMode) => update({ contextMode })}
       />
       {cfg.contextMode === 'messages' ? (
-        <Text style={styles.contextHint}>{t('settings.contextMessagesHint', { chat: CHAT_MESSAGES, room: ROOM_MESSAGES })}</Text>
+        <View style={styles.messageFields}>
+          <FieldRow
+            star={false}
+            label={t('settings.contextChatMessages')}
+            value={messageDrafts.chatMessages ?? String(cfg.chatMessages)}
+            onChangeText={(text) => setMessages('chatMessages', text)}
+            keyboardType="number-pad"
+          />
+          <FieldRow
+            star={false}
+            label={t('settings.contextRoomMessages')}
+            value={messageDrafts.roomMessages ?? String(cfg.roomMessages)}
+            onChangeText={(text) => setMessages('roomMessages', text)}
+            keyboardType="number-pad"
+          />
+          {/* The field above keeps its own 16 pt bottom margin; pull the hint up under it. */}
+          <Text style={[styles.contextHint, styles.messagesHint]}>{t('settings.contextMessagesHint')}</Text>
+          {cfg.chatMessages > 1000 || cfg.roomMessages > 1000 ? (
+            <Text style={styles.messagesWarning}>{t('settings.contextMessagesWarning')}</Text>
+          ) : null}
+        </View>
       ) : null}
 
       {cfg.contextMode === 'tokens' && modelLoaded ? (
@@ -652,6 +680,20 @@ const createStyles = (colors: Colors) =>
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 12 },
     testRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
     testButton: { flex: 1 },
+    messageFields: { marginTop: 14 },
+    messagesHint: { marginTop: -8 },
+    messagesWarning: {
+      color: colors.danger,
+      backgroundColor: colors.dangerSoft,
+      borderColor: colors.dangerBorder,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: 12,
+      borderCurve: 'continuous',
+      padding: 12,
+      marginTop: 6,
+      fontSize: 13,
+      lineHeight: 18,
+    },
     contextHint: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: 10, marginBottom: 4 },
     statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12 },
     buttonPairRow: { flexDirection: 'row', gap: 12 },
