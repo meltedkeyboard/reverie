@@ -1,7 +1,8 @@
 import { Directory, File } from 'expo-file-system'
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { writeAvatarBase64 } from '@/lib/avatarStore'
+import type { MessageImage } from '@/db/messages'
+import { avatarUri, writeAvatarBase64 } from '@/lib/avatarStore'
 import { newAvatarName } from '@/lib/images'
 import { dataDirectory } from '@/lib/storage'
 
@@ -34,6 +35,37 @@ export async function convertLegacyAttachments(db: SQLiteDatabase) {
     if (dirty) await db.runAsync("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_dirty', ?)", dirty.value)
     else await db.runAsync("DELETE FROM app_settings WHERE key = 'sync_dirty'")
   }
+}
+
+// The pictures of the user's latest messages across all chats, newest first, each file once:
+// what the attach menu offers again. Files that are gone from disk are left out.
+// `limit` null means every one, looking back over the latest MAX_SCAN messages.
+const MAX_SCAN = 2000
+
+export async function listRecentAttachments(db: SQLiteDatabase, limit: number | null): Promise<MessageImage[]> {
+  // More rows than asked for, since the same file may be in several messages.
+  const scan = limit === null ? MAX_SCAN : Math.min(limit * 5, MAX_SCAN)
+  const rows = await db.getAllAsync<{ file: string | null; width: number | null; height: number | null; moving: string | null }>(
+    `SELECT json_extract(j.value, '$.file') AS file, json_extract(j.value, '$.width') AS width,
+            json_extract(j.value, '$.height') AS height, json_extract(j.value, '$.moving') AS moving
+     FROM messages m, json_each(m.images) j
+     WHERE m.role = 'user' AND m.images IS NOT NULL AND json_valid(m.images)
+     ORDER BY m.id DESC, j.key
+     LIMIT ?`,
+    scan
+  )
+  const seen = new Set<string>()
+  const recent: MessageImage[] = []
+  for (const row of rows) {
+    if (!row.file || seen.has(row.file)) continue
+    seen.add(row.file)
+    if (!new File(avatarUri(row.file, 'attachments')!).exists) continue
+    const picture: MessageImage = { file: row.file, width: row.width ?? 0, height: row.height ?? 0 }
+    if (row.moving && new File(avatarUri(row.moving, 'attachments')!).exists) picture.moving = row.moving
+    recent.push(picture)
+    if (limit !== null && recent.length === limit) break
+  }
+  return recent
 }
 
 // Deletes the files no message points at any more (a deleted chat, a picture taken off a

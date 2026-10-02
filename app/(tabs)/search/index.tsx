@@ -110,6 +110,7 @@ export default function SearchScreen() {
       { label: t('settings.continueButton'), keywords: [t('settings.homeScreen')], symbol: 'play.circle', fallback: 'play-circle-outline', href: settingsAt('continue') },
       { label: t('settings.privateButton'), keywords: [t('settings.chats')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('private') },
       { label: t('settings.suggestButton'), keywords: [t('settings.chats')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
+      { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: settingsAt('recents') },
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
       { label: t('settings.chatFont'), keywords: [t('settings.chats'), t('settings.chatTextSize')], symbol: 'textformat', fallback: 'text-outline', href: settingsAt('chatText') },
       { label: t('settings.limitsTitle'), keywords: [t('settings.limitsOff'), t('settings.limitAvatar'), t('settings.limitAttachment')], symbol: 'externaldrive', fallback: 'resize-outline', href: settingsAt('limits') },

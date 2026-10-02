@@ -42,6 +42,10 @@
   "settings.limitsNote": "How big a moving avatar and a moving picture in a message (GIF, animated WebP) may be. A big file makes the backup and the iCloud folder bigger",
   "settings.limitAvatar": "Avatar limit, MB",
   "settings.limitAttachment": "Attachment limit, MB",
+  "settings.recentPictures": "Recent pictures",
+  "settings.recentPicturesNote": "The latest pictures you sent, from all chats, in a row at the top of the attach menu",
+  "settings.recentUnlimited": "No limit",
+  "settings.recentCount": "How many to show",
   "settings.confirmDelete": "Confirm deletion",
   "settings.confirmDeleteNote": "Ask before deleting a chat or a character",
   "settings.chatFont": "Chat font",
@@ -324,6 +328,7 @@
   "chatsList.startChat": "Start chat",
 
   "attach.choosePhoto": "Choose photo",
+  "attach.recent": "Recent picture",
   "attach.title": "Attach",
   "attach.takePhoto": "Take photo",
   "attach.chooseFile": "Choose file",

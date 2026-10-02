@@ -21,6 +21,15 @@ import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEn
 import { getFileLimits } from '@/lib/fileLimits'
 import { loadFileLimits, setAttachmentLimitMb, setAvatarLimitMb, setLimitsOff } from '@/db/fileLimits'
 import { isHapticsEnabled, setHapticsEnabled } from '@/db/haptics'
+import {
+  isRecentAttachmentsEnabled,
+  loadRecentSettings,
+  setRecentAttachmentsEnabled,
+  setRecentCount,
+  setRecentUnlimited,
+  type RecentSettings,
+  DEFAULT_RECENT_COUNT,
+} from '@/db/recentAttachments'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
@@ -142,6 +151,21 @@ export default function SettingsScreen() {
   const [continueByVisit, setContinueByVisitValue] = useStoredFlag(isContinueByVisit, setContinueByVisit, true)
   const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
   const [suggestions, toggleSuggestions] = useStoredFlag(isSuggestionsEnabled, setSuggestionsEnabled, false)
+  const [recentPictures, toggleRecentPictures] = useStoredFlag(isRecentAttachmentsEnabled, setRecentAttachmentsEnabled, true)
+  // How many of them: a number that may be empty while retyped, or no limit.
+  const [recent, setRecent] = useState<RecentSettings>({ count: DEFAULT_RECENT_COUNT, unlimited: false })
+  const [recentDraft, setRecentDraft] = useState<string>()
+  useEffect(() => {
+    loadRecentSettings(db).then(setRecent)
+  }, [db])
+  const typeRecentCount = (text: string) => {
+    const digits = text.replace(/\D/g, '')
+    setRecentDraft(digits)
+    const n = Number(digits)
+    if (!Number.isSafeInteger(n) || n < 1) return
+    setRecent((r) => ({ ...r, count: n }))
+    setRecentCount(db, n)
+  }
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
   const [appLock, setAppLock] = useStoredFlag(isAppLockEnabled, setAppLockEnabled, false)
@@ -385,6 +409,38 @@ export default function SettingsScreen() {
       value={privateButton}
       onValueChange={togglePrivateButton}
     />
+  )
+
+  const recentRow = (
+    <>
+      <ToggleRow
+        label={t('settings.recentPictures')}
+        note={t('settings.recentPicturesNote')}
+        value={recentPictures}
+        onValueChange={toggleRecentPictures}
+      />
+      {recentPictures ? (
+        <>
+          <ToggleRow
+            label={t('settings.recentUnlimited')}
+            value={recent.unlimited}
+            onValueChange={(unlimited) => {
+              setRecent((r) => ({ ...r, unlimited }))
+              setRecentUnlimited(db, unlimited)
+            }}
+          />
+          <View style={recent.unlimited ? styles.inactive : undefined} pointerEvents={recent.unlimited ? 'none' : 'auto'}>
+            <FieldRow
+              star={false}
+              label={t('settings.recentCount')}
+              value={recentDraft ?? String(recent.count)}
+              onChangeText={typeRecentCount}
+              keyboardType="number-pad"
+            />
+          </View>
+        </>
+      ) : null}
+    </>
   )
 
   const confirmDeleteRow = (
@@ -672,6 +728,7 @@ export default function SettingsScreen() {
           <Eyebrow label={t('settings.chats')} color={colors.text} />
           {block('private', privateRow)}
           {block('suggest', suggestRow)}
+          {block('recents', recentRow)}
           {block('confirmDelete', confirmDeleteRow)}
           {block('chatText', chatTextRows)}
 

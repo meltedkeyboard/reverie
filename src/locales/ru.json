@@ -42,6 +42,10 @@
   "settings.limitsNote": "Насколько большой может быть движущаяся аватарка и движущаяся картинка в сообщении (GIF, анимированный WebP). Большие файлы увеличивают бэкап и папку iCloud",
   "settings.limitAvatar": "Лимит аватарки, МБ",
   "settings.limitAttachment": "Лимит вложения, МБ",
+  "settings.recentPictures": "Недавние картинки",
+  "settings.recentPicturesNote": "Последние отправленные вами картинки из всех чатов в ряд вверху меню прикрепления",
+  "settings.recentUnlimited": "Без лимита",
+  "settings.recentCount": "Сколько показывать",
   "settings.confirmDelete": "Подтверждать удаление",
   "settings.confirmDeleteNote": "Спрашивать перед удалением чата или персонажа",
   "settings.chatFont": "Шрифт чатов",
@@ -324,6 +328,7 @@
   "chatsList.startChat": "Начать чат",
 
   "attach.choosePhoto": "Выбрать фото",
+  "attach.recent": "Недавняя картинка",
   "attach.title": "Прикрепить",
   "attach.takePhoto": "Сделать снимок",
   "attach.chooseFile": "Выбрать файл",

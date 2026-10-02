@@ -4,6 +4,7 @@ import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -37,6 +38,9 @@ import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
+import { listRecentAttachments } from '@/db/attachments'
+import { useDatabase } from '@/db/provider'
+import { isRecentAttachmentsEnabled, loadRecentSettings } from '@/db/recentAttachments'
 import { withAlpha } from '@/lib/color'
 import { pickMessageImages, pictureUri } from '@/lib/attachments'
 import type { ImageSource } from '@/lib/images'
@@ -318,6 +322,13 @@ export function Composer({
   const [menuLeft, setMenuLeft] = useState(10)
   const openMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    isRecentAttachmentsEnabled(db)
+      .then(async (on) => {
+        if (!on) return []
+        const { count, unlimited } = await loadRecentSettings(db)
+        return listRecentAttachments(db, unlimited ? null : count)
+      })
+      .then(setRecents, () => setRecents([]))
     fieldBox.current?.measureInWindow((x) => {
       setMenuLeft(x)
       setMenuMounted(true)
@@ -329,25 +340,35 @@ export function Composer({
   const [menuHover, setMenuHover] = useState<number | null>(null)
   const menuBox = useRef({ width: 0, height: 0 })
   const menuRows = useRef<{ y: number; height: number }[]>([])
+  // The latest pictures sent, offered again above the sources; read when the menu opens.
+  const db = useDatabase()
+  const [recents, setRecents] = useState<MessageImage[]>([])
   const rowAt = (x: number, y: number) => {
     if (x < 0 || x > menuBox.current.width) return null
-    const index = menuRows.current.findIndex((row) => y >= row.y && y < row.y + row.height)
+    const index = menuRows.current.findIndex((r) => y >= r.y && y < r.y + r.height)
     return index < 0 ? null : index
   }
   const pickMenuItem = (index: number) => {
     closeMenu()
     attach(ATTACH_ITEMS[index].source)
   }
+  const pickRecent = (picture: MessageImage) => {
+    closeMenu()
+    Haptics.selectionAsync()
+    setImages((current) => (current.some((p) => p.file === picture.file) ? current : [...current, picture]))
+  }
+  // One gesture for the rows, so a finger dragged over them lights each one it passes, and
+  // letting go on a row picks it (as in a system menu). The row of pictures scrolls, so it
+  // has its own touches.
   const menuTouch = Gesture.Pan()
     .runOnJS(true)
     .minDistance(0)
     .onBegin((e) => setMenuHover(rowAt(e.x, e.y)))
-    .onUpdate((e) => setMenuHover((prev) => {
-      const next = rowAt(e.x, e.y)
-      return next === prev ? prev : next
-    }))
-    .onEnd((e) => {
-      const index = rowAt(e.x, e.y)
+    .onUpdate((e) => setMenuHover(rowAt(e.x, e.y)))
+    // Not onEnd: a Pan only ends as active once the finger has moved, and a plain tap never does.
+    .onTouchesUp((e) => {
+      const touch = e.changedTouches[0]
+      const index = touch ? rowAt(touch.x, touch.y) : null
       if (index !== null) pickMenuItem(index)
     })
     .onFinalize(() => setMenuHover(null))
@@ -620,8 +641,30 @@ export function Composer({
           <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} accessibilityLabel={t('common.close')} />
           <Animated.View style={[styles.menu, { left: menuLeft, bottom: insets.bottom + 8 }, menuStyle]}>
             <GlassSurface style={styles.menuBody} fallbackStyle={glass.solid}>
-              {/* One gesture for the whole list, so a finger dragged over the rows lights each
-                  one it passes, and letting go on a row picks it (as in a system menu). */}
+              {recents.length ? (
+                <>
+                  <FlatList
+                    horizontal
+                    data={recents}
+                    keyExtractor={(picture) => picture.file}
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="always"
+                    style={styles.recents}
+                    contentContainerStyle={styles.recentsContent}
+                    renderItem={({ item }) => (
+                      <Pressable
+                        onPress={() => pickRecent(item)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('attach.recent')}
+                        style={({ pressed }) => pressed && { opacity: 0.6 }}
+                      >
+                        <Image source={{ uri: pictureUri(item) }} style={styles.thumbCellImage} contentFit="cover" />
+                      </Pressable>
+                    )}
+                  />
+                  <View style={styles.recentsRule} />
+                </>
+              ) : null}
               <GestureDetector gesture={menuTouch}>
                 <View onLayout={(e) => (menuBox.current = e.nativeEvent.layout)}>
                   {ATTACH_ITEMS.map((item, index) => (
@@ -715,6 +758,11 @@ const DOCKED_INPUT = 42
 // The bar's padding around the field (the bottom one comes on top of the safe area).
 const BAR_PAD_TOP = 8
 const BAR_PAD_BOTTOM = 8
+// The recent pictures of the attach menu: one row that scrolls sideways.
+const THUMB = 52
+const THUMB_GAP = 6
+const MENU_WIDTH = 250
+
 const ATTACH_ITEMS = [
   { source: 'camera', icon: 'camera-outline', label: 'attach.takePhoto' },
   { source: 'library', icon: 'images-outline', label: 'attach.choosePhoto' },
@@ -739,8 +787,12 @@ const createStyles = (colors: Colors) =>
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, justifyContent: 'flex-end' },
   plus: { width: SIDE, height: SIDE, alignItems: 'center', justifyContent: 'center' },
   menu: { position: 'absolute', transformOrigin: 'left bottom' },
-  menuBody: { borderRadius: 24, padding: 6, minWidth: 230 },
+  menuBody: { borderRadius: 24, padding: 6, width: MENU_WIDTH },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 18 },
+  recents: { flexGrow: 0, height: THUMB + 12 },
+  recentsContent: { gap: THUMB_GAP, padding: 6 },
+  thumbCellImage: { width: THUMB, height: THUMB, borderRadius: 12, borderCurve: 'continuous', backgroundColor: colors.surface },
+  recentsRule: { height: 1, marginHorizontal: 8, marginBottom: 6, backgroundColor: colors.border },
   menuLabel: { color: colors.text, fontSize: 17 },
   accessory: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   bar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: 10 },
