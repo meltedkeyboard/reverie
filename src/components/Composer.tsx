@@ -25,7 +25,6 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
-import { AttachButton } from './AttachButton'
 import { BlurBar, EdgeFade } from './BarChrome'
 import { GlassSurface, useGlassStyles } from './Glass'
 import { useInputColors } from './Field'
@@ -110,6 +109,10 @@ export function Composer({
   }, [text])
   const stash = useRef('')
   const inputRef = useRef<TextInput>(null)
+  const [focused, setFocused] = useState(false)
+  // Whether the text would not fit on one line of the narrow, one-tier field. Measured by a
+  // hidden copy of the text at that width, so that widening the field cannot flip it back.
+  const [wraps, setWraps] = useState(false)
   const [images, setImages] = useState<MessageImage[]>([])
   const [picking, setPicking] = useState(false)
   const imageUris = useMemo(() => images.map((image) => attachmentUri(image.file)), [images])
@@ -121,6 +124,11 @@ export function Composer({
     inputRef.current?.focus()
     return () => setText(stash.current)
   }, [editing?.id])
+
+  // An empty text may not be laid out again, so it ends the wrapped state itself.
+  useEffect(() => {
+    if (!text) setWraps(false)
+  }, [text])
 
   const value = text.trim()
   const suggesting = !editing && !value && !images.length && !!suggestion
@@ -200,6 +208,7 @@ export function Composer({
   }
 
   const attach = async (source: ImageSource) => {
+    closeMenu()
     setPicking(true)
     try {
       const picked = await pickMessageImages(source)
@@ -209,10 +218,6 @@ export function Composer({
     } finally {
       setPicking(false)
     }
-  }
-
-  const measure = (e: LayoutChangeEvent) => {
-    height.value = e.nativeEvent.layout.height
   }
 
   const sendButton = (
@@ -229,7 +234,7 @@ export function Composer({
         <SFIcon
           name={ICONS[mode].sf}
           fallback={ICONS[mode].fallback}
-          size={mode === 'stop' ? 14 : 18}
+          size={mode === 'stop' ? 13 : 17}
           color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.text : '#FFFFFF'}
           effect={{ effect: 'bounce' }}
           trigger={mode === 'idle' ? 'send' : mode}
@@ -242,20 +247,119 @@ export function Composer({
   // With a toolbar the field has two tiers, as in the Claude app: the text across the
   // whole width, and under it the toolbar on the left and the send button on the right.
   const docked = toolbar !== undefined && toolbar !== null && !editing
+  // As in ChatGPT: one line is a capsule with the plus and the send button at the sides;
+  // a second line (typed or wrapped) moves them under the text, which takes the full width.
+  const expanded = docked || wraps || text.includes('\n')
+  const inputPad = expanded
+    ? styles.inputExpanded
+    : { paddingLeft: editing ? 14 : SIDE_PAD, paddingRight: SIDE_PAD }
+
+  // The attach menu is drawn here, above the field, instead of by a native menu: the system
+  // one grows out of its button, and with the plus inside the field it grew out of the
+  // whole field. This one just pops up over the chat and leaves the keyboard alone.
+  const [menuShown, setMenuShown] = useState(false)
+  const [menuMounted, setMenuMounted] = useState(false)
+  const pop = useSharedValue(0)
+  // Where the field really is on screen, read when the menu opens, so the menu lines up with
+  // it whatever state (narrow, wide, mid-animation) the field is in.
+  const fieldBox = useRef<Animated.View>(null)
+  const [menuLeft, setMenuLeft] = useState(10)
+  const openMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    fieldBox.current?.measureInWindow((x) => {
+      setMenuLeft(x)
+      setMenuMounted(true)
+      setMenuShown(true)
+      pop.value = withSpring(1, { damping: 20, stiffness: 300, mass: 0.7 })
+    })
+  }
+  const closeMenu = () => {
+    if (!menuShown) return
+    setMenuShown(false)
+    pop.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
+      if (finished) scheduleOnRN(setMenuMounted, false)
+    })
+  }
+  // A resting one-line field is a little narrower than with the keyboard up.
+  const narrow = useSharedValue(0)
+  const resting = !focused && !expanded
+  useEffect(() => {
+    narrow.value = withTiming(resting ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) })
+  }, [resting, narrow])
+  const narrowStyle = useAnimatedStyle(() => ({ paddingHorizontal: narrow.value * NARROW_INSET }))
+  // Scales with a transform only: Liquid Glass renders wrongly under a fading parent.
+  const menuStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
+
+  const plus = editing ? null : (
+    <Pressable
+      onPress={() => (menuShown ? closeMenu() : openMenu())}
+      disabled={picking}
+      hitSlop={4}
+      accessibilityLabel={t('attach.title')}
+      style={[styles.plus, picking && { opacity: 0.55 }]}
+    >
+      <Ionicons name="add" size={24} color={colors.text} />
+    </Pressable>
+  )
+
+  const barExtra = BAR_PAD_TOP + BAR_PAD_BOTTOM + insets.bottom
+
+  // The box follows the height of its content, easing to it: a line added or removed, or
+  // the buttons dropping under the text, grows or shrinks the field instead of snapping it.
+  const boxHeight = useSharedValue(SIDE + 2 * FIELD_PAD + 4)
+  const fitted = useRef(false)
+  const fit = (e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height
+    // The list keeps the room of the field as it was with no text: a field growing with the
+    // text goes over the messages instead of pushing them. (It cannot be told from wrapped
+    // text by the flags alone, since the layout comes before they update.) A toolbar's
+    // field counts as it is when empty, too.
+    if (fitted.current) boxHeight.value = withTiming(h, { duration: 220, easing: Easing.out(Easing.cubic) })
+    else boxHeight.value = h
+    fitted.current = true
+  }
+  // What the list reserves is the field as it is with one line, worked out from the parts
+  // that do not depend on the text. The text itself cannot be used: a multiline field grows
+  // natively before React hears of the new text, so a layout event can show a taller field
+  // with a stale (even empty) text, which once made the whole chat jump.
+  const [bannerH, setBannerH] = useState(0)
+  const [imagesH, setImagesH] = useState(0)
+  const [toolsH, setToolsH] = useState(0)
+  const reserve =
+    2 * FIELD_PAD +
+    (editing ? bannerH : 0) +
+    (images.length && !editing ? imagesH : 0) +
+    (docked ? DOCKED_INPUT + toolsH : ONE_LINE_INPUT) +
+    barExtra
+  useEffect(() => {
+    height.value = reserve
+  }, [reserve, height])
+
+  // The accessory sits on the height the list reserves, not on the bar itself, so it stays
+  // where it is while the field grows over it.
+  const accessoryStyle = useAnimatedStyle(() => ({ bottom: height.value }))
+  const boxStyle = useAnimatedStyle(() => ({ height: boxHeight.value }))
 
   const row = (
-    <View style={styles.row}>
-      {editing ? null : <AttachButton size={FIELD_HEIGHT} disabled={picking} onPick={attach} />}
-      <GlassSurface style={[styles.field, hushed && styles.hushed]} fallbackStyle={glass.solid}>
+    <Animated.View style={[styles.row, narrowStyle]}>
+      <Animated.View ref={fieldBox} style={[styles.fieldBox, boxStyle]} collapsable={false}>
+        {/* The glass is a sibling of the content, so the box can grow under the text. */}
+        <GlassSurface style={[StyleSheet.absoluteFill, styles.glass, hushed && styles.hushed]} fallbackStyle={glass.solid} />
+        <View style={styles.field} onLayout={fit}>
         {editing ? (
-          <View style={styles.banner}>
+          <View style={styles.banner} onLayout={(e) => setBannerH(e.nativeEvent.layout.height)}>
             <Ionicons name="create-outline" size={15} color={colors.accent} />
             <Text style={styles.bannerText}>{t('chat.editingMessage')}</Text>
             <IconButton name="close" size={18} color={colors.textMuted} onPress={onCancelEdit} style={styles.bannerClose} />
           </View>
         ) : null}
         {images.length && !editing ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            onLayout={(e) => setImagesH(e.nativeEvent.layout.height)}
+          >
             {imageUris.map((uri, index) => (
               <View key={index} style={styles.attachment}>
                 <Image source={{ uri }} style={styles.thumb} contentFit="cover" />
@@ -270,64 +374,112 @@ export function Composer({
             ))}
           </ScrollView>
         ) : null}
-        <View style={docked ? undefined : styles.inputRow}>
-          <GestureDetector gesture={swipe}>
-            <View style={docked ? undefined : styles.inputWrap}>
-              <TextInput
-                key={inputKey}
-                ref={inputRef}
-                value={text}
-                onChangeText={setText}
-                placeholder={suggesting ? '' : (placeholder ?? t('chat.messagePlaceholder'))}
-                {...inputColors}
-                multiline
-                autoFocus={autoFocus}
-                accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
-                style={[
-                  styles.input,
-                  docked && styles.inputDocked,
-                  suggesting && { minHeight: ghostHeight },
-                ]}
-              />
-              {suggesting ? (
-                <View style={styles.ghost} pointerEvents="none" onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}>
-                  <Text style={[styles.ghostText, docked && styles.inputDocked]}>{suggestion}</Text>
-                </View>
-              ) : null}
+        <GestureDetector gesture={swipe}>
+          <View>
+            <TextInput
+              key={inputKey}
+              ref={inputRef}
+              value={text}
+              onChangeText={setText}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={suggesting ? '' : (placeholder ?? t('chat.messagePlaceholder'))}
+              {...inputColors}
+              multiline
+              autoFocus={autoFocus}
+              accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
+              style={[
+                styles.input,
+                inputPad,
+                docked && styles.inputDocked,
+                suggesting && { minHeight: ghostHeight },
+              ]}
+            />
+            {suggesting ? (
+              <View style={styles.ghost} pointerEvents="none" onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}>
+                <Text style={[styles.ghostText, inputPad, docked && styles.inputDocked]}>{suggestion}</Text>
+              </View>
+            ) : null}
+          </View>
+        </GestureDetector>
+        {docked ? (
+          <View style={styles.tools} onLayout={(e) => setToolsH(e.nativeEvent.layout.height)}>
+            {plus}
+            <View style={styles.toolbar}>{toolbar}</View>
+            {sendButton}
+          </View>
+        ) : (
+          <>
+            {expanded ? <View style={{ height: SIDE + 2 }} /> : null}
+            <View style={styles.plusAt} pointerEvents="box-none">
+              {plus}
             </View>
-          </GestureDetector>
-          {docked ? (
-            <View style={styles.tools}>
-              <View style={styles.toolbar}>{toolbar}</View>
+            <View style={styles.sendAt} pointerEvents="box-none">
               {sendButton}
             </View>
-          ) : (
-            sendButton
-          )}
+            <Text
+              style={[styles.measure, { left: FIELD_PAD + (editing ? 14 : SIDE_PAD), right: FIELD_PAD + SIDE_PAD }]}
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              onTextLayout={(e) => setWraps(e.nativeEvent.lines.length > 1)}
+            >
+              {text}
+            </Text>
+          </>
+        )}
         </View>
-      </GlassSurface>
-    </View>
+      </Animated.View>
+    </Animated.View>
   )
 
   return (
     // The accessory sits in the dock's own layout: iOS ignores touches on children drawn
     // outside their parent, and box-none lets touches around it reach the list.
-    <KeyboardStickyView style={styles.dock} offset={{ closed: 0, opened: insets.bottom }} pointerEvents="box-none">
-      <View style={styles.accessory} pointerEvents="box-none">
+    <KeyboardStickyView
+      // The dock always covers the screen (touches pass through it, except on the menu's
+      // backdrop), so showing the menu changes no layout and a tap outside can close it.
+      style={styles.dock}
+      offset={{ closed: 0, opened: insets.bottom }}
+      pointerEvents="box-none"
+    >
+      <Animated.View style={[styles.accessory, accessoryStyle]} pointerEvents="box-none">
         {accessory}
-      </View>
+      </Animated.View>
       {liquidGlass ? (
         // Glass controls float over the messages; the fade keeps text scrolling
         // underneath from clashing with them.
-        <View style={[styles.floatingBar, { paddingBottom: insets.bottom + 8 }]} onLayout={measure} pointerEvents="box-none">
+        <View style={[styles.floatingBar, { paddingBottom: insets.bottom + BAR_PAD_BOTTOM }]} pointerEvents="box-none">
           <EdgeFade edge="bottom" style={styles.fade} />
           {row}
         </View>
       ) : (
-        <BlurBar edge="bottom" style={[styles.bar, { paddingBottom: insets.bottom + 8 }]} onLayout={measure}>
+        <BlurBar edge="bottom" style={[styles.bar, { paddingBottom: insets.bottom + BAR_PAD_BOTTOM }]}>
           {row}
         </BlurBar>
       )}
+      {menuMounted ? (
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} accessibilityLabel={t('common.close')} />
+          <Animated.View style={[styles.menu, { left: menuLeft, bottom: insets.bottom + 8 }, menuStyle]}>
+            <GlassSurface style={styles.menuBody} fallbackStyle={glass.solid}>
+              {ATTACH_ITEMS.map((item) => (
+                <Pressable
+                  key={item.source}
+                  onPress={() => {
+                    closeMenu()
+                    attach(item.source)
+                  }}
+                  style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: colors.accentSoft }]}
+                >
+                  <Ionicons name={item.icon} size={22} color={colors.text} />
+                  <Text style={styles.menuLabel}>{t(item.label)}</Text>
+                </Pressable>
+              ))}
+            </GlassSurface>
+          </Animated.View>
+        </>
+      ) : null}
     </KeyboardStickyView>
   )
 }
@@ -370,9 +522,25 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
   )
 }
 
-// A one-line field: the send button and the field's padding around it. The attach
-// button beside it is as tall, so the two line up.
-const FIELD_HEIGHT = 48
+// The plus and the send button are SIDE wide; the text of a one-line field keeps clear of
+// them by SIDE_PAD. NARROW_INSET is how much narrower the field is at rest.
+const SIDE = 34
+// The input's own height with a single line: padding 8 + a 22 line + 8 (docked: 12 on top).
+const ONE_LINE_INPUT = 38
+const DOCKED_INPUT = 42
+// The bar's padding around the field (the bottom one comes on top of the safe area).
+const BAR_PAD_TOP = 8
+const BAR_PAD_BOTTOM = 8
+const ATTACH_ITEMS = [
+  { source: 'camera', icon: 'camera-outline', label: 'attach.takePhoto' },
+  { source: 'library', icon: 'images-outline', label: 'attach.choosePhoto' },
+  { source: 'files', icon: 'folder-outline', label: 'attach.chooseFile' },
+] as const
+// Absolute children are placed from the field's outer edge, not inside its padding.
+const EDGE = 7
+const FIELD_PAD = 5
+const SIDE_PAD = EDGE + SIDE + 8 - FIELD_PAD
+const NARROW_INSET = 16
 
 const ICONS = {
   idle: { sf: 'arrow.up', fallback: 'arrow-up' },
@@ -384,10 +552,15 @@ const ICONS = {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-  dock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  accessory: { alignItems: 'center' },
-  bar: { paddingTop: 8, paddingHorizontal: 10 },
-  floatingBar: { paddingTop: 8, paddingHorizontal: 10 },
+  dock: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, justifyContent: 'flex-end' },
+  plus: { width: SIDE, height: SIDE, alignItems: 'center', justifyContent: 'center' },
+  menu: { position: 'absolute', transformOrigin: 'left bottom' },
+  menuBody: { borderRadius: 24, padding: 6, minWidth: 230 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 18 },
+  menuLabel: { color: colors.text, fontSize: 17 },
+  accessory: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  bar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: 10 },
+  floatingBar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: 10 },
   fade: { position: 'absolute', top: -28, left: 0, right: 0, bottom: 0 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingTop: 2 },
   bannerText: { flex: 1, color: colors.textMuted, fontSize: 13 },
@@ -395,7 +568,10 @@ const createStyles = (colors: Colors) =>
   // Matches MessageRow's cap so the composer lines up with the message column; a no-op
   // on phone widths.
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', alignSelf: 'center' },
-  field: { flex: 1, borderRadius: 26, padding: 5 },
+  fieldBox: { flex: 1, overflow: 'hidden' },
+  glass: { borderRadius: 26 },
+  // Pinned to the bottom, so a taller field reveals its text from above while the buttons stay.
+  field: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: FIELD_PAD },
   hushed: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong },
   attachment: { margin: 6, marginBottom: 2, marginRight: 4 },
   thumb: { width: 72, height: 72, borderRadius: 14 },
@@ -412,10 +588,12 @@ const createStyles = (colors: Colors) =>
     borderWidth: 1,
     borderColor: colors.border,
   },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  inputWrap: { flex: 1 },
+  plusAt: { position: 'absolute', left: EDGE, bottom: EDGE },
+  sendAt: { position: 'absolute', right: EDGE, bottom: EDGE },
+  // Never seen: the text laid out at the one-line width, to count its lines.
+  measure: { position: 'absolute', top: 0, opacity: 0, fontSize: 17, lineHeight: 22 },
+  inputExpanded: { paddingHorizontal: 14, paddingTop: 10 },
   input: {
-    flex: 1,
     maxHeight: 180,
     color: colors.text,
     fontSize: 17,
@@ -429,5 +607,5 @@ const createStyles = (colors: Colors) =>
   inputDocked: { paddingTop: 12, paddingBottom: 8 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolbar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  send: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  send: { width: SIDE, height: SIDE, borderRadius: SIDE / 2, alignItems: 'center', justifyContent: 'center' },
 })
