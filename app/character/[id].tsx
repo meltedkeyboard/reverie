@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedReaction, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
@@ -366,6 +367,31 @@ export default function CharacterEditorScreen() {
       if (open !== was) scheduleOnRN(setPhotoOpen, open)
     }
   )
+  // Android has no overscroll to pull on, so a downward drag that starts with the page at its
+  // top is told apart from a scroll by hand: the gesture only takes the touch then, and
+  // leaves ordinary scrolling alone.
+  const pull = useSharedValue(0)
+  const touchFrom = useSharedValue({ x: 0, y: 0 })
+  const androidPull = Gesture.Pan()
+    .manualActivation(true)
+    .enabled(hasPhoto)
+    .onTouchesDown((e) => {
+      const touch = e.allTouches[0]
+      touchFrom.value = { x: touch.absoluteX, y: touch.absoluteY }
+    })
+    .onTouchesMove((e, manager) => {
+      const touch = e.allTouches[0]
+      const dx = touch.absoluteX - touchFrom.value.x
+      const dy = touch.absoluteY - touchFrom.value.y
+      if (scrollY.value <= 1 && dy > 12 && dy > 2 * Math.abs(dx)) manager.activate()
+      else if (Math.abs(dx) > 12 || dy < -8) manager.fail()
+    })
+    .onUpdate((e) => {
+      pull.value = Math.max(0, e.translationY)
+    })
+    .onFinalize(() => {
+      pull.value = 0
+    })
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollY.value = event.contentOffset.y
@@ -381,6 +407,7 @@ export default function CharacterEditorScreen() {
   return (
     <View style={styles.screen}>
       {ready ? (
+        <PullHost gesture={Platform.OS === 'android' ? androidPull : null}>
         <KeyboardAwareScrollView
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
@@ -398,6 +425,7 @@ export default function CharacterEditorScreen() {
                 scrollY={scrollY}
                 dragging={dragging}
                 progress={photoSpread}
+                pull={Platform.OS === 'android' ? pull : undefined}
                 top={padding.paddingTop}
                 side={padding.paddingHorizontal}
               />
@@ -579,6 +607,7 @@ export default function CharacterEditorScreen() {
             )}
           </Animated.View>
         </KeyboardAwareScrollView>
+        </PullHost>
       ) : null}
 
       {photoOpen ? <StatusBar style="light" /> : null}
@@ -604,6 +633,17 @@ export default function CharacterEditorScreen() {
         }
       />
     </View>
+  )
+}
+
+// Android only: carries the gesture that stands in for the overscroll pull of iOS. Elsewhere
+// it renders its children as they are.
+function PullHost({ gesture, children }: { gesture: ReturnType<typeof Gesture.Pan> | null; children: React.ReactNode }) {
+  if (!gesture) return <>{children}</>
+  return (
+    <GestureDetector gesture={gesture}>
+      <View style={{ flex: 1 }}>{children}</View>
+    </GestureDetector>
   )
 }
 

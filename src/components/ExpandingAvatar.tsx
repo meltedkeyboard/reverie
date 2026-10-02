@@ -25,6 +25,10 @@ type Props = {
   dragging: SharedValue<boolean>
   // 0 round, 1 spread out; owned by the screen, whose header gives way to the photo.
   progress: SharedValue<number>
+  // Android only: how far a pull down at the top of the page has gone. There the scroll never
+  // goes below zero, so the screen measures the pull with a gesture of its own and hands it
+  // in; on iOS the overscroll above does the same and this stays unset.
+  pull?: SharedValue<number>
   // How far the avatar sits from the top of the screen and from its sides with the
   // content unscrolled; the open photo reaches out over both.
   top: number
@@ -46,7 +50,7 @@ const SPRING = { damping: 26, stiffness: 220, overshootClamping: true }
 // Everything moves by transforms: the photo is always laid out at its full size and scaled
 // down into the circle. Animating its size, or the height of its block, laid out the form
 // and its glass fields again on every frame, and the spread stuttered.
-export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, top, side }: Props) {
+export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: androidPull, top, side }: Props) {
   const { width } = useWindowDimensions()
   const openViewer = useOpenViewer()
   const open = useSharedValue(false)
@@ -67,6 +71,18 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, top, s
     }
   )
 
+  // The same opening, from the Android pull. Closing is the scroll reaction above.
+  useAnimatedReaction(
+    () => androidPull?.value ?? 0,
+    (pulled) => {
+      if (!open.value && pulled > PULL_TO_OPEN) {
+        open.value = true
+        progress.value = withSpring(1, SPRING)
+        scheduleOnRN(tick)
+      }
+    }
+  )
+
   // Another photo starts out round again, and a removed one hands the header back.
   useEffect(() => {
     open.value = false
@@ -80,7 +96,7 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, top, s
     const k = progress.value
     // Closed, the circle swells a little under the pull, hinting that it opens. Open, the
     // photo moves down with the page like the rest of it.
-    const pull = Math.max(0, -scrollY.value)
+    const pull = Math.max(0, -scrollY.value, androidPull?.value ?? 0)
     const swell = 1 + Math.min(pull / PULL_TO_OPEN, 1) * 0.12 * (1 - k)
     const closedScale = SIZE / width
     const scale = (closedScale + (1 - closedScale) * k) * swell
