@@ -20,7 +20,7 @@ const PAUSE_MS = 500
 
 // A glint that runs along the text in waves. Without a native mask each letter is its own
 // Text, brightened by how close the glint is to it; the one shared value drives them all.
-export function ShimmerText({ text, style }: { text: string; style: TextStyle }) {
+export function ShimmerText({ text, style, maxFontSizeMultiplier }: { text: string; style: TextStyle; maxFontSizeMultiplier?: number }) {
   const colors = useColors()
   const glint = useSharedValue(0)
   const letters = Array.from(text)
@@ -48,6 +48,7 @@ export function ShimmerText({ text, style }: { text: string; style: TextStyle })
           from={colors.textMuted}
           to={colors.text}
           style={style}
+          maxFontSizeMultiplier={maxFontSizeMultiplier}
         />
       ))}
     </View>
@@ -62,9 +63,10 @@ type LetterProps = {
   from: string
   to: string
   style: TextStyle
+  maxFontSizeMultiplier?: number
 }
 
-function Letter({ letter, index, count, glint, from, to, style }: LetterProps) {
+function Letter({ letter, index, count, glint, from, to, style, maxFontSizeMultiplier }: LetterProps) {
   const lit = useAnimatedStyle(() => {
     // The glint starts and ends just outside the text so it enters and leaves smoothly.
     const at = glint.value * (count + 2 * WIDTH) - WIDTH
@@ -72,12 +74,12 @@ function Letter({ letter, index, count, glint, from, to, style }: LetterProps) {
     return { color: interpolateColor(near, [0, 1], [from, to]) }
   })
   return (
-    <Animated.Text style={[style, lit]} importantForAccessibility="no">
+    <Animated.Text style={[style, lit]} maxFontSizeMultiplier={maxFontSizeMultiplier} importantForAccessibility="no">
       {letter}
     </Animated.Text>
   )
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row' },
+  row: { flexDirection: 'row', overflow: 'hidden' },
 })

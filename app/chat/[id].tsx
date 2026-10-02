@@ -20,6 +20,7 @@ import { MessageRow, type RowMessage } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { RoomView } from '@/components/RoomView'
 import { SFIcon } from '@/components/SFIcon'
+import { ShimmerText } from '@/components/ShimmerText'
 import { getCharacter, type Character } from '@/db/characters'
 import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { setContinueHidden, setLastOpened } from '@/db/continue'
@@ -374,9 +375,11 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
                 </View>
-                {title || naming ? (
+                {naming ? (
+                  <ShimmerText maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} text={title ?? t('chat.namingInProgress')} />
+                ) : title ? (
                   <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} numberOfLines={1}>
-                    {title ?? t('chat.namingInProgress')}
+                    {title}
                   </Text>
                 ) : null}
               </View>

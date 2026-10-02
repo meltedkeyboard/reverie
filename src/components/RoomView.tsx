@@ -20,6 +20,7 @@ import { useOpenViewer } from '@/components/ImageLink'
 import { MessageRow, type RowMessage, type RowScene } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { SFIcon } from '@/components/SFIcon'
+import { ShimmerText } from '@/components/ShimmerText'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { deleteChat, type Chat } from '@/db/chats'
 import { newMessage, type Message } from '@/db/messages'
@@ -461,9 +462,11 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
                 </Text>
                 <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
               </View>
-              {title || naming ? (
+              {naming ? (
+                <ShimmerText maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} text={title ?? t('chat.namingInProgress')} />
+              ) : title ? (
                 <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} numberOfLines={1}>
-                  {title ?? t('chat.namingInProgress')}
+                  {title}
                 </Text>
               ) : null}
             </View>

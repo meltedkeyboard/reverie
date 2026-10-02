@@ -229,6 +229,10 @@ export function Composer({
       if (inserted.current) {
         inserted.current = false
         setInputKey((key) => key + 1)
+      } else if (value.includes('\n')) {
+        // A typed multi-line message leaves the field tall when only the state is cleared;
+        // the native clear() makes it measure again and keeps the keyboard and the focus.
+        inputRef.current?.clear()
       }
     }
   }
