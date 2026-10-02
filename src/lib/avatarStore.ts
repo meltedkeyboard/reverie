@@ -5,7 +5,8 @@ import { newAvatarName } from '@/lib/images'
 import { extensionOf, movingKind } from '@/lib/media'
 import { dataDirectory } from '@/lib/storage'
 
-export type ImageKind = 'avatars' | 'backgrounds'
+// `attachments` holds the pictures sent in messages.
+export type ImageKind = 'avatars' | 'backgrounds' | 'attachments'
 
 // Only the file name goes into the database. The absolute path of the app
 // container changes between installs and updates, so it is resolved on read.
@@ -34,6 +35,14 @@ export async function persistAvatar(tempUri: string, kind: ImageKind = 'avatars'
   return name
 }
 
+// An original is kept exactly as it was picked, in its own format, next to the framed copy.
+export async function persistOriginal(tempUri: string, kind: ImageKind = 'avatars') {
+  folder(kind).create({ intermediates: true, idempotent: true })
+  const name = newAvatarName(extensionOf(tempUri) || 'jpg')
+  await new File(tempUri).copy(new File(folder(kind), name))
+  return name
+}
+
 export function removeAvatar(name: string, kind: ImageKind = 'avatars') {
   const file = imageFile(name, kind)
   if (file.exists) file.delete()
@@ -44,13 +53,23 @@ export async function readAvatarBase64(name: string, kind: ImageKind = 'avatars'
   return file.exists ? await file.base64() : null
 }
 
+export async function readAvatarBytes(name: string, kind: ImageKind = 'avatars') {
+  const file = imageFile(name, kind)
+  return file.exists ? await file.bytes() : null
+}
+
+export function writeAvatarBytes(name: string, bytes: Uint8Array, kind: ImageKind = 'avatars') {
+  folder(kind).create({ intermediates: true, idempotent: true })
+  new File(folder(kind), name).write(bytes)
+}
+
 export async function writeAvatarBase64(name: string, base64: string, kind: ImageKind = 'avatars') {
   folder(kind).create({ intermediates: true, idempotent: true })
   new File(folder(kind), name).write(toByteArray(base64))
 }
 
 export function removeAllAvatars() {
-  for (const kind of ['avatars', 'backgrounds'] as const) {
+  for (const kind of ['avatars', 'backgrounds', 'attachments'] as const) {
     if (folder(kind).exists) folder(kind).delete()
   }
 }

@@ -7,7 +7,7 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { DEFAULT_SAMPLING, insertCharacter } from '@/db/characters'
 import { t } from '@/i18n'
-import { avatarUri, persistAvatar, squareAvatar } from '@/lib/avatars'
+import { avatarUri, persistAvatar, persistOriginal, squareAvatar } from '@/lib/avatars'
 import { PLACEHOLDER_PNG_BASE64 } from '@/lib/cardPlaceholder'
 import { buildCard, embedCard, isPng, parseCard, readPngCard } from '@/lib/characterCard'
 import { saveFile, saveImageBytes } from '@/lib/download'
@@ -77,14 +77,20 @@ export async function importCharacterCard(db: SQLiteDatabase, source: CardSource
   if (card === null) throw new Error(t('card.noCardInPng'))
   const fields = parseCard(card)
 
+  // The card's picture is kept whole beside its square, so the framing can be redone.
   const avatar = png ? await persistAvatar(await squareAvatar(file.uri)) : null
+  const avatarOriginal = png ? await persistOriginal(file.uri) : null
   await insertCharacter(db, {
     ...fields,
     avatar,
+    avatarOriginal,
+    avatarCrop: null,
     ...DEFAULT_SAMPLING,
     replyLimit: null,
     thinking: 'auto',
     background: null,
+    backgroundOriginal: null,
+    backgroundCrop: null,
     backgroundEffect: 'blur',
     backgroundIntensity: 0.5,
     backgroundBubbleTransparency: 0.3,

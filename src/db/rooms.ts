@@ -22,6 +22,9 @@ export type RoomFields = {
   // Whether an extra short request may decide who speaks when the heuristics can't.
   director: boolean
   background: string | null
+  // The uncropped picture and the frame cut from it, as for a character's background.
+  backgroundOriginal: string | null
+  backgroundCrop: string | null
   backgroundEffect: BackgroundEffect
   backgroundIntensity: number
   backgroundBubbleTransparency: number
@@ -64,6 +67,8 @@ export const DEFAULT_ROOM: RoomFields = {
   maxChain: 3,
   director: true,
   background: null,
+  backgroundOriginal: null,
+  backgroundCrop: null,
   backgroundEffect: 'blur',
   backgroundIntensity: 0.5,
   backgroundBubbleTransparency: 0.3,
@@ -79,7 +84,8 @@ export const DEFAULT_MEMBER: Omit<MemberSettings, 'characterId'> = {
 
 export const ROOM_COLUMNS = `
   id, name, scenario, opening, user_name AS userName, floor, max_chain AS maxChain, director,
-  background, background_effect AS backgroundEffect, background_intensity AS backgroundIntensity,
+  background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
+  background_effect AS backgroundEffect, background_intensity AS backgroundIntensity,
   background_bubble_transparency AS backgroundBubbleTransparency, created_at AS createdAt
 `
 
@@ -144,7 +150,7 @@ export async function listRoomMembers(db: SQLiteDatabase, roomId: number): Promi
 }
 
 const FIELD_COLUMNS =
-  'name, scenario, opening, user_name, floor, max_chain, director, background, background_effect, background_intensity, background_bubble_transparency'
+  'name, scenario, opening, user_name, floor, max_chain, director, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency'
 
 function fieldValues(fields: RoomFields) {
   return [
@@ -156,6 +162,8 @@ function fieldValues(fields: RoomFields) {
     fields.maxChain,
     fields.director ? 1 : 0,
     fields.background,
+    fields.backgroundOriginal,
+    fields.backgroundCrop,
     fields.backgroundEffect,
     fields.backgroundIntensity,
     fields.backgroundBubbleTransparency,

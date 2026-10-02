@@ -1,7 +1,7 @@
 import { streamChat, type ChatRequest, type ChatTurn, type ContentPart } from '@/api/llm'
 import type { Message, Thought } from '@/db/messages'
 import type { ServerSettings } from '@/db/settings'
-import { imageDataUrl } from '@/lib/images'
+import { attachmentUri, withInlinedImages } from '@/lib/attachments'
 
 export type ReplyFrame = {
   text: string
@@ -35,7 +35,7 @@ export async function runReplyStream(cfg: ServerSettings, req: ChatRequest, sign
   }
 
   try {
-    for await (const part of streamChat(cfg, req, signal)) {
+    for await (const part of streamChat(cfg, await withInlinedImages(req), signal)) {
       if (part.kind === 'cutoff') {
         cutoff = true
         continue
@@ -89,7 +89,7 @@ export function toTurn(m: Message): ChatTurn {
   if (!m.images.length) return { role: m.role, content: m.content }
   const parts: ContentPart[] = m.images.map((image) => ({
     type: 'image_url',
-    image_url: { url: imageDataUrl(image.base64) },
+    image_url: { url: attachmentUri(image.file) },
   }))
   if (m.content.trim()) parts.push({ type: 'text', text: m.content })
   return { role: m.role, content: parts }

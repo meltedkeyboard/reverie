@@ -6,6 +6,10 @@ import { MESSAGE_COPY_COLUMNS } from '@/db/messages'
 export type CharacterFields = {
   name: string
   avatar: string | null
+  // The picture as picked, uncropped, and the frame cut from it (JSON, see ImageCrop). The
+  // avatar above is that frame, kept ready to show.
+  avatarOriginal: string | null
+  avatarCrop: string | null
   systemPrompt: string
   greeting: string
   temperature: number
@@ -17,6 +21,8 @@ export type CharacterFields = {
   thinking: ThinkingMode
   // File name of the picture behind the character's chats, like an avatar's.
   background: string | null
+  backgroundOriginal: string | null
+  backgroundCrop: string | null
   backgroundEffect: BackgroundEffect
   // 0 to 1: how far the picture is blurred or dimmed.
   backgroundIntensity: number
@@ -41,9 +47,10 @@ export const DEFAULT_SAMPLING = { temperature: 0.8, maxTokens: 800, topP: 0.95 }
 // Unqualified so the backup can select them too; in listCharacters the subqueries
 // qualify their own columns, so these still refer to the outer characters row.
 export const CHARACTER_COLUMNS = `
-  id, name, avatar, system_prompt AS systemPrompt, greeting,
+  id, name, avatar, avatar_original AS avatarOriginal, avatar_crop AS avatarCrop, system_prompt AS systemPrompt, greeting,
   temperature, max_tokens AS maxTokens, top_p AS topP, reply_limit AS replyLimit,
-  thinking, background, background_effect AS backgroundEffect,
+  thinking, background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
+  background_effect AS backgroundEffect,
   background_intensity AS backgroundIntensity,
   background_bubble_transparency AS backgroundBubbleTransparency, created_at AS createdAt
 `
@@ -78,12 +85,14 @@ export function getCharacter(db: SQLiteDatabase, id: number) {
 }
 
 const FIELD_COLUMNS =
-  'name, avatar, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_effect, background_intensity, background_bubble_transparency'
+  'name, avatar, avatar_original, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency'
 
 function fieldValues(fields: CharacterFields) {
   return [
     fields.name.trim(),
     fields.avatar,
+    fields.avatarOriginal,
+    fields.avatarCrop,
     fields.systemPrompt,
     fields.greeting,
     fields.temperature,
@@ -92,6 +101,8 @@ function fieldValues(fields: CharacterFields) {
     fields.replyLimit,
     fields.thinking,
     fields.background,
+    fields.backgroundOriginal,
+    fields.backgroundCrop,
     fields.backgroundEffect,
     fields.backgroundIntensity,
     fields.backgroundBubbleTransparency,
@@ -110,8 +121,8 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
   if (id === null) return insertCharacter(db, fields)
   await db.runAsync(
     `UPDATE characters
-     SET name = ?, avatar = ?, system_prompt = ?, greeting = ?, temperature = ?, max_tokens = ?, top_p = ?, reply_limit = ?, thinking = ?,
-         background = ?, background_effect = ?, background_intensity = ?,
+     SET name = ?, avatar = ?, avatar_original = ?, avatar_crop = ?, system_prompt = ?, greeting = ?, temperature = ?, max_tokens = ?, top_p = ?, reply_limit = ?, thinking = ?,
+         background = ?, background_original = ?, background_crop = ?, background_effect = ?, background_intensity = ?,
          background_bubble_transparency = ?
      WHERE id = ?`,
     [...fieldValues(fields), id]
@@ -122,21 +133,22 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
 // Copies the character together with all of its chats and messages. The copy gets its
 // own avatar and background files (already written by the caller), so deleting one never
 // breaks the other.
-export async function duplicateCharacter(
-  db: SQLiteDatabase,
-  id: number,
-  name: string,
-  avatar: string | null,
+export type CopiedImages = {
+  avatar: string | null
+  avatarOriginal: string | null
   background: string | null
-) {
+  backgroundOriginal: string | null
+}
+
+export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: string, images: CopiedImages) {
   let characterId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
       `INSERT INTO characters (${FIELD_COLUMNS}, created_at)
-       SELECT ?, ?, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking,
-         ?, background_effect, background_intensity, background_bubble_transparency, ?
+       SELECT ?, ?, ?, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking,
+         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, ?
        FROM characters WHERE id = ?`,
-      [name, avatar, background, Date.now(), id]
+      [name, images.avatar, images.avatarOriginal, images.background, images.backgroundOriginal, Date.now(), id]
     )
     characterId = res.lastInsertRowId
     const chats = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE character_id = ? ORDER BY id', id)

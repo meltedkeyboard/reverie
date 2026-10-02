@@ -37,9 +37,12 @@ export function useCharacterActions(reload: () => void) {
   }
 
   const duplicate = async (character: CharacterPreview) => {
-    const avatar = await copyStoredImage(character.avatar)
-    const background = await copyStoredImage(character.background, 'backgrounds')
-    await duplicateCharacter(db, character.id, `${character.name} (${t('characters.copySuffix')})`, avatar, background)
+    await duplicateCharacter(db, character.id, `${character.name} (${t('characters.copySuffix')})`, {
+      avatar: await copyStoredImage(character.avatar),
+      avatarOriginal: await copyStoredImage(character.avatarOriginal),
+      background: await copyStoredImage(character.background, 'backgrounds'),
+      backgroundOriginal: await copyStoredImage(character.backgroundOriginal, 'backgrounds'),
+    })
     reload()
   }
 

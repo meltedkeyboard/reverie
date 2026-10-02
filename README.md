@@ -22,7 +22,7 @@ Roleplay chat client for iOS and Android, built with Expo. It talks directly to 
 - Toasts: notices in Settings (backup, iCloud push and pull, errors) slide in from the top over the screen instead of blocking it with an alert.
 - App icon: nine alternates to the standard one (Settings > App icon), on iOS and Android. Not available in Expo Go.
 - App lock with Face ID, haptics toggle, "Continue" capsule on the home screen that jumps to the last active chat.
-- Backup export and import as JSON (the API key is not included).
+- Backup export and import as a zip (JSON files for characters, rooms and chats, the pictures as they are; the API key is not included). Older single-file JSON backups still import.
 - iCloud sync (not in Expo Go): the data is kept in a folder picked in iCloud Drive and picked up by the other devices. Works with an app signed by a free Apple ID, see below.
 - English and Russian UI.
 - iOS 26 Liquid Glass UI where available, with a plain fallback on older iOS and on Android.

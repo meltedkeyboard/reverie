@@ -4,6 +4,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
 import { getSyncState, markChecked, markSynced, setDirty } from '@/db/cloudSync'
 import { migrate, SCHEMA_VERSION } from '@/db/schema'
 import { t } from '@/i18n'
+import { convertLegacyAttachments } from '@/db/attachments'
 import { avatarUri, type ImageKind } from '@/lib/avatarStore'
 import { dataDirectory, databaseDirectory, keepCopy } from '@/lib/storage'
 import { cloudFolder } from '../../modules/reverie-cloud-folder'
@@ -34,7 +35,7 @@ type Manifest = { app: 'reverie'; rev: string; schema: number; savedAt: number }
 
 const MANIFEST = 'manifest.json'
 const DATABASE = 'reverie.db'
-const IMAGE_KINDS: ImageKind[] = ['avatars', 'backgrounds']
+const IMAGE_KINDS: ImageKind[] = ['avatars', 'backgrounds', 'attachments']
 // Parents first, so rows can be put back in this order and deleted in the reverse one.
 const TABLES = ['characters', 'rooms', 'room_members', 'chats', 'messages']
 // Tables whose insert trigger puts each new row on top and so scrambles a copied order.
@@ -85,11 +86,17 @@ async function withAttached<T>(db: SQLiteDatabase, file: File, schema: string, b
 async function referencedImages(db: SQLiteDatabase, schema: string) {
   const rows = await db.getAllAsync<{ name: string; kind: ImageKind }>(
     `SELECT avatar AS name, 'avatars' AS kind FROM ${schema}.characters WHERE avatar IS NOT NULL
+     UNION SELECT avatar_original, 'avatars' FROM ${schema}.characters WHERE avatar_original IS NOT NULL
      UNION SELECT background, 'backgrounds' FROM ${schema}.characters WHERE background IS NOT NULL
-     UNION SELECT background, 'backgrounds' FROM ${schema}.rooms WHERE background IS NOT NULL`
+     UNION SELECT background_original, 'backgrounds' FROM ${schema}.characters WHERE background_original IS NOT NULL
+     UNION SELECT background, 'backgrounds' FROM ${schema}.rooms WHERE background IS NOT NULL
+     UNION SELECT background_original, 'backgrounds' FROM ${schema}.rooms WHERE background_original IS NOT NULL
+     UNION SELECT json_extract(j.value, '$.file'), 'attachments'
+       FROM ${schema}.messages m, json_each(m.images) j WHERE m.images IS NOT NULL AND json_valid(m.images)`
   )
-  const images: Record<ImageKind, Set<string>> = { avatars: new Set(), backgrounds: new Set() }
-  for (const row of rows) images[row.kind].add(row.name)
+  const images: Record<ImageKind, Set<string>> = { avatars: new Set(), backgrounds: new Set(), attachments: new Set() }
+  // A message of an older database has base64 in its row and no file yet.
+  for (const row of rows) if (row.name) images[row.kind].add(row.name)
   return images
 }
 
@@ -199,6 +206,8 @@ async function pull(db: SQLiteDatabase, manifest: Manifest) {
       await db.execAsync('ROLLBACK')
       throw err
     }
+    // Rows from a database older than the files for pictures still carry them in base64.
+    await convertLegacyAttachments(db)
   })
   incoming.delete()
 }

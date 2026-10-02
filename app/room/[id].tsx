@@ -31,7 +31,7 @@ import {
   type RoomFields,
 } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
-import { avatarUri, persistAvatar, pickBackground, removeAvatar } from '@/lib/avatars'
+import { avatarUri, cropFromJson, cropToJson, persistAvatar, persistOriginal, pickBackground, removeAvatar, type CropRect } from '@/lib/avatars'
 import { setBackgroundDraft } from '@/lib/backgroundDraft'
 import { confirmDeletion } from '@/lib/confirmDelete'
 import { showMessage } from '@/lib/dialogs'
@@ -67,8 +67,13 @@ export default function RoomEditorScreen() {
   const [characters, setCharacters] = useState<CharacterPreview[]>([])
   const [picking, setPicking] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
+  // A fresh pick: the framed copy, the original and the frame, kept as temporary files
+  // until Save.
   const [bgPickedUri, setBgPickedUri] = useState<string | null>(null)
+  const [bgPickedOriginalUri, setBgPickedOriginalUri] = useState<string | null>(null)
+  const [bgPickedCrop, setBgPickedCrop] = useState<CropRect | null>(null)
   const storedBackground = useRef<string | null>(null)
+  const storedBackgroundOriginal = useRef<string | null>(null)
 
   const set = <K extends keyof RoomFields>(key: K, value: RoomFields[K]) => setFields((f) => ({ ...f, [key]: value }))
 
@@ -82,6 +87,7 @@ export default function RoomEditorScreen() {
       setFields(rest)
       setMembers(await listRoomMembers(db, room.id))
       storedBackground.current = room.background
+      storedBackgroundOriginal.current = room.backgroundOriginal
       setReady(true)
     })()
   }, [db, id, isNew, router])
@@ -108,18 +114,23 @@ export default function RoomEditorScreen() {
 
   const backgroundUri = bgPickedUri ?? (fields.background ? avatarUri(fields.background, 'backgrounds') : null)
 
-  const openBackground = (uri: string, fresh: boolean) => {
+  // `original` is what gets stored beside the framed copy: a temporary file for a fresh
+  // pick, or null when the stored original is reframed.
+  const openBackground = (uri: string, crop: CropRect | null, original: string | null) => {
     setBackgroundDraft({
       uri,
+      crop,
       characterName: fields.name.trim() || defaultName(),
       effect: fields.backgroundEffect,
       intensity: fields.backgroundIntensity,
       bubbleTransparency: fields.backgroundBubbleTransparency,
       onDone: (result) => {
-        if (result.uri) setBgPickedUri(result.uri)
-        else if (fresh) setBgPickedUri(uri)
+        setBgPickedUri(result.uri)
+        setBgPickedCrop(result.crop)
+        if (original) setBgPickedOriginalUri(original)
         setFields((f) => ({
           ...f,
+          backgroundOriginal: original ? null : f.backgroundOriginal,
           backgroundEffect: result.effect,
           backgroundIntensity: result.intensity,
           backgroundBubbleTransparency: result.bubbleTransparency,
@@ -132,10 +143,27 @@ export default function RoomEditorScreen() {
   const onPickBackground = async (source: ImageSource) => {
     try {
       const uri = await pickBackground(source)
-      if (uri) openBackground(uri, true)
+      if (uri) openBackground(uri, null, uri)
     } catch (err) {
       showMessage(t('background.failedTitle'), errorMessage(err))
     }
+  }
+
+  // The frame is redone on the original; a background saved before originals were kept has
+  // only its framed copy, which then becomes the original.
+  const onAdjustBackground = (shown: string) => {
+    if (bgPickedOriginalUri) return openBackground(bgPickedOriginalUri, bgPickedCrop, null)
+    if (fields.backgroundOriginal) {
+      return openBackground(avatarUri(fields.backgroundOriginal, 'backgrounds')!, cropFromJson(fields.backgroundCrop), null)
+    }
+    openBackground(shown, null, shown)
+  }
+
+  const onClearBackground = () => {
+    setBgPickedUri(null)
+    setBgPickedOriginalUri(null)
+    setBgPickedCrop(null)
+    setFields((f) => ({ ...f, background: null, backgroundOriginal: null, backgroundCrop: null }))
   }
 
   const onSave = async () => {
@@ -143,13 +171,18 @@ export default function RoomEditorScreen() {
     setSaving(true)
     try {
       const background = bgPickedUri ? await persistAvatar(bgPickedUri, 'backgrounds') : fields.background
+      const backgroundOriginal = bgPickedOriginalUri ? await persistOriginal(bgPickedOriginalUri, 'backgrounds') : fields.backgroundOriginal
+      const backgroundCrop = bgPickedUri ? cropToJson(bgPickedCrop) : fields.backgroundCrop
       const roomId = await saveRoom(
         db,
         isNew ? null : Number(id),
-        { ...fields, name: fields.name.trim() || defaultName(), background },
+        { ...fields, name: fields.name.trim() || defaultName(), background, backgroundOriginal, backgroundCrop },
         members
       )
       if (storedBackground.current && storedBackground.current !== background) removeAvatar(storedBackground.current, 'backgrounds')
+      if (storedBackgroundOriginal.current && storedBackgroundOriginal.current !== backgroundOriginal) {
+        removeAvatar(storedBackgroundOriginal.current, 'backgrounds')
+      }
       if (isNew) router.replace(`/rooms/${roomId}`)
       else router.back()
     } catch (err) {
@@ -167,6 +200,7 @@ export default function RoomEditorScreen() {
       onConfirm: async () => {
         await deleteRoom(db, Number(id))
         if (storedBackground.current) removeAvatar(storedBackground.current, 'backgrounds')
+        if (storedBackgroundOriginal.current) removeAvatar(storedBackgroundOriginal.current, 'backgrounds')
         router.dismissTo('/rooms')
       },
     })
@@ -346,16 +380,10 @@ export default function RoomEditorScreen() {
               </ImageSourceMenu>
               {backgroundUri ? (
                 <>
-                  <Pressable onPress={() => openBackground(backgroundUri, false)} hitSlop={8}>
+                  <Pressable onPress={() => onAdjustBackground(backgroundUri)} hitSlop={8}>
                     <Text style={styles.link}>{t('background.adjust')}</Text>
                   </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setBgPickedUri(null)
-                      set('background', null)
-                    }}
-                    hitSlop={8}
-                  >
+                  <Pressable onPress={onClearBackground} hitSlop={8}>
                     <Text style={styles.linkMuted}>{t('background.remove')}</Text>
                   </Pressable>
                 </>

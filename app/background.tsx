@@ -1,6 +1,6 @@
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
+import { ImageManipulator } from 'expo-image-manipulator'
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
@@ -14,6 +14,7 @@ import { ParamSlider } from '@/components/ParamSlider'
 import { Segmented } from '@/components/Segmented'
 import type { BackgroundEffect } from '@/db/characters'
 import { useTranslation } from '@/i18n'
+import { frameBackground, type CropRect } from '@/lib/avatars'
 import { backgroundDraft } from '@/lib/backgroundDraft'
 import { withAlpha } from '@/lib/color'
 import { liquidGlass } from '@/lib/nativeUI'
@@ -75,6 +76,22 @@ export default function BackgroundScreen() {
     coverHeight.value = natural.height * cover
   }, [natural, cover, coverWidth, coverHeight])
 
+  // Framing redone starts from the old frame: the inverse of what `frameRect` computes.
+  const placed = useRef(false)
+  useEffect(() => {
+    if (placed.current || !draft?.crop || !natural || !cover) return
+    placed.current = true
+    const { originX, originY, width, height } = draft.crop
+    const scale = frame.width / width
+    const k = Math.min(MAX_ZOOM, Math.max(1, scale / cover))
+    const limitX = Math.max(0, (natural.width * cover * k - frame.width) / 2)
+    const limitY = Math.max(0, (natural.height * cover * k - frame.height) / 2)
+    zoom.value = k
+    offsetX.value = Math.min(limitX, Math.max(-limitX, (natural.width / 2 - (originX + width / 2)) * cover * k))
+    offsetY.value = Math.min(limitY, Math.max(-limitY, (natural.height / 2 - (originY + height / 2)) * cover * k))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, natural, cover, frame])
+
   const clampX = (x: number, k: number) => {
     'worklet'
     const limit = Math.max(0, (coverWidth.value * k - frameWidth.value) / 2)
@@ -121,27 +138,28 @@ export default function BackgroundScreen() {
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
 
-  // What the frame shows is cut out of the picture, so the chat, which covers its screen
-  // the same way, shows the same part.
-  const cropped = async () => {
-    if (!draft || !natural || !cover) return undefined
+  // The part of the original the frame shows, so the chat, which covers its screen the
+  // same way, shows the same part. Null while the picture is left as it is.
+  const frameRect = (): CropRect | null => {
+    if (!draft || !natural || !cover) return null
     const k = zoom.value
-    if (k === 1 && offsetX.value === 0 && offsetY.value === 0) return undefined
+    if (k === 1 && offsetX.value === 0 && offsetY.value === 0) return null
     const scale = cover * k
     const width = Math.min(natural.width, Math.round(frame.width / scale))
     const height = Math.min(natural.height, Math.round(frame.height / scale))
     const originX = Math.min(natural.width - width, Math.max(0, Math.round(natural.width / 2 - offsetX.value / scale - width / 2)))
     const originY = Math.min(natural.height - height, Math.max(0, Math.round(natural.height / 2 - offsetY.value / scale - height / 2)))
-    const picture = await ImageManipulator.manipulate(draft.uri).crop({ originX, originY, width, height }).renderAsync()
-    return (await picture.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 })).uri
+    return { originX, originY, width, height }
   }
 
   const done = async () => {
     if (saving) return
     setSaving(true)
     try {
-      const uri = await cropped()
-      draft?.onDone({ effect, intensity, bubbleTransparency, uri })
+      if (draft) {
+        const crop = frameRect()
+        draft.onDone({ effect, intensity, bubbleTransparency, uri: await frameBackground(draft.uri, crop), crop })
+      }
       close()
     } catch {
       setSaving(false)

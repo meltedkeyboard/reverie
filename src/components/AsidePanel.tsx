@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { ChatPhase } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
 import type { AsideQuestion, AsideTurn } from '@/lib/aside'
-import { imageDataUrl } from '@/lib/images'
+import { attachmentUri } from '@/lib/attachments'
 import type { ReplyFrame } from '@/lib/replyStream'
 import { useChatText } from '@/lib/chatText'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -168,7 +168,7 @@ function Question({ text }: { text: AsideQuestion }) {
       {text.images.length ? (
         <View style={styles.pictures}>
           {text.images.map((image, i) => {
-            const uri = imageDataUrl(image.base64)
+            const uri = attachmentUri(image.file)
             return (
               <ImageLink key={i} uri={uri} aspect={image.width && image.height ? image.width / image.height : 1}>
                 <Image source={{ uri }} style={styles.picture} contentFit="cover" />

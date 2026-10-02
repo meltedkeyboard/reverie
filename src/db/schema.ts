@@ -208,6 +208,23 @@ const MIGRATIONS = [
       )
     )
     .join('\n'),
+  // Pictures keep their uncropped original beside the framed copy that is shown, and the
+  // frame as JSON ({originX, originY, width, height} in pixels of the original), so the
+  // framing can be redone later without losing anything.
+  `
+    ALTER TABLE characters ADD COLUMN avatar_original TEXT;
+    ALTER TABLE characters ADD COLUMN avatar_crop TEXT;
+    ALTER TABLE characters ADD COLUMN background_original TEXT;
+    ALTER TABLE characters ADD COLUMN background_crop TEXT;
+    ALTER TABLE rooms ADD COLUMN background_original TEXT;
+    ALTER TABLE rooms ADD COLUMN background_crop TEXT;
+  `,
+  // Pictures of messages moved out of the rows into files: images now holds
+  // [{file, width, height}] instead of base64. Done by the app at start (db/attachments.ts);
+  // this entry only raises the schema version, so an older app refuses such a database.
+  `
+    SELECT 1;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

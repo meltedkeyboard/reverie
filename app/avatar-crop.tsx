@@ -1,7 +1,7 @@
 import { Image } from 'expo-image'
 import { ImageManipulator } from 'expo-image-manipulator'
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
@@ -71,6 +71,22 @@ export default function AvatarCropScreen() {
     window.value = diameter
   }, [pictureWidth, pictureHeight, diameter, coverWidth, coverHeight, window])
 
+  // Framing redone starts from the old frame: the inverse of what `choose` computes.
+  const placed = useRef(false)
+  useEffect(() => {
+    if (placed.current || !draft?.crop || !natural || !cover) return
+    placed.current = true
+    const { originX, originY, width } = draft.crop
+    const scale = diameter / width
+    zoom.value = Math.min(MAX_ZOOM, Math.max(1, scale / cover))
+    const k = zoom.value * cover
+    const limitX = Math.max(0, (pictureWidth * zoom.value - diameter) / 2)
+    const limitY = Math.max(0, (pictureHeight * zoom.value - diameter) / 2)
+    offsetX.value = Math.min(limitX, Math.max(-limitX, (natural.width / 2 - (originX + width / 2)) * k))
+    offsetY.value = Math.min(limitY, Math.max(-limitY, (natural.height / 2 - (originY + draft.crop.height / 2)) * k))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, natural, cover, diameter])
+
   // The picture may never leave part of the window uncovered.
   const clampX = (x: number, k: number) => {
     'worklet'
@@ -118,13 +134,13 @@ export default function AvatarCropScreen() {
       const side = Math.min(natural.width, natural.height, Math.round(diameter / scale))
       const originX = Math.round(natural.width / 2 - offsetX.value / scale - side / 2)
       const originY = Math.round(natural.height / 2 - offsetY.value / scale - side / 2)
-      const uri = await squareAvatar(draft.uri, {
+      const crop = {
         originX: Math.min(natural.width - side, Math.max(0, originX)),
         originY: Math.min(natural.height - side, Math.max(0, originY)),
         width: side,
         height: side,
-      })
-      draft.onDone(uri)
+      }
+      draft.onDone(await squareAvatar(draft.uri, crop), crop)
       close()
     } catch (err) {
       setSaving(false)

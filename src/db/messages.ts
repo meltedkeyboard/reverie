@@ -2,7 +2,8 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 export type Role = 'user' | 'assistant'
 
-export type MessageImage = { base64: string; width: number; height: number }
+// A picture of a message: the name of its file in the `attachments` folder.
+export type MessageImage = { file: string; width: number; height: number }
 
 // What a reasoning model thought before answering and for how long.
 export type Thought = { text: string; ms: number }

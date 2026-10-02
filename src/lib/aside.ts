@@ -1,7 +1,7 @@
 import type { ChatRequest, ChatTurn, ContentPart } from '@/api/llm'
 import { DEFAULT_SAMPLING, type Character, type ThinkingMode } from '@/db/characters'
 import type { Message, MessageImage, Thought } from '@/db/messages'
-import { imageDataUrl } from '@/lib/images'
+import { attachmentUri } from '@/lib/attachments'
 import type { Room, RoomMember } from '@/db/rooms'
 import { USER } from '@/lib/room/audience'
 import { userNameOf } from '@/lib/room/prompt'
@@ -93,7 +93,7 @@ export function buildAsideRequest(scene: AsideScene, history: Message[], thread:
   const turns: ChatTurn[] = []
   questions.forEach((q, i) => {
     const text = i === 0 ? `${opening}\n\n---\n\nMy question: ${q.text}` : q.text
-    const pictures: ContentPart[] = q.images.map((image) => ({ type: 'image_url', image_url: { url: imageDataUrl(image.base64) } }))
+    const pictures: ContentPart[] = q.images.map((image) => ({ type: 'image_url', image_url: { url: attachmentUri(image.file) } }))
     turns.push({ role: 'user', content: pictures.length ? [...pictures, { type: 'text', text }] : text })
     const answer = thread[i]?.answer
     if (answer) turns.push({ role: 'assistant', content: answer })

@@ -2,22 +2,12 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
 
-import type { MessageImage } from '@/db/messages'
 import { t } from '@/i18n'
-
-// Vision models downscale large inputs anyway, and every photo in the context window
-// is sent again with each reply, so a smaller picture keeps requests fast.
-const MAX_SIDE = 1024
 
 // How many pictures one message can take from the library at a time.
 const MAX_PICKED = 10
 
 export type ImageSource = 'library' | 'camera' | 'files'
-
-export async function pickMessageImages(source: ImageSource): Promise<MessageImage[]> {
-  const uris = await pickUris(source, true)
-  return Promise.all(uris.map(prepareMessageImage))
-}
 
 export async function requireCamera() {
   const permission = await ImagePicker.requestCameraPermissionsAsync()
@@ -58,12 +48,6 @@ export async function resizedJpeg(uri: string, maxSide: number, compress: number
     picture = await ImageManipulator.manipulate(original).resize(resize).renderAsync()
   }
   return picture.saveAsync({ format: SaveFormat.JPEG, compress, base64 })
-}
-
-async function prepareMessageImage(uri: string): Promise<MessageImage> {
-  const saved = await resizedJpeg(uri, MAX_SIDE, 0.8, true)
-  if (!saved.base64) throw new Error(t('images.readFailed'))
-  return { base64: saved.base64, width: saved.width, height: saved.height }
 }
 
 export function imageDataUrl(base64: string) {

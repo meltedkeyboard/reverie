@@ -1,8 +1,14 @@
 // The picture file the avatar crop screen frames, and where the square goes. Passed
 // around the router like the background draft: a callback does not fit in a route param.
+import type { CropRect } from '@/lib/avatars'
+
 export type AvatarCropDraft = {
+  // The original, uncropped.
   uri: string
-  onDone: (uri: string) => void
+  // The frame to start from when framing is redone.
+  crop?: CropRect | null
+  // The framed copy to show, and the frame it was cut with.
+  onDone: (uri: string, crop: CropRect) => void
 }
 
 let pending: AvatarCropDraft | null = null

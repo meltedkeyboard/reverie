@@ -4,24 +4,39 @@ import { File } from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
 
 import { t } from '@/i18n'
-import { pickUris, requireCamera, resizedJpeg, newAvatarName, type ImageSource } from '@/lib/images'
+import { pickUris, requireCamera, newAvatarName, type ImageSource } from '@/lib/images'
 import { extensionOf, MAX_ANIMATED_BYTES, movingKind } from '@/lib/media'
 import { readAvatarBase64, removeAvatar, writeAvatarBase64, type ImageKind } from './avatarStore'
 
 // Picking and resizing work the same everywhere; only storage differs per platform. Avatars
 // and chat backgrounds are kept in separate folders.
 export type { ImageKind } from './avatarStore'
-export { avatarUri, persistAvatar, removeAvatar, readAvatarBase64, writeAvatarBase64, removeAllAvatars } from './avatarStore'
+export { avatarUri, persistAvatar, persistOriginal, removeAvatar, readAvatarBase64, readAvatarBytes, writeAvatarBase64, writeAvatarBytes, removeAllAvatars } from './avatarStore'
 
 const SIDE = 512
 
+// The frame cut out of an original, in its pixels (as drawn, with its orientation applied).
+// Stored as JSON beside the original; null means the default frame.
 export type CropRect = { originX: number; originY: number; width: number; height: number }
 
-// A photo from the camera, already cropped in the system's own editor.
+export const cropToJson = (crop: CropRect | null) => (crop ? JSON.stringify(crop) : null)
+
+export function cropFromJson(json: string | null): CropRect | null {
+  if (!json) return null
+  try {
+    const crop = JSON.parse(json)
+    return [crop?.originX, crop?.originY, crop?.width, crop?.height].every((n) => typeof n === 'number') ? crop : null
+  } catch {
+    return null
+  }
+}
+
+// A photo from the camera, as it is: like the others it is framed on /avatar-crop, so the
+// whole shot is kept.
 export async function pickAvatarPhoto() {
   await requireCamera()
-  const picked = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 })
-  return picked.canceled ? null : squareAvatar(picked.assets[0].uri)
+  const picked = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 })
+  return picked.canceled ? null : picked.assets[0].uri
 }
 
 // A picture, GIF or video from the photo library, as it is. The system editor would flatten
@@ -62,12 +77,22 @@ export async function squareAvatar(uri: string, rect?: CropRect) {
 
 const BACKGROUND_SIDE = 1600
 
-// A picture for behind the chat, kept in its own proportions and shrunk to a size a phone
-// screen needs. Returns a temporary file, or null when nothing was chosen.
+// A picture for behind the chat, as picked: it is framed on /background, which makes the
+// copy the chat shows. Null when nothing was chosen.
 export async function pickBackground(source: ImageSource) {
   const [uri] = await pickUris(source, false)
-  if (!uri) return null
-  return (await resizedJpeg(uri, BACKGROUND_SIDE, 0.85)).uri
+  return uri ?? null
+}
+
+// The part of the original the chat shows (all of it without a frame), shrunk to a size a
+// phone screen needs. Returns a temporary file.
+export async function frameBackground(uri: string, crop: CropRect | null) {
+  let picture = ImageManipulator.manipulate(uri)
+  if (crop) picture = picture.crop(crop)
+  const framed = await picture.renderAsync()
+  const resize = framed.width >= framed.height ? { width: BACKGROUND_SIDE } : { height: BACKGROUND_SIDE }
+  const shown = Math.max(framed.width, framed.height) > BACKGROUND_SIDE ? await ImageManipulator.manipulate(framed).resize(resize).renderAsync() : framed
+  return (await shown.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 })).uri
 }
 
 // A stored picture under a new name, so a duplicated character owns its own file.
@@ -81,7 +106,14 @@ export async function copyStoredImage(name: string | null, kind: ImageKind = 'av
 }
 
 // Everything a character keeps in the image store.
-export function removeCharacterImages(character: { avatar: string | null; background: string | null }) {
+export function removeCharacterImages(character: {
+  avatar: string | null
+  avatarOriginal: string | null
+  background: string | null
+  backgroundOriginal: string | null
+}) {
   if (character.avatar) removeAvatar(character.avatar)
+  if (character.avatarOriginal) removeAvatar(character.avatarOriginal)
   if (character.background) removeAvatar(character.background, 'backgrounds')
+  if (character.backgroundOriginal) removeAvatar(character.backgroundOriginal, 'backgrounds')
 }

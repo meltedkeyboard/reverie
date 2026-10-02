@@ -5,17 +5,24 @@ import { MESSAGE_COLUMNS } from '@/db/messages'
 import { DEFAULT_MEMBER, DEFAULT_ROOM, insertRoom, ROOM_COLUMNS, type FloorMode } from '@/db/rooms'
 import { loadSettings, saveSettings } from '@/db/settings'
 import { t } from '@/i18n'
-import { pickJsonFile } from '@/lib/pickJson'
-import { readAvatarBase64, removeAllAvatars, writeAvatarBase64, type ImageKind } from '@/lib/avatars'
-import { saveJson } from '@/lib/download'
+import { pickBackupFile } from '@/lib/pickBackup'
+import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/avatars'
+import { isArchive, packArchive, unpackArchive } from '@/lib/backupArchive'
+import { saveFile } from '@/lib/download'
+import { strFromU8 } from 'fflate'
+
 import { extensionOf } from '@/lib/media'
 
-const BACKUP_VERSION = 7
+// 9: a zip of JSON files and pictures. Up to 8 it was one JSON file with the pictures in base64.
+const BACKUP_VERSION = 9
 
 type BackupCharacter = {
   id: number
   name: string
   avatar: string | null
+  // Backups from before originals were kept leave these out.
+  avatarOriginal?: string | null
+  avatarCrop?: string | null
   systemPrompt: string
   greeting: string
   temperature: number
@@ -25,6 +32,8 @@ type BackupCharacter = {
   thinking?: ThinkingMode
   // Backups from before chat backgrounds leave these out.
   background?: string | null
+  backgroundOriginal?: string | null
+  backgroundCrop?: string | null
   backgroundEffect?: BackgroundEffect
   backgroundIntensity?: number
   backgroundBubbleTransparency?: number
@@ -44,6 +53,8 @@ type BackupRoom = {
   maxChain: number
   director: number | boolean
   background: string | null
+  backgroundOriginal?: string | null
+  backgroundCrop?: string | null
   backgroundEffect: BackgroundEffect
   backgroundIntensity: number
   backgroundBubbleTransparency: number
@@ -66,7 +77,9 @@ type BackupMessage = {
   chatId: number
   role: string
   content: string
-  images?: string | null
+  // Version 9: a list of files in the zip's attachments folder. Up to 8 a JSON string with
+  // the pictures in base64.
+  images?: string | { file: string; width: number; height: number }[] | null
   // Backups from before a message could have several pictures hold one.
   image?: string | null
   imageWidth?: number | null
@@ -91,21 +104,22 @@ type Backup = {
   roomMembers?: BackupMember[]
   chats: BackupChat[]
   messages: BackupMessage[]
-  avatars: Record<string, string>
+  // Only in the old single-file backups: the pictures by name, in base64.
+  avatars?: Record<string, string>
   settings?: { baseUrl?: string; model?: string }
 }
 
-function backupImages(message: BackupMessage) {
-  if (message.images) return message.images
-  if (!message.image) return null
-  return JSON.stringify([{ base64: message.image, width: message.imageWidth, height: message.imageHeight }])
-}
-
 export async function exportBackup(db: SQLiteDatabase) {
-  const characters = await db.getAllAsync<{ id: number; avatar: string | null; background: string | null }>(
+  const characters = await db.getAllAsync<{
+    id: number
+    avatar: string | null
+    avatarOriginal: string | null
+    background: string | null
+    backgroundOriginal: string | null
+  }>(
     `SELECT ${CHARACTER_COLUMNS} FROM characters ORDER BY sort_order, id`
   )
-  const rooms = await db.getAllAsync<{ background: string | null }>(`SELECT ${ROOM_COLUMNS} FROM rooms ORDER BY sort_order, id`)
+  const rooms = await db.getAllAsync<{ background: string | null; backgroundOriginal: string | null }>(`SELECT ${ROOM_COLUMNS} FROM rooms ORDER BY sort_order, id`)
   const roomMembers = await db.getAllAsync(
     `SELECT room_id AS roomId, character_id AS characterId, position, talkativeness, perception, triggers, muted, present
      FROM room_members ORDER BY room_id, position`
@@ -113,42 +127,71 @@ export async function exportBackup(db: SQLiteDatabase) {
   const chats = await db.getAllAsync(
     'SELECT id, character_id AS characterId, room_id AS roomId, title, created_at AS createdAt FROM chats ORDER BY sort_order, id'
   )
-  const messages = await db.getAllAsync(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`)
+  const rows = await db.getAllAsync<{ id: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`)
+  const messages = rows.map((row) => (row.images ? { ...row, images: JSON.parse(row.images) } : row))
   const { baseUrl, model } = await loadSettings(db)
 
-  const avatars: Record<string, string> = {}
-  // Backgrounds travel in the same map as the avatars: both are just pictures by name.
+  // Every picture a character or a room points at, the originals too, once each.
+  const wanted = new Map<string, { kind: ImageKind; name: string }>()
+  const want = (name: string | null, kind: ImageKind) => {
+    if (name) wanted.set(`${kind}/${name}`, { kind, name })
+  }
   for (const character of characters) {
-    for (const [name, kind] of [[character.avatar, 'avatars'], [character.background, 'backgrounds']] as const) {
-      if (!name) continue
-      const base64 = await readAvatarBase64(name, kind)
-      if (base64) avatars[name] = base64
-    }
+    want(character.avatar, 'avatars')
+    want(character.avatarOriginal, 'avatars')
+    want(character.background, 'backgrounds')
+    want(character.backgroundOriginal, 'backgrounds')
   }
   for (const room of rooms) {
-    if (!room.background) continue
-    const base64 = await readAvatarBase64(room.background, 'backgrounds')
-    if (base64) avatars[room.background] = base64
+    want(room.background, 'backgrounds')
+    want(room.backgroundOriginal, 'backgrounds')
+  }
+  for (const message of messages) {
+    for (const picture of (message.images as { file?: string }[] | null) ?? []) want(picture.file ?? null, 'attachments')
+  }
+  const files: { path: string; bytes: Uint8Array }[] = []
+  for (const { kind, name } of wanted.values()) {
+    const bytes = await readAvatarBytes(name, kind)
+    if (bytes) files.push({ path: `${kind}/${name}`, bytes })
   }
 
   // The API key is left out on purpose: the file usually ends up in iCloud Drive.
-  const dump = { app: 'reverie', version: BACKUP_VERSION, exportedAt: new Date().toISOString(), settings: { baseUrl, model }, characters, rooms, roomMembers, chats, messages, avatars }
-
-  return saveJson(`reverie-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(dump))
+  const manifest = { app: 'reverie', version: BACKUP_VERSION, exportedAt: new Date().toISOString(), settings: { baseUrl, model } }
+  const zip = packArchive({
+    manifest,
+    characters: characters as (typeof characters[number] & { name: string })[],
+    rooms: rooms as (typeof rooms[number] & { id: number; name: string })[],
+    roomMembers: roomMembers as { roomId: number }[],
+    chats: chats as { id: number; title: string | null }[],
+    messages: messages as unknown as { chatId: number }[],
+    files,
+  })
+  return saveFile(`reverie-backup-${new Date().toISOString().slice(0, 10)}.zip`, zip, 'application/zip')
 }
 
-// Picks a JSON file and adds its characters, chats and messages as new rows alongside
-// whatever is already in the database — nothing existing is touched or replaced.
-export async function importBackup(db: SQLiteDatabase): Promise<{ characters: number } | null> {
-  const text = await pickJsonFile()
-  if (text === null) return null
-
-  let dump: Backup
+// What a backup file holds, whichever form it came in: the zip, or the old single JSON file.
+function openBackup(bytes: Uint8Array): { dump: Backup; file: (path: string) => string | Uint8Array | undefined } {
   try {
-    dump = JSON.parse(text)
+    if (isArchive(bytes)) {
+      const { manifest, file, ...rest } = unpackArchive(bytes)
+      return { dump: { ...(manifest as Backup), ...(rest as unknown as Backup) }, file }
+    }
+    // The old file: pictures by name only, so the folder in the path is dropped.
+    const dump: Backup = JSON.parse(strFromU8(bytes))
+    return { dump, file: (path) => dump.avatars?.[path.slice(path.indexOf('/') + 1)] }
   } catch {
     throw new Error(t('backup.corrupted'))
   }
+}
+
+// Picks a backup (a zip, or an older JSON file) and adds its characters, chats and messages
+// as new rows alongside whatever is already in the database — nothing existing is touched
+// or replaced.
+export async function importBackup(db: SQLiteDatabase): Promise<{ characters: number } | null> {
+  const bytes = await pickBackupFile()
+  if (bytes === null) return null
+
+  const { dump, file } = openBackup(bytes)
   if (dump.app !== 'reverie' || !Array.isArray(dump.characters)) {
     throw new Error(t('backup.notBackup'))
   }
@@ -167,12 +210,14 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
 
   await db.withTransactionAsync(async () => {
     const importImage = async (name: string | null | undefined, kind: ImageKind = 'avatars') => {
-      if (!name || !dump.avatars[name]) return null
-      let stored = avatarNames.get(name) ?? null
+      const data = name ? file(`${kind}/${name}`) : undefined
+      if (!name || !data) return null
+      let stored = avatarNames.get(`${kind}/${name}`) ?? null
       if (!stored) {
         stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.${extensionOf(name) || 'jpg'}`
-        await writeAvatarBase64(stored, dump.avatars[name], kind)
-        avatarNames.set(name, stored)
+        if (typeof data === 'string') await writeAvatarBase64(stored, data, kind)
+        else writeAvatarBytes(stored, data, kind)
+        avatarNames.set(`${kind}/${name}`, stored)
       }
       return stored
     }
@@ -184,9 +229,13 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
         {
           ...character,
           avatar: await importImage(character.avatar),
+          avatarOriginal: await importImage(character.avatarOriginal),
+          avatarCrop: character.avatarCrop ?? null,
           replyLimit: character.replyLimit ?? null,
           thinking: character.thinking ?? 'auto',
           background: await importImage(character.background, 'backgrounds'),
+          backgroundOriginal: await importImage(character.backgroundOriginal, 'backgrounds'),
+          backgroundCrop: character.backgroundCrop ?? null,
           backgroundEffect: character.backgroundEffect ?? 'blur',
           backgroundIntensity: character.backgroundIntensity ?? 0.5,
           backgroundBubbleTransparency: character.backgroundBubbleTransparency ?? 0.3,
@@ -204,6 +253,8 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
           ...room,
           director: Boolean(room.director),
           background: await importImage(room.background, 'backgrounds'),
+          backgroundOriginal: await importImage(room.backgroundOriginal, 'backgrounds'),
+          backgroundCrop: room.backgroundCrop ?? null,
         },
         room.createdAt
       )
@@ -243,6 +294,26 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
       chatIds.set(chat.id, res.lastInsertRowId)
     }
 
+    // The message's pictures as the JSON the database keeps, whichever way the backup held
+    // them: files of the zip, or base64 in the row (older backups).
+    const importImages = async (message: BackupMessage) => {
+      let list: { file?: string; base64?: string; width: number; height: number }[] = []
+      if (Array.isArray(message.images)) list = message.images
+      else if (message.images) list = JSON.parse(message.images)
+      else if (message.image) list = [{ base64: message.image, width: message.imageWidth ?? 0, height: message.imageHeight ?? 0 }]
+      const kept = []
+      for (const { file: name, base64, width, height } of list) {
+        let stored: string | null = null
+        if (name) stored = await importImage(name, 'attachments')
+        else if (base64) {
+          stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
+          await writeAvatarBase64(stored, base64, 'attachments')
+        }
+        if (stored) kept.push({ file: stored, width, height })
+      }
+      return kept.length ? JSON.stringify(kept) : null
+    }
+
     for (const message of dump.messages ?? []) {
       const chatId = chatIds.get(message.chatId)
       if (!chatId) continue
@@ -254,7 +325,7 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
           chatId,
           message.role,
           message.content,
-          backupImages(message),
+          await importImages(message),
           message.variants ?? null,
           message.variant ?? 0,
           message.thoughts ?? null,

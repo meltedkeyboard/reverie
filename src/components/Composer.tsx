@@ -35,7 +35,8 @@ import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
-import { imageDataUrl, pickMessageImages, type ImageSource } from '@/lib/images'
+import { attachmentUri, pickMessageImages } from '@/lib/attachments'
+import type { ImageSource } from '@/lib/images'
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -111,7 +112,7 @@ export function Composer({
   const inputRef = useRef<TextInput>(null)
   const [images, setImages] = useState<MessageImage[]>([])
   const [picking, setPicking] = useState(false)
-  const imageUris = useMemo(() => images.map((image) => imageDataUrl(image.base64)), [images])
+  const imageUris = useMemo(() => images.map((image) => attachmentUri(image.file)), [images])
 
   useEffect(() => {
     if (!editing) return

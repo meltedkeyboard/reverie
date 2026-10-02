@@ -35,7 +35,10 @@ import * as Haptics from '@/lib/haptics'
 import { setAvatarCropDraft } from '@/lib/avatarCrop'
 import {
   avatarUri,
+  cropFromJson,
+  cropToJson,
   persistAvatar,
+  persistOriginal,
   acceptMoving,
   pickAvatarFile,
   pickAvatarLibrary,
@@ -43,7 +46,9 @@ import {
   pickBackground,
   removeAvatar,
   removeCharacterImages,
+  type CropRect,
 } from '@/lib/avatars'
+import { movingKind } from '@/lib/media'
 import { setBackgroundDraft } from '@/lib/backgroundDraft'
 import type { ImageSource } from '@/lib/images'
 import { confirmDeletion } from '@/lib/confirmDelete'
@@ -79,14 +84,24 @@ export default function CharacterEditorScreen() {
   const [systemPrompt, setSystemPrompt] = useState('')
   const [greeting, setGreeting] = useState('')
   const [avatar, setAvatar] = useState<string | null>(null)
+  // The stored copy that is shown, the original beside it and the frame between them. A
+  // fresh pick is kept apart as temporary files until Save.
+  const [avatarOriginal, setAvatarOriginal] = useState<string | null>(null)
+  const [avatarCrop, setAvatarCrop] = useState<string | null>(null)
   const [pickedUri, setPickedUri] = useState<string | null>(null)
+  const [pickedOriginalUri, setPickedOriginalUri] = useState<string | null>(null)
+  const [pickedCrop, setPickedCrop] = useState<CropRect | null>(null)
   const [temperature, setTemperature] = useState<number>(DEFAULT_SAMPLING.temperature)
   const [maxTokens, setMaxTokens] = useState<number>(DEFAULT_SAMPLING.maxTokens)
   const [topP, setTopP] = useState<number>(DEFAULT_SAMPLING.topP)
   const [replyLimit, setReplyLimit] = useState<number | null>(null)
   const [thinking, setThinking] = useState<ThinkingMode>('auto')
   const [background, setBackground] = useState<string | null>(null)
+  const [backgroundOriginal, setBackgroundOriginal] = useState<string | null>(null)
+  const [backgroundCrop, setBackgroundCrop] = useState<string | null>(null)
   const [bgPickedUri, setBgPickedUri] = useState<string | null>(null)
+  const [bgPickedOriginalUri, setBgPickedOriginalUri] = useState<string | null>(null)
+  const [bgPickedCrop, setBgPickedCrop] = useState<CropRect | null>(null)
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>('blur')
   const [bgIntensity, setBgIntensity] = useState(0.5)
   const [bgBubbleTransparency, setBgBubbleTransparency] = useState(0.3)
@@ -96,6 +111,8 @@ export default function CharacterEditorScreen() {
   const [beforeGen, setBeforeGen] = useState<{ prompt: string; greeting: string } | null>(null)
   const storedAvatar = useRef<string | null>(null)
   const storedBackground = useRef<string | null>(null)
+  const storedAvatarOriginal = useRef<string | null>(null)
+  const storedBackgroundOriginal = useRef<string | null>(null)
 
   useEffect(() => {
     if (isNew) return
@@ -105,60 +122,102 @@ export default function CharacterEditorScreen() {
       setSystemPrompt(found.systemPrompt)
       setGreeting(found.greeting)
       setAvatar(found.avatar)
+      setAvatarOriginal(found.avatarOriginal)
+      setAvatarCrop(found.avatarCrop)
       setTemperature(found.temperature)
       setMaxTokens(found.maxTokens)
       setTopP(found.topP)
       setReplyLimit(found.replyLimit)
       setThinking(found.thinking)
       setBackground(found.background)
+      setBackgroundOriginal(found.backgroundOriginal)
+      setBackgroundCrop(found.backgroundCrop)
       setBgEffect(found.backgroundEffect)
       setBgIntensity(found.backgroundIntensity)
       setBgBubbleTransparency(found.backgroundBubbleTransparency)
       storedAvatar.current = found.avatar
       storedBackground.current = found.background
+      storedAvatarOriginal.current = found.avatarOriginal
+      storedBackgroundOriginal.current = found.backgroundOriginal
       setReady(true)
     })
   }, [db, id, isNew, router])
 
   const canSave = ready && !saving && name.trim().length > 0
 
+  // Frames a still picture on its own screen. `original` is what gets stored beside the
+  // framed copy: a temporary file for a fresh pick, or null when the stored one is reframed.
+  const openCrop = (uri: string, crop: CropRect | null, original: string | null) => {
+    setAvatarCropDraft({
+      uri,
+      crop,
+      onDone: (framed, rect) => {
+        setPickedUri(framed)
+        setPickedCrop(rect)
+        if (original) {
+          setPickedOriginalUri(original)
+          setAvatarOriginal(null)
+        }
+      },
+    })
+    router.push('/avatar-crop')
+  }
+
   const onPickAvatar = async (source: ImageSource) => {
     try {
-      if (source === 'camera') {
-        const photo = await pickAvatarPhoto()
-        if (photo) setPickedUri(photo)
-        return
-      }
-      const file = source === 'files' ? await pickAvatarFile() : await pickAvatarLibrary()
+      const file = source === 'camera' ? await pickAvatarPhoto() : source === 'files' ? await pickAvatarFile() : await pickAvatarLibrary()
       if (!file) return
       // A GIF or a video keeps its motion, so it skips the crop and is shown by its middle.
-      if (acceptMoving(file)) return setPickedUri(file)
-      setAvatarCropDraft({ uri: file, onDone: setPickedUri })
-      router.push('/avatar-crop')
+      if (acceptMoving(file)) {
+        setPickedUri(file)
+        setPickedOriginalUri(null)
+        setPickedCrop(null)
+        setAvatarOriginal(null)
+        return
+      }
+      openCrop(file, null, file)
     } catch (err) {
       showMessage(t('editor.avatarFailedTitle'), errorMessage(err))
     }
   }
 
+  // The frame is redone on the original; an avatar saved before originals were kept has
+  // only its framed copy, which then becomes the original.
+  const onRecropAvatar = () => {
+    if (pickedOriginalUri) return openCrop(pickedOriginalUri, pickedCrop, null)
+    if (avatarOriginal) return openCrop(avatarUri(avatarOriginal)!, cropFromJson(avatarCrop), null)
+    const shown = pickedUri ?? (avatar ? avatarUri(avatar) : null)
+    if (shown) openCrop(shown, null, shown)
+  }
+
   const onClearAvatar = () => {
     setPickedUri(null)
+    setPickedOriginalUri(null)
+    setPickedCrop(null)
     setAvatar(null)
+    setAvatarOriginal(null)
   }
 
   // The picture now behind the chat: a fresh pick, else the one already stored.
   const backgroundUri = bgPickedUri ?? (background ? avatarUri(background, 'backgrounds') : null)
 
   // The effect is tried out on its own screen; what it returns is kept until Save.
-  const openBackground = (uri: string, fresh: boolean) => {
+  // `original` is what gets stored beside the framed copy, as for the avatar.
+  const openBackground = (uri: string, crop: CropRect | null, original: string | null) => {
     setBackgroundDraft({
       uri,
+      crop,
       characterName: name.trim(),
       effect: bgEffect,
       intensity: bgIntensity,
       bubbleTransparency: bgBubbleTransparency,
       onDone: (result) => {
-        if (result.uri) setBgPickedUri(result.uri)
-        else if (fresh) setBgPickedUri(uri)
+        setBgPickedUri(result.uri)
+        setBgPickedCrop(result.crop)
+        if (original) {
+          setBgPickedOriginalUri(original)
+          setBackgroundOriginal(null)
+        }
         setBgEffect(result.effect)
         setBgIntensity(result.intensity)
         setBgBubbleTransparency(result.bubbleTransparency)
@@ -170,15 +229,24 @@ export default function CharacterEditorScreen() {
   const onPickBackground = async (source: ImageSource) => {
     try {
       const uri = await pickBackground(source)
-      if (uri) openBackground(uri, true)
+      if (uri) openBackground(uri, null, uri)
     } catch (err) {
       showMessage(t('background.failedTitle'), errorMessage(err))
     }
   }
 
+  const onAdjustBackground = () => {
+    if (bgPickedOriginalUri) return openBackground(bgPickedOriginalUri, bgPickedCrop, null)
+    if (backgroundOriginal) return openBackground(avatarUri(backgroundOriginal, 'backgrounds')!, cropFromJson(backgroundCrop), null)
+    if (backgroundUri) openBackground(backgroundUri, null, backgroundUri)
+  }
+
   const onClearBackground = () => {
     setBgPickedUri(null)
+    setBgPickedOriginalUri(null)
+    setBgPickedCrop(null)
     setBackground(null)
+    setBackgroundOriginal(null)
   }
 
   const onSave = async () => {
@@ -186,10 +254,16 @@ export default function CharacterEditorScreen() {
     setSaving(true)
     try {
       const nextAvatar = pickedUri ? await persistAvatar(pickedUri) : avatar
+      const nextAvatarOriginal = pickedOriginalUri ? await persistOriginal(pickedOriginalUri) : avatarOriginal
+      const nextAvatarCrop = pickedUri ? cropToJson(pickedCrop) : avatarCrop
       const nextBackground = bgPickedUri ? await persistAvatar(bgPickedUri, 'backgrounds') : background
+      const nextBackgroundOriginal = bgPickedOriginalUri ? await persistOriginal(bgPickedOriginalUri, 'backgrounds') : backgroundOriginal
+      const nextBackgroundCrop = bgPickedUri ? cropToJson(bgPickedCrop) : backgroundCrop
       await saveCharacter(db, isNew ? null : Number(id), {
         name,
         avatar: nextAvatar,
+        avatarOriginal: nextAvatarOriginal,
+        avatarCrop: nextAvatarCrop,
         systemPrompt,
         greeting,
         temperature,
@@ -198,20 +272,36 @@ export default function CharacterEditorScreen() {
         replyLimit,
         thinking,
         background: nextBackground,
+        backgroundOriginal: nextBackgroundOriginal,
+        backgroundCrop: nextBackgroundCrop,
         backgroundEffect: bgEffect,
         backgroundIntensity: bgIntensity,
         backgroundBubbleTransparency: bgBubbleTransparency,
       })
       if (storedAvatar.current && storedAvatar.current !== nextAvatar) removeAvatar(storedAvatar.current)
       if (storedBackground.current && storedBackground.current !== nextBackground) removeAvatar(storedBackground.current, 'backgrounds')
+      if (storedAvatarOriginal.current && storedAvatarOriginal.current !== nextAvatarOriginal) removeAvatar(storedAvatarOriginal.current)
+      if (storedBackgroundOriginal.current && storedBackgroundOriginal.current !== nextBackgroundOriginal) {
+        removeAvatar(storedBackgroundOriginal.current, 'backgrounds')
+      }
       if (!asProfile) return router.back()
       // Back to the profile, now showing what was saved.
       storedAvatar.current = nextAvatar
       storedBackground.current = nextBackground
+      storedAvatarOriginal.current = nextAvatarOriginal
+      storedBackgroundOriginal.current = nextBackgroundOriginal
       setAvatar(nextAvatar)
+      setAvatarOriginal(nextAvatarOriginal)
+      setAvatarCrop(nextAvatarCrop)
       setPickedUri(null)
+      setPickedOriginalUri(null)
+      setPickedCrop(null)
       setBackground(nextBackground)
+      setBackgroundOriginal(nextBackgroundOriginal)
+      setBackgroundCrop(nextBackgroundCrop)
       setBgPickedUri(null)
+      setBgPickedOriginalUri(null)
+      setBgPickedCrop(null)
       setSaving(false)
       setEditing(false)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
@@ -229,7 +319,12 @@ export default function CharacterEditorScreen() {
       destructive: true,
       onConfirm: async () => {
         await deleteCharacter(db, Number(id))
-        removeCharacterImages({ avatar: storedAvatar.current, background: storedBackground.current })
+        removeCharacterImages({
+          avatar: storedAvatar.current,
+          avatarOriginal: storedAvatarOriginal.current,
+          background: storedBackground.current,
+          backgroundOriginal: storedBackgroundOriginal.current,
+        })
         router.dismissTo('/')
       },
     })
@@ -250,6 +345,7 @@ export default function CharacterEditorScreen() {
 
   const photoUri = pickedUri ?? (avatar ? avatarUri(avatar) : null)
   const hasPhoto = Boolean(photoUri)
+  const canRecrop = hasPhoto && !movingKind(photoUri!)
   // The character's own name heads the screen once it has one.
   const title = name.trim() || (isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle'))
 
@@ -322,6 +418,11 @@ export default function CharacterEditorScreen() {
                   <ImageSourceMenu onPick={onPickAvatar}>
                     <Text style={styles.link}>{hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')}</Text>
                   </ImageSourceMenu>
+                  {canRecrop ? (
+                    <Pressable onPress={onRecropAvatar} hitSlop={8}>
+                      <Text style={styles.link}>{t('editor.recropPhoto')}</Text>
+                    </Pressable>
+                  ) : null}
                   {hasPhoto ? (
                     <Pressable onPress={onClearAvatar} hitSlop={8}>
                       <Text style={styles.linkMuted}>{t('editor.removePhoto')}</Text>
@@ -340,7 +441,7 @@ export default function CharacterEditorScreen() {
                     </ImageSourceMenu>
                     {backgroundUri ? (
                       <>
-                        <Pressable onPress={() => openBackground(backgroundUri, false)} hitSlop={8}>
+                        <Pressable onPress={onAdjustBackground} hitSlop={8}>
                           <Text style={styles.link}>{t('background.adjust')}</Text>
                         </Pressable>
                         <Pressable onPress={onClearBackground} hitSlop={8}>
