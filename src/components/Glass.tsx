@@ -30,7 +30,7 @@ export function GlassSurface({ style, fallbackStyle, interactive, tintColor, var
     <GlassView
       glassEffectStyle={variant}
       colorScheme={scheme}
-      isInteractive={interactive}
+      isInteractive={interactive ?? false}
       tintColor={tintColor}
       style={style}
       {...rest}

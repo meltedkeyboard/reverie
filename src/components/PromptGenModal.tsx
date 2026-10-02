@@ -208,6 +208,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
       {hasCurrent ? (
         <View style={styles.block}>
           <ChipGroup
+            fadeColor={colors.surface}
             options={[
               { value: 'improve', label: t('promptGen.modeImprove') },
               { value: 'new', label: t('promptGen.modeNew') },
@@ -243,6 +244,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
       <Eyebrow label={t('promptGen.lengthLabel')} color={colors.text} />
       <View style={styles.block}>
         <ChipGroup
+            fadeColor={colors.surface}
           options={[
             { value: 'short', label: t('promptGen.lengthShort') },
             { value: 'medium', label: t('promptGen.lengthMedium') },
@@ -256,6 +258,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
       <Eyebrow label={t('promptGen.formatLabel')} color={colors.text} />
       <View style={styles.block}>
         <ChipGroup
+            fadeColor={colors.surface}
           options={[
             { value: 'prose', label: t('promptGen.formatProse') },
             { value: 'sections', label: t('promptGen.formatSections') },

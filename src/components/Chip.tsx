@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text } from 'react-native'
+import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
@@ -10,11 +10,12 @@ type Props = {
   label: string
   active: boolean
   onPress: () => void
+  style?: StyleProp<ViewStyle>
 }
 
 // A small Liquid Glass capsule to pick from a row of them; the chosen one is tinted
 // with the accent. Outside iOS 26 it is the plain surface, filled when chosen.
-export function Chip({ label, active, onPress }: Props) {
+export function Chip({ label, active, onPress, style }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
@@ -25,11 +26,10 @@ export function Chip({ label, active, onPress }: Props) {
       }}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      // Interactive glass springs under the finger by itself; a scale on top would fight it.
-      style={({ pressed }) => !liquidGlass && pressed && { transform: [{ scale: 0.96 }] }}
+      // The glass is not interactive (its press spring pulls the chip along with a sideways scroll), so on glass nothing moves.
+      style={({ pressed }) => [style, !liquidGlass && pressed && { transform: [{ scale: 0.96 }] }]}
     >
       <GlassSurface
-        interactive
         tintColor={active ? colors.accent : undefined}
         style={styles.chip}
         fallbackStyle={active ? styles.solidActive : styles.solid}
