@@ -37,6 +37,7 @@ import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
+import { withAlpha } from '@/lib/color'
 import { pickMessageImages, pictureUri } from '@/lib/attachments'
 import type { ImageSource } from '@/lib/images'
 import * as Haptics from '@/lib/haptics'
@@ -324,6 +325,32 @@ export function Composer({
       pop.value = withSpring(1, { damping: 20, stiffness: 300, mass: 0.7 })
     })
   }
+  // The row under the finger while it is down on the menu.
+  const [menuHover, setMenuHover] = useState<number | null>(null)
+  const menuBox = useRef({ width: 0, height: 0 })
+  const menuRows = useRef<{ y: number; height: number }[]>([])
+  const rowAt = (x: number, y: number) => {
+    if (x < 0 || x > menuBox.current.width) return null
+    const index = menuRows.current.findIndex((row) => y >= row.y && y < row.y + row.height)
+    return index < 0 ? null : index
+  }
+  const pickMenuItem = (index: number) => {
+    closeMenu()
+    attach(ATTACH_ITEMS[index].source)
+  }
+  const menuTouch = Gesture.Pan()
+    .runOnJS(true)
+    .minDistance(0)
+    .onBegin((e) => setMenuHover(rowAt(e.x, e.y)))
+    .onUpdate((e) => setMenuHover((prev) => {
+      const next = rowAt(e.x, e.y)
+      return next === prev ? prev : next
+    }))
+    .onEnd((e) => {
+      const index = rowAt(e.x, e.y)
+      if (index !== null) pickMenuItem(index)
+    })
+    .onFinalize(() => setMenuHover(null))
   const closeMenu = () => {
     if (!menuShown) return
     setMenuShown(false)
@@ -593,19 +620,26 @@ export function Composer({
           <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} accessibilityLabel={t('common.close')} />
           <Animated.View style={[styles.menu, { left: menuLeft, bottom: insets.bottom + 8 }, menuStyle]}>
             <GlassSurface style={styles.menuBody} fallbackStyle={glass.solid}>
-              {ATTACH_ITEMS.map((item) => (
-                <Pressable
-                  key={item.source}
-                  onPress={() => {
-                    closeMenu()
-                    attach(item.source)
-                  }}
-                  style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: colors.accentSoft }]}
-                >
-                  <Ionicons name={item.icon} size={22} color={colors.text} />
-                  <Text style={styles.menuLabel}>{t(item.label)}</Text>
-                </Pressable>
-              ))}
+              {/* One gesture for the whole list, so a finger dragged over the rows lights each
+                  one it passes, and letting go on a row picks it (as in a system menu). */}
+              <GestureDetector gesture={menuTouch}>
+                <View onLayout={(e) => (menuBox.current = e.nativeEvent.layout)}>
+                  {ATTACH_ITEMS.map((item, index) => (
+                    <View
+                      key={item.source}
+                      onLayout={(e) => (menuRows.current[index] = e.nativeEvent.layout)}
+                      accessible
+                      accessibilityRole="button"
+                      accessibilityLabel={t(item.label)}
+                      onAccessibilityTap={() => pickMenuItem(index)}
+                      style={[styles.menuItem, menuHover === index && { backgroundColor: withAlpha(colors.text, 0.1) }]}
+                    >
+                      <Ionicons name={item.icon} size={22} color={colors.text} />
+                      <Text style={styles.menuLabel}>{t(item.label)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </GestureDetector>
             </GlassSurface>
           </Animated.View>
         </>
