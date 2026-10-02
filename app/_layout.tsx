@@ -103,7 +103,8 @@ function AppShell() {
       <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
       <ThemeProvider value={navigationTheme}>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          <Stack.Screen name="viewer" options={{ animation: 'fade' }} />
+          {/* Opens in a blink; closed by the button or a tap, so no swipe-back either. */}
+          <Stack.Screen name="viewer" options={{ animation: 'fade', animationDuration: 120, gestureEnabled: false }} />
           <Stack.Screen name="background" options={{ animation: 'fade' }} />
           <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
         </Stack>

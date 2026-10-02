@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { Alert, FlatList, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, FlatList, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -19,6 +19,7 @@ const MAX_SCALE = 5
 const DOUBLE_TAP_SCALE = 2.5
 const EASE = { duration: 220 }
 const TAP_SLOP = 10
+const NATIVE = Platform.OS === 'ios'
 
 export default function ViewerScreen() {
   const router = useRouter()
@@ -71,15 +72,19 @@ export default function ViewerScreen() {
           const page = Math.round(e.nativeEvent.contentOffset.x / window.width)
           setIndex(Math.min(images.length - 1, Math.max(0, page)))
         }}
-        renderItem={({ item }) => (
-          <ZoomableImage
-            image={item}
-            width={window.width}
-            height={window.height}
-            onZoomChange={setZoomed}
-            onTap={close}
-          />
-        )}
+        renderItem={({ item }) =>
+          NATIVE ? (
+            <NativeZoomImage
+              image={item}
+              width={window.width}
+              height={window.height}
+              onZoomChange={setZoomed}
+              onTap={close}
+            />
+          ) : (
+            <ZoomableImage image={item} width={window.width} height={window.height} onZoomChange={setZoomed} onTap={close} />
+          )
+        }
       />
       <View style={[styles.bar, { top: insets.top + 4 }]} pointerEvents="box-none">
         <GlassButton icon="chevron-back" iconSize={26} onPress={close} />
@@ -107,6 +112,79 @@ export default function ViewerScreen() {
         </View>
       ) : null}
     </View>
+  )
+}
+
+type NativeZoomProps = {
+  image: ViewerImage
+  width: number
+  height: number
+  onZoomChange: (zoomed: boolean) => void
+  onTap: () => void
+}
+
+// iOS: the picture sits in a scroll view that zooms, pans and bounces by itself, with the
+// system physics. A double tap zooms to the point or back out, a single tap closes.
+function NativeZoomImage({ image, width, height, onZoomChange, onTap }: NativeZoomProps) {
+  const frameWidth = Math.min(width, height * image.aspect)
+  const frameHeight = frameWidth / image.aspect
+  const scroller = useRef<ScrollView>(null)
+  const zoomed = useRef(false)
+
+  const track = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const isZoomed = e.nativeEvent.zoomScale > 1.01
+    if (isZoomed !== zoomed.current) {
+      zoomed.current = isZoomed
+      onZoomChange(isZoomed)
+    }
+  }
+
+  const zoomAt = (x: number, y: number) => {
+    if (zoomed.current) {
+      scroller.current?.scrollResponderZoomTo({ x: 0, y: 0, width, height, animated: true })
+      return
+    }
+    // The content is as large as the screen, so a tap's point is the point in the content.
+    const w = width / DOUBLE_TAP_SCALE
+    const h = height / DOUBLE_TAP_SCALE
+    scroller.current?.scrollResponderZoomTo({ x: x - w / 2, y: y - h / 2, width: w, height: h, animated: true })
+  }
+  const tapped = () => {
+    if (!zoomed.current) onTap()
+  }
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDistance(TAP_SLOP)
+    .onEnd((e) => {
+      scheduleOnRN(zoomAt, e.x, e.y)
+    })
+  const singleTap = Gesture.Tap()
+    .maxDistance(TAP_SLOP)
+    .onEnd(() => {
+      scheduleOnRN(tapped)
+    })
+
+  return (
+    <GestureDetector gesture={Gesture.Exclusive(doubleTap, singleTap)}>
+      <ScrollView
+        ref={scroller}
+        style={{ width, height }}
+        // As large as the screen, the picture centered in it: with a content narrower than
+        // the screen and centerContent, UIKit shifted it sideways after a bounce past the
+        // largest zoom.
+        contentContainerStyle={{ width, height, alignItems: 'center', justifyContent: 'center' }}
+        minimumZoomScale={1}
+        maximumZoomScale={MAX_SCALE}
+        bouncesZoom
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={track}
+      >
+        <Picture uri={image.uri} style={{ width: frameWidth, height: frameHeight }} contentFit="contain" />
+      </ScrollView>
+    </GestureDetector>
   )
 }
 
