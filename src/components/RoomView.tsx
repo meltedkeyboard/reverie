@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Keyboard, StyleSheet, Text, View } from 'react-native'
+import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -417,8 +417,10 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
       </View>
 
       {empty ? (
-        <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="none">
-          <RoomIntro room={room} cast={cast} hint={members.length ? t('room.emptyHint') : t('room.noMembersHint')} />
+        <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="box-none">
+          <ScrollView style={styles.emptyScroll} contentContainerStyle={styles.emptyContent} showsVerticalScrollIndicator={false}>
+            <RoomIntro room={room} cast={cast} hint={members.length ? t('room.emptyHint') : t('room.noMembersHint')} />
+          </ScrollView>
         </Animated.View>
       ) : null}
 
@@ -606,9 +608,7 @@ function RoomIntro({ room, cast, hint }: { room: Room; cast: { name: string; ava
       <AvatarStack cast={cast} size={56} max={4} />
       <Text style={styles.introName}>{room.name}</Text>
       {room.scenario.trim() ? (
-        <Text style={styles.introScenario} numberOfLines={3}>
-          {room.scenario.trim()}
-        </Text>
+        <Text style={styles.introScenario}>{room.scenario.trim()}</Text>
       ) : null}
       {hint ? <Text style={styles.introMeta}>{hint}</Text> : null}
     </View>
@@ -641,6 +641,8 @@ const createStyles = (colors: Colors) =>
     },
     introMeta: { color: colors.textFaint, fontSize: 14, marginTop: 8, textAlign: 'center' },
     empty: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+    emptyScroll: { alignSelf: 'stretch' },
+    emptyContent: { flexGrow: 1, justifyContent: 'center' },
     accessory: { alignItems: 'center' },
     statusSlot: { marginBottom: 12 },
     status: {
