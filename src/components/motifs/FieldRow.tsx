@@ -129,8 +129,11 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.surface,
       overflow: 'hidden',
     },
-    fieldInput: { color: colors.text, fontSize: 16, paddingVertical: 12, paddingHorizontal: 14 },
-    multilineInput: { lineHeight: LINE_HEIGHT, textAlignVertical: 'top' },
+    // One line: a set height with no vertical padding, so the native field centers the text
+    // and the placeholder itself. With padding they could settle at different heights
+    // (the placeholder sat lower when the font fell back for Cyrillic).
+    fieldInput: { color: colors.text, fontSize: 16, height: 46, paddingVertical: 0, paddingHorizontal: 14 },
+    multilineInput: { lineHeight: LINE_HEIGHT, textAlignVertical: 'top', paddingVertical: 12 },
     // The text of an expanding field, laid out like the input it stands in for, with
     // room on the right for the expand mark.
     readerContent: { paddingVertical: 12, paddingLeft: 14, paddingRight: 40 },

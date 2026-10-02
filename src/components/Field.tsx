@@ -48,9 +48,10 @@ const createStyles = (colors: Colors) =>
       color: colors.text,
       fontSize: 16,
       paddingHorizontal: 14,
-      paddingTop: 13,
-      paddingBottom: 13,
+      height: 48,
+      paddingVertical: 0,
     },
-    multiline: { minHeight: 132, textAlignVertical: 'top' },
+    // Several lines: no set height, the padding comes back.
+    multiline: { height: undefined, minHeight: 132, paddingTop: 13, paddingBottom: 13, textAlignVertical: 'top' },
     hint: { color: colors.textFaint, fontSize: 12, marginTop: 6, marginLeft: 4, lineHeight: 17 },
   })
