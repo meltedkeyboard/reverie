@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
@@ -14,7 +15,10 @@ type Props = {
   accessibilityLabel?: string
   // A symbol before the label, in the label's color. With `slide`, the button shows no
   // spinner while loading: the symbol keeps leaving that way and coming back from the other.
-  icon?: Pick<ComponentProps<typeof SFIcon>, 'name' | 'fallback'> & { slide?: 'up' | 'down' }
+  // `plain` draws the Ionicons glyph instead of the SF Symbol, for a button inside a
+  // NativeMenu: a SwiftUI symbol in the menu's label gets the accent tint. The glyph then
+  // takes the label's color, where the SF Symbol is in the text color.
+  icon?: Pick<ComponentProps<typeof SFIcon>, 'name' | 'fallback'> & { slide?: 'up' | 'down'; plain?: boolean }
   onPress?: () => void
   // The label's color, which says what the action is: the accent, or danger for deleting.
   color?: string
@@ -56,7 +60,11 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
           <View style={styles.content}>
             {icon ? (
               <SlidingIcon direction={icon.slide} active={sliding}>
-                <SFIcon name={icon.name} fallback={icon.fallback} size={19} color={filled ? ink : color ?? colors.text} onAccent={filled} />
+                {icon.plain ? (
+                  <Ionicons name={icon.fallback} size={19} color={ink} />
+                ) : (
+                  <SFIcon name={icon.name} fallback={icon.fallback} size={19} color={filled ? ink : color ?? colors.text} onAccent={filled} />
+                )}
               </SlidingIcon>
             ) : null}
             {label ? (

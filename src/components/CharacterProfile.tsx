@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import { Fragment, useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
 import type { BackgroundEffect } from '@/db/characters'
 import { useTranslation } from '@/i18n'
@@ -10,6 +10,8 @@ import { useColors, useStyles, type Colors } from '@/theme'
 import { ChatBackground } from './ChatBackground'
 import { Divider } from './motifs/Divider'
 import { Eyebrow } from './motifs/Eyebrow'
+import { NativeMenu, type MenuItem } from './NativeMenu'
+import { PillButton } from './PillButton'
 
 type Props = {
   greeting: string
@@ -17,12 +19,14 @@ type Props = {
   // The settings as they read, already put in words by the screen.
   params: { label: string; value: string }[]
   background: { uri: string; effect: BackgroundEffect; intensity: number } | null
+  // The choices of the export button at the bottom; without them there is no button.
+  exportItems?: MenuItem[]
 }
 
 // A character to look at rather than to edit, as a Telegram profile: under the avatar
 // what the character is, and how it answers. The name stays in the header, from where it
 // moves onto the photo when the avatar spreads. Empty parts are left out.
-export function CharacterProfile({ greeting, systemPrompt, params, background }: Props) {
+export function CharacterProfile({ greeting, systemPrompt, params, background, exportItems }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
@@ -69,6 +73,14 @@ export function CharacterProfile({ greeting, systemPrompt, params, background }:
           {section}
         </Fragment>
       ))}
+      {exportItems ? (
+        <>
+          <Divider />
+          <NativeMenu items={exportItems} style={styles.export}>
+            <PillButton label={t('card.export')} icon={{ name: 'square.and.arrow.up', fallback: 'share-outline', plain: true }} />
+          </NativeMenu>
+        </>
+      ) : null}
     </View>
   )
 }
@@ -76,6 +88,11 @@ export function CharacterProfile({ greeting, systemPrompt, params, background }:
 // iOS moves things on a critically damped spring of about half a second; clamped, so the
 // height never passes the text and settles back.
 const SPRING = { stiffness: 170, damping: 26, mass: 1, overshootClamping: true }
+const OPEN_BASE_MS = 340
+const OPEN_MS_PER_PX = 0.9
+const OPEN_MAX_MS = 760
+// A soft start and a long settle, so the text eases out of the fold instead of snapping.
+const OPEN_EASING = Easing.bezier(0.4, 0, 0.2, 1)
 const LINE_HEIGHT = 23
 
 // A long text cut to a few lines with "more" at the end of the last one, over the text
@@ -99,9 +116,16 @@ function ClampedText({ text, lines }: { text: string; lines: number }) {
   const line = LINE_HEIGHT * fontScale
   const lessHeight = LESS_HEIGHT * fontScale
 
+  // Opening is timed by how far the box has to grow: a spring covers any distance in the
+  // same half second, so a long text jumped open. Closing keeps the spring.
   useEffect(() => {
-    progress.value = withSpring(open ? 1 : 0, SPRING)
-  }, [open, progress])
+    if (!open) {
+      progress.value = withSpring(0, SPRING)
+      return
+    }
+    const distance = Math.max(0, whole + lessHeight - cut)
+    progress.value = withTiming(1, { duration: Math.min(OPEN_MAX_MS, OPEN_BASE_MS + distance * OPEN_MS_PER_PX), easing: OPEN_EASING })
+  }, [open, progress, whole, cut, lessHeight])
 
   // Open, the box also holds the "show less" line under the text.
   const box = useAnimatedStyle(() => (long ? { height: cut + (whole + lessHeight - cut) * progress.value } : {}))
@@ -167,6 +191,7 @@ const createStyles = (colors: Colors) =>
     moreButton: { justifyContent: 'center', paddingLeft: 2 },
     less: { justifyContent: 'flex-end', alignItems: 'flex-start' },
     link: { color: colors.accent, fontSize: 16, lineHeight: LINE_HEIGHT },
+    export: { alignSelf: 'center' },
     params: { marginTop: 2 },
     param: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, paddingVertical: 11 },
     paramRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },

@@ -10,7 +10,6 @@ import { Avatar } from '@/components/Avatar'
 import { CharacterProfile } from '@/components/CharacterProfile'
 import { ChatBackground } from '@/components/ChatBackground'
 import { ImageSourceMenu } from '@/components/ImageSourceMenu'
-import { MenuGlassButton } from '@/components/MenuGlassButton'
 import { ChipGroup } from '@/components/ChipGroup'
 import { ExpandingAvatar, useSpreadPush } from '@/components/ExpandingAvatar'
 import { BarButton, DrawnFormScreenHeader } from '@/components/FormScreenHeader'
@@ -473,6 +472,8 @@ export default function CharacterEditorScreen() {
                   { label: t('editor.paragraphLimit'), value: replyLengthLabel },
                 ]}
                 background={backgroundUri ? { uri: backgroundUri, effect: bgEffect, intensity: bgIntensity } : null}
+                // Saves the card as it is stored, so edits not yet saved are not in it.
+                exportItems={isNew ? undefined : exportTargets(() => getCharacter(db, Number(id)))}
               />
             )}
           </Animated.View>
@@ -487,10 +488,6 @@ export default function CharacterEditorScreen() {
         overPhoto={photoSpread}
         right={
           <View style={styles.headerButtons}>
-            {/* Saves the card as it is stored, so edits not yet saved are not in it. */}
-            {isNew || !ready ? null : (
-              <MenuGlassButton icon="share-outline" items={exportTargets(() => getCharacter(db, Number(id)))} />
-            )}
             {/* One button that turns from the pencil into the checkmark, so the change is
                 the symbol's own transition rather than a swap. */}
             <BarButton
