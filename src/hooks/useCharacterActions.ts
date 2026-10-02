@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import { deleteCharacter, duplicateCharacter, type CharacterPreview } from '@/db/characters'
 import { createChat } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
+import { useCardExport } from '@/hooks/useCardExport'
 import { useTranslation } from '@/i18n'
 import { copyStoredImage, removeCharacterImages } from '@/lib/avatars'
 import type { MenuItem } from '@/components/NativeMenu'
@@ -15,6 +16,7 @@ export function useCharacterActions(reload: () => void) {
   const db = useDatabase()
   const router = useRouter()
   const { t } = useTranslation()
+  const { exportItem } = useCardExport()
 
   const startChat = async (character: CharacterPreview) => {
     router.push(`/chat/${await createChat(db, character)}`)
@@ -45,6 +47,7 @@ export function useCharacterActions(reload: () => void) {
     { label: t('characters.newChat'), systemImage: 'plus.bubble', onSelect: () => startChat(character) },
     { label: t('characters.edit'), systemImage: 'pencil', onSelect: () => router.push(`/character/${character.id}`) },
     { label: t('characters.duplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(character) },
+    exportItem(async () => character),
     { label: t('characters.delete'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(character) },
   ]
 

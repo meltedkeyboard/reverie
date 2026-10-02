@@ -11,7 +11,9 @@ export type MenuItem = {
   // SF Symbol shown next to the label in the native menu.
   systemImage?: string
   destructive?: boolean
-  onSelect: () => void
+  onSelect?: () => void
+  // A submenu that unfolds from this item.
+  children?: MenuItem[]
 }
 
 type Props = {
@@ -58,15 +60,21 @@ export function NativeMenu({ items, children, style, disabled = false, glassRadi
 
   const { Host, Menu, Button } = swiftUI.ui
   const m = swiftUI.modifiers
-  const buttons = items.map((item) => (
-    <Button
-      key={item.label}
-      label={item.label}
-      systemImage={item.systemImage as SymbolName | undefined}
-      role={item.destructive ? 'destructive' : undefined}
-      onPress={item.onSelect}
-    />
-  ))
+  const toView = (item: MenuItem): ReactNode =>
+    item.children ? (
+      <Menu key={item.label} label={item.label} systemImage={item.systemImage}>
+        {item.children.map(toView)}
+      </Menu>
+    ) : (
+      <Button
+        key={item.label}
+        label={item.label}
+        systemImage={item.systemImage as SymbolName | undefined}
+        role={item.destructive ? 'destructive' : undefined}
+        onPress={item.onSelect}
+      />
+    )
+  const buttons = items.map(toView)
 
   const { Group, RNHostView } = swiftUI.ui
   const glass = glassRadius !== undefined && liquidGlass

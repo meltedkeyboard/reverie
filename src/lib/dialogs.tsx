@@ -7,7 +7,9 @@ import { openAndroidDialog } from './androidDialog'
 export type SheetAction = {
   label: string
   destructive?: boolean
-  onSelect: () => void
+  onSelect?: () => void
+  // A submenu: choosing this action opens its own sheet with these.
+  children?: SheetAction[]
 }
 
 export type Confirmation = {
@@ -26,7 +28,12 @@ export type TextPrompt = {
   onSubmit: (text: string) => void
 }
 
-export function showSheet(title: string | undefined, actions: SheetAction[]) {
+export function showSheet(title: string | undefined, items: SheetAction[]) {
+  const actions = items.map(({ label, destructive, onSelect, children }) => ({
+    label,
+    destructive,
+    onSelect: children ? () => showSheet(label, children) : (onSelect ?? (() => {})),
+  }))
   if (Platform.OS === 'android') return openAndroidDialog({ kind: 'sheet', title, actions })
   const destructive = actions.findIndex((action) => action.destructive)
   ActionSheetIOS.showActionSheetWithOptions(

@@ -10,6 +10,7 @@ import { Avatar } from '@/components/Avatar'
 import { CharacterProfile } from '@/components/CharacterProfile'
 import { ChatBackground } from '@/components/ChatBackground'
 import { ImageSourceMenu } from '@/components/ImageSourceMenu'
+import { MenuGlassButton } from '@/components/MenuGlassButton'
 import { ChipGroup } from '@/components/ChipGroup'
 import { ExpandingAvatar, useSpreadPush } from '@/components/ExpandingAvatar'
 import { BarButton, DrawnFormScreenHeader } from '@/components/FormScreenHeader'
@@ -29,6 +30,7 @@ import {
   type ThinkingMode,
 } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
+import { useCardExport } from '@/hooks/useCardExport'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
 import { setAvatarCropDraft } from '@/lib/avatarCrop'
@@ -64,6 +66,7 @@ export default function CharacterEditorScreen() {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
+  const { exportTargets } = useCardExport()
 
   const THINKING_OPTIONS: { value: ThinkingMode; label: string }[] = [
     { value: 'auto', label: t('editor.thinkingAuto') },
@@ -483,17 +486,23 @@ export default function CharacterEditorScreen() {
         title={title}
         overPhoto={photoSpread}
         right={
-          // One button that turns from the pencil into the checkmark, so the change is
-          // the symbol's own transition rather than a swap.
-          <BarButton
-            symbol={editing ? 'checkmark' : 'pencil'}
-            fallback={editing ? 'checkmark' : 'pencil'}
-            disabled={editing ? !canSave : !ready}
-            onPress={editing ? onSave : () => setEditing(true)}
-            accessibilityLabel={editing ? t('common.save') : t('action.edit')}
-            prominent={editing}
-            animateChange
-          />
+          <View style={styles.headerButtons}>
+            {/* Saves the card as it is stored, so edits not yet saved are not in it. */}
+            {isNew || !ready ? null : (
+              <MenuGlassButton icon="share-outline" items={exportTargets(() => getCharacter(db, Number(id)))} />
+            )}
+            {/* One button that turns from the pencil into the checkmark, so the change is
+                the symbol's own transition rather than a swap. */}
+            <BarButton
+              symbol={editing ? 'checkmark' : 'pencil'}
+              fallback={editing ? 'checkmark' : 'pencil'}
+              disabled={editing ? !canSave : !ready}
+              onPress={editing ? onSave : () => setEditing(true)}
+              accessibilityLabel={editing ? t('common.save') : t('action.edit')}
+              prominent={editing}
+              animateChange
+            />
+          </View>
         }
       />
     </View>
@@ -503,6 +512,7 @@ export default function CharacterEditorScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
+    headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     chips: { marginBottom: 16 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
     aiButton: { alignSelf: 'flex-start', marginBottom: 12 },

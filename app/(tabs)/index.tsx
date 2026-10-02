@@ -11,6 +11,7 @@ import { EmptyState, ListSeparator } from '@/components/EmptyState'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/GlassHeader'
 import { HomePattern } from '@/components/HomePattern'
+import { MenuGlassButton } from '@/components/MenuGlassButton'
 import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
@@ -20,7 +21,10 @@ import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
+import { errorMessage } from '@/lib/errors'
+import { importCharacterCard, type CardSource } from '@/lib/importCard'
 import { liquidGlass } from '@/lib/nativeUI'
+import { showToast } from '@/lib/toast'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 export default function CharactersScreen() {
@@ -48,6 +52,17 @@ export default function CharactersScreen() {
       reload()
     }, [reload])
   )
+
+  const onImportCard = async (source: CardSource) => {
+    try {
+      const name = await importCharacterCard(db, source)
+      if (name === null) return
+      showToast({ tone: 'success', title: t('card.importDone'), message: name })
+      reload()
+    } catch (err) {
+      showToast({ tone: 'error', title: t('card.importFailed'), message: errorMessage(err) })
+    }
+  }
 
   const { menuItems, confirmDelete } = useCharacterActions(reload)
   const reorder = useReorder(characters, setCharacters, (ids) => setCharacterOrder(db, ids))
@@ -110,11 +125,20 @@ export default function CharactersScreen() {
       <GlassHeader
         floating
         right={
-          <Link href="/character/new" asChild>
-            <Link.AppleZoom>
-              <GlassButton icon="add" iconSize={26} accessibilityLabel={t('characters.createCharacter')} />
-            </Link.AppleZoom>
-          </Link>
+          <View style={styles.headerButtons}>
+            <MenuGlassButton
+              icon="download-outline"
+              items={[
+                { label: t('card.importFromFiles'), systemImage: 'folder', onSelect: () => onImportCard('files') },
+                { label: t('card.importFromPhotos'), systemImage: 'photo.on.rectangle', onSelect: () => onImportCard('photos') },
+              ]}
+            />
+            <Link href="/character/new" asChild>
+              <Link.AppleZoom>
+                <GlassButton icon="add" iconSize={26} accessibilityLabel={t('characters.createCharacter')} />
+              </Link.AppleZoom>
+            </Link>
+          </View>
         }
       >
         <TabTitle>{t('characters.title')}</TabTitle>
@@ -163,4 +187,5 @@ const createStyles = (colors: Colors) =>
   noticeTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 2 },
   noticeText: { color: colors.textMuted, fontSize: 14, lineHeight: 19 },
   emptyButton: { minWidth: 200 },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 })

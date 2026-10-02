@@ -17,6 +17,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Which actions a message has in its menu | `src/lib/messageActions.ts`, rendered in `src/components/MessageRow.tsx` |
 | A DB column or a new table | new entry at the end of `MIGRATIONS` in `src/db/schema.ts`, then the matching `src/db/*.ts` file |
 | Backup format | `src/lib/backup.ts` (`BACKUP_VERSION`, currently 7) |
+| Character Card import and export (JSON or PNG, V1/V2/V3; export is a PNG with a V2 card) | `src/lib/characterCard.ts` (PNG text chunks, field mapping, `buildCard`, `embedCard`, `cardPlaceholder.ts` for a character without an avatar), `src/lib/importCard.ts` (picker, avatar, insert, `exportCharacterCard` via `saveFile` / `saveImageBytes`), the download menu (Files / Photos) on the Characters tab, `useCardExport` (the Files / Photos choices and the toast) behind "Export card" in the character menu and the share button of the character screen |
 | Auto chat title | `src/lib/titles.ts` |
 | System prompt / greeting generator | `src/lib/promptGen.ts` and `src/components/PromptGenModal.tsx` |
 | Colors, fonts, light/dark | `src/theme.tsx` |
@@ -45,7 +46,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 
 | Route | File | Purpose |
 |---|---|---|
-| `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice. Does not scroll while empty (so does Rooms, and Search without results) |
+| `/` | `(tabs)/index.tsx` | Characters tab: reorder, server notice, the card import menu (Files / Photos) next to "+". Does not scroll while empty (so does Rooms, and Search without results) |
 | `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder |
 | `/settings` | `(tabs)/settings.tsx` | Settings tab: server, theme, language, Continue capsule and where it leads, lock, haptics, private question button, iCloud sync, backup. `?section=` scrolls to a block and flashes it |
 | `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26) |
@@ -53,7 +54,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 | `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead. `?message=ID` opens it scrolled to that message |
 | `/rooms/:roomId` | `rooms/[roomId].tsx` | Scenes of one room, import of a member's chat |
 | `/room/:id` | `room/[id].tsx` | Room editor: members, floor mode, scene, background |
-| `/character/:id` | `character/[id].tsx` | Character editor. With `?profile=1` (the info button of the chats list) it opens as a read-only profile, `CharacterProfile`, in the manner of Telegram: the pencil in the header turns into the save checkmark (`BarButton` with `animateChange`), and saving returns to the profile. The editor: prompt, greeting, sampling, thinking mode, background. The avatar spreads into a full-width photo on a pull (`ExpandingAvatar`, fed the scroll offset by `useAnimatedScrollHandler`), the drawn header giving way and the name moving onto the photo. Transforms only: the photo is laid out full size and scaled into the circle, and `useSpreadPush` moves the form down, since animating sizes re-laid out the form every frame |
+| `/character/:id` | `character/[id].tsx` | Character editor. With `?profile=1` (the info button of the chats list) it opens as a read-only profile, `CharacterProfile`, in the manner of Telegram: the pencil in the header turns into the save checkmark (`BarButton` with `animateChange`), and saving returns to the profile. The editor: prompt, greeting, sampling, thinking mode, background. The header carries a share button (`MenuGlassButton`, Files / Photos) that exports the stored card, next to the pencil. The avatar spreads into a full-width photo on a pull (`ExpandingAvatar`, fed the scroll offset by `useAnimatedScrollHandler`), the drawn header giving way and the name moving onto the photo. Transforms only: the photo is laid out full size and scaled into the circle, and `useSpreadPush` moves the form down, since animating sizes re-laid out the form every frame |
 | `/background` | `background.tsx` | Background picker, effect and intensity |
 | `/avatar-crop` | `avatar-crop.tsx` | Moving and pinching a still avatar picked from Photos or Files under a round window; the camera crops in the system editor instead |
 | `/text-editor` | `text-editor.tsx` | A long form text (system prompt, greeting, scene) on the whole screen, like a note; each change goes straight back to the form. Opens without the keyboard; a wrapper takes the JS touch (`onStartShouldSetResponderCapture`), because `TextInput` focuses itself when any touch ends, a scroll included |
@@ -148,8 +149,9 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 | Group | Files |
 |---|---|
 | Images | `images.ts` (pick, resize to 1024 px JPEG, data URLs), `avatars.ts` (pick avatar/background: `pickAvatarPhoto` camera, `pickAvatarLibrary` and `pickAvatarFile` raw, a still one then framed on `/avatar-crop`, a moving one kept by `acceptMoving`; `squareAvatar` cuts a given square, copy), `avatarStore.ts` (files, avatars and backgrounds in separate folders), `media.ts` (which files are video or a moving picture, by extension and, for WebP/PNG, a header sniff; the size cap) |
-| Backup | `backup.ts` (export, import, wipe), `download.ts` (save JSON through the Files "Save as" sheet from `modules/reverie-save-as`, or to a picked folder without it, an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` |
-| Dialogs | `dialogs.tsx` (native alerts and sheets, for choices that must block), `chatDialogs.ts` |
+| Backup | `backup.ts` (export, import, wipe), `download.ts` (`saveFile` / `saveJson`: a file through the Files "Save as" sheet from `modules/reverie-save-as`, or to a picked folder without it; `saveImage` / `saveImageBytes`: an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` |
+| Dialogs | `dialogs.tsx` (native alerts and sheets, for choices that must block; a `SheetAction` with `children` opens a sheet of its own), `chatDialogs.ts` |
+| Character cards | `characterCard.ts` (reads and writes the `chara` / `ccv3` text chunk of a PNG, maps a card to a character and back), `importCard.ts` (the pickers, the avatar, saving to Files or Photos), `cardPlaceholder.ts` (the picture that carries a card for a character without an avatar) |
 | Toasts | `toast.ts`: one message at a time with a tone (`success`, `error`, `info`) and optional buttons, gone after a few seconds. `ToastHost` drops it in from the top on a spring over the screen, on glass like the other controls; a tap or a swipe up sends it back. It takes no touches outside itself, unlike an alert. Settings and iCloud sync use it for every notice; only the wipe confirmation stays an `Alert`, and so does a conflict found by a quiet sync on another screen (a sheet) |
 | Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
 | AI helpers | `promptGen.ts`, `titles.ts`, `aside.ts` (the Private request, `characterScene`/`roomScene`) |
@@ -165,7 +167,8 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 | `useChat` | Conversation state, streaming, variants, editing |
 | `useRoom` | A room scene: the speaker queue, director, autoplay, nudges |
 | `useAside` | The Private thread with the model beside a chat or a scene, in memory only |
-| `useCharacterActions` | Duplicate / delete / export actions for a character |
+| `useCharacterActions` | New chat / edit / duplicate / export / delete actions for a character |
+| `useCardExport` | The "Save to Files / Save to Photos" menu items for a character card and the toast after saving; used by the character menu and the character screen |
 | `useLastChat` | The chat behind the "Continue" capsule on the Characters and Rooms tabs: the one opened last, or the one written in last, as set in Settings. Chats without a user message never count. `LastChatProvider` in the tabs layout holds both kinds for the one shared button; `useContinueAnchor` on a tab's root view tells it where the content ends (inside a tab the safe area includes the tab bar); only the focused tab reports, re-measuring on focus and every half second |
 | `useConnectionTest` | "Test connection" button state |
 | `useReorder` | Drag-to-reorder lists (`react-native-reorderable-list`) |
@@ -179,7 +182,7 @@ A folder picked in iCloud Drive, not the iCloud entitlement: that one needs a pa
 - **Rooms:** `RoomView`, `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`. `Check` is the checkmark of a picked sheet row.
 - **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton` (one for both home tabs, drawn by `(tabs)/_layout.tsx` over them as `HomeContinueButton`; slides its content out and in when it comes to lead to another chat; on a switch between Characters and Rooms the content just changes), `EmptyState`.
 - **Forms:** `Field`, `ToggleRow`, `Segmented`, `ChipGroup` (a row of `Chip`), `ParamSlider`, `FormScreenHeader`, `PromptGenModal`, `PickerBox` (a field chosen from the system menu rather than typed, `NativeMenu` around the box; `FieldRow` with `menu`). The server's models go through it in Settings and onboarding once the connection test has listed them; in onboarding, while none is picked, the main button is the menu's trigger (a menu cannot be opened from code).
-- **Chrome and glass:** `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs), `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `PillButton`, `Chip`, `SFIcon`.
+- **Chrome and glass:** `MenuGlassButton` (a round glass header button that opens a menu), `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs), `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `PillButton`, `Chip`, `SFIcon`.
 - **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `Picture` (one picture by file: expo-image, or a looping muted `expo-video` player for MP4/MOV/M4V; used by `Avatar`, `ExpandingAvatar` and the viewer), `ExpandingAvatar` (the character editor's), `ImageLink`, `HomePattern`, `Wordmark`.
 - **`motifs/`:** small brand decorations (`Star*`, `Divider`, `Eyebrow`, `FieldRow`). `Eyebrow` is the section heading everywhere: Georgia 19 pt, regular, no star, no caps, as in the first releases.
 
@@ -220,7 +223,7 @@ Nine icons besides the standard one (which follows the light and dark look from 
 The same code base, with the iOS-only parts replaced or left out.
 
 - `nativeUI.ts` loads `@expo/ui` (SwiftUI) and `expo-glass-effect` only on iOS, so `swiftUI` and `liquidGlass` are null on Android and every component takes its fallback path. `ExpoUI` registers a module on Android too, which is why the platform is checked and not only the module.
-- `ActionSheetIOS` and `Alert.prompt` do not exist on Android. `showSheet` and `promptText` in `src/lib/dialogs.tsx` hand the request to `src/lib/androidDialog.ts`, and `DialogHost` (mounted in `app/_layout.tsx`) draws it in a `Modal`. `NativeMenu` falls back to `showSheet`, so its menus are a bottom sheet there.
+- `ActionSheetIOS` and `Alert.prompt` do not exist on Android. `showSheet` and `promptText` in `src/lib/dialogs.tsx` hand the request to `src/lib/androidDialog.ts`, and `DialogHost` (mounted in `app/_layout.tsx`) draws it in a `Modal`. `NativeMenu` falls back to `showSheet`, so its menus are a bottom sheet there. A `MenuItem` with `children` is a submenu: a nested SwiftUI `Menu` on iOS, a second sheet opened by the first elsewhere.
 - Tabs: `NativeTabs` has Material icons (`md`) next to the SF Symbols and, unlike iOS, insets the content by the tab bar itself.
 - Storage: no `Library` folder and no Files app. The data sits in `files/Reverie` and the "show in Files" toggle is hidden (`settings.tsx`, search entries).
 - No blur on Android (it costs a copy of the screen per frame): `BlurBar` is a nearly opaque tint, the app lock shield a solid color.
