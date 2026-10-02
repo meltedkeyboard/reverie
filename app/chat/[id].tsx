@@ -9,13 +9,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AsidePanel } from '@/components/AsidePanel'
 import { Avatar } from '@/components/Avatar'
-import { castGallery } from '@/components/AvatarStack'
 import { ChatBackground } from '@/components/ChatBackground'
 import { Composer, ComposerSwap } from '@/components/Composer'
 import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
-import { useOpenViewer } from '@/components/ImageLink'
 import { MessageRow, type RowMessage } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { RoomView } from '@/components/RoomView'
@@ -28,7 +26,7 @@ import { newMessage } from '@/db/messages'
 import { isPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase } from '@/db/provider'
 import { createRoomChat, getRoom, listRoomMembers, type Room, type RoomMember } from '@/db/rooms'
-import { areSuggestionHintsEnabled, isSuggestionsEnabled } from '@/db/suggestions'
+import { isSuggestionsEnabled } from '@/db/suggestions'
 import { useAside } from '@/hooks/useAside'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useSuggestion } from '@/hooks/useSuggestion'
@@ -121,7 +119,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const chatId = chat.id
   const db = useDatabase()
   const router = useRouter()
-  const openViewer = useOpenViewer()
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
   const colors = useColors()
@@ -129,11 +126,9 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const { t } = useTranslation()
   const [privateEnabled, setPrivateEnabled] = useState(true)
   const [suggestEnabled, setSuggestEnabled] = useState(false)
-  const [suggestHints, setSuggestHints] = useState(true)
   useEffect(() => {
     isPrivateChatEnabled(db).then(setPrivateEnabled)
     isSuggestionsEnabled(db).then(setSuggestEnabled)
-    areSuggestionHintsEnabled(db).then(setSuggestHints)
   }, [db])
   const {
     messages,
@@ -276,10 +271,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
     }
   }
 
-  // The avatar in the header is the menu's trigger, so its photo opens from the menu.
-  const avatar = castGallery([character])
   const chatMenu: MenuItem[] = [
-    ...(avatar.length ? [{ label: t('chat.menuShowAvatar'), systemImage: 'photo', onSelect: () => openViewer(avatar) }] : []),
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) },
@@ -362,12 +354,16 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           </View>
         }
       >
-        {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
-            of the pill. */}
-        <NativeMenu items={chatMenu} style={styles.whoPress} glassRadius={22}>
-          <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
-            <View style={styles.whoContent}>
-              <Avatar name={character.name} file={character.avatar} size={34} viewable={false} />
+        <View style={styles.headerWho}>
+          {/* The photo is a button of its own, as in Telegram: it opens full screen, and
+              the pill beside it keeps the menu. */}
+          <GlassSurface interactive style={styles.photo}>
+            <Avatar name={character.name} file={character.avatar} size={38} />
+          </GlassSurface>
+          {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
+              of the pill. */}
+          <NativeMenu items={chatMenu} style={styles.whoPress} glassRadius={22}>
+            <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
               <View style={styles.whoText}>
                 <View style={styles.nameRow}>
                   <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
@@ -383,9 +379,9 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
                   </Text>
                 ) : null}
               </View>
-            </View>
-          </PillSurface>
-        </NativeMenu>
+            </PillSurface>
+          </NativeMenu>
+        </View>
       </GlassHeader>
 
       {/* With the private thread open the field talks to the model aside, and the thread
@@ -404,7 +400,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           suggestion={suggestion}
           onSuggestionTaken={clearSuggestion}
           onSuggestionDismissed={dismissSuggestion}
-          suggestionHints={suggestHints}
           onSend={(text, image) => {
             if (asideOpen) return void aside.ask(text, image)
             send(text, image)
@@ -447,10 +442,11 @@ const PillSurface = nativeMenuGlass ? View : GlassSurface
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  whoPress: { alignSelf: 'flex-start', maxWidth: '100%' },
-  who: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  whoContent: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
-  whoPill: { borderRadius: 22, paddingVertical: 4, paddingLeft: 4, paddingRight: 14 },
+  headerWho: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  photo: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  whoPress: { flexShrink: 1 },
+  who: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+  whoPill: { borderRadius: 22, paddingVertical: 4, paddingHorizontal: 16 },
   whoText: { flexShrink: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },

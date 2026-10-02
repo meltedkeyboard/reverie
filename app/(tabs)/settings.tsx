@@ -21,12 +21,7 @@ import { isHapticsEnabled, setHapticsEnabled } from '@/db/haptics'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
-import {
-  areSuggestionHintsEnabled,
-  isSuggestionsEnabled,
-  setSuggestionHintsEnabled,
-  setSuggestionsEnabled,
-} from '@/db/suggestions'
+import { isSuggestionsEnabled, setSuggestionsEnabled } from '@/db/suggestions'
 import { useCloudSync } from '@/hooks/useCloudSync'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useShake } from '@/hooks/useShake'
@@ -137,7 +132,6 @@ export default function SettingsScreen() {
   const [continueByVisit, setContinueByVisitValue] = useStoredFlag(isContinueByVisit, setContinueByVisit, true)
   const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
   const [suggestions, toggleSuggestions] = useStoredFlag(isSuggestionsEnabled, setSuggestionsEnabled, false)
-  const [suggestHints, toggleSuggestHints] = useStoredFlag(areSuggestionHintsEnabled, setSuggestionHintsEnabled, true)
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
   const [appLock, setAppLock] = useStoredFlag(isAppLockEnabled, setAppLockEnabled, false)
@@ -352,11 +346,6 @@ export default function SettingsScreen() {
         note={t('settings.suggestButtonNote')}
         value={suggestions}
         onValueChange={toggleSuggestions}
-      />
-      <ToggleRow
-        label={t('settings.suggestHints')}
-        value={!suggestHints}
-        onValueChange={(off) => toggleSuggestHints(!off)}
       />
     </>
   )

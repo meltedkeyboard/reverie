@@ -27,7 +27,7 @@ import { newMessage, type Message } from '@/db/messages'
 import { isPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase } from '@/db/provider'
 import { setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
-import { areSuggestionHintsEnabled, isSuggestionsEnabled } from '@/db/suggestions'
+import { isSuggestionsEnabled } from '@/db/suggestions'
 import { useAside } from '@/hooks/useAside'
 import { useSuggestion } from '@/hooks/useSuggestion'
 import { useRoom, type RoomPhase } from '@/hooks/useRoom'
@@ -108,11 +108,9 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const [castOpen, setCastOpen] = useState(false)
   const [privateEnabled, setPrivateEnabled] = useState(true)
   const [suggestEnabled, setSuggestEnabled] = useState(false)
-  const [suggestHints, setSuggestHints] = useState(true)
   useEffect(() => {
     isPrivateChatEnabled(db).then(setPrivateEnabled)
     isSuggestionsEnabled(db).then(setSuggestEnabled)
-    areSuggestionHintsEnabled(db).then(setSuggestHints)
   }, [db])
 
   // A private thread with the model about the scene, as in a one-on-one chat. While it is
@@ -486,7 +484,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
           suggestion={suggestion}
           onSuggestionTaken={clearSuggestion}
           onSuggestionDismissed={dismissSuggestion}
-          suggestionHints={suggestHints}
           hushed={asideOpen || (whisper && addressees.length > 0 && !narration)}
           toolbar={
             members.length && !asideOpen ? (
