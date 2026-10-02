@@ -55,7 +55,7 @@
   "appIcon.Metal": "Metal",
   "appIcon.RetroSticker": "Retro sticker",
   "appIcon.ToneOnTone": "Tone on tone",
-  "appIcon.hint": "The icon on the home screen changes at once. iOS asks to confirm the change, and an Android launcher may take a moment to redraw it. The standard icon follows the light and dark look.",
+  "appIcon.hint": "The standard icon follows the light and dark look.",
   "appIcon.failed": "Couldn't change the icon",
   "settings.chatReset": "Reset to default",
   "chatPreview.user": "Tell me how the evening went.",
