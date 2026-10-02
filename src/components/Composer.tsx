@@ -1,5 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
+import MaskedView from '@react-native-masked-view/masked-view'
 import { Image } from 'expo-image'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Pressable,
@@ -110,9 +112,36 @@ export function Composer({
   const stash = useRef('')
   const inputRef = useRef<TextInput>(null)
   const [focused, setFocused] = useState(false)
+  // Which edges of the field's scrolling text have more beyond them, to fade those out
+  // instead of cutting the lines off.
+  const [fades, setFades] = useState({ top: false, bottom: false })
+  const scrollInfo = useRef({ offset: 0, content: 0, view: 0 })
+  const updateFades = () => {
+    const { content, view } = scrollInfo.current
+    // Text that fits does not scroll, whatever offset was left from when it was longer.
+    if (content <= view + 1) scrollInfo.current.offset = 0
+    const { offset } = scrollInfo.current
+    const next = { top: offset > 1, bottom: content > view + 1 && offset + view < content - 1 }
+    setFades((prev) => (prev.top === next.top && prev.bottom === next.bottom ? prev : next))
+  }
   // Whether the text would not fit on one line of the narrow, one-tier field. Measured by a
   // hidden copy of the text at that width, so that widening the field cannot flip it back.
   const [wraps, setWraps] = useState(false)
+  // Enter on an empty field opens the field up without typing a line break: it grows and
+  // stays empty, the placeholder moving up into the new place. Ends once text has been
+  // typed and cleared again (a sent message clears it too).
+  const [opened, setOpened] = useState(false)
+  const hadText = useRef(false)
+  // Whether a suggestion stands in for the empty text, which is then what gets measured.
+  const suggestingRef = useRef(false)
+  const change = (next: string) => {
+    if (!textRef.current && next.includes('\n') && !next.trim()) {
+      setOpened(true)
+      inputRef.current?.setNativeProps({ text: '' })
+      return
+    }
+    setText(next)
+  }
   const [images, setImages] = useState<MessageImage[]>([])
   const [picking, setPicking] = useState(false)
   const imageUris = useMemo(() => images.map((image) => attachmentUri(image.file)), [images])
@@ -127,11 +156,23 @@ export function Composer({
 
   // An empty text may not be laid out again, so it ends the wrapped state itself.
   useEffect(() => {
-    if (!text) setWraps(false)
+    if (text) hadText.current = true
+    else {
+      if (!suggestingRef.current) setWraps(false)
+      if (hadText.current) {
+        hadText.current = false
+        setOpened(false)
+      }
+    }
   }, [text])
 
   const value = text.trim()
   const suggesting = !editing && !value && !images.length && !!suggestion
+  suggestingRef.current = suggesting
+  // The suggestion ending (taken, dismissed, a new message) lets the wrapped state go.
+  useEffect(() => {
+    if (!suggesting && !textRef.current) setWraps(false)
+  }, [suggesting])
   // Height of the suggestion as drawn over the field. It is not the placeholder: on iOS a
   // multiline field grows to fit a long placeholder and never shrinks back after it.
   const [ghostHeight, setGhostHeight] = useState(0)
@@ -249,7 +290,7 @@ export function Composer({
   const docked = toolbar !== undefined && toolbar !== null && !editing
   // As in ChatGPT: one line is a capsule with the plus and the send button at the sides;
   // a second line (typed or wrapped) moves them under the text, which takes the full width.
-  const expanded = docked || wraps || text.includes('\n')
+  const expanded = docked || opened || wraps || text.includes('\n') || (suggesting && !!suggestion?.includes('\n'))
   const inputPad = expanded
     ? styles.inputExpanded
     : { paddingLeft: editing ? 14 : SIDE_PAD, paddingRight: SIDE_PAD }
@@ -287,6 +328,14 @@ export function Composer({
     narrow.value = withTiming(resting ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) })
   }, [resting, narrow])
   const narrowStyle = useAnimatedStyle(() => ({ paddingHorizontal: narrow.value * NARROW_INSET }))
+
+  // The placeholder and the suggestion sit where the text will start: at once in the opened
+  // field, no gliding between the two layouts.
+  const textLeft = FIELD_PAD + (expanded ? 14 : editing ? 14 : SIDE_PAD)
+  const textTop = FIELD_PAD + (docked ? 12 : expanded ? 10 : 8)
+  const placeholderAt = { left: textLeft, top: textTop }
+  const ghostRight = FIELD_PAD + (expanded ? 14 : SIDE_PAD)
+  const showPlaceholder = !text && !suggesting
   // Scales with a transform only: Liquid Glass renders wrongly under a fading parent.
   const menuStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
 
@@ -340,6 +389,17 @@ export function Composer({
   const accessoryStyle = useAnimatedStyle(() => ({ bottom: height.value }))
   const boxStyle = useAnimatedStyle(() => ({ height: boxHeight.value }))
 
+  // The fades only exist in the opened field: in the one-line capsule nothing scrolls, and a
+  // size or offset left over from the taller field must not keep an edge dimmed. An emptied
+  // field has scrolled back to the top.
+  const edges = expanded ? fades : NO_FADES
+  useEffect(() => {
+    if (expanded && text) return
+    scrollInfo.current.offset = 0
+    scrollInfo.current.content = 0
+    setFades((prev) => (prev.top || prev.bottom ? NO_FADES : prev))
+  }, [expanded, text])
+
   const row = (
     <Animated.View style={[styles.row, narrowStyle]}>
       <Animated.View ref={fieldBox} style={[styles.fieldBox, boxStyle]} collapsable={false}>
@@ -376,30 +436,53 @@ export function Composer({
         ) : null}
         <GestureDetector gesture={swipe}>
           <View>
-            <TextInput
-              key={inputKey}
-              ref={inputRef}
-              value={text}
-              onChangeText={setText}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              placeholder={suggesting ? '' : (placeholder ?? t('chat.messagePlaceholder'))}
-              {...inputColors}
-              multiline
-              autoFocus={autoFocus}
-              accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
-              style={[
-                styles.input,
-                inputPad,
-                docked && styles.inputDocked,
-                suggesting && { minHeight: ghostHeight },
-              ]}
-            />
-            {suggesting ? (
-              <View style={styles.ghost} pointerEvents="none" onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}>
-                <Text style={[styles.ghostText, inputPad, docked && styles.inputDocked]}>{suggestion}</Text>
-              </View>
-            ) : null}
+            <MaskedView
+              maskElement={
+                <View style={styles.maskFill}>
+                  <LinearGradient colors={edges.top ? [CLEAR, SOLID] : [SOLID, SOLID]} style={styles.maskEdge} />
+                  <View style={styles.maskMiddle} />
+                  <LinearGradient colors={edges.bottom ? [SOLID, CLEAR] : [SOLID, SOLID]} style={styles.maskEdge} />
+                </View>
+              }
+            >
+              <TextInput
+                key={inputKey}
+                ref={inputRef}
+                value={text}
+                onChangeText={change}
+                onScroll={(e) => {
+                  scrollInfo.current.offset = e.nativeEvent.contentOffset.y
+                  updateFades()
+                }}
+                onContentSizeChange={(e) => {
+                  scrollInfo.current.content = e.nativeEvent.contentSize.height
+                  updateFades()
+                }}
+                onLayout={(e) => {
+                  scrollInfo.current.view = e.nativeEvent.layout.height
+                  updateFades()
+                }}
+                // Backspace in the opened, empty field folds it back.
+                onKeyPress={(e) => {
+                  if (e.nativeEvent.key === 'Backspace' && !textRef.current) setOpened(false)
+                }}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                placeholder={suggesting ? '' : (placeholder ?? t('chat.messagePlaceholder'))}
+                {...inputColors}
+                // The placeholder is drawn below, where it can glide between the two layouts.
+                placeholderTextColor="transparent"
+                multiline
+                autoFocus={autoFocus}
+                accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
+                style={[
+                  styles.input,
+                  inputPad,
+                  docked && styles.inputDocked,
+                  suggesting && { minHeight: ghostHeight + (docked ? 12 : expanded ? 10 : 8) + 8 },
+                ]}
+              />
+            </MaskedView>
           </View>
         </GestureDetector>
         {docked ? (
@@ -424,11 +507,32 @@ export function Composer({
               importantForAccessibility="no-hide-descendants"
               onTextLayout={(e) => setWraps(e.nativeEvent.lines.length > 1)}
             >
-              {text}
+              {text || (suggesting ? suggestion : '')}
             </Text>
           </>
         )}
         </View>
+        {/* In the box, not in the content: the content is pinned to the bottom and its top jumps
+            when the field opens, the box's top moves with the growth. */}
+        {suggesting ? (
+          <Animated.View
+            style={[styles.ghost, placeholderAt, { right: ghostRight }]}
+            pointerEvents="none"
+          >
+            <Text style={styles.ghostText} onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}>
+              {suggestion}
+            </Text>
+          </Animated.View>
+        ) : null}
+        {showPlaceholder ? (
+          <Animated.Text
+            style={[styles.placeholder, placeholderAt, { color: inputColors.placeholderTextColor }]}
+            numberOfLines={1}
+            pointerEvents="none"
+          >
+            {placeholder ?? t('chat.messagePlaceholder')}
+          </Animated.Text>
+        ) : null}
       </Animated.View>
     </Animated.View>
   )
@@ -525,6 +629,11 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
 // The plus and the send button are SIDE wide; the text of a one-line field keeps clear of
 // them by SIDE_PAD. NARROW_INSET is how much narrower the field is at rest.
 const SIDE = 34
+// The mask that fades the scrolling text out at its edges (only the alpha counts).
+const SOLID = '#000000'
+const CLEAR = 'rgba(0,0,0,0)'
+const FADE = 18
+const NO_FADES = { top: false, bottom: false }
 // The input's own height with a single line: padding 8 + a 22 line + 8 (docked: 12 on top).
 const ONE_LINE_INPUT = 38
 const DOCKED_INPUT = 42
@@ -591,6 +700,10 @@ const createStyles = (colors: Colors) =>
   plusAt: { position: 'absolute', left: EDGE, bottom: EDGE },
   sendAt: { position: 'absolute', right: EDGE, bottom: EDGE },
   // Never seen: the text laid out at the one-line width, to count its lines.
+  placeholder: { position: 'absolute', right: FIELD_PAD + SIDE_PAD, fontSize: 17, lineHeight: 22 },
+  maskFill: { flex: 1, backgroundColor: 'transparent' },
+  maskEdge: { height: FADE },
+  maskMiddle: { flex: 1, backgroundColor: SOLID },
   measure: { position: 'absolute', top: 0, opacity: 0, fontSize: 17, lineHeight: 22 },
   inputExpanded: { paddingHorizontal: 14, paddingTop: 10 },
   input: {
@@ -602,8 +715,8 @@ const createStyles = (colors: Colors) =>
     paddingBottom: 8,
     paddingHorizontal: 14,
   },
-  ghost: { position: 'absolute', top: 0, left: 0, right: 0, maxHeight: 180, overflow: 'hidden' },
-  ghostText: { color: colors.textMuted, fontSize: 17, lineHeight: 22, paddingTop: 8, paddingBottom: 8, paddingHorizontal: 14 },
+  ghost: { position: 'absolute', maxHeight: 164, overflow: 'hidden' },
+  ghostText: { color: colors.textMuted, fontSize: 17, lineHeight: 22 },
   inputDocked: { paddingTop: 12, paddingBottom: 8 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolbar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
