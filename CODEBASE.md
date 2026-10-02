@@ -9,7 +9,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | I want to change... | Go to |
 |---|---|
 | A request to the model, SSE parsing, thinking mode | `src/api/llm.ts` |
-| How many messages are sent as context | `CONTEXT_WINDOW` in `src/api/llm.ts` |
+| How much history is sent as context | `fitHistory` in `src/lib/context.ts` (the token estimate, the slider's steps); `selectHistory` picks by the mode (`contextMode`: the last 20 messages of a chat or 30 of a room, or the token window); the window `contextTokens` is a slider in Settings > Server, shown in tokens mode once the Play button has loaded the model |
 | Send / regenerate / variants / edit / delete logic | `src/hooks/useChat.ts` (rooms: `src/hooks/useRoom.ts`) |
 | Who speaks next in a room, whispers, eavesdropping | `src/lib/room/floor.ts`, `src/lib/room/audience.ts` |
 | What a room character sees of the scene | `src/lib/room/prompt.ts` |
@@ -85,7 +85,7 @@ Every avatar opens the viewer: `Avatar` and `AvatarStack` (the whole cast, via `
 ## Data flow of a chat
 
 1. `chat/[id].tsx` loads the chat and character, then mounts `useChat`.
-2. `useChat` builds the request: system prompt from the character, the last `CONTEXT_WINDOW` messages using the selected variants, images as `image_url` parts.
+2. `useChat` builds the request: system prompt from the character, the newest messages that fit the context window set in Settings (`fitHistory`, minus the system prompt and `maxTokens`) using the selected variants, images as `image_url` parts.
 3. `streamChat` (`src/api/llm.ts`) yields `StreamPart`s: reply text and reasoning. `useChat` updates state per chunk and writes to the DB through `src/db/messages.ts`.
 4. `regenerateTargetAt` decides what a regenerate replaces and which history the model sees.
 5. After the first reply `autoName` calls `suggestTitle` and stores the title with `setChatTitle`. The title is asked for with thinking off, regardless of the character; if the model still answers with nothing, it is asked again with the server default and a larger budget.

@@ -1,14 +1,11 @@
 import type { ChatRequest, ChatTurn, ContentPart } from '@/api/llm'
 import type { Message } from '@/db/messages'
 import type { Room, RoomMember } from '@/db/rooms'
+import { ROOM_MESSAGES, selectHistory, turnTokens } from '@/lib/context'
 import { toTurn, withReplyLimit } from '@/lib/replyStream'
 
 import { hearing, USER } from './audience'
 import type { Planned } from './floor'
-
-// More than a one-on-one chat: several people talk, so the same stretch of scene takes
-// more lines, and whatever the speaker could not hear is dropped first.
-export const ROOM_CONTEXT_WINDOW = 30
 
 export function userNameOf(room: Room) {
   return room.userName.trim() || 'User'
@@ -19,6 +16,8 @@ function list(names: string[]) {
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
+type Window = Parameters<typeof selectHistory>[2]
+
 type Context = {
   speaker: RoomMember
   room: Room
@@ -27,11 +26,12 @@ type Context = {
   history: Message[]
   planned: Planned
   guidance?: string
+  window: Window
 }
 
 // The scene as this one character lived it: their own lines as the assistant, everyone
 // else's as the user with a name in front, and nothing they could not have heard.
-export function buildRoomRequest({ speaker, room, members, history, planned, guidance }: Context): ChatRequest {
+export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window }: Context): ChatRequest {
   const me = speaker.characterId
   const name = speaker.character.name
   const userName = userNameOf(room)
@@ -67,7 +67,14 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
     turns[turns.length - 1] = { role: turn.role, content: joinContent(prev.content, turn.content) }
   }
 
-  const visible = history.filter((m) => hearing(m, me)).slice(-ROOM_CONTEXT_WINDOW)
+  // Whatever the speaker could not hear is dropped first, then the oldest lines go. Each
+  // line is longer by the name written in front of it.
+  const visible = selectHistory(
+    history.filter((m) => hearing(m, me)),
+    (m) => turnTokens(toTurn(m)) + 12,
+    window,
+    { messages: ROOM_MESSAGES, system, maxTokens: speaker.character.maxTokens }
+  )
   for (const m of visible) {
     if (m.kind === 'narration') {
       push({ role: 'user', content: `[Narration] ${m.content}` })

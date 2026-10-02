@@ -1,19 +1,26 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { Platform } from 'react-native'
 
+import { CONTEXT_MODES, CONTEXT_STEPS, DEFAULT_CONTEXT_TOKENS, type ContextMode } from '@/lib/context'
+
 export type ServerSettings = {
   baseUrl: string
   apiKey: string
   model: string
+  // The model's context window, as set by hand: it changes with the model, so it is not per character.
+  contextTokens: number
+  contextMode: ContextMode
 }
 
 export const DEFAULT_SETTINGS: ServerSettings = {
   baseUrl: '',
   apiKey: '',
   model: '',
+  contextTokens: DEFAULT_CONTEXT_TOKENS,
+  contextMode: 'messages',
 }
 
-const KEYS = { baseUrl: 'base_url', apiKey: 'api_key', model: 'model' } as const
+const KEYS = { baseUrl: 'base_url', apiKey: 'api_key', model: 'model', contextTokens: 'context_tokens', contextMode: 'context_mode' } as const
 
 export async function getSetting(db: SQLiteDatabase, key: string) {
   const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', key)
@@ -43,6 +50,11 @@ async function getChoice<T extends string>(db: SQLiteDatabase, key: string, allo
   return allowed.includes(value as T) ? (value as T) : 'system'
 }
 
+function storedContext(value: string | undefined) {
+  const n = Number(value)
+  return (CONTEXT_STEPS as readonly number[]).includes(n) ? n : DEFAULT_SETTINGS.contextTokens
+}
+
 export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> {
   const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM app_settings')
   const stored = new Map(rows.map((r) => [r.key, r.value]))
@@ -50,6 +62,8 @@ export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> 
     baseUrl: stored.get(KEYS.baseUrl) ?? DEFAULT_SETTINGS.baseUrl,
     apiKey: stored.get(KEYS.apiKey) ?? DEFAULT_SETTINGS.apiKey,
     model: stored.get(KEYS.model) ?? DEFAULT_SETTINGS.model,
+    contextTokens: storedContext(stored.get(KEYS.contextTokens)),
+    contextMode: CONTEXT_MODES.find((m) => m === stored.get(KEYS.contextMode)) ?? DEFAULT_SETTINGS.contextMode,
   }
 }
 
@@ -62,7 +76,7 @@ export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
   const next = saveQueue.then(() =>
     db.withTransactionAsync(async () => {
       for (const field of Object.keys(KEYS) as (keyof typeof KEYS)[]) {
-        await setSetting(db, KEYS[field], settings[field])
+        await setSetting(db, KEYS[field], String(settings[field]))
       }
     })
   )

@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { CONTEXT_WINDOW, type ChatTurn } from '@/api/llm'
+import type { ChatTurn } from '@/api/llm'
 import type { Character } from '@/db/characters'
 import { setChatTitle, type Chat } from '@/db/chats'
 import {
@@ -21,6 +21,7 @@ import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
 import { useAbortable } from '@/hooks/useAbortable'
 import { t } from '@/i18n'
+import { CHAT_MESSAGES, selectHistory, turnTokens } from '@/lib/context'
 import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
 import { CONTINUE_NOTE, emptyReplyReason, runReplyStream, toTurn, withReplyLimit } from '@/lib/replyStream'
@@ -174,7 +175,11 @@ export function useChat(chat: Chat, character: Character) {
       try {
         const cfg = await loadSettings(db)
         const system = withReplyLimit(target.systemPrompt.trim(), target.replyLimit)
-        const turns = history.slice(-CONTEXT_WINDOW).map(toTurn)
+        const turns = selectHistory(history.map(toTurn), turnTokens, cfg, {
+          messages: CHAT_MESSAGES,
+          system,
+          maxTokens: target.maxTokens,
+        })
         const streamed = await runReplyStream(
           cfg,
           {

@@ -6,8 +6,6 @@ import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/settings'
 import { t } from '@/i18n'
 import { errorMessage } from '@/lib/errors'
 
-export const CONTEXT_WINDOW = 20
-
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 
 export type ChatTurn = { role: 'system' | 'user' | 'assistant'; content: string | ContentPart[] }
@@ -177,6 +175,35 @@ async function reasoningFields(cfg: ServerSettings, base: string, mode: Thinking
   if (mode === 'off') return allowed.includes('off') ? { reasoning_effort: 'none' } : {}
   if (allowed.includes('on') || allowed.includes('medium')) return { reasoning_effort: 'medium' }
   return {}
+}
+
+// Loads the model into memory, which on a big one takes a while, so there is no deadline.
+// LM Studio and Ollama have a call for it; llama.cpp and vLLM serve the model they were
+// started with, so there is nothing to load and the connection is all that is checked.
+export async function loadModel(cfg: ServerSettings) {
+  const base = normalizeBaseUrl(cfg.baseUrl)
+  if (!base) throw new Error(t('llm.baseUrlMissing'))
+  const model = cfg.model.trim()
+  if (!model) throw new Error(t('llm.setModel'))
+
+  await askLocalNetworkAccess(`${base}/v1/models`)
+  serverKinds.delete(base)
+  const server = await detectServer(cfg, base)
+  if (server.kind === 'other') {
+    await testConnection(cfg)
+    return
+  }
+
+  const [path, body] =
+    server.kind === 'lmstudio' ? ['/api/v1/models/load', { model }] : ['/api/generate', { model, prompt: '', stream: false }]
+  let res
+  try {
+    res = await fetch(`${base}${path}`, { method: 'POST', headers: requestHeaders(cfg), body: JSON.stringify(body) })
+  } catch (err) {
+    throw unreachable(err)
+  }
+  if (!res.ok) throw await readServerError(res)
+  await res.text().catch(() => '')
 }
 
 async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: boolean, signal?: AbortSignal) {

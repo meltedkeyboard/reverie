@@ -5,14 +5,15 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ChipGroup } from '@/components/ChipGroup'
+import { loadModel } from '@/api/llm'
 import { Flash } from '@/components/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
 import { FieldRow } from '@/components/motifs/FieldRow'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
 import type { MenuItem } from '@/components/NativeMenu'
+import { ParamSlider } from '@/components/ParamSlider'
 import { PillButton } from '@/components/PillButton'
-import { SettingsWheel, type WheelItem } from '@/components/SettingsWheel'
 import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/confirmDelete'
@@ -24,9 +25,9 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } fro
 import { isSuggestionsEnabled, setSuggestionsEnabled } from '@/db/suggestions'
 import { useCloudSync } from '@/hooks/useCloudSync'
 import { useConnectionTest } from '@/hooks/useConnectionTest'
-import { useShake } from '@/hooks/useShake'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
+import { CHAT_MESSAGES, CONTEXT_STEPS, ROOM_MESSAGES, type ContextMode } from '@/lib/context'
 import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
 import { alternateIconsAvailable, currentAppIcon } from '@/lib/appIcons'
 import { confirm } from '@/lib/dialogs'
@@ -40,11 +41,6 @@ import { isShownInFiles } from '@/lib/storage'
 import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
 
 const android = Platform.OS === 'android'
-
-// An easter egg: shaking the phone hard on this tab turns the settings into cards on a
-// wheel, and shaking it again brings the list back. Harder and longer than the shake on
-// the About screen, so it does not come up by chance.
-const WHEEL_SHAKE = { threshold: 2.8, jolts: 4 }
 
 export default function SettingsScreen() {
   const db = useDatabase()
@@ -61,21 +57,6 @@ export default function SettingsScreen() {
   const offsets = useRef<Partial<Record<SettingsSection, number>>>({})
   // `n` tells two jumps to the same section apart, so the tint plays again.
   const [flashed, setFlashed] = useState<{ section: SettingsSection; n: number } | null>(null)
-
-  // Listens only while the tab is in front: not under About, which has a shake of its own.
-  const [focused, setFocused] = useState(false)
-  useFocusEffect(
-    useCallback(() => {
-      setFocused(true)
-      return () => setFocused(false)
-    }, [])
-  )
-  const [wheel, setWheel] = useState(false)
-  const toggleWheel = useCallback(() => {
-    notificationAsync(NotificationFeedbackType.Success)
-    setWheel((on) => !on)
-  }, [])
-  useShake(toggleWheel, focused, WHEEL_SHAKE)
 
   // Runs when the parameter arrives and again as sections are laid out, since on the
   // first visit the one asked for may not have been measured yet. The parameter is
@@ -106,6 +87,10 @@ export default function SettingsScreen() {
     </View>
   )
 
+  const CONTEXT_OPTIONS: { value: ContextMode; label: string }[] = [
+    { value: 'messages', label: t('settings.contextMessages') },
+    { value: 'tokens', label: t('settings.contextTokens') },
+  ]
   const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
     { value: 'system', label: t('theme.system') },
     { value: 'light', label: t('theme.light') },
@@ -216,9 +201,28 @@ export default function SettingsScreen() {
     if (loaded) saveSettings(db, cfg)
   }, [db, cfg, loaded])
 
+  // The context slider shows once the model is loaded; another server or model starts over.
+  const [loadingModel, setLoadingModel] = useState(false)
+  const [modelLoaded, setModelLoaded] = useState(false)
+
   const update = (patch: Partial<ServerSettings>) => {
     setCfg((prev) => ({ ...prev, ...patch }))
     if (patch.baseUrl !== undefined || patch.apiKey !== undefined) resetStatus()
+    if (patch.baseUrl !== undefined || patch.apiKey !== undefined || patch.model !== undefined) setModelLoaded(false)
+  }
+
+  const onLoadModel = async () => {
+    setLoadingModel(true)
+    try {
+      await loadModel(cfg)
+      setModelLoaded(true)
+      notificationAsync(NotificationFeedbackType.Success)
+    } catch (err) {
+      notificationAsync(NotificationFeedbackType.Error)
+      showToast({ tone: 'error', title: t('settings.loadModelFailed'), message: errorMessage(err) })
+    } finally {
+      setLoadingModel(false)
+    }
   }
 
   // The models the server lists are picked from a system menu, the chosen one checked.
@@ -292,7 +296,6 @@ export default function SettingsScreen() {
     })
   }
 
-  // The sections, laid out either as the plain list or as the wheel below.
   const appearance = (
     <>
       <Eyebrow label={t('settings.appearance')} color={colors.text} />
@@ -449,8 +452,42 @@ export default function SettingsScreen() {
           autoCorrect={false}
         />
       )}
+      <View style={styles.testRow}>
+        <PillButton label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} style={styles.testButton} />
+        <PillButton
+          accessibilityLabel={t('settings.loadModel')}
+          icon={{ name: 'play.fill', fallback: 'play' }}
+          onPress={onLoadModel}
+          loading={loadingModel}
+          disabled={!cfg.baseUrl.trim() || !cfg.model.trim()}
+        />
+      </View>
 
-      <PillButton label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} style={styles.testButton} />
+      <Eyebrow label={t('settings.contextLabel')} color={colors.text} />
+      <ChipGroup
+        options={CONTEXT_OPTIONS}
+        value={cfg.contextMode}
+        onChange={(contextMode) => update({ contextMode })}
+      />
+      {cfg.contextMode === 'messages' ? (
+        <Text style={styles.contextHint}>{t('settings.contextMessagesHint', { chat: CHAT_MESSAGES, room: ROOM_MESSAGES })}</Text>
+      ) : null}
+
+      {cfg.contextMode === 'tokens' && modelLoaded ? (
+        <>
+          {/* A step of the slider, not a token count: the sizes models come in are doublings. */}
+          <ParamSlider
+            label={t('settings.contextTokensLabel')}
+            value={Math.max(0, CONTEXT_STEPS.indexOf(cfg.contextTokens as (typeof CONTEXT_STEPS)[number]))}
+            min={0}
+            max={CONTEXT_STEPS.length - 1}
+            step={1}
+            formatValue={(i) => `${CONTEXT_STEPS[i] / 1024}K`}
+            onChange={(i) => update({ contextTokens: CONTEXT_STEPS[i] })}
+          />
+          <Text style={styles.contextHint}>{t('settings.contextHint')}</Text>
+        </>
+      ) : null}
 
       {status.kind === 'ok' || status.kind === 'error' ? <Text style={styles.statusText}>{status.text}</Text> : null}
     </>
@@ -534,75 +571,9 @@ export default function SettingsScreen() {
     </>
   )
 
-  const wheelItems: WheelItem[] = [
-    { key: 'appearance', sections: ['appearance'], content: block('appearance', appearance) },
-    { key: 'language', sections: ['language'], content: block('language', language) },
-    ...(appIconRows ? [{ key: 'appIcon', sections: ['appIcon' as const], content: block('appIcon', appIconRows) }] : []),
-    {
-      key: 'home',
-      sections: ['continue'],
-      content: (
-        <>
-          <Eyebrow label={t('settings.homeScreen')} color={colors.text} />
-          {block('continue', continueRows)}
-        </>
-      ),
-    },
-    {
-      key: 'chats',
-      sections: ['private', 'suggest', 'confirmDelete', 'chatText'],
-      content: (
-        <>
-          <Eyebrow label={t('settings.chats')} color={colors.text} />
-          {block('private', privateRow)}
-          {block('suggest', suggestRow)}
-          {block('confirmDelete', confirmDeleteRow)}
-          {block('chatText', chatTextRows)}
-        </>
-      ),
-    },
-    {
-      key: 'feedback',
-      sections: ['haptics'],
-      content: (
-        <>
-          <Eyebrow label={t('settings.feedback')} color={colors.text} />
-          {block('haptics', hapticsRow)}
-        </>
-      ),
-    },
-    {
-      key: 'security',
-      sections: ['faceId', 'files'],
-      content: (
-        <>
-          <Eyebrow label={t('settings.security')} color={colors.text} />
-          {block('faceId', faceIdRow)}
-          {android ? null : block('files', filesRow)}
-        </>
-      ),
-    },
-    { key: 'server', sections: ['server'], content: block('server', server) },
-    ...(showCloud ? [{ key: 'icloud', sections: ['icloud'], content: block('icloud', icloud) }] : []),
-    { key: 'backup', sections: ['backup'], content: block('backup', backup) },
-    {
-      key: 'about',
-      sections: [],
-      content: (
-        <>
-          <Eyebrow label={t('settings.aboutTitle')} color={colors.text} />
-          {aboutRow}
-        </>
-      ),
-    },
-    { key: 'wipe', sections: ['wipe'], content: block('wipe', wipe) },
-  ]
-
   return (
     <View style={styles.screen}>
-      {loaded && wheel ? <SettingsWheel items={wheelItems} focus={flashed} /> : null}
-
-      {loaded && !wheel ? (
+      {loaded ? (
         <KeyboardAwareScrollView
           ref={scrollRef}
           bottomOffset={24}
@@ -679,7 +650,9 @@ const createStyles = (colors: Colors) =>
     flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 16 },
     rowLabel: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
     note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 12 },
-    testButton: { alignSelf: 'stretch' },
+    testRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+    testButton: { flex: 1 },
+    contextHint: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: 10, marginBottom: 4 },
     statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12 },
     buttonPairRow: { flexDirection: 'row', gap: 12 },
     pairButton: { flex: 1 },

@@ -236,6 +236,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           history,
           planned,
           guidance,
+          window: cfg,
         })
         const streamed = await runReplyStream(cfg, req, ctrl.signal, {
           onStart: () => setPhase('streaming'),
