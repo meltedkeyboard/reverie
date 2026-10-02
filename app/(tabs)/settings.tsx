@@ -18,6 +18,8 @@ import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/continue'
+import { getFileLimits } from '@/lib/fileLimits'
+import { loadFileLimits, setAttachmentLimitMb, setAvatarLimitMb, setLimitsOff } from '@/db/fileLimits'
 import { isHapticsEnabled, setHapticsEnabled } from '@/db/haptics'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase, useShowInFiles } from '@/db/provider'
@@ -115,6 +117,21 @@ export default function SettingsScreen() {
     setMessageDrafts((d) => ({ ...d, [field]: digits }))
     const n = Number(digits)
     if (Number.isSafeInteger(n) && n >= 1) update({ [field]: n })
+  }
+  // The size limits: the numbers may be empty while being retyped, a number below 1 is not kept.
+  const [limits, setLimits] = useState(getFileLimits)
+  const [limitDrafts, setLimitDrafts] = useState<{ avatarMb?: string; attachmentMb?: string }>({})
+  useEffect(() => {
+    loadFileLimits(db).then(setLimits)
+  }, [db])
+  const typeLimit = (field: 'avatarMb' | 'attachmentMb', text: string) => {
+    const digits = text.replace(/\D/g, '')
+    setLimitDrafts((d) => ({ ...d, [field]: digits }))
+    const n = Number(digits)
+    if (!Number.isSafeInteger(n) || n < 1) return
+    setLimits((l) => ({ ...l, [field]: n }))
+    if (field === 'avatarMb') setAvatarLimitMb(db, n)
+    else setAttachmentLimitMb(db, n)
   }
   const { status, models, test, reset: resetStatus } = useConnectionTest()
   const [exporting, setExporting] = useState(false)
@@ -566,6 +583,38 @@ export default function SettingsScreen() {
     </>
   )
 
+  const limitRows = (
+    <>
+      <Eyebrow label={t('settings.limitsTitle')} color={colors.text} />
+      <ToggleRow
+        label={t('settings.limitsOff')}
+        note={t('settings.limitsNote')}
+        value={limits.off}
+        onValueChange={(off) => {
+          setLimits((l) => ({ ...l, off }))
+          setLimitsOff(db, off)
+        }}
+      />
+      {/* Switched off, the numbers stay as they were but cannot be touched. */}
+      <View style={limits.off ? styles.inactive : undefined} pointerEvents={limits.off ? 'none' : 'auto'}>
+        <FieldRow
+          star={false}
+          label={t('settings.limitAvatar')}
+          value={limitDrafts.avatarMb ?? String(limits.avatarMb)}
+          onChangeText={(text) => typeLimit('avatarMb', text)}
+          keyboardType="number-pad"
+        />
+        <FieldRow
+          star={false}
+          label={t('settings.limitAttachment')}
+          value={limitDrafts.attachmentMb ?? String(limits.attachmentMb)}
+          onChangeText={(text) => typeLimit('attachmentMb', text)}
+          keyboardType="number-pad"
+        />
+      </View>
+    </>
+  )
+
   const backup = (
     <>
       <Eyebrow label={t('settings.backupTitle')} color={colors.text} />
@@ -639,6 +688,10 @@ export default function SettingsScreen() {
 
           <Divider />
 
+          {block('limits', limitRows)}
+
+          <Divider />
+
           {block('server', server)}
 
           <Divider />
@@ -681,6 +734,7 @@ const createStyles = (colors: Colors) =>
     testRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
     testButton: { flex: 1 },
     messageFields: { marginTop: 14 },
+    inactive: { opacity: 0.4 },
     messagesHint: { marginTop: -8 },
     messagesWarning: {
       color: colors.danger,

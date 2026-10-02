@@ -3,7 +3,9 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 export type Role = 'user' | 'assistant'
 
 // A picture of a message: the name of its file in the `attachments` folder.
-export type MessageImage = { file: string; width: number; height: number }
+// A moving picture (GIF, animated WebP/APNG) keeps its own file in `moving`, shown in the chat
+// and the viewer; `file` stays the still that the model gets.
+export type MessageImage = { file: string; width: number; height: number; moving?: string }
 
 // What a reasoning model thought before answering and for how long.
 export type Thought = { text: string; ms: number }

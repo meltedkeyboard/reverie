@@ -2,7 +2,7 @@ import { toByteArray } from 'base64-js'
 import { Directory, File } from 'expo-file-system'
 
 import { newAvatarName } from '@/lib/images'
-import { extensionOf, movingKind } from '@/lib/media'
+import { extensionOf, movingFormat, movingKind } from '@/lib/media'
 import { dataDirectory } from '@/lib/storage'
 
 // `attachments` holds the pictures sent in messages.
@@ -30,7 +30,7 @@ export function avatarUri(name: string, kind: ImageKind = 'avatars'): string | n
 export async function persistAvatar(tempUri: string, kind: ImageKind = 'avatars') {
   folder(kind).create({ intermediates: true, idempotent: true })
   // A moving avatar keeps its own format; everything else was already made a JPEG.
-  const name = newAvatarName(movingKind(tempUri) ? extensionOf(tempUri) : 'jpg')
+  const name = newAvatarName(movingKind(tempUri) === 'video' ? extensionOf(tempUri) : (movingFormat(tempUri) ?? 'jpg'))
   await new File(tempUri).copy(new File(folder(kind), name))
   return name
 }

@@ -5,7 +5,8 @@ import * as ImagePicker from 'expo-image-picker'
 
 import { t } from '@/i18n'
 import { pickUris, requireCamera, newAvatarName, type ImageSource } from '@/lib/images'
-import { extensionOf, MAX_ANIMATED_BYTES, movingKind } from '@/lib/media'
+import { avatarLimitBytes } from '@/lib/fileLimits'
+import { extensionOf, movingKind } from '@/lib/media'
 import { readAvatarBase64, removeAvatar, writeAvatarBase64, type ImageKind } from './avatarStore'
 
 // Picking and resizing work the same everywhere; only storage differs per platform. Avatars
@@ -58,8 +59,9 @@ export function acceptMoving(uri: string) {
   const ext = extensionOf(uri)
   if (ext === 'webm') throw new Error(t('editor.avatarWebm'))
   if (!movingKind(uri)) return false
-  if ((new File(uri).size ?? 0) > MAX_ANIMATED_BYTES) {
-    throw new Error(t('editor.avatarTooBig', { mb: Math.round(MAX_ANIMATED_BYTES / 1024 / 1024) }))
+  const limit = avatarLimitBytes()
+  if ((new File(uri).size ?? 0) > limit) {
+    throw new Error(t('editor.avatarTooBig', { mb: Math.round(limit / 1024 / 1024) }))
   }
   return true
 }

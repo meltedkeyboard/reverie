@@ -36,7 +36,7 @@ import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
-import { attachmentUri, pickMessageImages } from '@/lib/attachments'
+import { pickMessageImages, pictureUri } from '@/lib/attachments'
 import type { ImageSource } from '@/lib/images'
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
@@ -132,10 +132,12 @@ export function Composer({
   // typed and cleared again (a sent message clears it too).
   const [opened, setOpened] = useState(false)
   const hadText = useRef(false)
+  const picturedRef = useRef(false)
   // Whether a suggestion stands in for the empty text, which is then what gets measured.
   const suggestingRef = useRef(false)
   const change = (next: string) => {
-    if (!textRef.current && next.includes('\n') && !next.trim()) {
+    // With pictures attached the field is already open, so Enter is a plain line break.
+    if (!textRef.current && next.includes('\n') && !next.trim() && !picturedRef.current) {
       setOpened(true)
       inputRef.current?.setNativeProps({ text: '' })
       return
@@ -143,8 +145,9 @@ export function Composer({
     setText(next)
   }
   const [images, setImages] = useState<MessageImage[]>([])
+  picturedRef.current = images.length > 0 && !editing
   const [picking, setPicking] = useState(false)
-  const imageUris = useMemo(() => images.map((image) => attachmentUri(image.file)), [images])
+  const imageUris = useMemo(() => images.map(pictureUri), [images])
 
   useEffect(() => {
     if (!editing) return
@@ -290,7 +293,9 @@ export function Composer({
   const docked = toolbar !== undefined && toolbar !== null && !editing
   // As in ChatGPT: one line is a capsule with the plus and the send button at the sides;
   // a second line (typed or wrapped) moves them under the text, which takes the full width.
-  const expanded = docked || opened || wraps || text.includes('\n') || (suggesting && !!suggestion?.includes('\n'))
+  const pictured = images.length > 0 && !editing
+  const [imagesH, setImagesH] = useState(0)
+  const expanded = docked || opened || pictured || wraps || text.includes('\n') || (suggesting && !!suggestion?.includes('\n'))
   const inputPad = expanded
     ? styles.inputExpanded
     : { paddingLeft: editing ? 14 : SIDE_PAD, paddingRight: SIDE_PAD }
@@ -332,7 +337,8 @@ export function Composer({
   // The placeholder and the suggestion sit where the text will start: at once in the opened
   // field, no gliding between the two layouts.
   const textLeft = FIELD_PAD + (expanded ? 14 : editing ? 14 : SIDE_PAD)
-  const textTop = FIELD_PAD + (docked ? 12 : expanded ? 10 : 8)
+  // The placeholder is drawn over the box, so it goes down by the row of pictures above the text.
+  const textTop = FIELD_PAD + (pictured ? imagesH : 0) + (docked ? 12 : expanded ? 10 : 8)
   const placeholderAt = { left: textLeft, top: textTop }
   const ghostRight = FIELD_PAD + (expanded ? 14 : SIDE_PAD)
   const showPlaceholder = !text && !suggesting
@@ -372,7 +378,6 @@ export function Composer({
   // natively before React hears of the new text, so a layout event can show a taller field
   // with a stale (even empty) text, which once made the whole chat jump.
   const [bannerH, setBannerH] = useState(0)
-  const [imagesH, setImagesH] = useState(0)
   const [toolsH, setToolsH] = useState(0)
   const reserve =
     2 * FIELD_PAD +
@@ -682,7 +687,7 @@ const createStyles = (colors: Colors) =>
   // Pinned to the bottom, so a taller field reveals its text from above while the buttons stay.
   field: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: FIELD_PAD },
   hushed: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong },
-  attachment: { margin: 6, marginBottom: 2, marginRight: 4 },
+  attachment: { margin: 6, marginBottom: 2, marginRight: 8 },
   thumb: { width: 72, height: 72, borderRadius: 14 },
   thumbRemove: {
     position: 'absolute',

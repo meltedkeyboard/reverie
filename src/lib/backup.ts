@@ -147,7 +147,10 @@ export async function exportBackup(db: SQLiteDatabase) {
     want(room.backgroundOriginal, 'backgrounds')
   }
   for (const message of messages) {
-    for (const picture of (message.images as { file?: string }[] | null) ?? []) want(picture.file ?? null, 'attachments')
+    for (const picture of (message.images as { file?: string; moving?: string }[] | null) ?? []) {
+      want(picture.file ?? null, 'attachments')
+      want(picture.moving ?? null, 'attachments')
+    }
   }
   const files: { path: string; bytes: Uint8Array }[] = []
   for (const { kind, name } of wanted.values()) {
@@ -297,19 +300,21 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
     // The message's pictures as the JSON the database keeps, whichever way the backup held
     // them: files of the zip, or base64 in the row (older backups).
     const importImages = async (message: BackupMessage) => {
-      let list: { file?: string; base64?: string; width: number; height: number }[] = []
+      let list: { file?: string; moving?: string; base64?: string; width: number; height: number }[] = []
       if (Array.isArray(message.images)) list = message.images
       else if (message.images) list = JSON.parse(message.images)
       else if (message.image) list = [{ base64: message.image, width: message.imageWidth ?? 0, height: message.imageHeight ?? 0 }]
       const kept = []
-      for (const { file: name, base64, width, height } of list) {
+      for (const { file: name, moving, base64, width, height } of list) {
         let stored: string | null = null
         if (name) stored = await importImage(name, 'attachments')
         else if (base64) {
           stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
           await writeAvatarBase64(stored, base64, 'attachments')
         }
-        if (stored) kept.push({ file: stored, width, height })
+        if (!stored) continue
+        const movingStored = moving ? await importImage(moving, 'attachments') : null
+        kept.push(movingStored ? { file: stored, width, height, moving: movingStored } : { file: stored, width, height })
       }
       return kept.length ? JSON.stringify(kept) : null
     }

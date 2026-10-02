@@ -10,6 +10,7 @@ import { DialogHost } from '@/components/DialogHost'
 import { StartupBoundary } from '@/components/StartupBoundary'
 import { ToastHost } from '@/components/ToastHost'
 import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
+import { loadFileLimits } from '@/db/fileLimits'
 import { isHapticsEnabled } from '@/db/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
@@ -43,6 +44,7 @@ function ThemedApp() {
   useEffect(() => {
     isHapticsEnabled(db)
     isConfirmDeleteEnabled(db)
+    loadFileLimits(db)
     loadThemePreference(db).then(setPreferenceState)
     loadLocalePreference(db).then(setLocalePreferenceState)
   }, [db])

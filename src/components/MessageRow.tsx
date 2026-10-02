@@ -12,7 +12,7 @@ import { withAlpha } from '@/lib/color'
 import { showSheet } from '@/lib/dialogs'
 import { PRESS_ANYWHERE } from '@/lib/press'
 import * as Haptics from '@/lib/haptics'
-import { attachmentUri } from '@/lib/attachments'
+import { pictureUri } from '@/lib/attachments'
 import { CHAT_METRICS, useChatText } from '@/lib/chatText'
 import { messageActions, type MessageAction } from '@/lib/messageActions'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -375,7 +375,7 @@ type PictureProps = { image: MessageImage; onLongPress: () => void }
 
 function Picture({ image, onLongPress }: PictureProps) {
   const styles = useStyles(createStyles)
-  const uri = useMemo(() => attachmentUri(image.file), [image.file])
+  const uri = useMemo(() => pictureUri(image), [image.file, image.moving])
   const width = image.width || PICTURE_MAX.width
   const height = image.height || PICTURE_MAX.width
   const scale = Math.min(PICTURE_MAX.width / width, PICTURE_MAX.height / height)

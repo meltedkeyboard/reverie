@@ -47,7 +47,10 @@ export async function pruneAttachments(db: SQLiteDatabase) {
   if (await db.getFirstAsync(`SELECT 1 FROM messages WHERE ${LEGACY} LIMIT 1`)) return
 
   const rows = await db.getAllAsync<{ name: string | null }>(
-    `SELECT DISTINCT json_extract(j.value, '$.file') AS name
+    `SELECT json_extract(j.value, '$.file') AS name
+     FROM messages m, json_each(m.images) j
+     WHERE m.images IS NOT NULL AND json_valid(m.images)
+     UNION SELECT json_extract(j.value, '$.moving')
      FROM messages m, json_each(m.images) j
      WHERE m.images IS NOT NULL AND json_valid(m.images)`
   )

@@ -92,6 +92,8 @@ async function referencedImages(db: SQLiteDatabase, schema: string) {
      UNION SELECT background, 'backgrounds' FROM ${schema}.rooms WHERE background IS NOT NULL
      UNION SELECT background_original, 'backgrounds' FROM ${schema}.rooms WHERE background_original IS NOT NULL
      UNION SELECT json_extract(j.value, '$.file'), 'attachments'
+       FROM ${schema}.messages m, json_each(m.images) j WHERE m.images IS NOT NULL AND json_valid(m.images)
+     UNION SELECT json_extract(j.value, '$.moving'), 'attachments'
        FROM ${schema}.messages m, json_each(m.images) j WHERE m.images IS NOT NULL AND json_valid(m.images)`
   )
   const images: Record<ImageKind, Set<string>> = { avatars: new Set(), backgrounds: new Set(), attachments: new Set() }

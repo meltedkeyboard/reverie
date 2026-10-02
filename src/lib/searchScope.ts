@@ -24,6 +24,7 @@ export type SettingsSection =
   | 'private'
   | 'suggest'
   | 'confirmDelete'
+  | 'limits'
   | 'chatText'
   | 'haptics'
   | 'faceId'
