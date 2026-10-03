@@ -15,7 +15,7 @@ protocol.registerSchemesAsPrivileged([
 function serveDist() {
   protocol.handle('app', async (request) => {
     const { pathname } = new URL(request.url)
-    let file = path.join(DIST, decodeURIComponent(pathname))
+    const file = path.join(DIST, pathname === '/' ? 'index.html' : decodeURIComponent(pathname))
     // Stay inside dist, and let expo-router's client routes fall back to the page.
     if (!file.startsWith(DIST)) return new Response('Forbidden', { status: 403 })
     const response = await net.fetch(pathToFileURL(file).toString()).catch(() => null)
@@ -104,7 +104,8 @@ function createWindow() {
     shell.openExternal(url)
     return { action: 'deny' }
   })
-  win.loadURL(DEV_URL ?? 'app://reverie/index.html')
+  // The root, not /index.html: expo-router reads the address as the route, and has none called that.
+  win.loadURL(DEV_URL ?? 'app://reverie/')
 }
 
 app.whenReady().then(() => {

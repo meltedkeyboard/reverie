@@ -29,20 +29,23 @@ jobs:
 
       - run: npm ci
 
+      - name: Take the version from package.json
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
       - run: npx expo prebuild --platform android --clean
 
       - name: Assemble the release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
-      - run: cp android/app/build/outputs/apk/release/app-release.apk Reverie.apk
+      - run: cp android/app/build/outputs/apk/release/app-release.apk Reverie-$VERSION.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: Reverie-apk
-          path: Reverie.apk
+          path: Reverie-${{ env.VERSION }}.apk
 
       - if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: Reverie.apk
+          files: Reverie-${{ env.VERSION }}.apk

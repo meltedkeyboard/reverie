@@ -1,7 +1,7 @@
 # Builds an unsigned Reverie.ipa to be signed on the way to the phone with a personal
 # Apple ID (Sideloadly, AltStore). Started by hand from the Actions tab, or by pushing
 # a v* tag, which also attaches the .ipa to a GitHub release.
-name: iOS build 
+name: iOS build
 
 on:
   workflow_dispatch:
@@ -29,6 +29,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Take the version from package.json
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
       # Generates ios/ from app.json and installs the pods.
       - run: npx expo prebuild --platform ios --clean
 
@@ -55,14 +58,14 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/app.xcarchive/Products/Applications/*.app Payload/
-          zip -qry ../Reverie.ipa Payload
+          zip -qry ../Reverie-$VERSION.ipa Payload
 
       - uses: actions/upload-artifact@v4
         with:
           name: Reverie-ipa
-          path: Reverie.ipa
+          path: Reverie-${{ env.VERSION }}.ipa
 
       - if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: Reverie.ipa
+          files: Reverie-${{ env.VERSION }}.ipa

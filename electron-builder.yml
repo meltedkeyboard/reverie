@@ -10,11 +10,16 @@ files:
   - dist/**
   - package.json
 icon: assets/images/icon.png
+# Reverie-4.3.0.exe, .dmg, .AppImage, like the .apk and .ipa
+artifactName: ${productName}-${version}.${ext}
 win:
   target: nsis
 mac:
   target: dmg
   category: public.app-category.entertainment
 linux:
-  target: AppImage
+  # The AppImage is one file; the tar.gz holds the unpacked app with its plain `reverie` executable
+  target:
+    - AppImage
+    - tar.gz
   category: Network

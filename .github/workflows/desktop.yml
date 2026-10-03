@@ -1,0 +1,59 @@
+# Builds the Electron desktop app: a Windows installer, a macOS .dmg and, for Linux, an
+# AppImage and a .tar.gz with the plain executable, all unsigned. Started from the Actions tab, or by pushing a v* tag, which also attaches
+# the files to a GitHub release. The files are named Reverie-<version>.<ext>, the
+# version being package.json's (see artifactName in electron-builder.yml).
+name: Desktop build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            files: release/*.exe
+          - os: macos-latest
+            name: macOS
+            files: release/*.dmg
+          - os: ubuntu-latest
+            name: Linux
+            files: |
+              release/*.AppImage
+              release/*.tar.gz
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      # No certificates here: do not go looking for a signing identity.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # The web build goes to dist/, which electron-builder packs together with electron/.
+      - run: npx expo export -p web
+
+      - run: npx electron-builder --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Reverie-${{ matrix.name }}
+          path: ${{ matrix.files }}
+
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.files }}
