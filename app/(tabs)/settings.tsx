@@ -190,7 +190,7 @@ export default function SettingsScreen() {
   }
 
   const cloudSync = useCloudSync()
-  // Expo Go has no iCloud module. In development the section is still shown there, with
+  // Expo Go has no sync module. In development the section is still shown there, with
   // its buttons out and pretending to work, so the layout and animations can be looked at.
   const cloudPreview = __DEV__ && !cloudSync.available
 
@@ -216,8 +216,8 @@ export default function SettingsScreen() {
   }
 
   const cloudStatus = [
-    cloudSync.folder ? t('settings.icloudFolder', { folder: cloudSync.folder }) : t('settings.icloudNoFolder'),
-    cloudSync.syncedAt ? t('settings.icloudSyncedAt', { when: formatWhen(cloudSync.syncedAt, locale) }) : null,
+    cloudSync.folder ? t('settings.folderSyncFolder', { folder: cloudSync.folder }) : t('settings.folderSyncNoFolder'),
+    cloudSync.syncedAt ? t('settings.folderSyncSyncedAt', { when: formatWhen(cloudSync.syncedAt, locale) }) : null,
   ]
     .filter(Boolean)
     .join('\n')
@@ -595,12 +595,12 @@ export default function SettingsScreen() {
   )
 
   const showCloud = cloudSync.available || cloudPreview
-  const icloud = (
+  const folderSync = (
     <>
-      <Eyebrow label={t('settings.icloud')} color={colors.text} />
+      <Eyebrow label={t('settings.folderSync')} color={colors.text} />
       <ToggleRow
-        label={t('settings.icloudSync')}
-        note={t('settings.icloudSyncNote')}
+        label={t('settings.folderSyncSync')}
+        note={t('settings.folderSyncSyncNote')}
         value={cloudSync.enabled}
         onValueChange={toggleCloudSync}
         disabled={cloudSync.syncing || cloudAction !== null || backingUp}
@@ -611,7 +611,7 @@ export default function SettingsScreen() {
           <View style={styles.buttonPairRow}>
             <PillButton
               filled
-              label={t('settings.icloudPush')}
+              label={t('settings.folderSyncPush')}
               icon={{ name: 'arrow.up', fallback: 'arrow-up', slide: 'up' }}
               onPress={() => runCloud('push', cloudSync.pushNow)}
               loading={cloudAction === 'push'}
@@ -620,7 +620,7 @@ export default function SettingsScreen() {
             />
             <PillButton
               filled
-              label={t('settings.icloudPull')}
+              label={t('settings.folderSyncPull')}
               icon={{ name: 'arrow.down', fallback: 'arrow-down', slide: 'down' }}
               onPress={() => runCloud('pull', cloudSync.pullNow)}
               loading={cloudAction === 'pull'}
@@ -628,7 +628,7 @@ export default function SettingsScreen() {
               style={styles.pairButton}
             />
             <PillButton
-              accessibilityLabel={t('settings.icloudChangeFolder')}
+              accessibilityLabel={t('settings.folderSyncChangeFolder')}
               icon={{ name: 'folder', fallback: 'folder-outline' }}
               onPress={() => cloudSync.changeFolder().catch((err) => showToast({ tone: 'error', title: t('sync.failedTitle'), message: errorMessage(err) }))}
               disabled={cloudSync.syncing || cloudAction !== null || backingUp}
@@ -755,7 +755,7 @@ export default function SettingsScreen() {
 
           {showCloud ? (
             <>
-              {block('icloud', icloud)}
+              {block('folderSync', folderSync)}
               <Divider />
             </>
           ) : null}

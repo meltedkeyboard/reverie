@@ -153,6 +153,11 @@ const createStyles = (colors: Colors) =>
       gap: 12,
       height: HEIGHT,
       borderRadius: HEIGHT / 2,
+      borderCurve: 'continuous',
+      // Opaque under the glass, so the cards scrolling beneath do not show through it. The color
+      // of the screen, not the accent: the tinted glass blends with what is behind it, and over
+      // the accent it came out darker than the buttons in Settings.
+      backgroundColor: colors.bg,
       padding: 8,
       paddingRight: 16,
     },

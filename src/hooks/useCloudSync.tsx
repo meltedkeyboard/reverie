@@ -60,7 +60,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
         return outcome
       } catch (err) {
         if (loud) showToast({ tone: 'error', title: t('sync.failedTitle'), message: errorMessage(err) })
-        else console.warn('iCloud sync failed', err)
+        else console.warn('Folder sync failed', err)
         return null
       } finally {
         setSyncing(false)

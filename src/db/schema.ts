@@ -194,7 +194,7 @@ const MIGRATIONS = [
     ALTER TABLE messages ADD COLUMN overheard TEXT;
     ALTER TABLE messages ADD COLUMN absent TEXT;
   `,
-  // iCloud sync needs to know whether anything changed since the last sync. Any write to
+  // Folder sync needs to know whether anything changed since the last sync. Any write to
   // the synced tables sets sync_dirty; only the first one after a sync actually writes.
   ['characters', 'rooms', 'room_members', 'chats', 'messages']
     .flatMap((table) =>

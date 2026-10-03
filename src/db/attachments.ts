@@ -16,7 +16,7 @@ export async function convertLegacyAttachments(db: SQLiteDatabase) {
   const rows = await db.getAllAsync<{ id: number }>(`SELECT id FROM messages WHERE ${LEGACY}`)
   if (!rows.length) return
 
-  // Rewriting rows would mark the database as changed for iCloud sync, which this is not.
+  // Rewriting rows would mark the database as changed for folder sync, which this is not.
   const dirty = await db.getFirstAsync<{ value: string }>("SELECT value FROM app_settings WHERE key = 'sync_dirty'")
   try {
     for (const { id } of rows) {

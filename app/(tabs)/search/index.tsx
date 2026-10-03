@@ -134,7 +134,7 @@ export default function SearchScreen() {
     }
     if (cloudSyncAvailable) {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
-      entries.splice(backup, 0, { label: t('settings.icloud'), keywords: [t('settings.icloudSync'), 'iCloud'], symbol: 'icloud', fallback: 'cloud-outline', href: settingsAt('icloud') })
+      entries.splice(backup, 0, { label: t('settings.folderSync'), keywords: [t('settings.folderSyncSync'), 'iCloud', 'Google Drive'], symbol: 'arrow.triangle.2.circlepath', fallback: 'sync-outline', href: settingsAt('folderSync') })
     }
     return android ? entries.filter((entry) => entry.label !== t('settings.showInFiles')) : entries
   }, [t])

@@ -2,11 +2,11 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { getFlag, getSetting, setFlag, setSetting } from '@/db/settings'
 
-// iCloud sync keeps its state here, on this device only: app_settings never leaves it.
-const ENABLED_KEY = 'icloud_sync'
+// Folder sync keeps its state here, on this device only: app_settings never leaves it.
+const ENABLED_KEY = 'folder_sync'
 // Set by the triggers of the last migration in schema.ts on any change to the synced tables.
 const DIRTY_KEY = 'sync_dirty'
-// The revision of the iCloud copy this device last matched, pushed or pulled.
+// The revision of the copy in the sync folder this device last matched, pushed or pulled.
 const REV_KEY = 'sync_rev'
 const SYNCED_AT_KEY = 'sync_at'
 

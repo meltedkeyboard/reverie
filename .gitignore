@@ -11,3 +11,7 @@ assets/images/
 TODO.md
 /android/
 Reverie-android.apk
+
+# Gradle output of the local Android modules
+modules/*/android/build/
+modules/*/android/.gradle/

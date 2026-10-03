@@ -158,7 +158,7 @@ export async function exportBackup(db: SQLiteDatabase) {
     if (bytes) files.push({ path: `${kind}/${name}`, bytes })
   }
 
-  // The API key is left out on purpose: the file usually ends up in iCloud Drive.
+  // The API key is left out on purpose: the file usually ends up in a cloud drive.
   const manifest = { app: 'reverie', version: BACKUP_VERSION, exportedAt: new Date().toISOString(), settings: { baseUrl, model } }
   const zip = packArchive({
     manifest,

@@ -19,14 +19,14 @@ Roleplay chat client for iOS and Android, built with Expo. It talks directly to 
 - Per-character chat backgrounds with effects and adjustable bubble transparency.
 - Private questions: the eye in a chat or a scene asks the model about it aside, like `/btw` — it reads the chat and answers out of character, and nothing is saved or seen by the characters.
 - Reply suggestions (off by default, Settings > Chats): after a reply the model drafts your next message in gray in the field, streaming as it is written. Swipe the field right to type it in, left to dismiss it until you reopen the chat.
-- Toasts: notices in Settings (backup, iCloud push and pull, errors) slide in from the top over the screen instead of blocking it with an alert.
+- Toasts: notices in Settings (backup, sync push and pull, errors) slide in from the top over the screen instead of blocking it with an alert.
 - App icon: nine alternates to the standard one (Settings > App icon), on iOS and Android. Not available in Expo Go.
 - App lock with Face ID, haptics toggle, "Continue" capsule on the home screen that jumps to the last active chat.
 - Backup export and import as a zip (JSON files for characters, rooms and chats, the pictures as they are; the API key is not included). Older single-file JSON backups still import.
-- iCloud sync (not in Expo Go): the data is kept in a folder picked in iCloud Drive and picked up by the other devices. Works with an app signed by a free Apple ID, see below.
+- Folder sync (not in Expo Go): the data is kept in a folder you pick (iCloud Drive, Google Drive, any other storage or a local folder) and picked up by the other devices, on iOS and Android. Works with an app signed by a free Apple ID, see below.
 - English and Russian UI.
 - iOS 26 Liquid Glass UI where available, with a plain fallback on older iOS and on Android.
-- Android: the same app without the iOS-only parts. Face ID becomes the system biometric prompt, the iOS menus and action sheets are drawn in React Native, and iCloud sync and the "show in Files" toggle are absent.
+- Android: the same app without the iOS-only parts. Face ID becomes the system biometric prompt, the iOS menus and action sheets are drawn in React Native, and the "show in Files" toggle is absent.
 
 ## Quick start
 
@@ -75,4 +75,4 @@ A detailed map of the code (where to change what, data flow, conventions) is in 
 - Plain HTTP servers are allowed through `NSAllowsArbitraryLoads` in `app.json`.
 - A chat where the user wrote nothing is deleted when returning to the list.
 - The "Continue" capsule state is stored in `app_settings` (`src/db/continue.ts`).
-- iCloud sync does not use the iCloud entitlement (CloudKit or an app container), which a free Apple ID cannot sign. The user picks a folder in iCloud Drive through the document picker instead, and the app keeps a bookmark to it (`modules/reverie-cloud-folder`). The whole database and the pictures go there as a snapshot; when both devices changed since the last sync, the user picks which copy wins.
+- Folder sync does not use the iCloud entitlement (CloudKit or an app container), which a free Apple ID cannot sign. The user picks a folder through the system picker instead (the document picker on iOS, the folder picker of the Storage Access Framework on Android), and the app keeps a bookmark or a persisted permission for it (`modules/reverie-cloud-folder`). The whole database and the pictures go there as a snapshot; when both devices changed since the last sync, the user picks which copy wins.

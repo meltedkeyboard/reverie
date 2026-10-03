@@ -30,7 +30,7 @@ export type SettingsSection =
   | 'haptics'
   | 'faceId'
   | 'files'
-  | 'icloud'
+  | 'folderSync'
   | 'server'
   | 'backup'
   | 'wipe'

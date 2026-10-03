@@ -107,6 +107,7 @@ export function Composer({
   onSuggestionDismissed,
 }: Props) {
   const insets = useSafeAreaInsets()
+  const { width: windowWidth } = useWindowDimensions()
   const colors = useColors()
   const inputColors = useInputColors()
   const glass = useGlassStyles()
@@ -395,6 +396,11 @@ export function Composer({
   const placeholderAt = { left: textLeft, top: textTop }
   const ghostRight = FIELD_PAD + (expanded ? 14 : SIDE_PAD)
   const showPlaceholder = !text && !suggesting
+  // The row sits in the bar's 10 pt padding and the field is narrowed by the inset on each side.
+  const measureWidth = Math.max(
+    0,
+    windowWidth - 2 * (BAR_PAD_SIDE + NARROW_INSET) - (FIELD_PAD + (editing ? 14 : SIDE_PAD)) - (FIELD_PAD + SIDE_PAD)
+  )
   // Scales with a transform only: Liquid Glass renders wrongly under a fading parent.
   const menuStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
 
@@ -569,7 +575,14 @@ export function Composer({
               {sendButton}
             </View>
             <Text
-              style={[styles.measure, { left: FIELD_PAD + (editing ? 14 : SIDE_PAD), right: FIELD_PAD + SIDE_PAD }]}
+              style={[
+                styles.measure,
+                // A fixed width, that of the field at rest (the narrowest it gets), worked out
+                // from the screen. Taken from the field itself it changed with the focus and
+                // along the 220 ms the field takes to narrow, so a line that fit in one and
+                // not in the other opened the field, which widened, folded back, and so on.
+                { left: FIELD_PAD + (editing ? 14 : SIDE_PAD), width: measureWidth },
+              ]}
               pointerEvents="none"
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
@@ -758,6 +771,7 @@ const DOCKED_INPUT = 42
 // The bar's padding around the field (the bottom one comes on top of the safe area).
 const BAR_PAD_TOP = 8
 const BAR_PAD_BOTTOM = 8
+const BAR_PAD_SIDE = 10
 // The recent pictures of the attach menu: one row that scrolls sideways.
 const THUMB = 52
 const THUMB_GAP = 6
@@ -795,8 +809,8 @@ const createStyles = (colors: Colors) =>
   recentsRule: { height: 1, marginHorizontal: 8, marginBottom: 6, backgroundColor: colors.border },
   menuLabel: { color: colors.text, fontSize: 17 },
   accessory: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  bar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: 10 },
-  floatingBar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: 10 },
+  bar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: BAR_PAD_SIDE },
+  floatingBar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: BAR_PAD_SIDE },
   fade: { position: 'absolute', top: -28, left: 0, right: 0, bottom: 0 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingTop: 2 },
   bannerText: { flex: 1, color: colors.textMuted, fontSize: 13 },

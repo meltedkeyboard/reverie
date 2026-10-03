@@ -90,7 +90,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     [db]
   )
 
-  // For after the data was replaced underneath (an iCloud pull): the same file on a new
+  // For after the data was replaced underneath (a pull from the sync folder): the same file on a new
   // connection, so every screen reloads through its [db] effects.
   const reload = useCallback(async () => {
     if (!db) return

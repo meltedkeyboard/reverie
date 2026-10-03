@@ -9,7 +9,8 @@ import { avatarUri, type ImageKind } from '@/lib/avatarStore'
 import { dataDirectory, databaseDirectory, keepCopy } from '@/lib/storage'
 import { cloudFolder } from '../../modules/reverie-cloud-folder'
 
-// Sync with a folder in iCloud Drive, as whole snapshots. The folder holds:
+// Sync with a folder the user picked (iCloud Drive, Google Drive, a local one), as whole
+// snapshots. The folder holds:
 //
 //   manifest.json          which revision is there; written last, so it is the commit point
 //   reverie.db             the database without app_settings (API key, this device's flags)
@@ -18,11 +19,11 @@ import { cloudFolder } from '../../modules/reverie-cloud-folder'
 // A device remembers the revision it last pushed or pulled and whether anything changed
 // since (sync_dirty, set by triggers). Only one side changed: that side wins. Both did:
 // the user picks one, and the data here is put aside first if it is the one that loses.
-// The database in iCloud is never opened in place: SQLite over a synced file corrupts.
+// The database in the folder is never opened in place: SQLite over a synced file corrupts.
 
 export const cloudSyncAvailable = cloudFolder !== null
 
-// 'behind': a push was refused because iCloud has a revision this device has not seen;
+// 'behind': a push was refused because the folder has a revision this device has not seen;
 // 'empty': a pull found nothing in the folder.
 export type SyncOutcome = 'pushed' | 'pulled' | 'unchanged' | 'conflict' | 'behind' | 'empty'
 
@@ -47,7 +48,7 @@ function folder() {
 }
 
 function workFile(name: string) {
-  const dir = new Directory(Paths.cache, 'icloud-sync')
+  const dir = new Directory(Paths.cache, 'folder-sync')
   dir.create({ intermediates: true, idempotent: true })
   return new File(dir, name)
 }
