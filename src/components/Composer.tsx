@@ -467,19 +467,16 @@ export function Composer({
     (images.length && !editing ? imagesH : 0) +
     (docked ? DOCKED_INPUT + toolsH : ONE_LINE_INPUT) +
     barExtra
-  // On a phone the list keeps the room of the one-line field and a growing field goes over the
-  // messages. On the web it follows the field, so a taller one pushes them up instead of
-  // covering the last lines: the room under the text differs for the resting and the opened field.
   const web = Platform.OS === 'web'
-  useEffect(() => {
-    if (!web) height.value = reserve
-  }, [web, reserve, height])
+  // The list reserves the room the field really takes, so a taller one (a few lines, a
+  // suggestion, pictures) pushes the messages up instead of covering the last lines and their
+  // actions. It eases with the box, and never goes below the room of the one-line field.
   useAnimatedReaction(
     () => Math.max(reserve, barExtra + boxHeight.value),
     (value) => {
-      if (web) height.value = value
+      height.value = value
     },
-    [web, reserve, barExtra]
+    [reserve, barExtra]
   )
 
   // The accessory sits on the height the list reserves, not on the bar itself, so it does not
@@ -581,8 +578,9 @@ export function Composer({
                 // The placeholder is drawn below, where it can glide between the two layouts.
                 placeholderTextColor="transparent"
                 multiline
-                // A browser's <textarea> is two rows tall unless told otherwise.
-                numberOfLines={1}
+                // A browser's <textarea> is two rows tall unless told otherwise. On iOS the prop
+                // is a cap on the lines the field shows, so it is left off there.
+                numberOfLines={Platform.OS === 'web' ? 1 : undefined}
                 autoFocus={autoFocus && Platform.OS !== 'web'}
                 accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
                 style={[

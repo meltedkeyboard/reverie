@@ -13,7 +13,7 @@ import {
   type ScrollViewProps,
 } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
-import Animated, { useAnimatedReaction, ZoomIn, ZoomOut, type SharedValue } from 'react-native-reanimated'
+import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming, Easing, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
@@ -268,13 +268,19 @@ export function ConversationList({
   )
 }
 
-// Floats above the composer once the newest message is out of sight.
-export function JumpButton({ onPress }: { onPress: () => void }) {
+// Floats above the composer once the newest message is out of sight. It stays mounted and
+// only scales in and out: a Liquid Glass view that is mounted anew, or that fades, comes back
+// with the glyph alone and no material.
+export function JumpButton({ visible, onPress }: { visible: boolean; onPress: () => void }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
+  const shown = useSharedValue(visible ? 1 : 0)
+  useEffect(() => {
+    shown.value = withTiming(visible ? 1 : 0, { duration: visible ? 160 : 140, easing: Easing.out(Easing.cubic) })
+  }, [visible, shown])
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: 0.01 + 0.99 * shown.value }] }))
   return (
-    // Zoom, not fade: Liquid Glass under a fading parent loses its material and leaves only the glyph.
-    <Animated.View entering={ZoomIn.duration(160)} exiting={ZoomOut.duration(140)} style={styles.jumpSlot}>
+    <Animated.View style={[styles.jumpSlot, style]} pointerEvents={visible ? 'box-none' : 'none'}>
       {liquidGlass ? (
         <GlassButton icon="arrow-down" onPress={onPress} />
       ) : (

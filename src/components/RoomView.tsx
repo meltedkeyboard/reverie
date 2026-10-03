@@ -539,11 +539,9 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
           onCancelEdit={() => setEditingRow(null)}
         />
       </ComposerSwap>
-      {awayFromEnd ? (
-        <ComposerFloat top={composerTop}>
-          <JumpButton onPress={() => listRef.current?.jumpToNewest()} />
-        </ComposerFloat>
-      ) : null}
+      <ComposerFloat top={composerTop}>
+        <JumpButton visible={awayFromEnd} onPress={() => listRef.current?.jumpToNewest()} />
+      </ComposerFloat>
 
       <CastSheet
         visible={castOpen}

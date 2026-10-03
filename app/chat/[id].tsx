@@ -425,11 +425,9 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
         />
       </ComposerSwap>
       {/* Outside the swap, so it neither sinks with the field nor goes missing in Private. */}
-      {awayFromEnd ? (
-        <ComposerFloat top={composerTop}>
-          <JumpButton onPress={() => listRef.current?.jumpToNewest()} />
-        </ComposerFloat>
-      ) : null}
+      <ComposerFloat top={composerTop}>
+        <JumpButton visible={awayFromEnd} onPress={() => listRef.current?.jumpToNewest()} />
+      </ComposerFloat>
     </View>
   )
 }
