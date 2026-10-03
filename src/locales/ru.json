@@ -380,7 +380,7 @@
   "backup.rooms": "Комнаты",
   "backup.selected": "{{selected}} из {{total}}",
   "backup.untitled": "Чат без названия",
-  "backup.roomNote": "Комната придёт без участников, чьи персонажи не отмечены.",
+  "backup.roomNote": "Комната придёт без участников, чьи персонажи не отмечены",
   "backup.notBackup": "Это не копия Reverie",
 
   "format.today": "Сегодня",

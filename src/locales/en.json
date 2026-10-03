@@ -380,7 +380,7 @@
   "backup.rooms": "Rooms",
   "backup.selected": "{{selected}} of {{total}}",
   "backup.untitled": "Untitled chat",
-  "backup.roomNote": "A room comes without the members whose characters aren't ticked.",
+  "backup.roomNote": "A room comes without the members whose characters aren't ticked",
   "backup.notBackup": "This isn't a Reverie backup",
 
   "format.today": "Today",
