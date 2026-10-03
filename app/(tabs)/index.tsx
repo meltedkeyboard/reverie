@@ -18,14 +18,21 @@ import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
+import { useFeaturedFill } from '@/hooks/useFeaturedFill'
 import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { errorMessage } from '@/lib/errors'
+import { FEATURED_GAP } from '@/lib/featuredLayout'
 import { importCharacterCard, type CardSource } from '@/lib/importCard'
 import { liquidGlass } from '@/lib/nativeUI'
 import { showToast } from '@/lib/toast'
 import { useColors, useStyles, type Colors } from '@/theme'
+
+// The server notice above the list: its height and the margin under it.
+const NOTICE_HEIGHT = 74
+
+const FeaturedSeparator = () => <View style={{ height: FEATURED_GAP }} />
 
 export default function CharactersScreen() {
   const db = useDatabase()
@@ -42,8 +49,10 @@ export default function CharactersScreen() {
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
-    setCharacters(await listCharacters(db))
-    setServerSet(Boolean((await loadSettings(db)).baseUrl.trim()))
+    const list = await listCharacters(db)
+    const set = Boolean((await loadSettings(db)).baseUrl.trim())
+    setCharacters(list)
+    setServerSet(set)
     await reloadLastChat()
   }, [db, reloadLastChat])
 
@@ -67,16 +76,27 @@ export default function CharactersScreen() {
   const { menuItems, confirmDelete } = useCharacterActions(reload)
   const reorder = useReorder(characters, setCharacters, (ids) => setCharacterOrder(db, ids))
 
+  // A lone character is one card over the whole screen, and the list does not scroll.
+  const fill = useFeaturedFill(
+    characters?.length ?? 0,
+    padding,
+    (lastChat ? CONTINUE_BUTTON_SPACE : 0) + (serverSet ? 0 : NOTICE_HEIGHT)
+  )
+  const featured = fill.height !== undefined
+
   return (
-    <View style={styles.screen} ref={anchor.ref} onLayout={anchor.onLayout}>
+    <View style={styles.screen} ref={anchor.ref} onLayout={(e) => {
+      anchor.onLayout()
+      fill.onLayout(e)
+    }}>
       <HomePattern />
       <ReorderableList
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
         {...reorder}
-        scrollEnabled={!!characters?.length}
+        scrollEnabled={fill.scroll}
         contentContainerStyle={[padding, lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE }]}
-        ItemSeparatorComponent={ListSeparator}
+        ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}
         ListHeaderComponent={
           !serverSet && characters ? (
             // A row like the "finish setting up" one in iOS Settings: a glyph on a
@@ -119,6 +139,7 @@ export default function CharactersScreen() {
             onOpen={() => router.push(`/chats/${character.id}`)}
             onDelete={() => confirmDelete(character)}
             menu={menuItems(character)}
+            fillHeight={fill.height}
           />
         )}
       />

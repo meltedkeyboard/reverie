@@ -16,12 +16,16 @@ import { listCharacters } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { deleteRoom, listRooms, setRoomOrder, type RoomPreview } from '@/db/rooms'
+import { useFeaturedFill } from '@/hooks/useFeaturedFill'
 import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { removeAvatar } from '@/lib/avatars'
 import { confirmDeletion } from '@/lib/confirmDelete'
+import { FEATURED_GAP } from '@/lib/featuredLayout'
 import { useStyles, type Colors } from '@/theme'
+
+const FeaturedSeparator = () => <View style={{ height: FEATURED_GAP }} />
 
 export default function RoomsScreen() {
   const db = useDatabase()
@@ -37,8 +41,10 @@ export default function RoomsScreen() {
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
-    setRooms(await listRooms(db))
-    setCharacterCount((await listCharacters(db)).length)
+    const list = await listRooms(db)
+    const characters = (await listCharacters(db)).length
+    setRooms(list)
+    setCharacterCount(characters)
     await reloadLastChat()
   }, [db, reloadLastChat])
 
@@ -49,6 +55,10 @@ export default function RoomsScreen() {
   )
 
   const reorder = useReorder(rooms, setRooms, (ids) => setRoomOrder(db, ids))
+
+  // A lone room is one card over the whole screen, and the list does not scroll.
+  const fill = useFeaturedFill(rooms?.length ?? 0, padding, lastChat ? CONTINUE_BUTTON_SPACE : 0)
+  const featured = fill.height !== undefined
 
   const confirmDelete = (room: RoomPreview) => {
     confirmDeletion({
@@ -71,15 +81,18 @@ export default function RoomsScreen() {
   ]
 
   return (
-    <View style={styles.screen} ref={anchor.ref} onLayout={anchor.onLayout}>
+    <View style={styles.screen} ref={anchor.ref} onLayout={(e) => {
+      anchor.onLayout()
+      fill.onLayout(e)
+    }}>
       <HomePattern />
       <ReorderableList
         data={rooms ?? []}
         keyExtractor={(r) => String(r.id)}
         {...reorder}
-        scrollEnabled={!!rooms?.length}
+        scrollEnabled={fill.scroll}
         contentContainerStyle={[padding, lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE }]}
-        ItemSeparatorComponent={ListSeparator}
+        ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}
         ListEmptyComponent={
           rooms ? (
             <EmptyState
@@ -103,6 +116,7 @@ export default function RoomsScreen() {
             onOpen={() => router.push(`/rooms/${room.id}`)}
             onDelete={() => confirmDelete(room)}
             menu={roomMenu(room)}
+            fillHeight={fill.height}
           />
         )}
       />

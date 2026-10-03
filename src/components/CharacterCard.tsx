@@ -6,7 +6,9 @@ import { plural } from '@/lib/format'
 import { characterPreview } from '@/lib/roleplay'
 import { useStyles, type Colors } from '@/theme'
 
+import { AnimatedFill } from './AnimatedFill'
 import { Avatar } from './Avatar'
+import { FeaturedBody } from './FeaturedBody'
 import { ListCard } from './ListCard'
 import type { MenuItem } from './NativeMenu'
 
@@ -15,13 +17,30 @@ type Props = {
   onOpen: () => void
   onDelete: () => void
   menu: MenuItem[]
+  // A single character: one card this tall, filling the screen: a full-width square picture
+  // on top and the text under it taking the rest.
+  fillHeight?: number
 }
 
-export function CharacterCard({ character, onOpen, onDelete, menu }: Props) {
+function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight }: Props) {
   const styles = useStyles(createStyles)
   const { locale } = useTranslation()
   const preview = characterPreview(character)
   const chats = character.chatCount
+  if (fillHeight !== undefined) {
+    return (
+      <ListCard vertical onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={[styles.featured, { height: fillHeight }]}>
+        <View style={styles.hero}>
+          <Avatar name={character.name} file={character.avatar} size={200} square fill />
+        </View>
+        <FeaturedBody
+          name={character.name}
+          count={chats > 0 ? `${chats} ${plural(chats, locale, ['чат', 'чата', 'чатов'], ['chat', 'chats'])}` : null}
+          preview={preview}
+        />
+      </ListCard>
+    )
+  }
   return (
     <ListCard onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.card}>
       <View style={styles.avatar}>
@@ -51,11 +70,22 @@ export function CharacterCard({ character, onOpen, onDelete, menu }: Props) {
 // stretches with the card when a larger text size makes the card taller.
 const AVATAR = 88
 
+// The card draws itself; the wrapper only animates the change between row and full screen.
+export function CharacterCard(props: Props) {
+  return (
+    <AnimatedFill fillHeight={props.fillHeight}>
+      <CharacterCardContent {...props} />
+    </AnimatedFill>
+  )
+}
+
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   card: { gap: 14, paddingLeft: 0, paddingVertical: 0, minHeight: AVATAR, overflow: 'hidden' },
   avatar: { width: AVATAR, alignSelf: 'stretch' },
   body: { flex: 1, paddingVertical: 12 },
+  featured: { overflow: 'hidden' },
+  hero: { aspectRatio: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 3 },
   name: { flexShrink: 1, color: colors.text, fontSize: 17, fontWeight: '600' },
   chats: { color: colors.textFaint, fontSize: 13 },

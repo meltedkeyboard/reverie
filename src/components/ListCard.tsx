@@ -21,6 +21,8 @@ type Props = {
   // Title of the action sheet the menu falls back to.
   menuTitle?: string
   style?: StyleProp<ViewStyle>
+  // Children stack top to bottom (a large card with a picture on top), the menu over a corner.
+  vertical?: boolean
   children: React.ReactNode
 }
 
@@ -33,29 +35,34 @@ type Props = {
 // solid fill turned into a grey haze in the dark scheme. The glass is a sibling of the
 // content rather than inside it: clipped, its rim and the swell of a touch would be cut
 // off at the corners.
-export function ListCard({ onOpen, onDelete, menu, menuTitle, style, children }: Props) {
+export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, children }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const drag = useReorderableDrag()
   const openSheet = () => showSheet(menuTitle, menu)
+  // In a vertical card the ellipsis floats over the picture, on a dark disc to stay readable.
+  const iconColor = vertical ? '#FFFFFF' : colors.textFaint
   const menuButton = swiftUI ? (
     // Claims the touch, so the card does not open under the menu.
-    <View onStartShouldSetResponder={() => true}>
+    <View onStartShouldSetResponder={() => true} style={vertical && styles.floating}>
       <NativeMenu items={menu} style={styles.menu}>
-        <Ionicons name="ellipsis-horizontal" size={18} color={colors.textFaint} />
+        <Ionicons name="ellipsis-horizontal" size={18} color={iconColor} />
       </NativeMenu>
     </View>
   ) : (
-    <IconButton name="ellipsis-horizontal" size={18} color={colors.textFaint} onPress={openSheet} />
+    <View style={vertical && styles.floating}>
+      <IconButton name="ellipsis-horizontal" size={18} color={iconColor} onPress={openSheet} />
+    </View>
   )
+  const cardStyle = [styles.card, vertical && styles.vertical, style]
 
   if (liquidGlass) {
     return (
       <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete} throwAway={!isConfirmDeleteOn()}>
         <Pressable onPress={onOpen} onLongPress={drag}>
           <GlassSurface interactive variant="clear" style={styles.layer} />
-          <View style={[styles.card, styles.glassCard, style]}>
+          <View style={[cardStyle, styles.glassCard]}>
             {children}
             {menuButton}
           </View>
@@ -69,7 +76,7 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, children }:
       <Pressable
         onPress={onOpen}
         onLongPress={drag}
-        style={({ pressed }) => [styles.card, style, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
+        style={({ pressed }) => [cardStyle, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
       >
         {children}
         {menuButton}
@@ -111,4 +118,12 @@ const createStyles = (colors: Colors) =>
     glassCard: { borderWidth: 0, backgroundColor: 'transparent' },
     // The same box as the IconButton it replaces.
     menu: { width: 40, height: 40 },
+    vertical: { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingVertical: 0, paddingLeft: 0, paddingRight: 0 },
+    floating: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+    },
   })
