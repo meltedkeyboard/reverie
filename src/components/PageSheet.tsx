@@ -9,15 +9,17 @@ type Props = {
   // Header buttons; with nothing on the left the title sits at the start.
   left?: React.ReactNode
   right?: React.ReactNode
+  // The page's fill; the surface color by default.
+  background?: string
   children: React.ReactNode
 }
 
 // A modal page sheet with a title bar, swipe-to-dismiss on iOS.
-export function PageSheet({ visible, onClose, title, left, right, children }: Props) {
+export function PageSheet({ visible, onClose, title, left, right, background, children }: Props) {
   const styles = useStyles(createStyles)
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onClose}>
-      <View style={styles.root}>
+      <View style={[styles.root, background !== undefined && { backgroundColor: background }]}>
         <View style={styles.header}>
           {left !== undefined ? <View style={styles.side}>{left}</View> : null}
           <Text style={styles.title}>{title}</Text>

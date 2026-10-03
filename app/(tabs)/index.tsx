@@ -2,7 +2,7 @@ import { Link, useRouter, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import ReorderableList from 'react-native-reorderable-list'
+import ReorderableList, { type ReorderableListReorderEvent } from 'react-native-reorderable-list'
 
 import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
@@ -13,7 +13,7 @@ import { GlassHeader, TabTitle, useScreenPadding } from '@/components/GlassHeade
 import { HomePattern } from '@/components/HomePattern'
 import { MenuGlassButton } from '@/components/MenuGlassButton'
 import { SFIcon } from '@/components/SFIcon'
-import { listCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
+import { listCharacters, mergeCharacters, sameCharacter, setCharacterOrder, type CharacterPreview } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/settings'
@@ -22,6 +22,8 @@ import { useFeaturedFill } from '@/hooks/useFeaturedFill'
 import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
+import { removeCharacterImages } from '@/lib/avatars'
+import { confirm } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
 import { FEATURED_GAP } from '@/lib/featuredLayout'
 import { importCharacterCard, type CardSource } from '@/lib/importCard'
@@ -76,6 +78,34 @@ export default function CharactersScreen() {
   const { menuItems, confirmDelete } = useCharacterActions(reload)
   const reorder = useReorder(characters, setCharacters, (ids) => setCharacterOrder(db, ids))
 
+  // A card dropped next to an identical one (the one it displaced first) offers to merge: the
+  // other one stays, with its settings, and takes over the chats of the dropped one.
+  const onReorder = (event: ReorderableListReorderEvent) => {
+    reorder.onReorder(event)
+    const list = characters
+    const dragged = list?.[event.from]
+    if (!list || !dragged) return
+    const target = [list[event.to], list[event.to + (event.to > event.from ? 1 : -1)]].find(
+      (other) => other && other.id !== dragged.id && sameCharacter(other, dragged)
+    )
+    if (!target) return
+    confirm({
+      title: t('characters.mergeTitle'),
+      message: t('characters.mergeMessage', { name: target.name, count: dragged.chatCount }),
+      confirmLabel: t('characters.merge'),
+      onConfirm: async () => {
+        try {
+          await mergeCharacters(db, target.id, dragged.id)
+          removeCharacterImages(dragged)
+          showToast({ tone: 'success', title: t('characters.mergeDone'), message: target.name })
+        } catch (err) {
+          showToast({ tone: 'error', title: t('characters.mergeFailed'), message: errorMessage(err) })
+        }
+        reload()
+      },
+    })
+  }
+
   // A lone character is one card over the whole screen, and the list does not scroll.
   const fill = useFeaturedFill(
     characters?.length ?? 0,
@@ -94,6 +124,7 @@ export default function CharactersScreen() {
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
         {...reorder}
+        onReorder={onReorder}
         scrollEnabled={fill.scroll}
         contentContainerStyle={[padding, lastChat && { paddingBottom: padding.paddingBottom + CONTINUE_BUTTON_SPACE }]}
         ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}

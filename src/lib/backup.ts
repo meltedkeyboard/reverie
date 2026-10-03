@@ -8,7 +8,9 @@ import { t } from '@/i18n'
 import { pickBackupFile } from '@/lib/pickBackup'
 import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/avatars'
 import { isArchive, packArchive, unpackArchive } from '@/lib/backupArchive'
+import { applySelection, buildTree, type BackupTree, type Selection } from '@/lib/backupSelection'
 import { saveFile } from '@/lib/download'
+import { fromByteArray } from 'base64-js'
 import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/media'
@@ -109,26 +111,43 @@ type Backup = {
   settings?: { baseUrl?: string; model?: string }
 }
 
-export async function exportBackup(db: SQLiteDatabase) {
-  const characters = await db.getAllAsync<{
-    id: number
-    avatar: string | null
-    avatarOriginal: string | null
-    background: string | null
-    backgroundOriginal: string | null
-  }>(
-    `SELECT ${CHARACTER_COLUMNS} FROM characters ORDER BY sort_order, id`
+// The tree the export sheet shows: characters and rooms with their chats, from the database.
+export async function loadBackupTree(db: SQLiteDatabase): Promise<BackupTree> {
+  const characters = await db.getAllAsync<{ id: number; name: string; avatar: string | null }>('SELECT id, name, avatar FROM characters ORDER BY sort_order, id')
+  const rooms = await db.getAllAsync<{ id: number; name: string }>('SELECT id, name FROM rooms ORDER BY sort_order, id')
+  const chats = await db.getAllAsync<{ id: number; characterId: number | null; roomId: number | null; title: string | null; messageCount: number }>(
+    `SELECT ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title,
+            (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ch.id) AS messageCount
+     FROM chats ch ORDER BY ch.sort_order, ch.id`
   )
-  const rooms = await db.getAllAsync<{ background: string | null; backgroundOriginal: string | null }>(`SELECT ${ROOM_COLUMNS} FROM rooms ORDER BY sort_order, id`)
-  const roomMembers = await db.getAllAsync(
-    `SELECT room_id AS roomId, character_id AS characterId, position, talkativeness, perception, triggers, muted, present
-     FROM room_members ORDER BY room_id, position`
-  )
-  const chats = await db.getAllAsync(
-    'SELECT id, character_id AS characterId, room_id AS roomId, title, created_at AS createdAt FROM chats ORDER BY sort_order, id'
-  )
-  const rows = await db.getAllAsync<{ id: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`)
-  const messages = rows.map((row) => (row.images ? { ...row, images: JSON.parse(row.images) } : row))
+  return buildTree({ characters, rooms, chats })
+}
+
+// Everything when `selection` is left out.
+export async function exportBackup(db: SQLiteDatabase, selection?: Selection) {
+  const all = {
+    characters: await db.getAllAsync<{
+      id: number
+      avatar: string | null
+      avatarOriginal: string | null
+      background: string | null
+      backgroundOriginal: string | null
+    }>(`SELECT ${CHARACTER_COLUMNS} FROM characters ORDER BY sort_order, id`),
+    rooms: await db.getAllAsync<{ id: number; background: string | null; backgroundOriginal: string | null }>(
+      `SELECT ${ROOM_COLUMNS} FROM rooms ORDER BY sort_order, id`
+    ),
+    roomMembers: await db.getAllAsync<{ roomId: number; characterId: number }>(
+      `SELECT room_id AS roomId, character_id AS characterId, position, talkativeness, perception, triggers, muted, present
+       FROM room_members ORDER BY room_id, position`
+    ),
+    chats: await db.getAllAsync<{ id: number; characterId: number | null; roomId: number | null; title: string | null }>(
+      'SELECT id, character_id AS characterId, room_id AS roomId, title, created_at AS createdAt FROM chats ORDER BY sort_order, id'
+    ),
+    messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
+  }
+  const picked = selection ? applySelection(all, selection) : all
+  const { characters, rooms = [], roomMembers = [], chats } = picked
+  const messages = picked.messages.map((row) => (row.images ? { ...row, images: JSON.parse(row.images) } : row))
   const { baseUrl, model } = await loadSettings(db)
 
   // Every picture a character or a room points at, the originals too, once each.
@@ -187,17 +206,46 @@ function openBackup(bytes: Uint8Array): { dump: Backup; file: (path: string) => 
   }
 }
 
-// Picks a backup (a zip, or an older JSON file) and adds its characters, chats and messages
-// as new rows alongside whatever is already in the database — nothing existing is touched
-// or replaced.
-export async function importBackup(db: SQLiteDatabase): Promise<{ characters: number } | null> {
+export type OpenedBackup = ReturnType<typeof openBackup> & { tree: BackupTree }
+
+// Picks a backup (a zip, or an older JSON file) and opens it; null when cancelled.
+export async function readBackup(): Promise<OpenedBackup | null> {
   const bytes = await pickBackupFile()
   if (bytes === null) return null
 
-  const { dump, file } = openBackup(bytes)
+  const opened = openBackup(bytes)
+  const { dump } = opened
   if (dump.app !== 'reverie' || !Array.isArray(dump.characters)) {
     throw new Error(t('backup.notBackup'))
   }
+  const tree = buildTree({ ...dump, chats: dump.chats ?? [], messages: dump.messages ?? [] })
+  for (const node of tree.characters) node.avatarUri = avatarPreview(opened.file, node.avatar)
+  return { ...opened, tree }
+}
+
+// A small still avatar of the backup as a data URL for the list; a big or moving one would
+// only slow the sheet down, so the initial stands in for it.
+const PREVIEW_LIMIT = 300 * 1024
+function avatarPreview(file: (path: string) => string | Uint8Array | undefined, name: string | null | undefined) {
+  const data = name ? file(`avatars/${name}`) : undefined
+  if (!name || !data) return null
+  const ext = extensionOf(name).toLowerCase()
+  const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'jpg' || ext === 'jpeg' || ext === '' ? 'image/jpeg' : null
+  if (!mime) return null
+  if (typeof data === 'string') return data.length < PREVIEW_LIMIT * 1.4 ? `data:${mime};base64,${data}` : null
+  return data.length < PREVIEW_LIMIT ? `data:${mime};base64,${fromByteArray(data)}` : null
+}
+
+// Adds the characters, rooms, chats and messages of an opened backup that `selection` keeps
+// (all of them without it) as new rows alongside whatever is already in the database —
+// nothing existing is touched or replaced.
+export async function importBackup(
+  db: SQLiteDatabase,
+  opened: OpenedBackup,
+  selection?: Selection
+): Promise<{ characters: number; rooms: number; chats: number }> {
+  const { file } = opened
+  const dump = selection ? applySelection({ ...opened.dump, chats: opened.dump.chats ?? [], messages: opened.dump.messages ?? [] }, selection) : opened.dump
 
   const characterIds = new Map<number, number>()
   const roomIds = new Map<number, number>()
@@ -351,7 +399,7 @@ export async function importBackup(db: SQLiteDatabase): Promise<{ characters: nu
     if (!current.baseUrl) await saveSettings(db, { ...current, baseUrl: dump.settings.baseUrl, model: dump.settings.model ?? current.model })
   }
 
-  return { characters: characterIds.size }
+  return { characters: characterIds.size, rooms: roomIds.size, chats: chatIds.size }
 }
 
 // Deletes every room, character, chat, message and avatar, plus the server settings. Cascades

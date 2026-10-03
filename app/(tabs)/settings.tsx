@@ -39,7 +39,9 @@ import { useConnectionTest } from '@/hooks/useConnectionTest'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { CONTEXT_STEPS, type ContextMode } from '@/lib/context'
-import { exportBackup, importBackup, wipeAllData } from '@/lib/backup'
+import { BackupTreeSheet } from '@/components/BackupTreeSheet'
+import { exportBackup, importBackup, loadBackupTree, readBackup, wipeAllData, type OpenedBackup } from '@/lib/backup'
+import type { BackupTree, Selection } from '@/lib/backupSelection'
 import { alternateIconsAvailable, currentAppIcon } from '@/lib/appIcons'
 import { confirm } from '@/lib/dialogs'
 import { showToast } from '@/lib/toast'
@@ -288,10 +290,26 @@ export default function SettingsScreen() {
     if (found.length === 1 && !found.includes(cfg.model)) update({ model: found[0] })
   }
 
+  // The sheet with what to take or bring in: open while there is a tree.
+  const [exportTree, setExportTree] = useState<BackupTree | null>(null)
+  const [opened, setOpened] = useState<OpenedBackup | null>(null)
+
   const onExport = async () => {
     setExporting(true)
     try {
-      const saved = await exportBackup(db)
+      setExportTree(await loadBackupTree(db))
+    } catch (err) {
+      showToast({ tone: 'error', title: t('settings.exportFailedTitle'), message: errorMessage(err) })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const runExport = async (selection: Selection) => {
+    setExportTree(null)
+    setExporting(true)
+    try {
+      const saved = await exportBackup(db, selection)
       if (saved) {
         showToast({
           tone: 'success',
@@ -309,14 +327,26 @@ export default function SettingsScreen() {
   const onImport = async () => {
     setImporting(true)
     try {
-      const result = await importBackup(db)
-      if (result) {
-        showToast({
-          tone: 'success',
-          title: t('settings.importDoneTitle'),
-          message: t('settings.importDoneMessage', { count: result.characters }),
-        })
-      }
+      setOpened(await readBackup())
+    } catch (err) {
+      showToast({ tone: 'error', title: t('settings.importFailedTitle'), message: errorMessage(err) })
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const runImport = async (selection: Selection) => {
+    const backup = opened
+    setOpened(null)
+    if (!backup) return
+    setImporting(true)
+    try {
+      const result = await importBackup(db, backup, selection)
+      showToast({
+        tone: 'success',
+        title: t('settings.importDoneTitle'),
+        message: t('settings.importDoneMessage', { characters: result.characters, rooms: result.rooms, chats: result.chats }),
+      })
     } catch (err) {
       showToast({ tone: 'error', title: t('settings.importFailedTitle'), message: errorMessage(err) })
     } finally {
@@ -686,6 +716,8 @@ export default function SettingsScreen() {
           style={styles.pairButton}
         />
       </View>
+      <BackupTreeSheet tree={exportTree} confirmLabel={t('settings.exportJson')} onConfirm={runExport} onClose={() => setExportTree(null)} />
+      <BackupTreeSheet tree={opened?.tree ?? null} confirmLabel={t('settings.importJson')} onConfirm={runImport} onClose={() => setOpened(null)} />
     </>
   )
 

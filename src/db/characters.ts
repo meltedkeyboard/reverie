@@ -171,3 +171,47 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
 export async function deleteCharacter(db: SQLiteDatabase, id: number) {
   await db.runAsync('DELETE FROM characters WHERE id = ?', id)
 }
+
+// The same character by what makes it one: name, prompt and greeting. Sampling, pictures and
+// dates may differ, as with a backup imported twice.
+export function sameCharacter(a: CharacterFields, b: CharacterFields) {
+  const norm = (text: string) => text.trim()
+  return norm(a.name) === norm(b.name) && norm(a.systemPrompt) === norm(b.systemPrompt) && norm(a.greeting) === norm(b.greeting)
+}
+
+// Folds `dropId` into `keepId`: its chats move over (with their messages), it takes the same
+// place in every room, and then it is deleted. The kept character's own fields stay as they are.
+export async function mergeCharacters(db: SQLiteDatabase, keepId: number, dropId: number) {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('UPDATE chats SET character_id = ? WHERE character_id = ?', [keepId, dropId])
+
+    const inRooms = await db.getFirstAsync('SELECT 1 FROM room_members WHERE character_id = ?', dropId)
+    if (inRooms) {
+      await db.runAsync(
+        `INSERT OR IGNORE INTO room_members (room_id, character_id, position, talkativeness, perception, triggers, muted, present)
+         SELECT room_id, ?, position, talkativeness, perception, triggers, muted, present FROM room_members WHERE character_id = ?`,
+        [keepId, dropId]
+      )
+      await db.runAsync('DELETE FROM room_members WHERE character_id = ?', dropId)
+      await db.runAsync('UPDATE messages SET speaker_id = ? WHERE speaker_id = ?', [keepId, dropId])
+      // The lists of who a line was for, who heard it and who was away name characters by id.
+      const remap = (json: string | null) => {
+        if (!json) return json
+        const ids: number[] = JSON.parse(json)
+        if (!ids.includes(dropId)) return json
+        return JSON.stringify([...new Set(ids.map((id) => (id === dropId ? keepId : id)))])
+      }
+      const rows = await db.getAllAsync<{ id: number; addressees: string | null; audience: string | null; overheard: string | null; absent: string | null }>(
+        `SELECT id, addressees, audience, overheard, absent FROM messages
+         WHERE addressees IS NOT NULL OR audience IS NOT NULL OR overheard IS NOT NULL OR absent IS NOT NULL`
+      )
+      for (const row of rows) {
+        const next = [remap(row.addressees), remap(row.audience), remap(row.overheard), remap(row.absent)]
+        if (next[0] === row.addressees && next[1] === row.audience && next[2] === row.overheard && next[3] === row.absent) continue
+        await db.runAsync('UPDATE messages SET addressees = ?, audience = ?, overheard = ?, absent = ? WHERE id = ?', [...next, row.id])
+      }
+    }
+
+    await db.runAsync('DELETE FROM characters WHERE id = ?', dropId)
+  })
+}
