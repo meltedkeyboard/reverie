@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 import type { Character } from '@/db/characters'
 import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
+import { notifyChatsChanged } from '@/lib/chatEvents'
 
 // Exactly one of characterId and roomId is set: a chat is either one-on-one or a scene.
 export type Chat = { id: number; characterId: number | null; roomId: number | null; title: string | null; createdAt: number }
@@ -57,12 +58,14 @@ export async function createChat(db: SQLiteDatabase, character: Character) {
     const greeting = character.greeting.trim()
     if (greeting) await addMessage(db, chatId, 'assistant', greeting)
   })
+  notifyChatsChanged()
   return chatId
 }
 
 export async function setChatTitle(db: SQLiteDatabase, id: number, title: string | null) {
   const value = title?.trim() || null
   await db.runAsync('UPDATE chats SET title = ? WHERE id = ?', [value, id])
+  notifyChatsChanged()
   return value
 }
 
@@ -82,11 +85,13 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
       [chatId, id]
     )
   })
+  notifyChatsChanged()
   return chatId
 }
 
 export async function deleteChat(db: SQLiteDatabase, id: number) {
   await db.runAsync('DELETE FROM chats WHERE id = ?', id)
+  notifyChatsChanged()
 }
 
 // A chat the user never wrote in holds at most the greeting. Such chats are dropped once

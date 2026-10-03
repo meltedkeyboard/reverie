@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router'
-import { StyleSheet, Text, View } from 'react-native'
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { liquidGlass } from '@/lib/nativeUI'
+import { columnInset, FORM_COLUMN } from '@/hooks/useLayoutMode'
+import { floatingBars } from '@/lib/nativeUI'
 import { fonts, HEADER_FONT_SCALE, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
 
 import { BlurBar, EdgeFade } from './BarChrome'
+import { GlassButton } from './Glass'
 import { IconButton } from './IconButton'
 import { Star } from './motifs/Star'
 
@@ -28,10 +30,13 @@ export function useHeaderHeight() {
 // form, which gets a little more air at both ends.
 export function useScreenPadding(kind: 'list' | 'form') {
   const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
   const top = insets.top + HEADER_ROW_HEIGHT
+  // A wide window gets a centered column instead of cards and fields across all of it.
+  const paddingHorizontal = columnInset(width, FORM_COLUMN, 16)
   return kind === 'list'
-    ? { paddingTop: top + 16, paddingBottom: insets.bottom + 24, paddingHorizontal: 16, flexGrow: 1 }
-    : { paddingTop: top + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }
+    ? { paddingTop: top + 16, paddingBottom: insets.bottom + 24, paddingHorizontal, flexGrow: 1 }
+    : { paddingTop: top + 20, paddingBottom: insets.bottom + 40, paddingHorizontal }
 }
 
 export function HeaderTitle({ children }: { children: React.ReactNode }) {
@@ -60,7 +65,11 @@ export function TabTitle({ children }: { children: React.ReactNode }) {
 // Goes back; a screen presented modally closes with a cross instead.
 export function BackButton({ close }: { close?: boolean }) {
   const router = useRouter()
-  return <IconButton name={close ? 'close' : 'chevron-back'} size={close ? 24 : 26} onPress={() => router.back()} />
+  const name = close ? 'close' : 'chevron-back'
+  const size = close ? 24 : 26
+  // iOS keeps the plain icon; elsewhere it sits on the round surface like the other bar buttons.
+  if (Platform.OS === 'ios') return <IconButton name={name} size={size} onPress={() => router.back()} />
+  return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
 }
 
 export function GlassHeader({ left, right, children, floating }: Props) {
@@ -76,7 +85,7 @@ export function GlassHeader({ left, right, children, floating }: Props) {
     </View>
   )
 
-  if (floating && liquidGlass) {
+  if (floating && floatingBars) {
     return (
       <View style={[styles.floating, { paddingTop: insets.top }]} pointerEvents="box-none">
         <EdgeFade edge="top" style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} />

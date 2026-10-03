@@ -1,13 +1,14 @@
 import type Ionicons from '@expo/vector-icons/Ionicons'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Platform, Pressable, SectionList, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
+import { Platform, Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native'
 import type { SearchBarCommands } from 'react-native-screens'
 
 import { Avatar } from '@/components/Avatar'
 import { AvatarStack } from '@/components/AvatarStack'
 import { EmptyState } from '@/components/EmptyState'
 import { TabTitle } from '@/components/GlassHeader'
+import { columnInset, FORM_COLUMN } from '@/hooks/useLayoutMode'
 import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
@@ -22,6 +23,7 @@ import { getSearchScope, type SearchScope, type SettingsSection } from '@/lib/se
 import { useColors, useStyles, type Colors } from '@/theme'
 
 const android = Platform.OS === 'android'
+const web = Platform.OS === 'web'
 
 type SettingEntry = {
   label: string
@@ -65,6 +67,7 @@ export default function SearchScreen() {
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const searchBar = useRef<SearchBarCommands>(null)
+  const { width } = useWindowDimensions()
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<SearchScope>(getSearchScope)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -208,9 +211,9 @@ export default function SearchScreen() {
     scope === 'rooms' ? t('search.placeholderRooms') : scope === 'settings' ? t('search.placeholderSettings') : t('search.placeholderCharacters')
 
   const renderItem = ({ item }: { item: Item }) => (
-    <Pressable onPress={() => open(item)} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+    <ResultButton onPress={() => open(item)}>
       <ResultRow item={item} needle={needle} locale={locale} you={t('search.you')} />
-    </Pressable>
+    </ResultButton>
   )
 
   const empty = loaded ? (
@@ -230,7 +233,22 @@ export default function SearchScreen() {
       stickySectionHeadersEnabled={false}
       ListEmptyComponent={empty}
       scrollEnabled={sections.length > 0}
-      contentContainerStyle={[styles.content, contentStyle]}
+      ListHeaderComponent={
+        web ? (
+          // The web has no native search bar in the header, so the field is part of the list.
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={placeholder}
+            placeholderTextColor={colors.textFaint}
+            selectionColor={colors.accent}
+            autoFocus
+            autoCapitalize="none"
+            style={styles.field}
+          />
+        ) : null
+      }
+      contentContainerStyle={[styles.content, web && { paddingHorizontal: columnInset(width, FORM_COLUMN, 16), paddingTop: 16 }, contentStyle]}
       contentInsetAdjustmentBehavior="automatic"
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
@@ -244,12 +262,16 @@ export default function SearchScreen() {
           headerShown: true,
           // The scroll edge effect is drawn under a transparent bar. Android does not inset
           // the list by an automatic content inset, so there the bar is solid and pushes it down.
-          headerTransparent: !android,
+          headerTransparent: !android && !web,
+          // Search is a place of the sidebar on the web, not a step on the way from another screen.
+          headerBackVisible: !web,
+          // The web header ignores headerBackVisible and draws its own arrow whenever there is a screen to go back to.
+          headerLeft: web ? () => null : undefined,
           headerStyle: { backgroundColor: colors.bg },
           headerShadowVisible: false,
           headerTitleAlign: 'left',
           headerTitle: () => <TabTitle>{t('search.title')}</TabTitle>,
-          headerSearchBarOptions: {
+          headerSearchBarOptions: web ? undefined : {
             ref: searchBar,
             placeholder,
             autoCapitalize: 'none',
@@ -263,6 +285,27 @@ export default function SearchScreen() {
         }}
       />
       {list({ paddingBottom: 24 })}
+    </View>
+  )
+}
+
+// On the web a row looks as in the sidebar: an outline on hover, a slight sink on press.
+function ResultButton({ onPress, children }: { onPress: () => void; children: React.ReactNode }) {
+  const styles = useStyles(createStyles)
+  const [hovered, setHovered] = useState(false)
+  // mouseenter and mouseleave exist on the web only, so they go in by spread, past the native types.
+  const hover = web ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {}
+  return (
+    <View {...hover}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.row,
+          web ? [hovered && styles.rowHover, pressed && styles.rowSink] : pressed && styles.rowPressed,
+        ]}
+      >
+        {children}
+      </Pressable>
     </View>
   )
 }
@@ -392,6 +435,18 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     content: { flexGrow: 1, paddingHorizontal: 16 },
+    field: {
+      color: colors.text,
+      fontSize: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      borderRadius: 14,
+      borderCurve: 'continuous',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginTop: 4,
+    },
     section: {
       color: colors.textFaint,
       fontSize: 12,
@@ -402,8 +457,10 @@ const createStyles = (colors: Colors) =>
       marginBottom: 6,
       marginHorizontal: 4,
     },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14, borderCurve: 'continuous', borderWidth: web ? 1 : 0, borderColor: 'transparent' },
     rowPressed: { backgroundColor: colors.accentSoft },
+    rowHover: { borderColor: colors.border },
+    rowSink: { transform: [{ scale: 0.985 }] },
     leading: { width: 40, alignItems: 'flex-start' },
     body: { flex: 1 },
     titleLine: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },

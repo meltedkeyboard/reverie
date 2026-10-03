@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -90,15 +90,14 @@ export function ToastHost() {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    layer: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 12 },
-    slide: {
-      shadowColor: '#000',
-      shadowOpacity: 0.18,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 8,
-    },
-    card: { borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12, width: '100%', maxWidth: 560, alignSelf: 'center' },
+    // Above the dialogs' layer (1000) and the sidebar: on the web the stacking is by zIndex, not by order.
+    layer: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 12, zIndex: 2000 },
+    // The shadow belongs to the box the card fills, so the width limit and the radius are here.
+    slide: Platform.select({
+      web: { boxShadow: '0 6px 16px rgba(0, 0, 0, 0.18)', borderRadius: 24, width: '100%', maxWidth: 560, alignSelf: 'center' },
+      default: { width: '100%', maxWidth: 560, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+    }),
+    card: { borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12 },
     body: {},
     // A failure is the same glass with a red cast.
     failedTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 24, backgroundColor: colors.dangerSoft },

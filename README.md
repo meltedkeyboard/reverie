@@ -53,6 +53,25 @@ Sign and install it with Sideloadly or AltStore using your Apple ID. A free acco
 
 To build locally on a Mac, run `./build-ipa.sh` (needs Xcode, CocoaPods, Node 24).
 
+## Desktop client (Electron, experimental)
+
+The same code runs on Windows, macOS and Linux: Expo builds it as a web app (`react-native-web`) and Electron puts it in a window (`electron/`). There is no second codebase; where the web differs from the phone, a `*.web.ts(x)` file or a `Platform.OS === 'web'` branch sits next to the original, and `expo-file-system` is replaced on the web by `src/web/expo-file-system.ts` (see `metro.config.js`). Not every screen is adapted yet.
+
+Needs only Node 24, no other toolchain.
+
+```
+npm install
+npm run desktop
+```
+
+`npm run desktop` (`scripts/desktop-dev.mjs`) starts Metro on port 8081, waits for it and opens the window; edits to `app/` and `src/` reload live. If the port is busy it says so and stops, close the old `expo start` first.
+
+To run the production build without making an installer: `npm run desktop:preview`. To make one: `npm run desktop:build`; it runs `expo export -p web`, then electron-builder (`electron-builder.yml`) writes an NSIS installer, a `.dmg` or an AppImage into `release/`. Build on the system you build for.
+
+In the built app the page is served from `app://` by `electron/main.js` with cross-origin isolation, which the SQLite worker needs.
+
+Data (the database and the images) is for now kept in the browser storage of the app profile (OPFS and IndexedDB), under `%APPDATA%Reverie` on Windows, so it is not visible in a file manager. Dev and the built app use different origins and so different data. Use Settings > Backup to move it between them.
+
 ## Project layout
 
 - `app/` - screens (expo-router): character list, character chats, chat, character editor, chat background, settings, onboarding, about, image viewer.

@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { Image } from 'expo-image'
 import { useEffect, useMemo, useRef } from 'react'
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { CHAT_COLUMN } from '@/hooks/useLayoutMode'
 import type { ChatPhase } from '@/hooks/useChat'
 import { useTranslation } from '@/i18n'
 import type { AsideQuestion, AsideTurn } from '@/lib/aside'
@@ -109,7 +111,8 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
   const empty = !turns.length && pending === null
 
   return (
-    <Animated.View entering={unfold} style={[styles.slot, fit]}>
+    // The desktop window has no keyboard to ride and the swap already brings the panel up with its field.
+    <Animated.View entering={Platform.OS === 'web' ? undefined : unfold} style={[styles.slot, fit]}>
       {/* The glass is a layer beside the content, not around it: clipped to scroll the
           thread inside, it would lose its material. The content is clipped instead. */}
       <View style={styles.panel}>
@@ -184,7 +187,15 @@ function Question({ text }: { text: AsideQuestion }) {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    slot: { alignSelf: 'center', width: '100%', paddingHorizontal: 10, marginBottom: 8, transformOrigin: 'bottom' },
+    // On the web as wide as the composer's column: its 10 pt side padding plus the column.
+    slot: {
+      alignSelf: 'center',
+      width: '100%',
+      paddingHorizontal: 10,
+      marginBottom: 8,
+      transformOrigin: 'bottom',
+      ...(Platform.OS === 'web' ? { maxWidth: CHAT_COLUMN + 20 } : null),
+    },
     panel: { flexShrink: 1 },
     layer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 24, borderCurve: 'continuous' },
     clip: { flexShrink: 1, borderRadius: 24, borderCurve: 'continuous', overflow: 'hidden' },

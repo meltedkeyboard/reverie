@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system'
-import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
+import { Platform } from 'react-native'
+import { deserializeDatabaseAsync, openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
 
 import { getSyncState, markChecked, markSynced, setDirty } from '@/db/cloudSync'
 import { migrate, SCHEMA_VERSION } from '@/db/schema'
@@ -123,18 +124,37 @@ async function isEmpty(db: SQLiteDatabase) {
   return !row?.n
 }
 
+// The web has no files SQLite can write or attach (the database sits in the browser's own
+// storage), so there the snapshot is made in memory, and the rows come over one by one.
+const web = Platform.OS === 'web'
+
+async function makeSnapshot(db: SQLiteDatabase, snapshot: File) {
+  if (web) {
+    const copy = await deserializeDatabaseAsync(await db.serializeAsync('main'))
+    try {
+      await copy.execAsync('DELETE FROM app_settings')
+      const images = await referencedImages(copy, 'main')
+      snapshot.write(await copy.serializeAsync('main'))
+      return images
+    } finally {
+      await copy.closeAsync()
+    }
+  }
+  await db.execAsync(`VACUUM INTO ${sqlPath(snapshot)}`)
+  return withAttached(db, snapshot, 'snap', async () => {
+    // secure_delete zeroes the rows, so the API key is not left in free pages of the file.
+    await db.execAsync('PRAGMA snap.secure_delete = ON; DELETE FROM snap.app_settings;')
+    return referencedImages(db, 'snap')
+  })
+}
+
 async function push(db: SQLiteDatabase) {
   // Cleared before the snapshot is taken, so a change made while the upload runs sets it
   // again and goes up next time instead of being lost.
   await setDirty(db, false)
   try {
     const snapshot = freshFile('outgoing.db')
-    await db.execAsync(`VACUUM INTO ${sqlPath(snapshot)}`)
-    const images = await withAttached(db, snapshot, 'snap', async () => {
-      // secure_delete zeroes the rows, so the API key is not left in free pages of the file.
-      await db.execAsync('PRAGMA snap.secure_delete = ON; DELETE FROM snap.app_settings;')
-      return referencedImages(db, 'snap')
-    })
+    const images = await makeSnapshot(db, snapshot)
 
     const stale: string[] = []
     for (const kind of IMAGE_KINDS) {
@@ -164,9 +184,71 @@ async function push(db: SQLiteDatabase) {
   }
 }
 
+async function copyImagesIn(images: Record<ImageKind, Set<string>>) {
+  for (const kind of IMAGE_KINDS) {
+    const dir = new Directory(dataDirectory(), kind)
+    dir.create({ intermediates: true, idempotent: true })
+    for (const name of images[kind]) {
+      if (new File(avatarUri(name, kind)!).exists) continue
+      await folder().copyIn(`${kind}/${name}`, new File(dir, name).uri)
+    }
+  }
+}
+
+// Written straight into the open database rather than swapping the file, so the screens
+// keep a working connection; the caller then hands them a fresh one.
+async function replaceRows(db: SQLiteDatabase, manifest: Manifest, copyTable: (table: string) => Promise<void>) {
+  await db.execAsync('BEGIN IMMEDIATE')
+  try {
+    for (const table of [...TABLES].reverse()) await db.execAsync(`DELETE FROM main.${table}`)
+    for (const table of TABLES) await copyTable(table)
+    await markSynced(db, manifest.rev)
+    await db.execAsync('COMMIT')
+  } catch (err) {
+    await db.execAsync('ROLLBACK')
+    throw err
+  }
+}
+
+async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: File) {
+  const copy = await deserializeDatabaseAsync(await incoming.bytes())
+  try {
+    const row = await copy.getFirstAsync<{ user_version: number }>('PRAGMA user_version')
+    const version = row?.user_version ?? 0
+    if (version > SCHEMA_VERSION) throw new Error(t('sync.newerApp'))
+    if (version < SCHEMA_VERSION) await migrate(copy)
+
+    await copyImagesIn(await referencedImages(copy, 'main'))
+    await replaceRows(db, manifest, async (table) => {
+      const rows = await copy.getAllAsync<Record<string, unknown>>(`SELECT * FROM ${table}`)
+      if (!rows.length) return
+      const columns = Object.keys(rows[0])
+      const insert = await db.prepareAsync(
+        `INSERT INTO main.${table} (${columns.map((c) => `"${c}"`).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`
+      )
+      try {
+        for (const r of rows) await insert.executeAsync(columns.map((c) => r[c] as never))
+      } finally {
+        await insert.finalizeAsync()
+      }
+      if (ORDERED_TABLES.includes(table)) {
+        for (const r of rows) await db.runAsync(`UPDATE main.${table} SET sort_order = ? WHERE id = ?`, r.sort_order as never, r.id as never)
+      }
+    })
+    await convertLegacyAttachments(db)
+  } finally {
+    await copy.closeAsync()
+  }
+}
+
 async function pull(db: SQLiteDatabase, manifest: Manifest) {
   const incoming = freshFile('incoming.db')
   await folder().copyIn(DATABASE, incoming.uri)
+  if (web) {
+    await pullInMemory(db, manifest, incoming)
+    incoming.delete()
+    return
+  }
 
   // A copy from an older version of the app is brought up to this one first.
   const copy = await openDatabaseAsync(incoming.name, { useNewConnection: true }, plainPath(incoming.parentDirectory.uri))
@@ -180,35 +262,15 @@ async function pull(db: SQLiteDatabase, manifest: Manifest) {
   }
 
   await withAttached(db, incoming, 'remote', async () => {
-    const images = await referencedImages(db, 'remote')
-    for (const kind of IMAGE_KINDS) {
-      const dir = new Directory(dataDirectory(), kind)
-      dir.create({ intermediates: true, idempotent: true })
-      for (const name of images[kind]) {
-        if (new File(avatarUri(name, kind)!).exists) continue
-        await folder().copyIn(`${kind}/${name}`, new File(dir, name).uri)
-      }
-    }
-
-    // Written straight into the open database rather than swapping the file, so the
-    // screens keep a working connection; the caller then hands them a fresh one.
-    await db.execAsync('BEGIN IMMEDIATE')
-    try {
-      for (const table of [...TABLES].reverse()) await db.execAsync(`DELETE FROM main.${table}`)
-      for (const table of TABLES) {
-        const columns = await db.getAllAsync<{ name: string }>(`PRAGMA main.table_info(${table})`)
-        const list = columns.map((c) => `"${c.name}"`).join(', ')
-        await db.execAsync(`INSERT INTO main.${table} (${list}) SELECT ${list} FROM remote.${table}`)
-      }
-      for (const table of ORDERED_TABLES) {
+    await copyImagesIn(await referencedImages(db, 'remote'))
+    await replaceRows(db, manifest, async (table) => {
+      const columns = await db.getAllAsync<{ name: string }>(`PRAGMA main.table_info(${table})`)
+      const list = columns.map((c) => `"${c.name}"`).join(', ')
+      await db.execAsync(`INSERT INTO main.${table} (${list}) SELECT ${list} FROM remote.${table}`)
+      if (ORDERED_TABLES.includes(table)) {
         await db.execAsync(`UPDATE main.${table} SET sort_order = (SELECT r.sort_order FROM remote.${table} r WHERE r.id = ${table}.id)`)
       }
-      await markSynced(db, manifest.rev)
-      await db.execAsync('COMMIT')
-    } catch (err) {
-      await db.execAsync('ROLLBACK')
-      throw err
-    }
+    })
     // Rows from a database older than the files for pictures still carry them in base64.
     await convertLegacyAttachments(db)
   })

@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from 'expo-router'
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, type Theme } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { StyleSheet, useWindowDimensions, View } from 'react-native'
@@ -7,6 +7,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 
 import { AppLock } from '@/components/AppLock'
 import { DialogHost } from '@/components/DialogHost'
+import { Sidebar } from '@/components/Sidebar'
 import { StartupBoundary } from '@/components/StartupBoundary'
 import { ToastHost } from '@/components/ToastHost'
 import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
@@ -15,6 +16,7 @@ import { isHapticsEnabled } from '@/db/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/settings'
 import { CloudSyncProvider } from '@/hooks/useCloudSync'
+import { useLayoutMode } from '@/hooks/useLayoutMode'
 import { ChatTextProvider } from '@/lib/chatText'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
@@ -83,8 +85,14 @@ function ThemedApp() {
   )
 }
 
+// Full-screen routes that go over the sidebar rather than beside it.
+const WITHOUT_SIDEBAR = ['/onboarding', '/viewer', '/background', '/avatar-crop']
+
 function AppShell() {
   const { colors, scheme } = useTheme()
+  const wide = useLayoutMode() === 'wide'
+  const pathname = usePathname()
+  const sidebar = wide && !WITHOUT_SIDEBAR.includes(pathname)
   const navigationTheme: Theme = useMemo(
     () => ({
       ...(scheme === 'light' ? DefaultTheme : DarkTheme),
@@ -104,12 +112,17 @@ function AppShell() {
     <>
       <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
       <ThemeProvider value={navigationTheme}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          {/* Opens in a blink; closed by the button or a tap, so no swipe-back either. */}
-          <Stack.Screen name="viewer" options={{ animation: 'fade', animationDuration: 120, gestureEnabled: false }} />
-          <Stack.Screen name="background" options={{ animation: 'fade' }} />
-          <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
-        </Stack>
+        <View style={styles.shell}>
+          {sidebar ? <Sidebar /> : null}
+          <View style={styles.main}>
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+              {/* Opens in a blink; closed by the button or a tap, so no swipe-back either. */}
+              <Stack.Screen name="viewer" options={{ animation: 'fade', animationDuration: 120, gestureEnabled: false }} />
+              <Stack.Screen name="background" options={{ animation: 'fade' }} />
+              <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
+            </Stack>
+          </View>
+        </View>
         <DialogHost />
         <ToastHost />
       </ThemeProvider>
@@ -119,4 +132,6 @@ function AppShell() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: darkColors.bg },
+  shell: { flex: 1, flexDirection: 'row' },
+  main: { flex: 1 },
 })

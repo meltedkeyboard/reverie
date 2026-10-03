@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Alert, FlatList, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
+import { FlatList, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -11,6 +11,7 @@ import { Picture } from '@/components/Picture'
 import { SFIcon } from '@/components/SFIcon'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
+import { showMessage } from '@/lib/dialogs'
 import { saveImage } from '@/lib/download'
 import { viewerImages, type ViewerImage } from '@/lib/viewer'
 import { useStyles, useTheme, type Colors } from '@/theme'
@@ -51,7 +52,7 @@ export default function ViewerScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
       setSaved(true)
     } catch (err) {
-      Alert.alert(t('images.saveFailed'), err instanceof Error ? err.message : String(err))
+      showMessage(t('images.saveFailed'), err instanceof Error ? err.message : String(err))
     }
   }
 

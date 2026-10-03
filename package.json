@@ -2,15 +2,19 @@
   "name": "reverie",
   "version": "4.2.0",
   "private": true,
-  "main": "expo-router/entry",
+  "main": "index",
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
+    "desktop": "node scripts/desktop-dev.mjs",
+    "desktop:preview": "expo export -p web && electron electron/main.js",
+    "desktop:build": "expo export -p web && electron-builder",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/build-icons.mjs",
     "postinstall": "patch-package && node scripts/build-icons.mjs"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
     "@expo/ui": "~57.0.19",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-community/slider": "5.2.0",
@@ -53,11 +57,14 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
+    "react-native-web": "^0.21.2",
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "@types/react": "~19.2.4",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
     "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   }

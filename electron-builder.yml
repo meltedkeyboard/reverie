@@ -1,0 +1,20 @@
+appId: reverie.app
+productName: Reverie
+extraMetadata:
+  # package.json's own main is the Expo entry, Electron must start from here
+  main: electron/main.js
+directories:
+  output: release
+files:
+  - electron/**
+  - dist/**
+  - package.json
+icon: assets/images/icon.png
+win:
+  target: nsis
+mac:
+  target: dmg
+  category: public.app-category.entertainment
+linux:
+  target: AppImage
+  category: Network

@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router'
+import { Redirect, Stack } from 'expo-router'
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
 import { useEffect, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
@@ -7,6 +7,7 @@ import { HomeContinueButton } from '@/components/ContinueButton'
 import type { ContinueKind } from '@/db/continue'
 import { isOnboardingComplete } from '@/db/onboarding'
 import { useDatabase } from '@/db/provider'
+import { useLayoutMode } from '@/hooks/useLayoutMode'
 import { LastChatProvider } from '@/hooks/useLastChat'
 import { useTranslation } from '@/i18n'
 import { noteTabFocus } from '@/lib/searchScope'
@@ -22,6 +23,7 @@ export default function TabsLayout() {
   const colors = useColors()
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
   const [home, setHome] = useState<ContinueKind | null>('character')
+  const wide = useLayoutMode() === 'wide'
 
   // The native tab bar switches at once, while focus reaches JS only after the navigator
   // has rendered the new state, long enough for the button to show over Settings for a
@@ -45,6 +47,16 @@ export default function TabsLayout() {
 
   // One continue button over the tabs rather than one per tab, so switching between
   // Characters and Rooms changes what it shows instead of swapping two buttons.
+  // A wide window has the sidebar for what the tabs do; the screens then stack in place of
+  // the bar, and there is no continue button, the sidebar lists every chat.
+  if (wide) {
+    return (
+      <LastChatProvider>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      </LastChatProvider>
+    )
+  }
+
   return (
     <LastChatProvider>
       <View style={styles.blank}>

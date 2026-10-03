@@ -20,6 +20,8 @@ const INDENT = '    '
 // the system selection with handles, and RN exposes one as a TextInput.
 export function SelectableText({ style, children }: { style: StyleProp<TextStyle>; children: ReactNode }) {
   const colors = useColors()
+  // A browser selects ordinary text by itself, and a <textarea> cannot hold nested Text.
+  if (Platform.OS === 'web') return <Text style={style}>{children}</Text>
   return (
     <TextInput
       editable={false}

@@ -30,6 +30,7 @@ import { setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMembe
 import { isSuggestionsEnabled } from '@/db/suggestions'
 import { useAside } from '@/hooks/useAside'
 import { useSuggestion } from '@/hooks/useSuggestion'
+import { useLayoutMode } from '@/hooks/useLayoutMode'
 import { useRoom, type RoomPhase } from '@/hooks/useRoom'
 import { useTranslation } from '@/i18n'
 import { roomScene } from '@/lib/aside'
@@ -61,6 +62,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
+  const wide = useLayoutMode() === 'wide'
   const keyboard = useReanimatedKeyboardAnimation()
 
   // Muting someone or switching the floor from here is saved at once and shown without
@@ -427,7 +429,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
       <GlassHeader
         floating
-        left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
+        left={wide ? undefined : <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
         right={
           <View style={styles.headerActions}>
             {privateEnabled || asideOpen ? (

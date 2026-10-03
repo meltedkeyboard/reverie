@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import MaskedView from '@react-native-masked-view/masked-view'
+import NativeMaskedView from '@react-native-masked-view/masked-view'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -11,9 +11,15 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
   useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native'
+
+// The web has no native mask: the package paints the mask element itself, a black slab
+// over the field. There the field is shown as it is, without the fade at its edges.
+const MaskedView: typeof NativeMaskedView =
+  Platform.OS === 'web' ? (({ children }: { children?: React.ReactNode }) => <>{children}</>) as never : NativeMaskedView
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
@@ -35,6 +41,7 @@ import { useInputColors } from './Field'
 import { IconButton } from './IconButton'
 import { SFIcon } from './SFIcon'
 import type { MessageImage } from '@/db/messages'
+import { CHAT_COLUMN } from '@/hooks/useLayoutMode'
 import { useTranslation } from '@/i18n'
 import { showMessage } from '@/lib/dialogs'
 import { errorMessage } from '@/lib/errors'
@@ -150,7 +157,8 @@ export function Composer({
     // With pictures attached the field is already open, so Enter is a plain line break.
     if (!textRef.current && next.includes('\n') && !next.trim() && !picturedRef.current) {
       setOpened(true)
-      inputRef.current?.setNativeProps({ text: '' })
+      // The web has no setNativeProps; there the controlled value already clears the field.
+      inputRef.current?.setNativeProps?.({ text: '' })
       return
     }
     setText(next)
@@ -159,6 +167,14 @@ export function Composer({
   picturedRef.current = images.length > 0 && !editing
   const [picking, setPicking] = useState(false)
   const imageUris = useMemo(() => images.map(pictureUri), [images])
+
+  // A browser scrolls whatever holds a field to show it when it takes focus. The field of a
+  // swap starts below its place, so autoFocus there pushed the whole interface down.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !autoFocus) return
+    const node = inputRef.current as unknown as HTMLElement | null
+    node?.focus({ preventScroll: true })
+  }, [autoFocus])
 
   useEffect(() => {
     if (!editing) return
@@ -320,6 +336,7 @@ export function Composer({
   // Where the field really is on screen, read when the menu opens, so the menu lines up with
   // it whatever state (narrow, wide, mid-animation) the field is in.
   const fieldBox = useRef<Animated.View>(null)
+  const dockBox = useRef<Animated.View>(null)
   const [menuLeft, setMenuLeft] = useState(10)
   const openMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -330,11 +347,17 @@ export function Composer({
         return listRecentAttachments(db, unlimited ? null : count)
       })
       .then(setRecents, () => setRecents([]))
+    // The dock is the menu's frame. On a phone it starts at the window's edge; beside the
+    // sidebar it starts after it, so the field's window x is taken from the dock's own.
     fieldBox.current?.measureInWindow((x) => {
-      setMenuLeft(x)
-      setMenuMounted(true)
-      setMenuShown(true)
-      pop.value = withSpring(1, { damping: 20, stiffness: 300, mass: 0.7 })
+      const show = (origin: number) => {
+        setMenuLeft(x - origin)
+        setMenuMounted(true)
+        setMenuShown(true)
+        pop.value = withSpring(1, { damping: 20, stiffness: 300, mass: 0.7 })
+      }
+      if (dockBox.current) dockBox.current.measureInWindow((dockX) => show(dockX))
+      else show(0)
     })
   }
   // The row under the finger while it is down on the menu.
@@ -399,7 +422,7 @@ export function Composer({
   // The row sits in the bar's 10 pt padding and the field is narrowed by the inset on each side.
   const measureWidth = Math.max(
     0,
-    windowWidth - 2 * (BAR_PAD_SIDE + NARROW_INSET) - (FIELD_PAD + (editing ? 14 : SIDE_PAD)) - (FIELD_PAD + SIDE_PAD)
+    Math.min(windowWidth, CHAT_COLUMN + 2 * BAR_PAD_SIDE) - 2 * (BAR_PAD_SIDE + NARROW_INSET) - (FIELD_PAD + (editing ? 14 : SIDE_PAD)) - (FIELD_PAD + SIDE_PAD)
   )
   // Scales with a transform only: Liquid Glass renders wrongly under a fading parent.
   const menuStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
@@ -444,9 +467,20 @@ export function Composer({
     (images.length && !editing ? imagesH : 0) +
     (docked ? DOCKED_INPUT + toolsH : ONE_LINE_INPUT) +
     barExtra
+  // On a phone the list keeps the room of the one-line field and a growing field goes over the
+  // messages. On the web it follows the field, so a taller one pushes them up instead of
+  // covering the last lines: the room under the text differs for the resting and the opened field.
+  const web = Platform.OS === 'web'
   useEffect(() => {
-    height.value = reserve
-  }, [reserve, height])
+    if (!web) height.value = reserve
+  }, [web, reserve, height])
+  useAnimatedReaction(
+    () => Math.max(reserve, barExtra + boxHeight.value),
+    (value) => {
+      if (web) height.value = value
+    },
+    [web, reserve, barExtra]
+  )
 
   // The accessory sits on the height the list reserves, not on the bar itself, so it does not
   // follow every line the field gains.
@@ -547,7 +581,9 @@ export function Composer({
                 // The placeholder is drawn below, where it can glide between the two layouts.
                 placeholderTextColor="transparent"
                 multiline
-                autoFocus={autoFocus}
+                // A browser's <textarea> is two rows tall unless told otherwise.
+                numberOfLines={1}
+                autoFocus={autoFocus && Platform.OS !== 'web'}
                 accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
                 style={[
                   styles.input,
@@ -629,6 +665,8 @@ export function Composer({
       pointerEvents="box-none"
     >
       <Animated.View
+        ref={dockBox}
+        collapsable={false}
         style={[styles.accessory, accessoryStyle]}
         pointerEvents="box-none"
         onLayout={(e) => {
@@ -637,7 +675,12 @@ export function Composer({
       >
         {accessory}
       </Animated.View>
-      {liquidGlass ? (
+      {web ? (
+        // The desktop field floats over the messages with nothing under it.
+        <View style={[styles.floatingBar, { paddingBottom: insets.bottom + BAR_PAD_BOTTOM }]} pointerEvents="box-none">
+          {row}
+        </View>
+      ) : liquidGlass ? (
         // Glass controls float over the messages; the fade keeps text scrolling
         // underneath from clashing with them.
         <View style={[styles.floatingBar, { paddingBottom: insets.bottom + BAR_PAD_BOTTOM }]} pointerEvents="box-none">
@@ -731,7 +774,10 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
   if (id === shownId) shown.current = children
   const offset = useSharedValue(0)
   // Far enough to clear the screen even with the keyboard up and a panel over the field.
-  const distance = screenHeight * 0.6
+  // On a desktop window the screen is far too tall for that: the field only dips a little
+  // and fades, which reads as a swap instead of a flight across the window.
+  const web = Platform.OS === 'web'
+  const distance = web ? 72 : screenHeight * 0.6
 
   useEffect(() => {
     if (id === shownId) return
@@ -749,7 +795,11 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
     offset.value = withSpring(0, { damping: 17, stiffness: 210, mass: 0.9 })
   }, [shownId, offset])
 
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }))
+  // Opacity only on the web: there is no Liquid Glass there to lose its material.
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: offset.value }],
+    ...(web ? { opacity: Math.min(1, Math.max(0, 1 - offset.value / distance)) } : null),
+  }))
   return (
     <Animated.View key={shownId} style={[StyleSheet.absoluteFill, style]} pointerEvents="box-none">
       {shown.current}
@@ -817,7 +867,7 @@ const createStyles = (colors: Colors) =>
   bannerClose: { width: 28, height: 28 },
   // Matches MessageRow's cap so the composer lines up with the message column; a no-op
   // on phone widths.
-  row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', alignSelf: 'center' },
+  row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', maxWidth: CHAT_COLUMN, alignSelf: 'center' },
   fieldBox: { flex: 1, overflow: 'hidden' },
   glass: { borderRadius: 26 },
   // Pinned to the bottom, so a taller field reveals its text from above while the buttons stay.
@@ -855,6 +905,8 @@ const createStyles = (colors: Colors) =>
     paddingTop: 8,
     paddingBottom: 8,
     paddingHorizontal: 14,
+    // The browser's own focus ring and white fill would show through the glass fallback.
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', backgroundColor: 'transparent', resize: 'none' } as object) : null),
   },
   ghost: { position: 'absolute', maxHeight: 164, overflow: 'hidden' },
   ghostText: { color: colors.textMuted, fontSize: 17, lineHeight: 22 },

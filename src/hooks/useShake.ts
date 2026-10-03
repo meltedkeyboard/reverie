@@ -1,5 +1,6 @@
 import { Accelerometer } from 'expo-sensors'
 import { useEffect, useRef } from 'react'
+import { Platform } from 'react-native'
 
 // A deliberate shake: JOLTS separate peaks past THRESHOLD total g-force, all
 // within WINDOW_MS. A single flick of the wrist or setting the phone down won't do it.
@@ -16,7 +17,8 @@ export function useShake(onShake: () => void, enabled: boolean, { threshold = TH
   const lastFired = useRef(0)
 
   useEffect(() => {
-    if (!enabled) return
+    // A desktop has no accelerometer, and expo-sensors has no web implementation to listen to.
+    if (!enabled || Platform.OS === 'web') return
     let jolts: number[] = []
     let above = false
     Accelerometer.setUpdateInterval(50)

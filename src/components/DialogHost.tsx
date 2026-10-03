@@ -1,11 +1,16 @@
 import { useState, useSyncExternalStore } from 'react'
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
+import { WebDialogHost } from '@/components/WebDialogs'
 import { useTranslation } from '@/i18n'
 import { closeAndroidDialog, getAndroidDialog, subscribeAndroidDialog } from '@/lib/androidDialog'
 import { useStyles, useTheme, type Colors } from '@/theme'
 
 export function DialogHost() {
+  return Platform.OS === 'web' ? <WebDialogHost /> : <SheetDialogHost />
+}
+
+function SheetDialogHost() {
   const dialog = useSyncExternalStore(subscribeAndroidDialog, getAndroidDialog)
   const styles = useStyles(createStyles)
   return (

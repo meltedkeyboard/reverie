@@ -26,3 +26,8 @@ export const glassEffect =
   glassModule?.isLiquidGlassAvailable() && glassModule.isGlassEffectAPIAvailable() ? glassModule : null
 
 export const liquidGlass = glassEffect !== null
+
+// The iOS 26 look of the bars: no bar at all, round controls floating over the content
+// with a fade under them. Android and the desktop get it with plain round surfaces in
+// place of the glass; only an iOS without Liquid Glass keeps the frosted bar.
+export const floatingBars = liquidGlass || Platform.OS !== 'ios'

@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactElement, type Ref } from 'react'
 import {
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,8 +13,9 @@ import {
   type ScrollViewProps,
 } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
-import Animated, { FadeIn, FadeOut, type SharedValue } from 'react-native-reanimated'
+import Animated, { useAnimatedReaction, ZoomIn, ZoomOut, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import { Flash } from '@/components/Flash'
 import { GlassButton } from '@/components/Glass'
@@ -149,6 +151,67 @@ export function ConversationList({
     return () => clearTimeout(timer)
   }, [draftIndex, held])
 
+  // The web has no native scroll view to pad by the composer, so the list pads itself
+  // with the composer's height, and the newest message stops above it.
+  const [composerPad, setComposerPad] = useState(0)
+  useAnimatedReaction(
+    () => composerHeight.value,
+    (height) => {
+      if (Platform.OS === 'web') scheduleOnRN(setComposerPad, height)
+    }
+  )
+
+  // react-native-web moves a flipped list by the wheel itself, in whole steps of the wheel's
+  // delta, so the chat jumped a notch at a time. The wheel is taken over here in the capture
+  // phase, before that handler, and the offset eases toward where the wheel points.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    const node = (listRef.current as unknown as { getScrollableNode?: () => HTMLElement } | null)?.getScrollableNode?.()
+    const outer = node?.parentElement
+    if (!node || !outer) return
+    let target = 0
+    let frame = 0
+    const step = () => {
+      const left = target - node.scrollTop
+      if (Math.abs(left) < 0.5) {
+        node.scrollTop = target
+        frame = 0
+        return
+      }
+      node.scrollTop += left * 0.2
+      frame = requestAnimationFrame(step)
+    }
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return
+      e.preventDefault()
+      e.stopPropagation()
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? node.clientHeight : 1
+      if (!frame) target = node.scrollTop
+      // The list is flipped: the wheel turning down brings the offset toward the newest message.
+      target = Math.min(Math.max(0, target - e.deltaY * unit), node.scrollHeight - node.clientHeight)
+      if (!frame) frame = requestAnimationFrame(step)
+    }
+    outer.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => {
+      outer.removeEventListener('wheel', onWheel, { capture: true })
+      cancelAnimationFrame(frame)
+    }
+  }, [])
+
+  // The web list is flipped by a transform and its rows differ in height, so rows rendered
+  // late show up as jumps while scrolling: more of them are kept ready, and the flipped
+  // scroller gets its own layer.
+  const webList =
+    Platform.OS === 'web'
+      ? {
+          initialNumToRender: 20,
+          maxToRenderPerBatch: 20,
+          windowSize: 41,
+          removeClippedSubviews: false,
+          style: { willChange: 'transform', overscrollBehavior: 'contain' } as object,
+        }
+      : null
+
   const renderScroll = useCallback(
     (props: ScrollViewProps) => (
       <KeyboardChatScrollView
@@ -185,19 +248,20 @@ export function ConversationList({
       extraData={extraData}
       keyExtractor={(row) => (row.streaming ? 'draft' : String(row.id))}
       renderItem={renderItem}
-      renderScrollComponent={renderScroll}
+      renderScrollComponent={Platform.OS === 'web' ? undefined : renderScroll}
       onScroll={onScroll}
       onScrollBeginDrag={() => setFollowTail(false)}
       onScrollToIndexFailed={onScrollToIndexFailed}
       maintainVisibleContentPosition={anchor !== null ? { minIndexForVisible: anchor } : undefined}
-      scrollEventThrottle={32}
+      scrollEventThrottle={Platform.OS === 'web' ? 16 : 32}
+      {...webList}
       ListHeaderComponent={header}
       ListFooterComponent={footer}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
         // The list is inverted, so this visually sits just above the composer.
-        paddingTop: 8,
+        paddingTop: 8 + (Platform.OS === 'web' ? composerPad + 16 : 0),
         paddingBottom: headerHeight + 12,
       }}
     />
@@ -209,7 +273,8 @@ export function JumpButton({ onPress }: { onPress: () => void }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
-    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(160)} style={styles.jumpSlot}>
+    // Zoom, not fade: Liquid Glass under a fading parent loses its material and leaves only the glyph.
+    <Animated.View entering={ZoomIn.duration(160)} exiting={ZoomOut.duration(140)} style={styles.jumpSlot}>
       {liquidGlass ? (
         <GlassButton icon="arrow-down" onPress={onPress} />
       ) : (

@@ -29,6 +29,7 @@ import { createRoomChat, getRoom, listRoomMembers, type Room, type RoomMember } 
 import { isSuggestionsEnabled } from '@/db/suggestions'
 import { useAside } from '@/hooks/useAside'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
+import { useLayoutMode } from '@/hooks/useLayoutMode'
 import { useSuggestion } from '@/hooks/useSuggestion'
 import { useTranslation } from '@/i18n'
 import { characterScene } from '@/lib/aside'
@@ -124,6 +125,8 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
+  // The sidebar is the way out of a chat in a wide window.
+  const wide = useLayoutMode() === 'wide'
   const [privateEnabled, setPrivateEnabled] = useState(true)
   const [suggestEnabled, setSuggestEnabled] = useState(false)
   useEffect(() => {
@@ -327,9 +330,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
 
       <GlassHeader
         floating
-        left={
-          <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />
-        }
+        left={wide ? undefined : <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
         right={
           <View style={styles.headerActions}>
             {privateEnabled || asideOpen ? (

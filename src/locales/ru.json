@@ -1,5 +1,6 @@
 {
   "common.cancel": "Отмена",
+  "common.ok": "ОК",
   "common.close": "Закрыть",
   "common.back": "Назад",
   "common.expand": "Открыть на весь экран",
@@ -385,6 +386,12 @@
 
   "format.today": "Сегодня",
   "format.yesterday": "Вчера",
+  "sidebar.collapse": "Свернуть панель",
+  "sidebar.expand": "Развернуть панель",
+  "sidebar.last7": "Предыдущие 7 дней",
+  "sidebar.earlier": "Ранее",
+  "sidebar.noChats": "Чатов пока нет",
+  "sidebar.untitled": "Новый чат",
 
   "rooms.title": "Комнаты",
   "rooms.emptyTitle": "Комнат пока нет",

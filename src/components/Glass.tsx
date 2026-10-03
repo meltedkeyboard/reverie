@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import type { ComponentProps } from 'react'
 import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
 
-import { glassEffect, liquidGlass } from '@/lib/nativeUI'
+import { floatingBars, glassEffect, liquidGlass } from '@/lib/nativeUI'
 import { useStyles, useTheme, type Colors } from '@/theme'
 
 import { IconButton } from './IconButton'
@@ -69,7 +69,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
         onPress={onPress}
         disabled={disabled}
         accessibilityLabel={accessibilityLabel}
-        style={fill ? { backgroundColor: fill } : undefined}
+        style={[floatingBars && styles.circleSolid, fill ? { backgroundColor: fill } : undefined]}
       >
         {children}
       </IconButton>
@@ -98,7 +98,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
 export function GlassGroup({ children }: { children: React.ReactNode }) {
   const styles = useStyles(createStyles)
   return (
-    <GlassSurface interactive style={styles.group}>
+    <GlassSurface interactive style={styles.group} fallbackStyle={floatingBars && styles.solid}>
       {children}
     </GlassSurface>
   )
@@ -114,6 +114,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     group: { height: 44, borderRadius: 22, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center' },
     circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    circleSolid: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     disabled: { opacity: 0.35 },
   })

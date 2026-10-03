@@ -226,6 +226,11 @@ function writeMarker(value: boolean) {
 export async function keepCopy(db: SQLiteDatabase) {
   const shelf = new Directory(hiddenRoot, 'earlier-databases', `${Date.now()}-before-sync`)
   shelf.create({ intermediates: true, idempotent: true })
+  // On the web the database is not a file SQLite can write to, so its bytes are saved.
+  if (Platform.OS === 'web') {
+    new File(shelf, DATABASE_NAME).write(await db.serializeAsync('main'))
+    return
+  }
   const path = `${plainPath(shelf)}/${DATABASE_NAME}`
   await db.execAsync(`VACUUM INTO '${path.replace(/'/g, "''")}'`)
 }

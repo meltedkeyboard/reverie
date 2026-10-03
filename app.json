@@ -2,7 +2,8 @@
   "expo": {
     "name": "Reverie",
     "slug": "reverie",
-    "platforms": ["ios", "android"],
+    "platforms": ["ios", "android", "web"],
+    "web": { "bundler": "metro", "output": "single" },
     "version": "4.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

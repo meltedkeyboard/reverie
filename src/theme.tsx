@@ -115,9 +115,38 @@ export function ThemeContextProvider({
   const scheme: Scheme = preference === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : preference
   // Alerts, action sheets and the keyboard follow the window rather than the app, so
   // a theme picked in the app is passed down to it; 'system' gives it back to iOS.
+  // react-native-web has no setColorScheme, and the page has no such windows.
   useEffect(() => {
-    Appearance.setColorScheme(preference === 'system' ? 'unspecified' : preference)
+    Appearance.setColorScheme?.(preference === 'system' ? 'unspecified' : preference)
   }, [preference])
+  // On the web (the desktop app) the scrollbars are drawn by the browser; they are
+  // restyled from the palette so they match the theme instead of the OS default.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return
+    const c = palettes[scheme]
+    const thumb = scheme === 'dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.22)'
+    const thumbHover = scheme === 'dark' ? 'rgba(255, 255, 255, 0.32)' : 'rgba(0, 0, 0, 0.38)'
+    let el = document.getElementById('reverie-scrollbars') as HTMLStyleElement | null
+    if (!el) {
+      el = document.createElement('style')
+      el.id = 'reverie-scrollbars'
+      document.head.appendChild(el)
+    }
+    el.textContent = `
+      :root { color-scheme: ${scheme}; }
+      *::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
+      *::-webkit-scrollbar-track { background: transparent; }
+      *::-webkit-scrollbar-corner { background: transparent; }
+      *::-webkit-scrollbar-thumb {
+        background-color: ${thumb};
+        border: 3px solid transparent;
+        background-clip: content-box;
+        border-radius: 999px;
+      }
+      *::-webkit-scrollbar-thumb:hover { background-color: ${thumbHover}; }
+      *::-webkit-scrollbar-thumb:active { background-color: ${c.accent}; }
+    `
+  }, [scheme])
   const value = useMemo(
     () => ({ colors: palettes[scheme], scheme, preference, setPreference }),
     [scheme, preference, setPreference]

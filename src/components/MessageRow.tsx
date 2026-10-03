@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { Message } from '@/db/messages'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
+import { CHAT_COLUMN } from '@/hooks/useLayoutMode'
 import { useTranslation } from '@/i18n'
 import type { MessageImage } from '@/db/messages'
 import { withAlpha } from '@/lib/color'
@@ -392,7 +393,7 @@ function Picture({ image, onLongPress }: PictureProps) {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-  userRow: { alignItems: 'flex-end', paddingLeft: 56, paddingRight: 16, marginVertical: 8, width: '100%', alignSelf: 'center' },
+  userRow: { alignItems: 'flex-end', paddingLeft: 56, paddingRight: 16, marginVertical: 8, width: '100%', maxWidth: CHAT_COLUMN, alignSelf: 'center' },
   bubble: {
     backgroundColor: colors.bubble,
     borderRadius: 20,
@@ -401,7 +402,7 @@ const createStyles = (colors: Colors) =>
   },
   picture: { borderRadius: 18, marginBottom: 4, backgroundColor: colors.surface },
   userText: { color: colors.text },
-  botRow: { alignItems: 'flex-start', paddingHorizontal: 20, marginVertical: 12, width: '100%', alignSelf: 'center' },
+  botRow: { alignItems: 'flex-start', paddingHorizontal: 20, marginVertical: 12, width: '100%', maxWidth: CHAT_COLUMN, alignSelf: 'center' },
   botText: { color: colors.text, letterSpacing: 0.1 },
   action: { fontStyle: 'italic', color: colors.textMuted },
   reactionRow: { marginVertical: 6 },
@@ -430,6 +431,7 @@ const createStyles = (colors: Colors) =>
     paddingHorizontal: 32,
     marginVertical: 14,
     width: '100%',
+    maxWidth: CHAT_COLUMN,
     alignSelf: 'center',
   },
   narrationRule: { width: 36, height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong, marginVertical: 10 },

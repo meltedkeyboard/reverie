@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
+import { notifyChatsChanged } from '@/lib/chatEvents'
+
 export type Role = 'user' | 'assistant'
 
 // A picture of a message: the name of its file in the `attachments` folder.
@@ -190,6 +192,7 @@ export async function addMessage(db: SQLiteDatabase, chatId: number, role: Role,
       packSome(message.absent),
     ]
   )
+  notifyChatsChanged()
   return { ...message, id: res.lastInsertRowId }
 }
 
