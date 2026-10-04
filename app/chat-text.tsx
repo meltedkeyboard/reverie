@@ -3,6 +3,7 @@ import Slider from '@react-native-community/slider'
 import { useMemo, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
+import { ChipGroup } from '@/components/ChipGroup'
 import { Pattern } from '@/components/Pattern'
 import { FormScreenHeader } from '@/components/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/Glass'
@@ -17,7 +18,7 @@ import { useTranslation } from '@/i18n'
 import { CHAT_METRICS, useChatTextSettings } from '@/lib/chatText'
 import * as Haptics from '@/lib/haptics'
 import { installedFontFamilies } from '../modules/reverie-fonts'
-import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { type Colors, ON_ACCENT, type ThemePreference, useColors, useStyles, useTheme } from '@/theme'
 import { isAndroid } from '@/lib/platform'
 
 const FIELD_HEIGHT = 48
@@ -44,6 +45,12 @@ export default function ChatTextScreen() {
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
+  const { preference, setPreference } = useTheme()
+  const themeOptions: { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: t('theme.system') },
+    { value: 'light', label: t('theme.light') },
+    { value: 'dark', label: t('theme.dark') },
+  ]
   const { font, userFont, setUserFont, pattern, setPattern, scale, setFont, setScale, reset } = useChatTextSettings()
   const untouched = font === DEFAULT_CHAT_FONT && !userFont && scale === CHAT_TEXT_SCALE_RANGE.default
   const fontFamily = font
@@ -85,8 +92,11 @@ export default function ChatTextScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={padding}>
+        <Text style={[styles.sectionLabel, styles.firstLabel]}>{t('settings.theme')}</Text>
+        <ChipGroup options={themeOptions} value={preference} onChange={setPreference} />
+
         {/* A made-up exchange, so a change shows at once as it will look in a chat. */}
-        <View style={styles.card}>
+        <View style={[styles.card, styles.previewCard]}>
           <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
             <View style={styles.bubble}>
               <Text
@@ -200,6 +210,8 @@ const createStyles = (colors: Colors) =>
       paddingBottom: 12,
     },
     // A set height, so the card does not grow with the text: what does not fit scrolls.
+    firstLabel: { marginTop: 0 },
+    previewCard: { marginTop: 20 },
     messages: { height: 200, marginBottom: 12 },
     messagesContent: { gap: 16 },
     bubble: {

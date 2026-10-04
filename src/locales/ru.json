@@ -9,6 +9,7 @@
 
   "settings.title": "Настройки",
   "settings.appearance": "Оформление",
+  "settings.theme": "Тема",
   "theme.system": "Системная",
   "theme.light": "Светлая",
   "theme.dark": "Тёмная",
@@ -212,6 +213,7 @@
   "background.choose": "Выбрать картинку",
   "background.change": "Заменить картинку",
   "background.cropHint": "Перетаскивайте и масштабируйте, чтобы выбрать кадр",
+  "background.reset": "Сбросить кадр",
   "background.adjust": "Настроить",
   "background.remove": "Убрать",
   "background.effectBlur": "Размытие",

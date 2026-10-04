@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ChipGroup } from '@/components/ChipGroup'
+import { LinkTile } from '@/components/LinkTile'
 import { loadModel } from '@/api/llm'
 import { Flash } from '@/components/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/GlassHeader'
@@ -51,7 +52,7 @@ import type { SettingsSection } from '@/lib/searchScope'
 import { isShownInFiles } from '@/lib/storage'
 import { reportError } from '@/lib/report'
 import { isAndroid } from '@/lib/platform'
-import { type Colors, textStyles, type ThemePreference, useColors, useStyles, useTheme } from '@/theme'
+import { type Colors, textStyles, useColors, useStyles } from '@/theme'
 
 
 export default function SettingsScreen() {
@@ -59,7 +60,6 @@ export default function SettingsScreen() {
   const router = useRouter()
   const padding = useScreenPadding('form')
   const colors = useColors()
-  const { preference, setPreference } = useTheme()
   const styles = useStyles(createStyles)
   const { t, locale, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
   const headerHeight = useHeaderHeight()
@@ -102,11 +102,6 @@ export default function SettingsScreen() {
   const CONTEXT_OPTIONS: { value: ContextMode; label: string }[] = [
     { value: 'messages', label: t('settings.contextMessages') },
     { value: 'tokens', label: t('settings.contextTokens') },
-  ]
-  const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
-    { value: 'system', label: t('theme.system') },
-    { value: 'light', label: t('theme.light') },
-    { value: 'dark', label: t('theme.dark') },
   ]
   const CONTINUE_OPTIONS: { value: 'visit' | 'message'; label: string }[] = [
     { value: 'visit', label: t('settings.continueByVisit') },
@@ -341,13 +336,6 @@ export default function SettingsScreen() {
     })
   }
 
-  const appearance = (
-    <>
-      <Eyebrow label={t('settings.appearance')} color={colors.text} />
-      <ChipGroup options={THEME_OPTIONS} value={preference} onChange={setPreference} />
-    </>
-  )
-
   const language = (
     <>
       <Eyebrow label={t('settings.language')} color={colors.text} />
@@ -449,16 +437,12 @@ export default function SettingsScreen() {
   )
 
   const chatText = useChatTextSettings()
-  const chatTextRows = (
-    <Pressable onPress={() => router.push('/chat-text')} style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}>
-      <View style={styles.linkText}>
-        <Text style={[styles.rowLabel, styles.linkLabel]}>{t('settings.chatFont')}</Text>
-        <Text style={styles.linkValue}>
-          {chatText.font === 'System' ? t('chatFont.system') : chatText.font}, {Math.round(chatText.scale * 100)}%
-        </Text>
-      </View>
-      <Text style={styles.chevron}>›</Text>
-    </Pressable>
+  const appearance = (
+    <LinkTile
+      title={t('settings.appearance')}
+      subtitle={`${chatText.font === 'System' ? t('chatFont.system') : chatText.font}, ${Math.round(chatText.scale * 100)}%`}
+      onPress={() => router.push('/chat-text')}
+    />
   )
 
   const hapticsRow = (
@@ -688,10 +672,10 @@ export default function SettingsScreen() {
   )
 
   const aboutRow = (
-    <Pressable onPress={() => router.push('/about')} style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}>
-      <Text style={[styles.rowLabel, styles.linkLabel]}>{t('settings.aboutReverie')}</Text>
-      <Text style={styles.chevron}>›</Text>
-    </Pressable>
+    <LinkTile
+      title={t('settings.aboutReverie')}
+      onPress={() => router.push('/about')}
+    />
   )
 
   const wipe = (
@@ -712,7 +696,7 @@ export default function SettingsScreen() {
           keyboardDismissMode="interactive"
           contentContainerStyle={padding}
         >
-          {block('appearance', appearance, styles.chips)}
+          {block('appearance', appearance)}
           {block('language', language, styles.chips)}
           {appIconRows ? block('appIcon', appIconRows) : null}
 
@@ -728,7 +712,6 @@ export default function SettingsScreen() {
           {block('suggest', suggestRow)}
           {block('recents', recentRow)}
           {block('confirmDelete', confirmDeleteRow)}
-          {block('chatText', chatTextRows)}
 
           <Divider />
 

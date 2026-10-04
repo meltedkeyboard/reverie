@@ -9,6 +9,7 @@
 
   "settings.title": "Settings",
   "settings.appearance": "Appearance",
+  "settings.theme": "Theme",
   "theme.system": "System",
   "theme.light": "Light",
   "theme.dark": "Dark",
@@ -212,6 +213,7 @@
   "background.choose": "Choose image",
   "background.change": "Change image",
   "background.cropHint": "Drag and pinch to frame the picture",
+  "background.reset": "Reset framing",
   "background.adjust": "Adjust",
   "background.remove": "Remove",
   "background.effectBlur": "Blur",

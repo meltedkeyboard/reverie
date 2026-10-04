@@ -107,14 +107,13 @@ export default function SearchScreen() {
 
   const settings = useMemo<SettingEntry[]>(() => {
     const entries: SettingEntry[] = [
-      { label: t('settings.appearance'), keywords: [t('theme.light'), t('theme.dark')], symbol: 'paintbrush', fallback: 'color-palette-outline', href: settingsAt('appearance') },
+      { label: t('settings.appearance'), keywords: [t('settings.theme'), t('theme.light'), t('theme.dark'), t('settings.chatFontField'), t('settings.chatTextSize'), t('settings.chatPattern')], symbol: 'paintbrush', fallback: 'color-palette-outline', href: settingsAt('appearance') },
       { label: t('settings.language'), keywords: [t('language.ru'), t('language.en')], symbol: 'globe', fallback: 'globe-outline', href: settingsAt('language') },
       { label: t('settings.continueButton'), keywords: [t('settings.homeScreen')], symbol: 'play.circle', fallback: 'play-circle-outline', href: settingsAt('continue') },
       { label: t('settings.privateButton'), keywords: [t('settings.chats')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('private') },
       { label: t('settings.suggestButton'), keywords: [t('settings.chats')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
       { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: settingsAt('recents') },
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
-      { label: t('settings.chatFont'), keywords: [t('settings.chats'), t('settings.chatFontField'), t('settings.chatTextSize'), t('settings.chatPattern')], symbol: 'textformat', fallback: 'text-outline', href: settingsAt('chatText') },
       { label: t('settings.limitsTitle'), keywords: [t('settings.limitsOff'), t('settings.limitAvatar'), t('settings.limitAttachment')], symbol: 'externaldrive', fallback: 'resize-outline', href: settingsAt('limits') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
       { label: t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },

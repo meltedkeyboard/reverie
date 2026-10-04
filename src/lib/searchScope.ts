@@ -26,7 +26,6 @@ export type SettingsSection =
   | 'confirmDelete'
   | 'recents'
   | 'limits'
-  | 'chatText'
   | 'haptics'
   | 'faceId'
   | 'files'
