@@ -131,7 +131,7 @@ export default function SearchScreen() {
     ]
     if (alternateIconsAvailable) {
       const language = entries.findIndex((entry) => entry.label === t('settings.language'))
-      entries.splice(language + 1, 0, { label: t('settings.appIcon'), keywords: [t('settings.appearance')], symbol: 'app', fallback: 'apps-outline', href: settingsAt('appIcon') })
+      entries.splice(language + 1, 0, { label: t('settings.appIcon'), keywords: [t('settings.appearance')], symbol: 'app', fallback: 'apps-outline', href: settingsAt('appearance') })
     }
     if (cloudSyncAvailable) {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))

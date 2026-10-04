@@ -3,16 +3,13 @@ import Slider from '@react-native-community/slider'
 import { useMemo, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { ChipGroup } from '@/components/ChipGroup'
 import { Pattern } from '@/components/Pattern'
 import { FormScreenHeader } from '@/components/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/Glass'
+import { ButtonCell, CheckCell, ListSection, MenuCell, SwitchCell } from '@/components/GroupedList'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { Markdown } from '@/components/Markdown'
-import { FieldRow } from '@/components/motifs/FieldRow'
 import type { MenuItem } from '@/components/NativeMenu'
-import { PillButton } from '@/components/PillButton'
-import { ToggleRow } from '@/components/ToggleRow'
 import { CHAT_PATTERNS, CHAT_TEXT_SCALE_RANGE, DEFAULT_CHAT_FONT, SYSTEM_FONT } from '@/db/settings'
 import { useTranslation } from '@/i18n'
 import { CHAT_METRICS, useChatTextSettings } from '@/lib/chatText'
@@ -51,7 +48,7 @@ export default function ChatTextScreen() {
     { value: 'light', label: t('theme.light') },
     { value: 'dark', label: t('theme.dark') },
   ]
-  const { font, userFont, setUserFont, pattern, setPattern, scale, setFont, setScale, reset } = useChatTextSettings()
+  const { font, userFont, setUserFont, userMarkdown, setUserMarkdown, pattern, setPattern, scale, setFont, setScale, reset } = useChatTextSettings()
   const untouched = font === DEFAULT_CHAT_FONT && !userFont && scale === CHAT_TEXT_SCALE_RANGE.default
   const fontFamily = font
   const scaled = (value: number) => value * scale
@@ -89,26 +86,31 @@ export default function ChatTextScreen() {
     lineHeight: scaled(CHAT_METRICS.bot.line),
   }
 
+  const user = {
+    color: colors.text,
+    fontFamily: userFont ? fontFamily : undefined,
+    fontSize: scaled(CHAT_METRICS.user.size),
+    lineHeight: scaled(CHAT_METRICS.user.line),
+  }
+
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={padding}>
-        <Text style={[styles.sectionLabel, styles.firstLabel]}>{t('settings.theme')}</Text>
-        <ChipGroup options={themeOptions} value={preference} onChange={setPreference} />
+        <ListSection header={t('settings.theme')}>
+          {themeOptions.map((o) => (
+            <CheckCell key={o.value} label={o.label} checked={preference === o.value} onPress={() => setPreference(o.value)} />
+          ))}
+        </ListSection>
 
         {/* A made-up exchange, so a change shows at once as it will look in a chat. */}
-        <View style={[styles.card, styles.previewCard]}>
+        <View style={styles.card}>
           <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
             <View style={styles.bubble}>
-              <Text
-                style={{
-                  color: colors.text,
-                  fontFamily: userFont ? fontFamily : undefined,
-                  fontSize: scaled(CHAT_METRICS.user.size),
-                  lineHeight: scaled(CHAT_METRICS.user.line),
-                }}
-              >
-                {t('chatPreview.user')}
-              </Text>
+              {userMarkdown ? (
+                <Markdown text={t('chatPreview.user')} style={user} selectable={false} />
+              ) : (
+                <Text style={user}>{t('chatPreview.user')}</Text>
+              )}
             </View>
             <Markdown text={t('chatPreview.reply')} style={bot} emStyle={styles.action} />
           </ScrollView>
@@ -127,68 +129,62 @@ export default function ChatTextScreen() {
           </View>
         </View>
 
-        <View style={styles.panel}>
-          <Text style={styles.small}>A</Text>
-          <Slider
-            value={scale}
-            minimumValue={CHAT_TEXT_SCALE_RANGE.min}
-            maximumValue={CHAT_TEXT_SCALE_RANGE.max}
-            onValueChange={drag}
-            onSlidingComplete={(v) => setScale(snap(v))}
-            minimumTrackTintColor={colors.accent}
-            maximumTrackTintColor={colors.borderStrong}
-            thumbTintColor={ON_ACCENT}
-            accessibilityLabel={t('settings.chatTextSize')}
-            style={styles.slider}
-          />
-          <Text style={styles.large}>A</Text>
-        </View>
+        <ListSection>
+          <View style={styles.sizeRow}>
+            <Text style={styles.small}>A</Text>
+            <Slider
+              value={scale}
+              minimumValue={CHAT_TEXT_SCALE_RANGE.min}
+              maximumValue={CHAT_TEXT_SCALE_RANGE.max}
+              onValueChange={drag}
+              onSlidingComplete={(v) => setScale(snap(v))}
+              minimumTrackTintColor={colors.accent}
+              maximumTrackTintColor={colors.borderStrong}
+              thumbTintColor={ON_ACCENT}
+              accessibilityLabel={t('settings.chatTextSize')}
+              style={styles.slider}
+            />
+            <Text style={styles.large}>A</Text>
+          </View>
+          <MenuCell label={t('settings.chatFontField')} value={font === SYSTEM_FONT ? t('chatFont.system') : font} items={items} />
+          <SwitchCell label={t('settings.chatUserFont')} value={userFont} onValueChange={setUserFont} />
+        </ListSection>
 
-        <FieldRow
-          star={false}
-          label={t('settings.chatFontField')}
-          value={font === SYSTEM_FONT ? t('chatFont.system') : font}
-          menu={items}
-        />
+        <ListSection>
+          <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
+        </ListSection>
 
-        <ToggleRow
-          label={t('settings.chatUserFont')}
-          note={t('settings.chatUserFontNote')}
-          value={userFont}
-          onValueChange={setUserFont}
-        />
+        <ListSection header={t('settings.chatPattern')}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
+            {CHAT_PATTERNS.map((id) => {
+              const selected = id === pattern
+              return (
+                <Pressable
+                  key={id}
+                  onPress={() => {
+                    if (!selected) Haptics.selectionAsync()
+                    setPattern(id)
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={t(`chatPattern.${id}`)}
+                  style={styles.tileButton}
+                >
+                  <View style={[styles.tile, selected && styles.tileSelected]}>
+                    <Pattern id={id} scale={TILE_INNER / 393} />
+                  </View>
+                  <Text style={[styles.tileLabel, selected && { color: colors.text }]} numberOfLines={1}>
+                    {t(`chatPattern.${id}`)}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+        </ListSection>
 
-        <Text style={styles.sectionLabel}>{t('settings.chatPattern')}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
-          {CHAT_PATTERNS.map((id) => {
-            const selected = id === pattern
-            return (
-              <Pressable
-                key={id}
-                onPress={() => {
-                  if (!selected) Haptics.selectionAsync()
-                  setPattern(id)
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityLabel={t(`chatPattern.${id}`)}
-                style={styles.tileButton}
-              >
-                <View style={[styles.tile, selected && styles.tileSelected]}>
-                  <Pattern id={id} scale={TILE_INNER / 393} />
-                </View>
-                <Text style={[styles.tileLabel, selected && { color: colors.text }]} numberOfLines={1}>
-                  {t(`chatPattern.${id}`)}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-        <Text style={styles.hint}>{t('settings.chatPatternHint')}</Text>
-
-        <PillButton label={t('settings.chatReset')} onPress={reset} disabled={untouched} style={styles.reset} />
-
-        <Text style={styles.hint}>{t('settings.chatTextHint')}</Text>
+        <ListSection>
+          <ButtonCell label={t('settings.chatReset')} onPress={reset} disabled={untouched} />
+        </ListSection>
       </ScrollView>
       <FormScreenHeader title={t('settings.chatFont')} />
     </View>
@@ -198,20 +194,17 @@ export default function ChatTextScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
+    // A set height, so the card does not grow with the text: what does not fit scrolls.
     card: {
-      borderRadius: 32,
+      borderRadius: 26,
       borderCurve: 'continuous',
       overflow: 'hidden',
       backgroundColor: colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
       paddingHorizontal: 16,
       paddingTop: 20,
       paddingBottom: 12,
+      marginBottom: 28,
     },
-    // A set height, so the card does not grow with the text: what does not fit scrolls.
-    firstLabel: { marginTop: 0 },
-    previewCard: { marginTop: 20 },
     messages: { height: 200, marginBottom: 12 },
     messagesContent: { gap: 16 },
     bubble: {
@@ -243,21 +236,11 @@ const createStyles = (colors: Colors) =>
       justifyContent: 'center',
       backgroundColor: colors.surfaceRaised,
     },
-    panel: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginVertical: 16,
-      paddingHorizontal: 20,
-      height: 64,
-      borderRadius: 32,
-      borderCurve: 'continuous',
-      backgroundColor: colors.surface,
-    },
+    sizeRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 56 },
     small: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
     large: { color: colors.textMuted, fontSize: 24, fontWeight: '600' },
     slider: { flex: 1, height: 40, marginHorizontal: 12 },
-    sectionLabel: { color: colors.textMuted, fontSize: 13, fontWeight: '600', marginTop: 20, marginBottom: 10, paddingHorizontal: 8 },
-    tiles: { gap: 12, paddingHorizontal: 4 },
+    tiles: { gap: 12, padding: 16 },
     tileButton: { width: TILE_WIDTH, alignItems: 'center', gap: 6 },
     tile: {
       width: TILE_WIDTH,
@@ -271,6 +254,4 @@ const createStyles = (colors: Colors) =>
     },
     tileSelected: { borderColor: colors.accent },
     tileLabel: { color: colors.textMuted, fontSize: 12 },
-    reset: { alignSelf: 'center', marginTop: 8 },
-    hint: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12, paddingHorizontal: 8 },
   })

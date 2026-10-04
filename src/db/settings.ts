@@ -184,6 +184,11 @@ const chatUserFont = defineFlag('chat_font_user', false)
 export const loadChatUserFont = chatUserFont.load
 export const saveChatUserFont = chatUserFont.save
 
+// Whether my own messages are rendered as Markdown like the replies. Off: shown as typed.
+const chatUserMarkdown = defineFlag('chat_user_markdown', false)
+export const loadChatUserMarkdown = chatUserMarkdown.load
+export const saveChatUserMarkdown = chatUserMarkdown.save
+
 // The pattern behind a chat that has no picture of its own, from the Penpot page
 // "Background Pattern"; 'none' is the plain theme background.
 export const CHAT_PATTERNS = ['none', 'stars', 'two-stars', 'big-star', 'diagonal', 'scattered', 'rings', 'rings-centered', 'dots'] as const

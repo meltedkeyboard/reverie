@@ -141,9 +141,17 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
               scene?.whisper ? styles.whisperBubble : null,
             ]}
           >
-            <Text style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}>
-              {message.content}
-            </Text>
+            {chatText.userMarkdown ? (
+              <Markdown
+                text={message.content}
+                style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}
+                selectable={false}
+              />
+            ) : (
+              <Text style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}>
+                {message.content}
+              </Text>
+            )}
           </Pressable>
         ) : null}
         {scene?.overheard ? <Overheard names={scene.overheard} end /> : null}

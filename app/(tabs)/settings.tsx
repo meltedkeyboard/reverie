@@ -1,20 +1,14 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
-import { ChipGroup } from '@/components/ChipGroup'
-import { LinkTile } from '@/components/LinkTile'
+import { ButtonCell, CheckCell, InputCell, LinkCell, ListFooter, ListSection, MenuCell, SwitchCell } from '@/components/GroupedList'
 import { loadModel } from '@/api/llm'
 import { Flash } from '@/components/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/GlassHeader'
-import { Divider } from '@/components/motifs/Divider'
-import { FieldRow } from '@/components/motifs/FieldRow'
-import { Eyebrow } from '@/components/motifs/Eyebrow'
 import { ParamSlider } from '@/components/ParamSlider'
-import { PillButton } from '@/components/PillButton'
-import { ToggleRow } from '@/components/ToggleRow'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/continue'
@@ -52,14 +46,13 @@ import type { SettingsSection } from '@/lib/searchScope'
 import { isShownInFiles } from '@/lib/storage'
 import { reportError } from '@/lib/report'
 import { isAndroid } from '@/lib/platform'
-import { type Colors, textStyles, useColors, useStyles } from '@/theme'
+import { type Colors, useStyles } from '@/theme'
 
 
 export default function SettingsScreen() {
   const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('form')
-  const colors = useColors()
   const styles = useStyles(createStyles)
   const { t, locale, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
   const headerHeight = useHeaderHeight()
@@ -337,75 +330,65 @@ export default function SettingsScreen() {
   }
 
   const language = (
-    <>
-      <Eyebrow label={t('settings.language')} color={colors.text} />
-      <ChipGroup options={LANGUAGE_OPTIONS} value={localePreference} onChange={setLocalePreference} />
-    </>
+    <ListSection header={t('settings.language')}>
+      {LANGUAGE_OPTIONS.map((o) => (
+        <CheckCell key={o.value} label={o.label} checked={localePreference === o.value} onPress={() => setLocalePreference(o.value)} />
+      ))}
+    </ListSection>
   )
 
-  // The row that opens the app icon picker; the picker needs a build with the native module.
+  // The app icon row needs a build with the native module.
   const [appIcon, setAppIconName] = useState(currentAppIcon)
   useFocusEffect(useCallback(() => setAppIconName(currentAppIcon()), []))
-  const appIconRows = alternateIconsAvailable ? (
-    <>
-      <Eyebrow label={t('settings.appIcon')} color={colors.text} />
-      <Pressable onPress={() => router.push('/app-icon')} style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}>
-        <Text style={[styles.rowLabel, styles.linkLabel]}>{t(`appIcon.${appIcon ?? 'default'}`)}</Text>
-        <Text style={styles.chevron}>›</Text>
-      </Pressable>
-    </>
-  ) : null
 
-  const continueRows = (
-    <>
-      <ToggleRow
-        label={t('settings.continueButton')}
-        note={t('settings.continueButtonNote')}
-        value={continueButton}
-        onValueChange={toggleContinueButton}
+  const chatText = useChatTextSettings()
+  const appearance = (
+    <ListSection>
+      <LinkCell
+        label={t('settings.appearance')}
+        value={`${chatText.font === 'System' ? t('chatFont.system') : chatText.font}, ${Math.round(chatText.scale * 100)}%`}
+        onPress={() => router.push('/chat-text')}
       />
-      {continueButton ? (
-        <ChipGroup
-          options={CONTINUE_OPTIONS}
-          value={continueByVisit ? 'visit' : 'message'}
-          onChange={(v) => setContinueByVisitValue(v === 'visit')}
-          style={styles.chips}
-        />
+      {alternateIconsAvailable ? (
+        <LinkCell label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
       ) : null}
-    </>
+    </ListSection>
   )
 
-  const suggestRow = (
-    <>
-      <ToggleRow
-        label={t('settings.suggestButton')}
-        note={t('settings.suggestButtonNote')}
-        value={suggestions}
-        onValueChange={toggleSuggestions}
-      />
-    </>
+  const continueRows = (
+    <ListSection header={t('settings.homeScreen')} footer={t('settings.continueButtonNote')}>
+      <SwitchCell label={t('settings.continueButton')} value={continueButton} onValueChange={toggleContinueButton} />
+      {continueButton
+        ? CONTINUE_OPTIONS.map((o) => (
+            <CheckCell
+              key={o.value}
+              label={o.label}
+              checked={(continueByVisit ? 'visit' : 'message') === o.value}
+              onPress={() => setContinueByVisitValue(o.value === 'visit')}
+            />
+          ))
+        : null}
+    </ListSection>
   )
 
   const privateRow = (
-    <ToggleRow
-      label={t('settings.privateButton')}
-      note={t('settings.privateButtonNote')}
-      value={privateButton}
-      onValueChange={togglePrivateButton}
-    />
+    <ListSection header={t('settings.chats')} footer={t('settings.privateButtonNote')}>
+      <SwitchCell label={t('settings.privateButton')} value={privateButton} onValueChange={togglePrivateButton} />
+    </ListSection>
+  )
+
+  const suggestRow = (
+    <ListSection footer={t('settings.suggestButtonNote')}>
+      <SwitchCell label={t('settings.suggestButton')} value={suggestions} onValueChange={toggleSuggestions} />
+    </ListSection>
   )
 
   const recentRow = (
-    <>
-      <ToggleRow
-        label={t('settings.recentPictures')}
-        note={t('settings.recentPicturesNote')}
-        value={recentPictures}
-        onValueChange={toggleRecentPictures}
-      />
+    <ListSection footer={t('settings.recentPicturesNote')}>
+      <SwitchCell label={t('settings.recentPictures')} value={recentPictures} onValueChange={toggleRecentPictures} />
       {recentPictures ? (
         <>
-          <ToggleRow
+          <SwitchCell
             label={t('settings.recentUnlimited')}
             value={recent.unlimited}
             onValueChange={(unlimited) => {
@@ -413,218 +396,193 @@ export default function SettingsScreen() {
               setRecentUnlimited(db, unlimited)
             }}
           />
-          <View style={recent.unlimited ? styles.inactive : undefined} pointerEvents={recent.unlimited ? 'none' : 'auto'}>
-            <FieldRow
-              star={false}
-              label={t('settings.recentCount')}
-              value={recentDraft ?? String(recent.count)}
-              onChangeText={typeRecentCount}
-              keyboardType="number-pad"
-            />
-          </View>
+          <InputCell
+            label={t('settings.recentCount')}
+            value={recentDraft ?? String(recent.count)}
+            onChangeText={typeRecentCount}
+            keyboardType="number-pad"
+            disabled={recent.unlimited}
+          />
         </>
       ) : null}
-    </>
+    </ListSection>
   )
 
   const confirmDeleteRow = (
-    <ToggleRow
-      label={t('settings.confirmDelete')}
-      note={t('settings.confirmDeleteNote')}
-      value={confirmDelete}
-      onValueChange={toggleConfirmDelete}
-    />
-  )
-
-  const chatText = useChatTextSettings()
-  const appearance = (
-    <LinkTile
-      title={t('settings.appearance')}
-      subtitle={`${chatText.font === 'System' ? t('chatFont.system') : chatText.font}, ${Math.round(chatText.scale * 100)}%`}
-      onPress={() => router.push('/chat-text')}
-    />
+    <ListSection>
+      <SwitchCell label={t('settings.confirmDelete')} value={confirmDelete} onValueChange={toggleConfirmDelete} />
+    </ListSection>
   )
 
   const hapticsRow = (
-    <ToggleRow label={t('settings.haptics')} note={t('settings.hapticsNote')} value={haptics} onValueChange={toggleHaptics} />
+    <ListSection header={t('settings.feedback')}>
+      <SwitchCell label={t('settings.haptics')} value={haptics} onValueChange={toggleHaptics} />
+    </ListSection>
   )
 
-  const faceIdRow = (
-    <ToggleRow
-      label={t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId')}
-      note={t(isAndroid ? 'settings.requireBiometricsNote' : 'settings.requireFaceIdNote')}
-      value={appLock}
-      onValueChange={toggleAppLock}
-    />
-  )
-
-  const filesRow = (
-    <ToggleRow
-      label={t('settings.showInFiles')}
-      note={t('settings.showInFilesNote')}
-      value={showInFiles}
-      onValueChange={toggleShowInFiles}
-      disabled={movingFiles}
-    />
+  // One group; each row is still its own block, so search can open at either.
+  const security = (
+    <ListSection header={t('settings.security')} footer={isAndroid ? undefined : t('settings.showInFilesNote')}>
+      {block(
+        'faceId',
+        <SwitchCell label={t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId')} value={appLock} onValueChange={toggleAppLock} />
+      )}
+      {isAndroid
+        ? null
+        : block('files', <SwitchCell label={t('settings.showInFiles')} value={showInFiles} onValueChange={toggleShowInFiles} disabled={movingFiles} />)}
+    </ListSection>
   )
 
   const server = (
     <>
-      <Eyebrow label={t('settings.server')} color={colors.text} />
-      <FieldRow
-        star={false}
-        label={t('settings.baseUrlLabel')}
-        hint={t('settings.baseUrlHint')}
-        value={cfg.baseUrl}
-        onChangeText={(baseUrl) => update({ baseUrl })}
-        placeholder={t('settings.baseUrlPlaceholder')}
-        keyboardType="url"
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      <FieldRow
-        star={false}
-        label={t('settings.apiKeyLabel')}
-        hint={t('settings.apiKeyHint')}
-        value={cfg.apiKey}
-        onChangeText={(apiKey) => update({ apiKey })}
-        placeholder={t('settings.apiKeyPlaceholder')}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      {/* Typed by hand until the server has listed its models, then picked from them. */}
-      {models.length > 0 ? (
-        <FieldRow
-          star={false}
-          label={t('settings.modelLabel')}
-          value={models.includes(cfg.model) ? cfg.model : ''}
-          placeholder={t('onboarding.pickModel')}
-          menu={modelItems(models)}
-        />
-      ) : (
-        <FieldRow
-          star={false}
-          label={t('settings.modelLabel')}
-          value={cfg.model}
-          onChangeText={(model) => update({ model })}
-          placeholder={t('settings.modelPlaceholder')}
+      <ListSection
+        header={t('settings.server')}
+        footer={
+          <>
+            <ListFooter>{t('settings.baseUrlHint')}</ListFooter>
+            {status.kind === 'ok' || status.kind === 'error' ? <ListFooter danger={status.kind === 'error'}>{status.text}</ListFooter> : null}
+          </>
+        }
+      >
+        <InputCell
+          label={t('settings.baseUrlLabel')}
+          value={cfg.baseUrl}
+          onChangeText={(baseUrl) => update({ baseUrl })}
+          placeholder={t('settings.baseUrlPlaceholder')}
+          keyboardType="url"
           autoCapitalize="none"
           autoCorrect={false}
         />
-      )}
-      <View style={styles.testRow}>
-        <PillButton label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} style={styles.testButton} />
-        <PillButton
-          accessibilityLabel={t('settings.loadModel')}
-          icon={{ name: 'play.fill', fallback: 'play' }}
+        <InputCell
+          label={t('settings.apiKeyLabel')}
+          value={cfg.apiKey}
+          onChangeText={(apiKey) => update({ apiKey })}
+          placeholder={t('settings.apiKeyPlaceholder')}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {/* Typed by hand until the server has listed its models, then picked from them. */}
+        {models.length > 0 ? (
+          <MenuCell
+            label={t('settings.modelLabel')}
+            value={models.includes(cfg.model) ? cfg.model : ''}
+            placeholder={t('onboarding.pickModel')}
+            items={modelItems(models)}
+          />
+        ) : (
+          <InputCell
+            label={t('settings.modelLabel')}
+            value={cfg.model}
+            onChangeText={(model) => update({ model })}
+            placeholder={t('settings.modelPlaceholder')}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        )}
+        <ButtonCell label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} />
+        <ButtonCell
+          label={t('settings.loadModel')}
           onPress={onLoadModel}
           loading={loadingModel}
           disabled={!cfg.baseUrl.trim() || !cfg.model.trim()}
         />
-      </View>
+      </ListSection>
 
-      <Eyebrow label={t('settings.contextLabel')} color={colors.text} />
-      <ChipGroup
-        options={CONTEXT_OPTIONS}
-        value={cfg.contextMode}
-        onChange={(contextMode) => update({ contextMode })}
-      />
-      {cfg.contextMode === 'messages' ? (
-        <View style={styles.messageFields}>
-          <FieldRow
-            star={false}
-            label={t('settings.contextChatMessages')}
-            value={messageDrafts.chatMessages ?? String(cfg.chatMessages)}
-            onChangeText={(text) => setMessages('chatMessages', text)}
-            keyboardType="number-pad"
-          />
-          <FieldRow
-            star={false}
-            label={t('settings.contextRoomMessages')}
-            value={messageDrafts.roomMessages ?? String(cfg.roomMessages)}
-            onChangeText={(text) => setMessages('roomMessages', text)}
-            keyboardType="number-pad"
-          />
-          {/* The field above keeps its own 16 pt bottom margin; pull the hint up under it. */}
-          <Text style={[styles.contextHint, styles.messagesHint]}>{t('settings.contextMessagesHint')}</Text>
-          {cfg.chatMessages > 1000 || cfg.roomMessages > 1000 ? (
-            <Text style={styles.messagesWarning}>{t('settings.contextMessagesWarning')}</Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {cfg.contextMode === 'tokens' && modelLoaded ? (
-        <>
-          {/* A step of the slider, not a token count: the sizes models come in are doublings. */}
-          <ParamSlider
-            label={t('settings.contextTokensLabel')}
-            value={Math.max(0, CONTEXT_STEPS.indexOf(cfg.contextTokens as (typeof CONTEXT_STEPS)[number]))}
-            min={0}
-            max={CONTEXT_STEPS.length - 1}
-            step={1}
-            formatValue={(i) => `${CONTEXT_STEPS[i] / 1024}K`}
-            onChange={(i) => update({ contextTokens: CONTEXT_STEPS[i] })}
-          />
-          <Text style={styles.contextHint}>{t('settings.contextHint')}</Text>
-        </>
-      ) : null}
-
-      {status.kind === 'ok' || status.kind === 'error' ? <Text style={styles.statusText}>{status.text}</Text> : null}
+      <ListSection
+        header={t('settings.contextLabel')}
+        footer={
+          cfg.contextMode === 'messages' ? (
+            <>
+              <ListFooter>{t('settings.contextMessagesHint')}</ListFooter>
+              {cfg.chatMessages > 1000 || cfg.roomMessages > 1000 ? <ListFooter danger>{t('settings.contextMessagesWarning')}</ListFooter> : null}
+            </>
+          ) : modelLoaded ? (
+            t('settings.contextHint')
+          ) : null
+        }
+      >
+        {CONTEXT_OPTIONS.map((o) => (
+          <CheckCell key={o.value} label={o.label} checked={cfg.contextMode === o.value} onPress={() => update({ contextMode: o.value })} />
+        ))}
+        {cfg.contextMode === 'messages' ? (
+          <>
+            <InputCell
+              label={t('settings.contextChatMessages')}
+              value={messageDrafts.chatMessages ?? String(cfg.chatMessages)}
+              onChangeText={(text) => setMessages('chatMessages', text)}
+              keyboardType="number-pad"
+            />
+            <InputCell
+              label={t('settings.contextRoomMessages')}
+              value={messageDrafts.roomMessages ?? String(cfg.roomMessages)}
+              onChangeText={(text) => setMessages('roomMessages', text)}
+              keyboardType="number-pad"
+            />
+          </>
+        ) : null}
+        {cfg.contextMode === 'tokens' && modelLoaded ? (
+          // A step of the slider, not a token count: the sizes models come in are doublings.
+          <View style={styles.sliderCell}>
+            <ParamSlider
+              label={t('settings.contextTokensLabel')}
+              value={Math.max(0, CONTEXT_STEPS.indexOf(cfg.contextTokens as (typeof CONTEXT_STEPS)[number]))}
+              min={0}
+              max={CONTEXT_STEPS.length - 1}
+              step={1}
+              formatValue={(i) => `${CONTEXT_STEPS[i] / 1024}K`}
+              onChange={(i) => update({ contextTokens: CONTEXT_STEPS[i] })}
+            />
+          </View>
+        ) : null}
+      </ListSection>
     </>
   )
 
   const showCloud = cloudSync.available || cloudPreview
+  const cloudBusy = cloudSync.syncing || backingUp
   const folderSync = (
-    <>
-      <Eyebrow label={t('settings.folderSync')} color={colors.text} />
-      <ToggleRow
+    <ListSection
+      header={t('settings.folderSync')}
+      footer={cloudSync.enabled || cloudPreview ? `${t('settings.folderSyncSyncNote')}\n\n${cloudStatus}` : t('settings.folderSyncSyncNote')}
+    >
+      <SwitchCell
         label={t('settings.folderSyncSync')}
-        note={t('settings.folderSyncSyncNote')}
         value={cloudSync.enabled}
         onValueChange={toggleCloudSync}
-        disabled={cloudSync.syncing || cloudAction !== null || backingUp}
+        disabled={cloudBusy || cloudAction !== null}
       />
       {cloudSync.enabled || cloudPreview ? (
         <>
-          <Text style={styles.note}>{cloudStatus}</Text>
-          <View style={styles.buttonPairRow}>
-            <PillButton
-              filled
-              label={t('settings.folderSyncPush')}
-              icon={{ name: 'arrow.up', fallback: 'arrow-up', slide: 'up' }}
-              onPress={() => runCloud('push', cloudSync.pushNow)}
-              loading={cloudAction === 'push'}
-              disabled={cloudSync.syncing || cloudAction === 'pull' || backingUp}
-              style={styles.pairButton}
-            />
-            <PillButton
-              filled
-              label={t('settings.folderSyncPull')}
-              icon={{ name: 'arrow.down', fallback: 'arrow-down', slide: 'down' }}
-              onPress={() => runCloud('pull', cloudSync.pullNow)}
-              loading={cloudAction === 'pull'}
-              disabled={cloudSync.syncing || cloudAction === 'push' || backingUp}
-              style={styles.pairButton}
-            />
-            <PillButton
-              accessibilityLabel={t('settings.folderSyncChangeFolder')}
-              icon={{ name: 'folder', fallback: 'folder-outline' }}
-              onPress={() => cloudSync.changeFolder().catch((err) => reportError(t('sync.failedTitle'), err))}
-              disabled={cloudSync.syncing || cloudAction !== null || backingUp}
-            />
-          </View>
+          <ButtonCell
+            label={t('settings.folderSyncPush')}
+            icon={{ fallback: 'arrow-up', slide: 'up' }}
+            onPress={() => runCloud('push', cloudSync.pushNow)}
+            loading={cloudAction === 'push'}
+            disabled={cloudBusy || cloudAction === 'pull'}
+          />
+          <ButtonCell
+            label={t('settings.folderSyncPull')}
+            icon={{ fallback: 'arrow-down', slide: 'down' }}
+            onPress={() => runCloud('pull', cloudSync.pullNow)}
+            loading={cloudAction === 'pull'}
+            disabled={cloudBusy || cloudAction === 'push'}
+          />
+          <ButtonCell
+            label={t('settings.folderSyncChangeFolder')}
+            icon={{ fallback: 'folder-outline' }}
+            onPress={() => cloudSync.changeFolder().catch((err) => reportError(t('sync.failedTitle'), err))}
+            disabled={cloudBusy || cloudAction !== null}
+          />
         </>
       ) : null}
-    </>
+    </ListSection>
   )
 
   const limitRows = (
-    <>
-      <Eyebrow label={t('settings.limitsTitle')} color={colors.text} />
-      <ToggleRow
+    <ListSection header={t('settings.limitsTitle')} footer={t('settings.limitsNote')}>
+      <SwitchCell
         label={t('settings.limitsOff')}
-        note={t('settings.limitsNote')}
         value={limits.off}
         onValueChange={(off) => {
           setLimits((l) => ({ ...l, off }))
@@ -632,58 +590,44 @@ export default function SettingsScreen() {
         }}
       />
       {/* Switched off, the numbers stay as they were but cannot be touched. */}
-      <View style={limits.off ? styles.inactive : undefined} pointerEvents={limits.off ? 'none' : 'auto'}>
-        <FieldRow
-          star={false}
-          label={t('settings.limitAvatar')}
-          value={limitDrafts.avatarMb ?? String(limits.avatarMb)}
-          onChangeText={(text) => typeLimit('avatarMb', text)}
-          keyboardType="number-pad"
-        />
-        <FieldRow
-          star={false}
-          label={t('settings.limitAttachment')}
-          value={limitDrafts.attachmentMb ?? String(limits.attachmentMb)}
-          onChangeText={(text) => typeLimit('attachmentMb', text)}
-          keyboardType="number-pad"
-        />
-      </View>
-    </>
+      <InputCell
+        label={t('settings.limitAvatar')}
+        value={limitDrafts.avatarMb ?? String(limits.avatarMb)}
+        onChangeText={(text) => typeLimit('avatarMb', text)}
+        keyboardType="number-pad"
+        disabled={limits.off}
+      />
+      <InputCell
+        label={t('settings.limitAttachment')}
+        value={limitDrafts.attachmentMb ?? String(limits.attachmentMb)}
+        onChangeText={(text) => typeLimit('attachmentMb', text)}
+        keyboardType="number-pad"
+        disabled={limits.off}
+      />
+    </ListSection>
   )
 
   const backup = (
     <>
-      <Eyebrow label={t('settings.backupTitle')} color={colors.text} />
-      <Text style={styles.note}>{t('settings.backupNote')}</Text>
-      <View style={styles.buttonPairRow}>
-        <PillButton filled label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={exporting || cloudAction !== null} style={styles.pairButton} />
-        <PillButton
-          filled
-          label={t('settings.importJson')}
-          onPress={onImport}
-          loading={importing}
-          disabled={importing || cloudAction !== null}
-          style={styles.pairButton}
-        />
-      </View>
+      <ListSection header={t('settings.backupTitle')} footer={t('settings.backupNote')}>
+        <ButtonCell label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={cloudAction !== null} />
+        <ButtonCell label={t('settings.importJson')} onPress={onImport} loading={importing} disabled={cloudAction !== null} />
+      </ListSection>
       <BackupTreeSheet tree={exportTree} confirmLabel={t('settings.exportJson')} onConfirm={runExport} onClose={() => setExportTree(null)} />
       <BackupTreeSheet tree={opened?.tree ?? null} confirmLabel={t('settings.importJson')} onConfirm={runImport} onClose={() => setOpened(null)} />
     </>
   )
 
   const aboutRow = (
-    <LinkTile
-      title={t('settings.aboutReverie')}
-      onPress={() => router.push('/about')}
-    />
+    <ListSection header={t('settings.aboutTitle')}>
+      <LinkCell label={t('settings.aboutReverie')} onPress={() => router.push('/about')} />
+    </ListSection>
   )
 
   const wipe = (
-    <>
-      <Eyebrow label={t('settings.dangerZone')} color={colors.danger} />
-      <Text style={styles.note}>{t('settings.dangerNote')}</Text>
-      <PillButton filled label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} disabled={wiping} color={colors.danger} />
-    </>
+    <ListSection header={t('settings.dangerZone')} footer={t('settings.dangerNote')}>
+      <ButtonCell danger label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} />
+    </ListSection>
   )
 
   return (
@@ -697,59 +641,19 @@ export default function SettingsScreen() {
           contentContainerStyle={padding}
         >
           {block('appearance', appearance)}
-          {block('language', language, styles.chips)}
-          {appIconRows ? block('appIcon', appIconRows) : null}
-
-          <Divider />
-
-          <Eyebrow label={t('settings.homeScreen')} color={colors.text} />
+          {block('language', language)}
           {block('continue', continueRows)}
-
-          <Divider />
-
-          <Eyebrow label={t('settings.chats')} color={colors.text} />
           {block('private', privateRow)}
           {block('suggest', suggestRow)}
           {block('recents', recentRow)}
           {block('confirmDelete', confirmDeleteRow)}
-
-          <Divider />
-
-          <Eyebrow label={t('settings.feedback')} color={colors.text} />
           {block('haptics', hapticsRow)}
-
-          <Divider />
-
-          <Eyebrow label={t('settings.security')} color={colors.text} />
-          {block('faceId', faceIdRow)}
-          {isAndroid ? null : block('files', filesRow)}
-
-          <Divider />
-
+          {security}
           {block('limits', limitRows)}
-
-          <Divider />
-
           {block('server', server)}
-
-          <Divider />
-
-          {showCloud ? (
-            <>
-              {block('folderSync', folderSync)}
-              <Divider />
-            </>
-          ) : null}
-
+          {showCloud ? block('folderSync', folderSync) : null}
           {block('backup', backup)}
-
-          <Divider />
-
-          <Eyebrow label={t('settings.aboutTitle')} color={colors.text} />
           {aboutRow}
-
-          <Divider />
-
           {block('wipe', wipe)}
         </KeyboardAwareScrollView>
       ) : null}
@@ -764,35 +668,7 @@ export default function SettingsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    chips: { marginBottom: 16 },
     // Reaches a little past the block, so the tint frames it instead of hugging the text.
-    flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 16 },
-    rowLabel: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    note: { ...textStyles(colors).note, marginBottom: 12 },
-    testRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-    testButton: { flex: 1 },
-    messageFields: { marginTop: 14 },
-    inactive: { opacity: 0.4 },
-    messagesHint: { marginTop: -8 },
-    messagesWarning: {
-      color: colors.danger,
-      backgroundColor: colors.dangerSoft,
-      borderColor: colors.dangerBorder,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderRadius: 12,
-      borderCurve: 'continuous',
-      padding: 12,
-      marginTop: 6,
-      fontSize: 13,
-      lineHeight: 18,
-    },
-    contextHint: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: 10, marginBottom: 4 },
-    statusText: { ...textStyles(colors).note, marginTop: 12 },
-    buttonPairRow: { flexDirection: 'row', gap: 12 },
-    pairButton: { flex: 1 },
-    linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-    linkLabel: { marginBottom: 0 },
-    linkText: { flex: 1 },
-    linkValue: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
-    chevron: { color: colors.textFaint, fontSize: 20 },
+    flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 30 },
+    sliderCell: { paddingHorizontal: 16, paddingTop: 12 },
   })

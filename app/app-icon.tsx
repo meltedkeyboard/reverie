@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent }
 import { FormScreenHeader } from '@/components/FormScreenHeader'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { useTranslation } from '@/i18n'
-import { APP_ICONS, currentAppIcon, DEFAULT_ICON_PREVIEW, setAppIcon } from '@/lib/appIcons'
+import { APP_ICONS, currentAppIcon, DEFAULT_ICON_PREVIEW, previewFor, setAppIcon } from '@/lib/appIcons'
 import * as Haptics from '@/lib/haptics'
 import { reportError } from '@/lib/report'
 import { useStyles, useTheme, type Colors } from '@/theme'
@@ -64,7 +64,7 @@ export default function AppIconScreen() {
                   ]}
                 >
                   <View style={{ width: art, height: art, borderRadius: art * CORNER, borderCurve: 'continuous', overflow: 'hidden' }}>
-                    <Image source={option.preview} style={{ width: art, height: art }} />
+                    <Image source={previewFor(option.preview, scheme)} style={{ width: art, height: art }} />
                   </View>
                 </View>
                 <Text style={[styles.label, selected && styles.labelSelected]} numberOfLines={2}>

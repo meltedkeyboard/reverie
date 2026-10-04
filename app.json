@@ -4,7 +4,7 @@
     "slug": "reverie",
     "platforms": ["ios", "android", "web"],
     "web": { "bundler": "metro", "output": "single" },
-    "version": "4.3.1",
+    "version": "4.4.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "reverie",
@@ -93,7 +93,7 @@
           },
           {
             "name": "PaperLight",
-            "ios": "./assets/images/alt/icon-04-paper-light.png",
+            "ios": { "light": "./assets/images/alt/icon-04-paper-light.png", "dark": "./assets/images/alt/icon-04-paper-light-dark.png", "tinted": "./assets/images/alt/icon-04-paper-light-tinted.png" },
             "android": { "foregroundImage": "./assets/images/alt/icon-04-paper-light-foreground.png", "backgroundColor": "#F5F1EA" }
           },
           {
@@ -103,12 +103,12 @@
           },
           {
             "name": "Outline",
-            "ios": "./assets/images/alt/icon-06-outline.png",
+            "ios": { "light": "./assets/images/alt/icon-06-outline-light.png", "dark": "./assets/images/alt/icon-06-outline.png", "tinted": "./assets/images/alt/icon-06-outline-tinted.png" },
             "android": { "foregroundImage": "./assets/images/alt/icon-06-outline-foreground.png", "backgroundColor": "#0B0D17" }
           },
           {
             "name": "NeonGlow",
-            "ios": "./assets/images/alt/icon-07-neon-glow.png",
+            "ios": { "light": "./assets/images/alt/icon-07-neon-glow-light.png", "dark": "./assets/images/alt/icon-07-neon-glow.png", "tinted": "./assets/images/alt/icon-07-neon-glow-tinted.png" },
             "android": { "foregroundImage": "./assets/images/alt/icon-07-neon-glow-foreground.png", "backgroundColor": "#0D0A1F" }
           },
           {
@@ -118,7 +118,7 @@
           },
           {
             "name": "RetroSticker",
-            "ios": "./assets/images/alt/icon-09-retro-sticker.png",
+            "ios": { "light": "./assets/images/alt/icon-09-retro-sticker.png", "dark": "./assets/images/alt/icon-09-retro-sticker-dark.png", "tinted": "./assets/images/alt/icon-09-retro-sticker-tinted.png" },
             "android": { "foregroundImage": "./assets/images/alt/icon-09-retro-sticker-foreground.png", "backgroundColor": "#FFF1D6" }
           },
           {

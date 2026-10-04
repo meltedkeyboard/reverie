@@ -15,18 +15,24 @@ export const alternateIconsAvailable = native?.supportsAlternateIcons ?? false
 
 // The names are the ones given to the plugin in app.json, drawn in assets/brand/alt and
 // rendered by scripts/build-icons.mjs, previews included. The standard icon is not here:
-// it is the app's own, in a light and a dark look.
+// it is the app's own, in a light and a dark look. An icon that is pale or dark all over
+// comes in both looks too, and so does its preview: { light, dark }.
 export const APP_ICONS = [
   { name: 'VioletGradient', preview: require('../../assets/images/alt/icon-02-violet-gradient-preview.png') },
   { name: 'CoralSunrise', preview: require('../../assets/images/alt/icon-03-coral-sunrise-preview.png') },
-  { name: 'PaperLight', preview: require('../../assets/images/alt/icon-04-paper-light-preview.png') },
+  { name: 'PaperLight', preview: { light: require('../../assets/images/alt/icon-04-paper-light-preview.png'), dark: require('../../assets/images/alt/icon-04-paper-light-dark-preview.png') } },
   { name: 'VioletSun', preview: require('../../assets/images/alt/icon-05-violet-solid-sun-preview.png') },
-  { name: 'Outline', preview: require('../../assets/images/alt/icon-06-outline-preview.png') },
-  { name: 'NeonGlow', preview: require('../../assets/images/alt/icon-07-neon-glow-preview.png') },
+  { name: 'Outline', preview: { light: require('../../assets/images/alt/icon-06-outline-light-preview.png'), dark: require('../../assets/images/alt/icon-06-outline-preview.png') } },
+  { name: 'NeonGlow', preview: { light: require('../../assets/images/alt/icon-07-neon-glow-light-preview.png'), dark: require('../../assets/images/alt/icon-07-neon-glow-preview.png') } },
   { name: 'Metal', preview: require('../../assets/images/alt/icon-08-metal-preview.png') },
-  { name: 'RetroSticker', preview: require('../../assets/images/alt/icon-09-retro-sticker-preview.png') },
+  { name: 'RetroSticker', preview: { light: require('../../assets/images/alt/icon-09-retro-sticker-preview.png'), dark: require('../../assets/images/alt/icon-09-retro-sticker-dark-preview.png') } },
   { name: 'ToneOnTone', preview: require('../../assets/images/alt/icon-10-tone-on-tone-preview.png') },
 ] as const
+
+// The picture of an icon as the Home Screen shows it in the given look.
+export function previewFor(preview: number | { light: number; dark: number }, scheme: 'light' | 'dark') {
+  return typeof preview === 'number' ? preview : preview[scheme]
+}
 
 export const DEFAULT_ICON_PREVIEW = {
   light: require('../../assets/images/alt/default-light-preview.png'),

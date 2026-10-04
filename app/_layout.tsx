@@ -8,6 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { AppLock } from '@/components/AppLock'
 import { DialogHost } from '@/components/DialogHost'
 import { Sidebar } from '@/components/Sidebar'
+import { SplashOverlay } from '@/components/SplashOverlay'
 import { StartupBoundary } from '@/components/StartupBoundary'
 import { ToastHost } from '@/components/ToastHost'
 import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
@@ -60,6 +61,7 @@ function ThemedApp() {
                   the screens are built anew for it. The database, the lock and sync stay. */}
               <AppShell key={fontScale} />
             </AppLock>
+            <SplashOverlay />
           </ChatTextProvider>
         </CloudSyncProvider>
       </ThemeContextProvider>

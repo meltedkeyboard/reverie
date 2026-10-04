@@ -1,3 +1,4 @@
+import * as SplashScreen from 'expo-splash-screen'
 import { Component, type ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
@@ -12,6 +13,11 @@ type State = { error: Error | null }
 // reason visible only in the console.
 export class StartupBoundary extends Component<Props, State> {
   state: State = { error: null }
+
+  // The splash waits for the app to draw; an app that failed to start never will.
+  componentDidCatch() {
+    SplashScreen.hideAsync().catch(() => {})
+  }
 
   static getDerivedStateFromError(error: Error) {
     return { error }

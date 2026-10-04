@@ -8,10 +8,12 @@ import {
   loadChatPattern,
   loadChatTextScale,
   loadChatUserFont,
+  loadChatUserMarkdown,
   saveChatFont,
   saveChatPattern,
   saveChatTextScale,
   saveChatUserFont,
+  saveChatUserMarkdown,
   type ChatFont,
   type ChatPatternId,
 } from '@/db/settings'
@@ -29,6 +31,9 @@ type ChatTextValue = {
   // Whether the user's own messages use the font too, not the system one.
   userFont: boolean
   setUserFont: (on: boolean) => void
+  // Whether the user's own messages go through Markdown, as the replies do.
+  userMarkdown: boolean
+  setUserMarkdown: (on: boolean) => void
   // The pattern behind chats that have no picture of their own.
   pattern: ChatPatternId
   setPattern: (pattern: ChatPatternId) => void
@@ -47,6 +52,7 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   const [font, setFontState] = useState<ChatFont>(DEFAULT_CHAT_FONT)
   const [scale, setScaleState] = useState<number>(CHAT_TEXT_SCALE_RANGE.default)
   const [userFont, setUserFontState] = useState(false)
+  const [userMarkdown, setUserMarkdownState] = useState(false)
   const [pattern, setPatternState] = useState<ChatPatternId>('none')
 
   useEffect(() => {
@@ -54,6 +60,7 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     loadChatFont(db).then(setFontState)
     loadChatTextScale(db).then(setScaleState)
     loadChatUserFont(db).then(setUserFontState)
+    loadChatUserMarkdown(db).then(setUserMarkdownState)
   }, [db])
 
   const setFont = useCallback(
@@ -77,6 +84,13 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     },
     [db]
   )
+  const setUserMarkdown = useCallback(
+    (on: boolean) => {
+      setUserMarkdownState(on)
+      saveChatUserMarkdown(db, on)
+    },
+    [db]
+  )
   const setPattern = useCallback(
     (next: ChatPatternId) => {
       setPatternState(next)
@@ -91,8 +105,8 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   }, [setFont, setScale, setUserFont])
 
   const value = useMemo(
-    () => ({ font, userFont, setUserFont, pattern, setPattern, scale, setFont, setScale, reset }),
-    [font, userFont, setUserFont, pattern, setPattern, scale, setFont, setScale, reset]
+    () => ({ font, userFont, setUserFont, userMarkdown, setUserMarkdown, pattern, setPattern, scale, setFont, setScale, reset }),
+    [font, userFont, setUserFont, userMarkdown, setUserMarkdown, pattern, setPattern, scale, setFont, setScale, reset]
   )
   return <ChatTextContext.Provider value={value}>{children}</ChatTextContext.Provider>
 }
@@ -100,14 +114,15 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
 // What a style of chat text takes from the settings: the family, and sizes that are
 // multiplied by the chosen scale. `scaled(17)` is a font size, `scaled(27)` a line height.
 export function useChatText() {
-  const { font, userFont, scale } = useChatTextSettings()
+  const { font, userFont, userMarkdown, scale } = useChatTextSettings()
   return useMemo(
     () => ({
       fontFamily: font,
       // undefined is the system font.
       userFontFamily: userFont ? font : undefined,
+      userMarkdown,
       scaled: (value: number) => Math.round(value * scale * 100) / 100,
     }),
-    [font, userFont, scale]
+    [font, userFont, userMarkdown, scale]
   )
 }

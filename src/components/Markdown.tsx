@@ -11,6 +11,9 @@ type Props = {
   // How *emphasis* looks: a roleplay reply mutes its actions, other text just slants.
   emStyle?: StyleProp<TextStyle>
   streaming?: boolean
+  // false draws plain Text, which leaves a long press to the parent: the user's bubble
+  // opens its menu on one, where a reply selects text.
+  selectable?: boolean
 }
 
 const HEADING_SCALE = [1.35, 1.2, 1.1, 1, 1, 1]
@@ -37,6 +40,10 @@ export function SelectableText({ style, children }: { style: StyleProp<TextStyle
   )
 }
 
+function PlainText({ style, children }: { style: StyleProp<TextStyle>; children: ReactNode }) {
+  return <Text style={style}>{children}</Text>
+}
+
 const blockReset = { padding: 0, paddingTop: 0, paddingBottom: 0 } as const
 
 // A piece of the reply: a paragraph, a heading or a list item flows as text, a code
@@ -47,7 +54,8 @@ type Piece = { flow: true; node: ReactNode; tight: boolean } | { flow: false; no
 // Pieces that flow are joined into one UITextView, so a selection runs through the
 // whole reply and only stops at a code block or a table, as in ChatGPT. Lists and
 // quotes are drawn with characters for the same reason: a view would split the text.
-function MarkdownView({ text, style, emStyle, streaming = false }: Props) {
+function MarkdownView({ text, style, emStyle, streaming = false, selectable = true }: Props) {
+  const Block = selectable ? SelectableText : PlainText
   const styles = useStyles(createStyles)
   // breaks: a model writes dialogue and verse line by line, and a single newline must
   // stay a line break rather than join the lines as plain Markdown would.
@@ -149,7 +157,7 @@ function MarkdownView({ text, style, emStyle, streaming = false }: Props) {
             flow: false,
             node: (
               <ScrollView horizontal style={styles.codeBlock} contentContainerStyle={styles.codeContent}>
-                <SelectableText style={[styles.code, { fontSize: size * 0.8 }]}>{token.text}</SelectableText>
+                <Block style={[styles.code, { fontSize: size * 0.8 }]}>{token.text}</Block>
               </ScrollView>
             ),
           }]
@@ -172,12 +180,12 @@ function MarkdownView({ text, style, emStyle, streaming = false }: Props) {
                   {rows.map((row, r) => (
                     <View key={r} style={[styles.tableRow, r > 0 && styles.tableRule]}>
                       {row.map((cell, c) => (
-                        <SelectableText
+                        <Block
                           key={c}
                           style={[style, styles.cell, r === 0 && styles.strong, { width: widths[c], textAlign: cell.align ?? 'left' }]}
                         >
                           {inline(cell.tokens)}
-                        </SelectableText>
+                        </Block>
                       ))}
                     </View>
                   ))}
@@ -196,7 +204,7 @@ function MarkdownView({ text, style, emStyle, streaming = false }: Props) {
   let run: ReactNode[] = []
   const flush = () => {
     if (!run.length) return
-    views.push(<SelectableText key={views.length} style={style}>{run}</SelectableText>)
+    views.push(<Block key={views.length} style={style}>{run}</Block>)
     run = []
   }
   pieces.forEach((piece, i) => {

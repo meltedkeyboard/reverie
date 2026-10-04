@@ -76,6 +76,42 @@ function adaptive(svg, glyph) {
 <g transform="translate(${cx} ${cy}) scale(${glyph.scale}) translate(${-(left + glyph.x)} ${-(top + glyph.y)})">${art}</g></svg>`
 }
 
+// The icons that are pale or dark all over get a version for the other look of the Home
+// Screen, and a tinted one, since iOS 18 takes the three together or none: what is drawn in
+// assets/brand/alt is one look, the other is recolored here, like the main icon's tinted one.
+// A tinted icon is shapes on black that iOS colors by their luminance, so the glyph is white
+// with the spark grey, without the glows and shadows.
+const VARIANTS = {
+  'icon-04-paper-light': {
+    other: 'dark',
+    colors: [['#f5f1ea', '#1b1916'], ['#14121f', '#f5f1ea']],
+    tinted: [['#f5f1ea', '#000000'], ['#14121f', '#ffffff'], ['#f0616d', '#8e8e93']],
+  },
+  'icon-09-retro-sticker': {
+    other: 'dark',
+    // The ink outlines and the sticker's hard shadow turn cream, to stay visible on the dark.
+    colors: [['#fff1d6', '#1d1912'], ['#0b0d17', '#fff1d6'], ['0 0 0 0 0.04 0 0 0 0 0.05 0 0 0 0 0.09', '0 0 0 0 1 0 0 0 0 0.945 0 0 0 0 0.84']],
+    tinted: [['#fff1d6', '#000000'], ['#8b5cf6', '#ffffff'], ['#ffd166', '#8e8e93'], ['#0b0d17', '#000000']],
+  },
+  'icon-06-outline': {
+    other: 'light',
+    colors: [['#0b0d17', '#f5f5f7'], ['#a78bfa', '#7c3aed']],
+    tinted: [['#0b0d17', '#000000'], ['#a78bfa', '#ffffff'], ['#f0616d', '#8e8e93']],
+  },
+  'icon-07-neon-glow': {
+    other: 'light',
+    // A pale lavender glow, the letter and the spark deep enough to read on it; the halos softer.
+    colors: [['#1b1038', '#ffffff'], ['#05040c', '#e6defb'], ['#c4b5fd', '#7c3aed'], ['#ff5c8a', '#f0336d'], [' 0 0 0 0.95 0', ' 0 0 0 0.45 0']],
+    tinted: [['#1b1038', '#000000'], ['#05040c', '#000000'], ['#c4b5fd', '#ffffff'], ['#ff5c8a', '#8e8e93']],
+  },
+}
+
+function recolor(svg, pairs) {
+  return pairs.reduce((out, [from, to]) => out.split(from).join(to), svg)
+}
+
+const withoutEffects = (svg) => svg.replace(/ filter='url\(#i\d+\)'/g, '')
+
 // The previews are what the picker in Settings shows.
 mkdirSync('assets/images/alt', { recursive: true })
 png(light, 'assets/images/alt/default-light-preview.png', 256)
@@ -86,6 +122,13 @@ for (const file of readdirSync(`${BRAND}/alt`).filter((f) => f.endsWith('.svg'))
   png(svg, `assets/images/alt/${slug}.png`)
   png(svg, `assets/images/alt/${slug}-preview.png`, 256)
   png(adaptive(svg, GLYPH_OF[slug] ?? GLYPH), `assets/images/alt/${slug}-foreground.png`)
+  const variant = VARIANTS[slug]
+  if (variant) {
+    const other = recolor(svg, variant.colors)
+    png(other, `assets/images/alt/${slug}-${variant.other}.png`)
+    png(other, `assets/images/alt/${slug}-${variant.other}-preview.png`, 256)
+    png(withoutEffects(recolor(svg, variant.tinted)), `assets/images/alt/${slug}-tinted.png`)
+  }
 }
 
 // The home screen's background tile, at every density the app picks from.

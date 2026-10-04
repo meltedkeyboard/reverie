@@ -19,7 +19,6 @@ export function getSearchScope() {
 export type SettingsSection =
   | 'appearance'
   | 'language'
-  | 'appIcon'
   | 'continue'
   | 'private'
   | 'suggest'

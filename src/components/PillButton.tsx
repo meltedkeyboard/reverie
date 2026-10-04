@@ -90,7 +90,7 @@ const LAP_MS = OUT_MS + IN_MS + HOLD_MS + 60
 
 // Stays true for one full lap of the sliding icon after it starts, even when the work
 // behind it ends sooner, so a quick push or pull still shows the animation once.
-function useAtLeastOneLap(active: boolean) {
+export function useAtLeastOneLap(active: boolean) {
   const [held, setHeld] = useState(false)
   const startedAt = useRef(0)
   useEffect(() => {
@@ -107,7 +107,7 @@ function useAtLeastOneLap(active: boolean) {
 
 // While active, the icon fades out moving `direction` and slides back in from the other
 // side, over and over; when it stops, it settles where it belongs.
-function SlidingIcon({ direction, active, children }: { direction?: 'up' | 'down'; active: boolean; children: ReactNode }) {
+export function SlidingIcon({ direction, active, children }: { direction?: 'up' | 'down'; active: boolean; children: ReactNode }) {
   const fade = useSharedValue(1)
   const shift = useSharedValue(0)
   const away = direction === 'down' ? SHIFT : -SHIFT
