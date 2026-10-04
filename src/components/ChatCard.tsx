@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import type { ChatPreview } from '@/db/chats'
 import { useTranslation } from '@/i18n'
-import { formatWhen, plural } from '@/lib/format'
+import { countLabel, formatWhen } from '@/lib/format'
 import { plainPreview } from '@/lib/roleplay'
 import { useStyles, type Colors } from '@/theme'
 
@@ -22,7 +22,7 @@ export function ChatCard({ chat, onOpen, onDelete, menu }: Props) {
   const preview = plainPreview(chat.lastMessage ?? '') || t('chatCard.emptyChat')
   const count = chat.messageCount
   const when = formatWhen(chat.lastActivity, locale)
-  const messages = `${count} ${plural(count, locale, ['сообщение', 'сообщения', 'сообщений'], ['message', 'messages'])}`
+  const messages = countLabel(count, 'message', locale)
   return (
     <ListCard onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={chat.title ?? undefined}>
       <View style={styles.body}>

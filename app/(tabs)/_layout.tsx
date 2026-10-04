@@ -1,7 +1,7 @@
 import { Redirect, Stack } from 'expo-router'
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
 import { useEffect, useState } from 'react'
-import { Platform, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 
 import { HomeContinueButton } from '@/components/ContinueButton'
 import type { ContinueKind } from '@/db/continue'
@@ -12,6 +12,7 @@ import { LastChatProvider } from '@/hooks/useLastChat'
 import { useTranslation } from '@/i18n'
 import { noteTabFocus } from '@/lib/searchScope'
 import { useColors } from '@/theme'
+import { isAndroid, isIOS } from '@/lib/platform'
 
 type TabListeners = ({ route }: { route: { name: string } }) => { tabPress: () => void; focus: () => void }
 
@@ -73,10 +74,10 @@ function AppTabs({ listeners }: { listeners: TabListeners }) {
   // On iOS the screens draw their own insets from the safe area, which already takes in
   // the tab bar; left automatic, scroll views would get them a second time. The Android
   // bar is opaque and does not float over the content, so there the tabs inset it.
-  const own = Platform.OS === 'ios'
+  const own = isIOS
   // Material You tints the Android bar with the wallpaper's color, so it is set to the app's.
   const material =
-    Platform.OS === 'android'
+    isAndroid
       ? {
           backgroundColor: colors.surface,
           indicatorColor: colors.accentSoft,

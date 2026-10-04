@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AppState } from 'react-native'
 
 import { forgetSyncRev, getSyncState, isCloudSyncEnabled, setCloudSyncEnabled } from '@/db/cloudSync'
@@ -6,8 +6,9 @@ import { useDatabase, useReloadDatabase } from '@/db/provider'
 import { t } from '@/i18n'
 import { cloudFolderName, cloudSyncAvailable, forgetCloudFolder, pickCloudFolder, syncWithCloud, type SyncMode } from '@/lib/cloudSync'
 import { showSheet } from '@/lib/dialogs'
-import { errorMessage } from '@/lib/errors'
 import { showToast } from '@/lib/toast'
+import { reportError } from '@/lib/report'
+import { createRequiredContext } from '@/lib/requiredContext'
 
 type CloudSync = {
   available: boolean
@@ -22,7 +23,7 @@ type CloudSync = {
   pullNow: () => Promise<void>
 }
 
-const CloudSyncContext = createContext<CloudSync | null>(null)
+export const [CloudSyncContext, useCloudSync] = createRequiredContext<CloudSync>('useCloudSync must be used within a <CloudSyncProvider>')
 
 // Syncs when the app starts and comes to the front (both ways) and when it leaves (up
 // only). Errors of those quiet runs are only logged; the push and pull buttons show them.
@@ -59,7 +60,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
         if (outcome === 'conflict' && mode === 'auto' && (loud || !conflictDismissed.current)) askConflict(loud)
         return outcome
       } catch (err) {
-        if (loud) showToast({ tone: 'error', title: t('sync.failedTitle'), message: errorMessage(err) })
+        if (loud) reportError(t('sync.failedTitle'), err)
         else console.warn('Folder sync failed', err)
         return null
       } finally {
@@ -170,8 +171,3 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
   return <CloudSyncContext.Provider value={value}>{children}</CloudSyncContext.Provider>
 }
 
-export function useCloudSync() {
-  const value = useContext(CloudSyncContext)
-  if (!value) throw new Error('useCloudSync must be used within a <CloudSyncProvider>')
-  return value
-}

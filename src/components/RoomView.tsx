@@ -1,46 +1,42 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { AsideToggleButton, ChatSurface, bubbleOpacityOf } from '@/components/ChatChrome'
 import { AsidePanel } from '@/components/AsidePanel'
 import { AvatarStack, castGallery } from '@/components/AvatarStack'
 import { CastBar, FloorButton } from '@/components/CastBar'
 import { CastSheet } from '@/components/CastSheet'
-import { ChatBackground } from '@/components/ChatBackground'
 import { Composer, ComposerFloat, ComposerSwap } from '@/components/Composer'
-import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
+import { ConversationList, ErrorCard, JumpButton } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { useOpenViewer } from '@/components/ImageLink'
 import { MessageRow, type RowMessage, type RowScene } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
-import { SFIcon } from '@/components/SFIcon'
 import { ShimmerText } from '@/components/ShimmerText'
 import { TypingIndicator } from '@/components/TypingIndicator'
-import { deleteChat, type Chat } from '@/db/chats'
+import { type Chat } from '@/db/chats'
 import { newMessage, type Message } from '@/db/messages'
-import { isPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase } from '@/db/provider'
 import { setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
-import { isSuggestionsEnabled } from '@/db/suggestions'
 import { useAside } from '@/hooks/useAside'
 import { useSuggestion } from '@/hooks/useSuggestion'
 import { useLayoutMode } from '@/hooks/useLayoutMode'
+import { useChatMenuActions, useMessageActions } from '@/hooks/useChatScreenActions'
+import { useChatShell } from '@/hooks/useChatShell'
+import { useChatSwitches } from '@/hooks/useStoredFlag'
 import { useRoom, type RoomPhase } from '@/hooks/useRoom'
 import { useTranslation } from '@/i18n'
 import { roomScene } from '@/lib/aside'
-import { avatarUri } from '@/lib/avatars'
-import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
-import { promptText, showMessage, showSheet } from '@/lib/dialogs'
-import { errorMessage } from '@/lib/errors'
-import { plural } from '@/lib/format'
+import { promptRenameChat } from '@/lib/chatDialogs'
+import { showSheet } from '@/lib/dialogs'
+import { countLabel } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
-import type { MessageAction } from '@/lib/messageActions'
 import { liquidGlass } from '@/lib/nativeUI'
 import { USER } from '@/lib/room/audience'
 import { CONTROL_FONT_SCALE, fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
@@ -63,7 +59,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const wide = useLayoutMode() === 'wide'
-  const keyboard = useReanimatedKeyboardAnimation()
 
   // Muting someone or switching the floor from here is saved at once and shown without
   // waiting for the screen to reload the room.
@@ -100,35 +95,19 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     autoName,
   } = useRoom(chat, room, members, setMembers)
 
-  const listRef = useRef<ConversationHandle>(null)
-  const composerHeight = useSharedValue(0)
-  const composerTop = useSharedValue(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
   const [addressees, setAddressees] = useState<number[]>([])
   const [whisper, setWhisper] = useState(false)
   const [narration, setNarration] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
-  const [privateEnabled, setPrivateEnabled] = useState(true)
-  const [suggestEnabled, setSuggestEnabled] = useState(false)
-  useEffect(() => {
-    isPrivateChatEnabled(db).then(setPrivateEnabled)
-    isSuggestionsEnabled(db).then(setSuggestEnabled)
-  }, [db])
+  const { privateEnabled, suggestEnabled } = useChatSwitches()
 
-  // A private thread with the model about the scene, as in a one-on-one chat. While it is
-  // open the field talks to the model, so who is addressed does not matter.
-  const [asideOpen, setAsideOpen] = useState(false)
-  // What was typed to the characters waits here while the field asks the model aside.
-  const sceneDraft = useRef('')
   const scene = useMemo(() => roomScene(room, members), [room, members])
   const aside = useAside(scene, messages)
-  const toggleAside = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    if (asideOpen) aside.reset()
-    else setEditingRow(null)
-    setAsideOpen(!asideOpen)
-  }
+  // The eye in the header opens a private thread with the model about the scene; while it
+  // is open the field talks to the model, so who is addressed does not matter.
+  const { listRef, composerHeight, composerTop, asideOpen, toggleAside, sceneDraft, emptyStyle, scrollToNewest } = useChatShell(aside, () => setEditingRow(null))
 
   // Someone removed from the room, or out of the scene, can't stay picked.
   useEffect(() => {
@@ -195,28 +174,10 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     [messages, byId]
   )
 
-  const scrollToNewest = () => listRef.current?.scrollToNewest()
+  const onAction = useMessageActions({ regenerate, removeMessage, edit: setEditingRow })
+  const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard })
 
-  const onAction = useCallback(
-    (message: RowMessage, action: MessageAction) => {
-      if (action === 'copy') Clipboard.setStringAsync(message.content)
-      else if (action === 'regenerate') regenerate(message.id)
-      else if (action === 'refine') {
-        promptText({
-          title: t('chat.refineTitle'),
-          message: t('chat.refineMessage'),
-          confirmLabel: t('chat.refineConfirm'),
-          onSubmit: (text) => {
-            if (text.trim()) regenerate(message.id, text)
-          },
-        })
-      } else if (action === 'edit') setEditingRow(message)
-      else removeMessage(message.id)
-    },
-    [regenerate, removeMessage, t]
-  )
-
-  const bubbleOpacity = room.background ? 1 - room.backgroundBubbleTransparency : 1
+  const bubbleOpacity = bubbleOpacityOf(room)
   const renderRow = useCallback(
     (row: RowMessage) => (
       <MessageRow
@@ -323,29 +284,13 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     showSheet(
       t('room.autoplayTitle'),
       AUTOPLAY_LENGTHS.map((count) => ({
-        label: `${count} ${plural(count, locale, ['реплика', 'реплики', 'реплик'], ['line', 'lines'])}`,
+        label: countLabel(count, 'line', locale),
         onSelect: () => {
           autoplay(count)
           scrollToNewest()
         },
       }))
     )
-  }
-
-  const confirmDelete = () => {
-    confirmDeleteChat(async () => {
-      discard()
-      await deleteChat(db, chatId)
-      router.back()
-    })
-  }
-
-  const suggestName = async () => {
-    try {
-      if (!(await autoName())) showMessage(t('chat.titleNotFoundTitle'), t('chat.titleNotFoundMessage'))
-    } catch (err) {
-      showMessage(t('chat.titleFailedTitle'), errorMessage(err))
-    }
   }
 
   // The cast in the header is the menu's trigger, so their photos open from the menu.
@@ -376,10 +321,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
   const cast = useMemo(() => members.map((m) => ({ name: m.character.name, avatar: m.character.avatar })), [members])
   const empty = loaded && rows.length === 0
-  const emptyStyle = useAnimatedStyle(() => ({
-    paddingTop: headerHeight,
-    paddingBottom: composerHeight.value + Math.max(0, Math.abs(keyboard.height.value) - insets.bottom),
-  }))
 
   const asidePanel = asideOpen ? (
     <AsidePanel
@@ -398,13 +339,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
   return (
     <View style={styles.screen}>
-      {room.background ? (
-        <ChatBackground
-          uri={avatarUri(room.background, 'backgrounds') ?? ''}
-          effect={room.backgroundEffect}
-          intensity={room.backgroundIntensity}
-        />
-      ) : null}
+      <ChatSurface owner={room} />
       <View style={StyleSheet.absoluteFill}>
         <ConversationList
           ref={listRef}
@@ -432,21 +367,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
         left={wide ? undefined : <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
         right={
           <View style={styles.headerActions}>
-            {privateEnabled || asideOpen ? (
-              <GlassButton
-                icon={asideOpen ? 'eye-off' : 'eye-off-outline'}
-                onPress={toggleAside}
-                accessibilityLabel={t('chat.privateTitle')}
-              >
-                <SFIcon
-                  name={asideOpen ? 'eye.slash.fill' : 'eye.slash'}
-                  fallback={asideOpen ? 'eye-off' : 'eye-off-outline'}
-                  size={20}
-                  color={colors.text}
-                  animateChange={asideOpen}
-                />
-              </GlassButton>
-            ) : null}
+            <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
             <Link href={`/chat/new?room=${room.id}`} asChild>
               <Link.AppleZoom>
                 <GlassButton icon="create-outline" />

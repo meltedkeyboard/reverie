@@ -1,22 +1,24 @@
-import { useState, useSyncExternalStore } from 'react'
-import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useSyncExternalStore } from 'react'
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
 import { WebDialogHost } from '@/components/WebDialogs'
+import { usePromptState } from '@/hooks/usePromptState'
 import { useTranslation } from '@/i18n'
-import { closeAndroidDialog, getAndroidDialog, subscribeAndroidDialog } from '@/lib/androidDialog'
+import { closeDialog, getDialog, subscribeDialog } from '@/lib/dialogStore'
 import { useStyles, useTheme, type Colors } from '@/theme'
+import { isWeb } from '@/lib/platform'
 
 export function DialogHost() {
-  return Platform.OS === 'web' ? <WebDialogHost /> : <SheetDialogHost />
+  return isWeb ? <WebDialogHost /> : <SheetDialogHost />
 }
 
 function SheetDialogHost() {
-  const dialog = useSyncExternalStore(subscribeAndroidDialog, getAndroidDialog)
+  const dialog = useSyncExternalStore(subscribeDialog, getDialog)
   const styles = useStyles(createStyles)
   return (
-    <Modal visible={dialog !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={closeAndroidDialog}>
+    <Modal visible={dialog !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={closeDialog}>
       <View style={[styles.backdrop, dialog?.kind === 'prompt' && styles.top]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={closeAndroidDialog} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeDialog} />
         {dialog?.kind === 'sheet' ? <Sheet title={dialog.title} actions={dialog.actions} /> : null}
         {dialog?.kind === 'prompt' ? <Prompt key={dialog.prompt.title} {...dialog.prompt} /> : null}
       </View>
@@ -36,14 +38,14 @@ function Sheet({ title, actions }: { title?: string; actions: { label: string; d
           key={action.label}
           style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceRaised }]}
           onPress={() => {
-            closeAndroidDialog()
+            closeDialog()
             action.onSelect()
           }}
         >
           <Text style={[styles.label, action.destructive && { color: colors.danger }]}>{action.label}</Text>
         </Pressable>
       ))}
-      <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceRaised }]} onPress={closeAndroidDialog}>
+      <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceRaised }]} onPress={closeDialog}>
         <Text style={[styles.label, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
       </Pressable>
     </View>
@@ -54,11 +56,7 @@ function Prompt({ title, message, initial, confirmLabel, onSubmit }: { title: st
   const styles = useStyles(createStyles)
   const { colors } = useTheme()
   const { t } = useTranslation()
-  const [text, setText] = useState(initial ?? '')
-  const submit = () => {
-    closeAndroidDialog()
-    onSubmit(text)
-  }
+  const { text, setText, submit } = usePromptState(initial, onSubmit)
   return (
     <View style={styles.card}>
       <Text style={styles.promptTitle}>{title}</Text>
@@ -75,7 +73,7 @@ function Prompt({ title, message, initial, confirmLabel, onSubmit }: { title: st
         selectionColor={colors.accent}
       />
       <View style={styles.buttons}>
-        <Pressable style={styles.button} onPress={closeAndroidDialog}>
+        <Pressable style={styles.button} onPress={closeDialog}>
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
         </Pressable>
         <Pressable style={styles.button} onPress={submit}>

@@ -11,7 +11,7 @@ import { useAbortable } from '@/hooks/useAbortable'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { useTranslation } from '@/i18n'
 import { errorMessage } from '@/lib/errors'
-import { plural } from '@/lib/format'
+import { countLabel } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
 import {
   buildGreetingMessages,
@@ -23,7 +23,7 @@ import {
   type PromptGenInput,
   type PromptLength,
 } from '@/lib/promptGen'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, fonts, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { useInputColors } from './Field'
 import { Divider } from './motifs/Divider'
@@ -196,7 +196,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
     if (activity?.thinking) return t('promptGen.thinking', { secs: thinkingSecs })
     if (activity) return activity.target === 'prompt' ? t('promptGen.writingPrompt') : t('promptGen.writingGreeting')
     if (!current) return ''
-    return `${words} ${plural(words, locale, ['слово', 'слова', 'слов'], ['word', 'words'])}`
+    return countLabel(words, 'word', locale)
   })()
 
   const chip = (label: string, onPress: () => void, key?: string) => (
@@ -349,7 +349,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
               disabled={!note.trim()}
               style={[styles.sendButton, !note.trim() && { backgroundColor: colors.borderStrong }]}
             >
-              <Ionicons name="arrow-up" size={18} color={note.trim() ? '#fff' : colors.textFaint} />
+              <Ionicons name="arrow-up" size={18} color={note.trim() ? ON_ACCENT : colors.textFaint} />
             </Pressable>
           </View>
         </View>

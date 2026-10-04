@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ChipGroup } from '@/components/ChipGroup'
@@ -11,7 +11,6 @@ import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/comp
 import { Divider } from '@/components/motifs/Divider'
 import { FieldRow } from '@/components/motifs/FieldRow'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
-import type { MenuItem } from '@/components/NativeMenu'
 import { ParamSlider } from '@/components/ParamSlider'
 import { PillButton } from '@/components/PillButton'
 import { ToggleRow } from '@/components/ToggleRow'
@@ -32,10 +31,10 @@ import {
 } from '@/db/recentAttachments'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase, useShowInFiles } from '@/db/provider'
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
+import { DEFAULT_SETTINGS, saveSettings, typedCount } from '@/db/settings'
 import { isSuggestionsEnabled, setSuggestionsEnabled } from '@/db/suggestions'
 import { useCloudSync } from '@/hooks/useCloudSync'
-import { useConnectionTest } from '@/hooks/useConnectionTest'
+import { useServerForm } from '@/hooks/useServerForm'
 import { useStoredFlag } from '@/hooks/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { CONTEXT_STEPS, type ContextMode } from '@/lib/context'
@@ -46,14 +45,14 @@ import { alternateIconsAvailable, currentAppIcon } from '@/lib/appIcons'
 import { confirm } from '@/lib/dialogs'
 import { showToast } from '@/lib/toast'
 import { useChatTextSettings } from '@/lib/chatText'
-import { errorMessage } from '@/lib/errors'
 import { formatWhen } from '@/lib/format'
 import { notificationAsync, NotificationFeedbackType } from '@/lib/haptics'
 import type { SettingsSection } from '@/lib/searchScope'
 import { isShownInFiles } from '@/lib/storage'
-import { useColors, useStyles, useTheme, type Colors, type ThemePreference } from '@/theme'
+import { reportError } from '@/lib/report'
+import { isAndroid } from '@/lib/platform'
+import { type Colors, textStyles, type ThemePreference, useColors, useStyles, useTheme } from '@/theme'
 
-const android = Platform.OS === 'android'
 
 export default function SettingsScreen() {
   const db = useDatabase()
@@ -119,15 +118,16 @@ export default function SettingsScreen() {
     { value: 'en', label: t('language.en') },
   ]
 
-  const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
-  const [loaded, setLoaded] = useState(false)
+  // The context slider shows once the model is loaded; another server or model starts over.
+  const [loadingModel, setLoadingModel] = useState(false)
+  const [modelLoaded, setModelLoaded] = useState(false)
+  const { cfg, setCfg, loaded, update, status, models, modelItems, onTest } = useServerForm(() => setModelLoaded(false))
   // What is typed in the message-count fields: it may be empty on the way to a new number.
   const [messageDrafts, setMessageDrafts] = useState<{ chatMessages?: string; roomMessages?: string }>({})
   const setMessages = (field: 'chatMessages' | 'roomMessages', text: string) => {
-    const digits = text.replace(/\D/g, '')
+    const { digits, count } = typedCount(text)
     setMessageDrafts((d) => ({ ...d, [field]: digits }))
-    const n = Number(digits)
-    if (Number.isSafeInteger(n) && n >= 1) update({ [field]: n })
+    if (count) update({ [field]: count })
   }
   // The size limits: the numbers may be empty while being retyped, a number below 1 is not kept.
   const [limits, setLimits] = useState(getFileLimits)
@@ -136,15 +136,13 @@ export default function SettingsScreen() {
     loadFileLimits(db).then(setLimits)
   }, [db])
   const typeLimit = (field: 'avatarMb' | 'attachmentMb', text: string) => {
-    const digits = text.replace(/\D/g, '')
+    const { digits, count } = typedCount(text)
     setLimitDrafts((d) => ({ ...d, [field]: digits }))
-    const n = Number(digits)
-    if (!Number.isSafeInteger(n) || n < 1) return
-    setLimits((l) => ({ ...l, [field]: n }))
-    if (field === 'avatarMb') setAvatarLimitMb(db, n)
-    else setAttachmentLimitMb(db, n)
+    if (!count) return
+    setLimits((l) => ({ ...l, [field]: count }))
+    if (field === 'avatarMb') setAvatarLimitMb(db, count)
+    else setAttachmentLimitMb(db, count)
   }
-  const { status, models, test, reset: resetStatus } = useConnectionTest()
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const backingUp = exporting || importing
@@ -161,12 +159,11 @@ export default function SettingsScreen() {
     loadRecentSettings(db).then(setRecent)
   }, [db])
   const typeRecentCount = (text: string) => {
-    const digits = text.replace(/\D/g, '')
+    const { digits, count } = typedCount(text)
     setRecentDraft(digits)
-    const n = Number(digits)
-    if (!Number.isSafeInteger(n) || n < 1) return
-    setRecent((r) => ({ ...r, count: n }))
-    setRecentCount(db, n)
+    if (!count) return
+    setRecent((r) => ({ ...r, count }))
+    setRecentCount(db, count)
   }
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
@@ -185,7 +182,7 @@ export default function SettingsScreen() {
       await moveFiles(shown)
     } catch (err) {
       setShowInFiles(isShownInFiles())
-      showToast({ tone: 'error', title: t('settings.showInFilesFailedTitle'), message: errorMessage(err) })
+      reportError(t('settings.showInFilesFailedTitle'), err)
     } finally {
       setMovingFiles(false)
     }
@@ -201,7 +198,7 @@ export default function SettingsScreen() {
       if (on) await cloudSync.enable()
       else await cloudSync.disable()
     } catch (err) {
-      showToast({ tone: 'error', title: t('sync.failedTitle'), message: errorMessage(err) })
+      reportError(t('sync.failedTitle'), err)
     }
   }
 
@@ -230,8 +227,8 @@ export default function SettingsScreen() {
       if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) {
         showToast({
           tone: 'error',
-          title: t(android ? 'settings.requireBiometrics' : 'settings.requireFaceId'),
-          message: t(`settings.${android ? 'biometricsUnavailable' : 'faceIdUnavailable'}`),
+          title: t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId'),
+          message: t(`settings.${isAndroid ? 'biometricsUnavailable' : 'faceIdUnavailable'}`),
         })
         return
       }
@@ -242,25 +239,8 @@ export default function SettingsScreen() {
   }
 
   useEffect(() => {
-    loadSettings(db).then((stored) => {
-      setCfg(stored)
-      setLoaded(true)
-    })
-  }, [db])
-
-  useEffect(() => {
     if (loaded) saveSettings(db, cfg)
   }, [db, cfg, loaded])
-
-  // The context slider shows once the model is loaded; another server or model starts over.
-  const [loadingModel, setLoadingModel] = useState(false)
-  const [modelLoaded, setModelLoaded] = useState(false)
-
-  const update = (patch: Partial<ServerSettings>) => {
-    setCfg((prev) => ({ ...prev, ...patch }))
-    if (patch.baseUrl !== undefined || patch.apiKey !== undefined) resetStatus()
-    if (patch.baseUrl !== undefined || patch.apiKey !== undefined || patch.model !== undefined) setModelLoaded(false)
-  }
 
   const onLoadModel = async () => {
     setLoadingModel(true)
@@ -270,24 +250,10 @@ export default function SettingsScreen() {
       notificationAsync(NotificationFeedbackType.Success)
     } catch (err) {
       notificationAsync(NotificationFeedbackType.Error)
-      showToast({ tone: 'error', title: t('settings.loadModelFailed'), message: errorMessage(err) })
+      reportError(t('settings.loadModelFailed'), err)
     } finally {
       setLoadingModel(false)
     }
-  }
-
-  // The models the server lists are picked from a system menu, the chosen one checked.
-  const modelItems = (list: string[]): MenuItem[] =>
-    list.map((id) => ({
-      label: id,
-      systemImage: id === cfg.model ? 'checkmark' : undefined,
-      onSelect: () => update({ model: id }),
-    }))
-
-  // One model alone is taken as it is; out of several the user picks from the field.
-  const onTest = async () => {
-    const found = await test(cfg)
-    if (found.length === 1 && !found.includes(cfg.model)) update({ model: found[0] })
   }
 
   // The sheet with what to take or bring in: open while there is a tree.
@@ -299,7 +265,7 @@ export default function SettingsScreen() {
     try {
       setExportTree(await loadBackupTree(db))
     } catch (err) {
-      showToast({ tone: 'error', title: t('settings.exportFailedTitle'), message: errorMessage(err) })
+      reportError(t('settings.exportFailedTitle'), err)
     } finally {
       setExporting(false)
     }
@@ -318,7 +284,7 @@ export default function SettingsScreen() {
         })
       }
     } catch (err) {
-      showToast({ tone: 'error', title: t('settings.exportFailedTitle'), message: errorMessage(err) })
+      reportError(t('settings.exportFailedTitle'), err)
     } finally {
       setExporting(false)
     }
@@ -329,7 +295,7 @@ export default function SettingsScreen() {
     try {
       setOpened(await readBackup())
     } catch (err) {
-      showToast({ tone: 'error', title: t('settings.importFailedTitle'), message: errorMessage(err) })
+      reportError(t('settings.importFailedTitle'), err)
     } finally {
       setImporting(false)
     }
@@ -348,7 +314,7 @@ export default function SettingsScreen() {
         message: t('settings.importDoneMessage', { characters: result.characters, rooms: result.rooms, chats: result.chats }),
       })
     } catch (err) {
-      showToast({ tone: 'error', title: t('settings.importFailedTitle'), message: errorMessage(err) })
+      reportError(t('settings.importFailedTitle'), err)
     } finally {
       setImporting(false)
     }
@@ -367,7 +333,7 @@ export default function SettingsScreen() {
           setCfg(DEFAULT_SETTINGS)
           router.replace('/onboarding')
         } catch (err) {
-          showToast({ tone: 'error', title: t('settings.wipeFailedTitle'), message: errorMessage(err) })
+          reportError(t('settings.wipeFailedTitle'), err)
         } finally {
           setWiping(false)
         }
@@ -501,8 +467,8 @@ export default function SettingsScreen() {
 
   const faceIdRow = (
     <ToggleRow
-      label={t(android ? 'settings.requireBiometrics' : 'settings.requireFaceId')}
-      note={t(android ? 'settings.requireBiometricsNote' : 'settings.requireFaceIdNote')}
+      label={t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId')}
+      note={t(isAndroid ? 'settings.requireBiometricsNote' : 'settings.requireFaceIdNote')}
       value={appLock}
       onValueChange={toggleAppLock}
     />
@@ -660,7 +626,7 @@ export default function SettingsScreen() {
             <PillButton
               accessibilityLabel={t('settings.folderSyncChangeFolder')}
               icon={{ name: 'folder', fallback: 'folder-outline' }}
-              onPress={() => cloudSync.changeFolder().catch((err) => showToast({ tone: 'error', title: t('sync.failedTitle'), message: errorMessage(err) }))}
+              onPress={() => cloudSync.changeFolder().catch((err) => reportError(t('sync.failedTitle'), err))}
               disabled={cloudSync.syncing || cloudAction !== null || backingUp}
             />
           </View>
@@ -773,7 +739,7 @@ export default function SettingsScreen() {
 
           <Eyebrow label={t('settings.security')} color={colors.text} />
           {block('faceId', faceIdRow)}
-          {android ? null : block('files', filesRow)}
+          {isAndroid ? null : block('files', filesRow)}
 
           <Divider />
 
@@ -819,7 +785,7 @@ const createStyles = (colors: Colors) =>
     // Reaches a little past the block, so the tint frames it instead of hugging the text.
     flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 16 },
     rowLabel: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 12 },
+    note: { ...textStyles(colors).note, marginBottom: 12 },
     testRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
     testButton: { flex: 1 },
     messageFields: { marginTop: 14 },
@@ -838,7 +804,7 @@ const createStyles = (colors: Colors) =>
       lineHeight: 18,
     },
     contextHint: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: 10, marginBottom: 4 },
-    statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12 },
+    statusText: { ...textStyles(colors).note, marginTop: 12 },
     buttonPairRow: { flexDirection: 'row', gap: 12 },
     pairButton: { flex: 1 },
     linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },

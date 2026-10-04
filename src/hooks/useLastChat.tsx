@@ -1,11 +1,12 @@
 import { useFocusEffect } from 'expo-router'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWindowDimensions, type View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { getLastChat, type LastChat } from '@/db/chats'
 import { getLastOpened, isContinueByVisit, isContinueEnabled, isContinueHidden, setContinueHidden, type ContinueKind } from '@/db/continue'
 import { useDatabase } from '@/db/provider'
+import { createRequiredContext } from '@/lib/requiredContext'
 
 type Chats = Record<ContinueKind, LastChat | null>
 
@@ -19,7 +20,7 @@ type LastChatContext = {
   setBottom: (bottom: number) => void
 }
 
-const Context = createContext<LastChatContext | null>(null)
+export const [Context, useLastChatContext] = createRequiredContext<LastChatContext>('useLastChat needs LastChatProvider')
 
 // The chats behind the continue button, for both home tabs at once: the button is one,
 // drawn over the tabs, and switching tabs only changes what it shows. Both are loaded up
@@ -54,12 +55,6 @@ export function LastChatProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => ({ chats, reload, hide, bottom, setBottom }), [chats, reload, hide, bottom])
   return <Context.Provider value={value}>{children}</Context.Provider>
-}
-
-export function useLastChatContext() {
-  const ctx = useContext(Context)
-  if (!ctx) throw new Error('useLastChat needs LastChatProvider')
-  return ctx
 }
 
 // The chat the continue button opens on a home tab: the last one with a character on

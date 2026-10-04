@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { usePathname, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -9,6 +9,7 @@ import { Avatar } from '@/components/Avatar'
 import { deleteChat, setChatTitle } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { listSearchChats, type SearchChat } from '@/db/search'
+import { useWindowKey } from '@/hooks/useWindowKey'
 import { t, useTranslation } from '@/i18n'
 import { onChatsChanged } from '@/lib/chatEvents'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
@@ -82,17 +83,13 @@ export function Sidebar() {
   const rootStyle = useAnimatedStyle(() => ({ width: SIDEBAR_WIDTH + (RAIL_WIDTH - SIDEBAR_WIDTH) * progress.value }))
   const fade = useAnimatedStyle(() => ({ opacity: 1 - progress.value }))
   // Ctrl+B, as in many editors and chat apps.
-  useEffect(() => {
-    if (Platform.OS !== 'web') return
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
-        e.preventDefault()
-        toggle()
-      }
+  useWindowKey(
+    (e) => (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b',
+    (e) => {
+      e.preventDefault()
+      toggle()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [toggle])
+  )
 
   const reload = useCallback(() => {
     listSearchChats(db).then(setChats)

@@ -18,7 +18,7 @@ import { frameBackground, type CropRect } from '@/lib/avatars'
 import { backgroundDraft } from '@/lib/backgroundDraft'
 import { withAlpha } from '@/lib/color'
 import { liquidGlass } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, FILL, useColors, useStyles } from '@/theme'
 
 const MAX_ZOOM = 4
 
@@ -238,7 +238,7 @@ export default function BackgroundScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    empty: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 6 },
+    empty: { ...FILL, alignItems: 'center', justifyContent: 'center', gap: 6 },
     emptyName: { color: colors.text, fontSize: 22, fontWeight: '600' },
     emptyHint: { color: colors.textMuted, fontSize: 15 },
     dock: {

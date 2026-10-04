@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from './Glass'
 
@@ -24,7 +24,7 @@ type Props = {
 export function Button({ label, icon, onPress, disabled, loading, variant = 'primary', style }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
-  const tint = variant === 'primary' || variant === 'glass' ? '#FFFFFF' : variant === 'soft' ? colors.accent : colors.text
+  const tint = variant === 'primary' || variant === 'glass' ? ON_ACCENT : variant === 'soft' ? colors.accent : colors.text
   const content = loading ? (
     <ActivityIndicator color={tint} />
   ) : (
@@ -77,8 +77,8 @@ const createStyles = (colors: Colors) =>
     soft: { height: 46, paddingHorizontal: 16, backgroundColor: colors.accentSoft },
     glass: { height: 52, paddingHorizontal: 28, borderRadius: 26 },
     label: { fontSize: 16, fontWeight: '600' },
-    primaryLabel: { color: '#FFFFFF' },
+    primaryLabel: { color: ON_ACCENT },
     secondaryLabel: { color: colors.text, fontWeight: '500' },
     softLabel: { color: colors.accent, fontSize: 15 },
-    glassLabel: { color: '#FFFFFF', fontSize: 17 },
+    glassLabel: { color: ON_ACCENT, fontSize: 17 },
   })

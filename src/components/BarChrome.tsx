@@ -1,8 +1,9 @@
 import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Platform, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
 
 import { useStyles, useTheme, type Colors } from '@/theme'
+import { isAndroid } from '@/lib/platform'
 
 type Edge = 'top' | 'bottom'
 
@@ -23,7 +24,7 @@ export function BlurBar({
   const styles = useStyles(createStyles)
   // Real blur on Android costs a copy of the screen under the bar on every frame of a
   // scroll, so the bar there is a nearly opaque tint instead.
-  if (Platform.OS === 'android') {
+  if (isAndroid) {
     return (
       <View style={[styles.bar, styles.tint, edge === 'top' ? styles.top : styles.bottom, style]} onLayout={onLayout}>
         {children}

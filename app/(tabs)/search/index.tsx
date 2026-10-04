@@ -1,7 +1,7 @@
 import type Ionicons from '@expo/vector-icons/Ionicons'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Platform, Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native'
+import { Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native'
 import type { SearchBarCommands } from 'react-native-screens'
 
 import { Avatar } from '@/components/Avatar'
@@ -20,10 +20,9 @@ import { cloudSyncAvailable } from '@/lib/cloudSync'
 import { formatWhen } from '@/lib/format'
 import { characterPreview } from '@/lib/roleplay'
 import { getSearchScope, type SearchScope, type SettingsSection } from '@/lib/searchScope'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { isAndroid, isWeb } from '@/lib/platform'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
-const android = Platform.OS === 'android'
-const web = Platform.OS === 'web'
 
 type SettingEntry = {
   label: string
@@ -115,10 +114,10 @@ export default function SearchScreen() {
       { label: t('settings.suggestButton'), keywords: [t('settings.chats')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
       { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: settingsAt('recents') },
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
-      { label: t('settings.chatFont'), keywords: [t('settings.chats'), t('settings.chatTextSize')], symbol: 'textformat', fallback: 'text-outline', href: settingsAt('chatText') },
+      { label: t('settings.chatFont'), keywords: [t('settings.chats'), t('settings.chatFontField'), t('settings.chatTextSize'), t('settings.chatPattern')], symbol: 'textformat', fallback: 'text-outline', href: settingsAt('chatText') },
       { label: t('settings.limitsTitle'), keywords: [t('settings.limitsOff'), t('settings.limitAvatar'), t('settings.limitAttachment')], symbol: 'externaldrive', fallback: 'resize-outline', href: settingsAt('limits') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
-      { label: t(android ? 'settings.requireBiometrics' : 'settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
+      { label: t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
       { label: t('settings.showInFiles'), keywords: [t('settings.security')], symbol: 'folder', fallback: 'folder-outline', href: settingsAt('files') },
       {
         label: t('settings.server'),
@@ -139,7 +138,7 @@ export default function SearchScreen() {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
       entries.splice(backup, 0, { label: t('settings.folderSync'), keywords: [t('settings.folderSyncSync'), 'iCloud', 'Google Drive'], symbol: 'arrow.triangle.2.circlepath', fallback: 'sync-outline', href: settingsAt('folderSync') })
     }
-    return android ? entries.filter((entry) => entry.label !== t('settings.showInFiles')) : entries
+    return isAndroid ? entries.filter((entry) => entry.label !== t('settings.showInFiles')) : entries
   }, [t])
 
   const sections = useMemo<Section[]>(() => {
@@ -234,8 +233,8 @@ export default function SearchScreen() {
       ListEmptyComponent={empty}
       scrollEnabled={sections.length > 0}
       ListHeaderComponent={
-        web ? (
-          // The web has no native search bar in the header, so the field is part of the list.
+        isWeb ? (
+          // The isWeb has no native search bar in the header, so the field is part of the list.
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -248,7 +247,7 @@ export default function SearchScreen() {
           />
         ) : null
       }
-      contentContainerStyle={[styles.content, web && { paddingHorizontal: columnInset(width, FORM_COLUMN, 16), paddingTop: 16 }, contentStyle]}
+      contentContainerStyle={[styles.content, isWeb && { paddingHorizontal: columnInset(width, FORM_COLUMN, 16), paddingTop: 16 }, contentStyle]}
       contentInsetAdjustmentBehavior="automatic"
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
@@ -262,16 +261,16 @@ export default function SearchScreen() {
           headerShown: true,
           // The scroll edge effect is drawn under a transparent bar. Android does not inset
           // the list by an automatic content inset, so there the bar is solid and pushes it down.
-          headerTransparent: !android && !web,
-          // Search is a place of the sidebar on the web, not a step on the way from another screen.
-          headerBackVisible: !web,
-          // The web header ignores headerBackVisible and draws its own arrow whenever there is a screen to go back to.
-          headerLeft: web ? () => null : undefined,
+          headerTransparent: !isAndroid && !isWeb,
+          // Search is a place of the sidebar on the isWeb, not a step on the way from another screen.
+          headerBackVisible: !isWeb,
+          // The isWeb header ignores headerBackVisible and draws its own arrow whenever there is a screen to go back to.
+          headerLeft: isWeb ? () => null : undefined,
           headerStyle: { backgroundColor: colors.bg },
           headerShadowVisible: false,
           headerTitleAlign: 'left',
           headerTitle: () => <TabTitle>{t('search.title')}</TabTitle>,
-          headerSearchBarOptions: web ? undefined : {
+          headerSearchBarOptions: isWeb ? undefined : {
             ref: searchBar,
             placeholder,
             autoCapitalize: 'none',
@@ -289,19 +288,19 @@ export default function SearchScreen() {
   )
 }
 
-// On the web a row looks as in the sidebar: an outline on hover, a slight sink on press.
+// On the isWeb a row looks as in the sidebar: an outline on hover, a slight sink on press.
 function ResultButton({ onPress, children }: { onPress: () => void; children: React.ReactNode }) {
   const styles = useStyles(createStyles)
   const [hovered, setHovered] = useState(false)
-  // mouseenter and mouseleave exist on the web only, so they go in by spread, past the native types.
-  const hover = web ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {}
+  // mouseenter and mouseleave exist on the isWeb only, so they go in by spread, past the native types.
+  const hover = isWeb ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {}
   return (
     <View {...hover}>
       <Pressable
         onPress={onPress}
         style={({ pressed }) => [
           styles.row,
-          web ? [hovered && styles.rowHover, pressed && styles.rowSink] : pressed && styles.rowPressed,
+          isWeb ? [hovered && styles.rowHover, pressed && styles.rowSink] : pressed && styles.rowPressed,
         ]}
       >
         {children}
@@ -390,7 +389,7 @@ function ResultRow({ item, needle, locale, you }: RowProps) {
   return (
     <>
       <View style={[styles.tile, { backgroundColor: setting.danger ? colors.danger : colors.accent }]}>
-        <SFIcon name={setting.symbol} fallback={setting.fallback} size={17} color="#FFFFFF" />
+        <SFIcon name={setting.symbol} fallback={setting.fallback} size={17} color={ON_ACCENT} />
       </View>
       <View style={styles.body}>
         <Highlighted text={setting.label} needle={needle} style={styles.title} />
@@ -457,7 +456,7 @@ const createStyles = (colors: Colors) =>
       marginBottom: 6,
       marginHorizontal: 4,
     },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14, borderCurve: 'continuous', borderWidth: web ? 1 : 0, borderColor: 'transparent' },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14, borderCurve: 'continuous', borderWidth: isWeb ? 1 : 0, borderColor: 'transparent' },
     rowPressed: { backgroundColor: colors.accentSoft },
     rowHover: { borderColor: colors.border },
     rowSink: { transform: [{ scale: 0.985 }] },

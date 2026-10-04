@@ -1,4 +1,4 @@
-import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
@@ -7,25 +7,17 @@ import ReorderableList from 'react-native-reorderable-list'
 import { AvatarStack } from '@/components/AvatarStack'
 import { Button } from '@/components/Button'
 import { ChatCard } from '@/components/ChatCard'
-import { EmptyState, ListSeparator } from '@/components/EmptyState'
+import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/EmptyState'
 import { GlassGroup } from '@/components/Glass'
 import { IconButton } from '@/components/IconButton'
 import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import type { MenuItem } from '@/components/NativeMenu'
-import { deleteChat, duplicateChat, listChats, pruneUntouchedChats, setChatOrder, setChatTitle } from '@/db/chats'
+import { listChats, pruneUntouchedChats, setChatOrder } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
-import {
-  getRoom,
-  importChatToRoom,
-  listRoomChats,
-  listRoomMembers,
-  type Room,
-  type RoomChatPreview,
-  type RoomMember,
-} from '@/db/rooms'
+import { getRoom, importChatToRoom, listRoomChats, listRoomMembers, type Room, type RoomChatPreview, type RoomMember } from '@/db/rooms'
+import { useChatListActions, useReloadOnFocus } from '@/hooks/useChatListActions'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
-import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { showMessage, showSheet } from '@/lib/dialogs'
 import { formatWhen } from '@/lib/format'
 import { fonts, HEADER_FONT_SCALE, useStyles, type Colors } from '@/theme'
@@ -52,11 +44,8 @@ export default function RoomScenesScreen() {
     setChats(await listRoomChats(db, found.id))
   }, [db, roomId, router])
 
-  useFocusEffect(
-    useCallback(() => {
-      reload()
-    }, [reload])
-  )
+  useReloadOnFocus(reload)
+  const { duplicate, rename: promptRename, remove: confirmDelete } = useChatListActions(reload)
 
   const reorder = useReorder(chats, setChats, (ids) => setChatOrder(db, ids))
 
@@ -65,26 +54,6 @@ export default function RoomScenesScreen() {
     { label: t('chat.menuDuplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(chat) },
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(chat) },
   ]
-
-  const duplicate = async (chat: RoomChatPreview) => {
-    const title = chat.title ? `${chat.title} (${t('characters.copySuffix')})` : null
-    await duplicateChat(db, chat.id, title)
-    reload()
-  }
-
-  const promptRename = (chat: RoomChatPreview) => {
-    promptRenameChat(chat.title, async (text) => {
-      await setChatTitle(db, chat.id, text)
-      reload()
-    })
-  }
-
-  const confirmDelete = (chat: RoomChatPreview) => {
-    confirmDeleteChat(async () => {
-      await deleteChat(db, chat.id)
-      reload()
-    })
-  }
 
   // Any one-on-one chat of a member can seed a scene here; the original stays put.
   const chooseImport = async () => {
@@ -129,7 +98,7 @@ export default function RoomScenesScreen() {
               action={
                 <Link href={`/chat/new?room=${roomId}`} asChild>
                   <Link.AppleZoom>
-                    <Button variant="glass" label={t('rooms.startScene')} style={styles.emptyButton} />
+                    <Button variant="glass" label={t('rooms.startScene')} style={emptyButtonStyle} />
                   </Link.AppleZoom>
                 </Link>
               }
@@ -180,6 +149,5 @@ export default function RoomScenesScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
-    emptyButton: { minWidth: 200 },
+    name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
   })

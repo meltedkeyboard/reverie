@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
 
+import { FEATURED_GAP } from '@/lib/featuredLayout'
 import { fonts, useStyles, type Colors } from '@/theme'
 
 export function EmptyState({ title, text, action }: { title: string; text: string; action?: React.ReactNode }) {
@@ -11,6 +12,14 @@ export function EmptyState({ title, text, action }: { title: string; text: strin
       {action}
     </View>
   )
+}
+
+// The primary button of an empty list.
+export const emptyButtonStyle = { minWidth: 200 }
+
+// The gap between cards while the continue button is shown above the list.
+export function FeaturedSeparator() {
+  return <View style={{ height: FEATURED_GAP }} />
 }
 
 export function ListSeparator() {

@@ -12,7 +12,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets'
 
 import * as Haptics from '@/lib/haptics'
-import { useStyles, type Colors } from '@/theme'
+import { type Colors, ON_ACCENT, useStyles } from '@/theme'
 
 type Props = {
   onDelete: () => void
@@ -151,7 +151,7 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
           accessibilityLabel={label}
           style={({ pressed: down }) => [styles.trash, { borderRadius: radius }, down && { opacity: 0.8 }]}
         >
-          <Ionicons name="trash" size={22} color="#FFFFFF" />
+          <Ionicons name="trash" size={22} color={ON_ACCENT} />
         </Pressable>
       </Animated.View>
       <GestureDetector gesture={Gesture.Exclusive(pan, tap)}>

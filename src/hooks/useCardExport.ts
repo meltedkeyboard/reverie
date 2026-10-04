@@ -1,8 +1,8 @@
 import type { MenuItem } from '@/components/NativeMenu'
 import { useTranslation } from '@/i18n'
-import { errorMessage } from '@/lib/errors'
 import { exportCharacterCard, type CardCharacter } from '@/lib/importCard'
 import { showToast } from '@/lib/toast'
+import { reportError } from '@/lib/report'
 
 // The "save the card to Files / to Photos" choices, with the toast that follows. `load`
 // gives the character at the moment of choosing, so a screen can hand over what is saved.
@@ -16,7 +16,7 @@ export function useCardExport() {
       const saved = await exportCharacterCard(character, target)
       if (saved) showToast({ tone: 'success', title: t('card.exportDone'), message: `${saved.name} · ${saved.folder}` })
     } catch (err) {
-      showToast({ tone: 'error', title: t('card.exportFailed'), message: errorMessage(err) })
+      reportError(t('card.exportFailed'), err)
     }
   }
 

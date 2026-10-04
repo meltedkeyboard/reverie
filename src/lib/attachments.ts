@@ -52,7 +52,8 @@ export async function withInlinedImages(req: ChatRequest): Promise<ChatRequest> 
     if (typeof turn.content === 'string') return turn
     const content = await Promise.all(
       turn.content.map(async (part) => {
-        if (part.type !== 'image_url' || !part.image_url.url.startsWith('file:')) return part
+        // On the web a stored file's uri is a blob: url, on a phone a file: one.
+        if (part.type !== 'image_url' || !/^(file|blob):/.test(part.image_url.url)) return part
         const file = new File(part.image_url.url)
         const base64 = file.exists ? await file.base64() : ''
         return { type: 'image_url' as const, image_url: { url: imageDataUrl(base64) } }

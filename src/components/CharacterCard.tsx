@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import type { CharacterPreview } from '@/db/characters'
 import { useTranslation } from '@/i18n'
-import { plural } from '@/lib/format'
+import { countLabel } from '@/lib/format'
 import { characterPreview } from '@/lib/roleplay'
 import { useStyles, type Colors } from '@/theme'
 
@@ -35,7 +35,7 @@ function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight }:
         </View>
         <FeaturedBody
           name={character.name}
-          count={chats > 0 ? `${chats} ${plural(chats, locale, ['чат', 'чата', 'чатов'], ['chat', 'chats'])}` : null}
+          count={chats > 0 ? countLabel(chats, 'chat', locale) : null}
           preview={preview}
         />
       </ListCard>
@@ -53,7 +53,7 @@ function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight }:
           </Text>
           {chats > 0 ? (
             <Text style={styles.chats}>
-              {chats} {plural(chats, locale, ['чат', 'чата', 'чатов'], ['chat', 'chats'])}
+              {countLabel(chats, 'chat', locale)}
             </Text>
           ) : null}
         </View>

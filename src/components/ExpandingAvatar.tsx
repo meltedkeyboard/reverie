@@ -12,7 +12,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets'
 
 import * as Haptics from '@/lib/haptics'
-import { fonts } from '@/theme'
+import { fonts, ON_ACCENT } from '@/theme'
 
 import { useOpenViewer } from './ImageLink'
 import { Picture } from './Picture'
@@ -158,5 +158,5 @@ const styles = StyleSheet.create({
   photo: { position: 'absolute', overflow: 'hidden' },
   topShade: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomShade: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 48, paddingHorizontal: 20, paddingBottom: 18 },
-  name: { color: '#FFFFFF', fontFamily: fonts.prose, fontSize: 28, fontWeight: '700' },
+  name: { color: ON_ACCENT, fontFamily: fonts.prose, fontSize: 28, fontWeight: '700' },
 })

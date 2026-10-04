@@ -3,23 +3,12 @@ import NativeMaskedView from '@react-native-masked-view/masked-view'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  FlatList,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  Platform,
-  useWindowDimensions,
-  type LayoutChangeEvent,
-} from 'react-native'
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native'
 
-// The web has no native mask: the package paints the mask element itself, a black slab
+// The isWeb has no native mask: the package paints the mask element itself, a black slab
 // over the field. There the field is shown as it is, without the fade at its edges.
 const MaskedView: typeof NativeMaskedView =
-  Platform.OS === 'web' ? (({ children }: { children?: React.ReactNode }) => <>{children}</>) as never : NativeMaskedView
+  isWeb ? (({ children }: { children?: React.ReactNode }) => <>{children}</>) as never : NativeMaskedView
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
@@ -43,8 +32,6 @@ import { SFIcon } from './SFIcon'
 import type { MessageImage } from '@/db/messages'
 import { CHAT_COLUMN } from '@/hooks/useLayoutMode'
 import { useTranslation } from '@/i18n'
-import { showMessage } from '@/lib/dialogs'
-import { errorMessage } from '@/lib/errors'
 import { listRecentAttachments } from '@/db/attachments'
 import { useDatabase } from '@/db/provider'
 import { isRecentAttachmentsEnabled, loadRecentSettings } from '@/db/recentAttachments'
@@ -53,7 +40,9 @@ import { pickMessageImages, pictureUri } from '@/lib/attachments'
 import type { ImageSource } from '@/lib/images'
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { alertError } from '@/lib/report'
+import { isWeb } from '@/lib/platform'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 type Props = {
   height: SharedValue<number>
@@ -157,7 +146,7 @@ export function Composer({
     // With pictures attached the field is already open, so Enter is a plain line break.
     if (!textRef.current && next.includes('\n') && !next.trim() && !picturedRef.current) {
       setOpened(true)
-      // The web has no setNativeProps; there the controlled value already clears the field.
+      // The isWeb has no setNativeProps; there the controlled value already clears the field.
       inputRef.current?.setNativeProps?.({ text: '' })
       return
     }
@@ -171,7 +160,7 @@ export function Composer({
   // A browser scrolls whatever holds a field to show it when it takes focus. The field of a
   // swap starts below its place, so autoFocus there pushed the whole interface down.
   useEffect(() => {
-    if (Platform.OS !== 'web' || !autoFocus) return
+    if (!isWeb || !autoFocus) return
     const node = inputRef.current as unknown as HTMLElement | null
     node?.focus({ preventScroll: true })
   }, [autoFocus])
@@ -285,7 +274,7 @@ export function Composer({
       const picked = await pickMessageImages(source)
       if (picked.length) setImages((current) => [...current, ...picked])
     } catch (err) {
-      showMessage(t('composer.attachFailedTitle'), errorMessage(err))
+      alertError(t('composer.attachFailedTitle'), err)
     } finally {
       setPicking(false)
     }
@@ -306,7 +295,7 @@ export function Composer({
           name={ICONS[mode].sf}
           fallback={ICONS[mode].fallback}
           size={mode === 'stop' ? 13 : 17}
-          color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.text : '#FFFFFF'}
+          color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.text : ON_ACCENT}
           effect={{ effect: 'bounce' }}
           trigger={mode === 'idle' ? 'send' : mode}
           onAccent={mode === 'send' || mode === 'save' || mode === 'stop'}
@@ -467,7 +456,6 @@ export function Composer({
     (images.length && !editing ? imagesH : 0) +
     (docked ? DOCKED_INPUT + toolsH : ONE_LINE_INPUT) +
     barExtra
-  const web = Platform.OS === 'web'
   // The list reserves the room the field really takes, so a taller one (a few lines, a
   // suggestion, pictures) pushes the messages up instead of covering the last lines and their
   // actions. It eases with the box, and never goes below the room of the one-line field.
@@ -533,7 +521,7 @@ export function Composer({
                   hitSlop={8}
                   style={styles.thumbRemove}
                 >
-                  <Ionicons name="close" size={13} color="#FFFFFF" />
+                  <Ionicons name="close" size={13} color={ON_ACCENT} />
                 </Pressable>
               </View>
             ))}
@@ -580,8 +568,8 @@ export function Composer({
                 multiline
                 // A browser's <textarea> is two rows tall unless told otherwise. On iOS the prop
                 // is a cap on the lines the field shows, so it is left off there.
-                numberOfLines={Platform.OS === 'web' ? 1 : undefined}
-                autoFocus={autoFocus && Platform.OS !== 'web'}
+                numberOfLines={isWeb ? 1 : undefined}
+                autoFocus={autoFocus && !isWeb}
                 accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
                 style={[
                   styles.input,
@@ -673,7 +661,7 @@ export function Composer({
       >
         {accessory}
       </Animated.View>
-      {web ? (
+      {isWeb ? (
         // The desktop field floats over the messages with nothing under it.
         <View style={[styles.floatingBar, { paddingBottom: insets.bottom + BAR_PAD_BOTTOM }]} pointerEvents="box-none">
           {row}
@@ -774,8 +762,7 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
   // Far enough to clear the screen even with the keyboard up and a panel over the field.
   // On a desktop window the screen is far too tall for that: the field only dips a little
   // and fades, which reads as a swap instead of a flight across the window.
-  const web = Platform.OS === 'web'
-  const distance = web ? 72 : screenHeight * 0.6
+  const distance = isWeb ? 72 : screenHeight * 0.6
 
   useEffect(() => {
     if (id === shownId) return
@@ -796,7 +783,7 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
   // Opacity only on the web: there is no Liquid Glass there to lose its material.
   const style = useAnimatedStyle(() => ({
     transform: [{ translateY: offset.value }],
-    ...(web ? { opacity: Math.min(1, Math.max(0, 1 - offset.value / distance)) } : null),
+    ...(isWeb ? { opacity: Math.min(1, Math.max(0, 1 - offset.value / distance)) } : null),
   }))
   return (
     <Animated.View key={shownId} style={[StyleSheet.absoluteFill, style]} pointerEvents="box-none">
@@ -825,11 +812,13 @@ const THUMB = 52
 const THUMB_GAP = 6
 const MENU_WIDTH = 250
 
-const ATTACH_ITEMS = [
+const ALL_ATTACH_ITEMS = [
   { source: 'camera', icon: 'camera-outline', label: 'attach.takePhoto' },
   { source: 'library', icon: 'images-outline', label: 'attach.choosePhoto' },
   { source: 'files', icon: 'folder-outline', label: 'attach.chooseFile' },
 ] as const
+// The desktop has no camera or photo library to tell apart from files: only the file row.
+const ATTACH_ITEMS = isWeb ? ALL_ATTACH_ITEMS.filter((item) => item.source === 'files') : ALL_ATTACH_ITEMS
 // Absolute children are placed from the field's outer edge, not inside its padding.
 const EDGE = 7
 const FIELD_PAD = 5
@@ -904,7 +893,7 @@ const createStyles = (colors: Colors) =>
     paddingBottom: 8,
     paddingHorizontal: 14,
     // The browser's own focus ring and white fill would show through the glass fallback.
-    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', backgroundColor: 'transparent', resize: 'none' } as object) : null),
+    ...(isWeb ? ({ outlineStyle: 'none', backgroundColor: 'transparent', resize: 'none' } as object) : null),
   },
   ghost: { position: 'absolute', maxHeight: 164, overflow: 'hidden' },
   ghostText: { color: colors.textMuted, fontSize: 17, lineHeight: 22 },

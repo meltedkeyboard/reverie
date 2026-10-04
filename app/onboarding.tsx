@@ -16,19 +16,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Button } from '@/components/Button'
 import { Field, FieldLabel } from '@/components/Field'
-import type { MenuItem } from '@/components/NativeMenu'
 import { PickerBox } from '@/components/PickerBox'
 import { SFIcon } from '@/components/SFIcon'
 import { Wordmark } from '@/components/Wordmark'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useDatabase } from '@/db/provider'
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, type ServerSettings } from '@/db/settings'
-import { useConnectionTest } from '@/hooks/useConnectionTest'
+import { saveSettings } from '@/db/settings'
+import { useServerForm } from '@/hooks/useServerForm'
 import { useTranslation } from '@/i18n'
 import { NativeMenu } from '@/components/NativeMenu'
 import * as Haptics from '@/lib/haptics'
 import { APP_VERSION } from '@/lib/version'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, textStyles, useColors, useStyles } from '@/theme'
 
 type Feature = {
   icon: Parameters<typeof SFIcon>[0]['name']
@@ -79,15 +78,9 @@ export default function OnboardingScreen() {
   const rise = useRef(new Animated.Value(12)).current
   const turn = useRef(new Animated.Value(0)).current
   const [onServer, setOnServer] = useState(false)
-  const [cfg, setCfg] = useState<ServerSettings>(DEFAULT_SETTINGS)
-  const { status, models, test, reset: resetStatus } = useConnectionTest()
+  const { cfg, update, status, models, modelItems, onTest } = useServerForm()
   const welcomeScroll = useFitScroll()
   const serverScroll = useFitScroll()
-
-  // Someone going through onboarding again sees the server they already have.
-  useEffect(() => {
-    loadSettings(db).then(setCfg)
-  }, [db])
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
@@ -107,24 +100,6 @@ export default function OnboardingScreen() {
       if (reduced) turn.setValue(1)
       else Animated.spring(turn, { toValue: 1, stiffness: 170, damping: 26, mass: 1, useNativeDriver: true }).start()
     })
-  }
-
-  const update = (patch: Partial<ServerSettings>) => {
-    setCfg((prev) => ({ ...prev, ...patch }))
-    if (patch.baseUrl !== undefined || patch.apiKey !== undefined) resetStatus()
-  }
-
-  const modelItems = (list: string[]): MenuItem[] =>
-    list.map((id) => ({
-      label: id,
-      systemImage: id === cfg.model ? 'checkmark' : undefined,
-      onSelect: () => update({ model: id }),
-    }))
-
-  const onTest = async () => {
-    const found = await test(cfg)
-    // A single model on the server is the one to talk to; out of several the user picks.
-    if (found.length === 1) update({ model: found[0] })
   }
 
   const finish = async (saveServer: boolean) => {
@@ -326,7 +301,7 @@ const createStyles = (colors: Colors) =>
     // Laid out as a Field, so the model sits in line with the address and the key.
     modelWrap: { marginBottom: 20 },
     modelSolid: { borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-    statusText: { color: colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 14 },
+    statusText: { ...textStyles(colors).note, textAlign: 'center', marginTop: 14 },
     later: { color: colors.textFaint, fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 14, marginHorizontal: 8 },
     footer: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 12 },
     skip: { alignSelf: 'center', paddingVertical: 12, marginTop: 4 },

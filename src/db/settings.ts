@@ -1,5 +1,4 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
-import { Platform } from 'react-native'
 
 import {
   CHAT_MESSAGES,
@@ -9,6 +8,7 @@ import {
   ROOM_MESSAGES,
   type ContextMode,
 } from '@/lib/context'
+import { FONTS } from '@/lib/platform'
 
 export type ServerSettings = {
   baseUrl: string
@@ -64,20 +64,49 @@ export function setFlag(db: SQLiteDatabase, key: string, on: boolean) {
   return setSetting(db, key, on ? '1' : '0')
 }
 
-// A stored value that must be one of a few; anything else, or nothing, is 'system'.
-async function getChoice<T extends string>(db: SQLiteDatabase, key: string, allowed: readonly T[]) {
-  const value = await getSetting(db, key)
-  return allowed.includes(value as T) ? (value as T) : 'system'
+// A switch stored under one key. onChange mirrors the value into a synchronous in-memory
+// copy, both when it is read and when it is written.
+export function defineFlag(key: string, defaultOn: boolean, onChange?: (on: boolean) => void) {
+  return {
+    async load(db: SQLiteDatabase) {
+      const on = await getFlag(db, key, defaultOn)
+      onChange?.(on)
+      return on
+    },
+    async save(db: SQLiteDatabase, on: boolean) {
+      onChange?.(on)
+      await setFlag(db, key, on)
+    },
+  }
+}
+
+// A whole number of at least 1, as stored text; anything else is the fallback.
+export function positiveInt(value: string | null | undefined, fallback: number) {
+  const n = Number(value)
+  return Number.isSafeInteger(n) && n >= 1 ? n : fallback
+}
+
+// A number typed into a field: the digits to show, and the count they make if it is 1 or more.
+export function typedCount(text: string) {
+  const digits = text.replace(/\D/g, '')
+  const n = positiveInt(digits, 0)
+  return { digits, count: n >= 1 ? n : null }
+}
+
+// A stored value that must be one of a few; anything else, or nothing, is the fallback.
+export function defineChoice<T extends string>(key: string, allowed: readonly T[], fallback: T) {
+  return {
+    async load(db: SQLiteDatabase) {
+      const value = await getSetting(db, key)
+      return allowed.find((v) => v === value) ?? fallback
+    },
+    save: (db: SQLiteDatabase, value: T) => setSetting(db, key, value),
+  }
 }
 
 function storedContext(value: string | undefined) {
   const n = Number(value)
   return (CONTEXT_STEPS as readonly number[]).includes(n) ? n : DEFAULT_SETTINGS.contextTokens
-}
-
-function storedMessages(value: string | undefined, fallback: number) {
-  const n = Number(value)
-  return Number.isSafeInteger(n) && n >= 1 ? n : fallback
 }
 
 export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> {
@@ -89,8 +118,8 @@ export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> 
     model: stored.get(KEYS.model) ?? DEFAULT_SETTINGS.model,
     contextTokens: storedContext(stored.get(KEYS.contextTokens)),
     contextMode: CONTEXT_MODES.find((m) => m === stored.get(KEYS.contextMode)) ?? DEFAULT_SETTINGS.contextMode,
-    chatMessages: storedMessages(stored.get(KEYS.chatMessages), DEFAULT_SETTINGS.chatMessages),
-    roomMessages: storedMessages(stored.get(KEYS.roomMessages), DEFAULT_SETTINGS.roomMessages),
+    chatMessages: positiveInt(stored.get(KEYS.chatMessages), DEFAULT_SETTINGS.chatMessages),
+    roomMessages: positiveInt(stored.get(KEYS.roomMessages), DEFAULT_SETTINGS.roomMessages),
   }
 }
 
@@ -111,31 +140,19 @@ export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
   return next
 }
 
-const THEME_KEY = 'theme_preference'
+const themePreference = defineChoice('theme_preference', ['system', 'light', 'dark'] as const, 'system')
+export const loadThemePreference = themePreference.load
+export const saveThemePreference = themePreference.save
 
-export function loadThemePreference(db: SQLiteDatabase) {
-  return getChoice(db, THEME_KEY, ['light', 'dark'] as const)
-}
-
-export function saveThemePreference(db: SQLiteDatabase, preference: 'system' | 'light' | 'dark') {
-  return setSetting(db, THEME_KEY, preference)
-}
-
-const LOCALE_KEY = 'locale_preference'
-
-export function loadLocalePreference(db: SQLiteDatabase) {
-  return getChoice(db, LOCALE_KEY, ['ru', 'en'] as const)
-}
-
-export function saveLocalePreference(db: SQLiteDatabase, preference: 'system' | 'ru' | 'en') {
-  return setSetting(db, LOCALE_KEY, preference)
-}
+const localePreference = defineChoice('locale_preference', ['system', 'ru', 'en'] as const, 'system')
+export const loadLocalePreference = localePreference.load
+export const saveLocalePreference = localePreference.save
 
 // A family name as the system knows it, or 'System' for the font of the app's own screens.
 export type ChatFont = string
 
 export const SYSTEM_FONT = 'System'
-export const DEFAULT_CHAT_FONT = Platform.OS === 'android' ? 'serif' : 'Georgia'
+export const DEFAULT_CHAT_FONT: string = FONTS.prose
 
 export const CHAT_TEXT_SCALE_RANGE = { min: 0.8, max: 1.6, default: 1 } as const
 
@@ -163,15 +180,18 @@ export function saveChatFont(db: SQLiteDatabase, font: ChatFont) {
 }
 
 // Whether my own messages are set in the chat font too. Off: they use the system font.
-const USER_FONT_KEY = 'chat_font_user'
+const chatUserFont = defineFlag('chat_font_user', false)
+export const loadChatUserFont = chatUserFont.load
+export const saveChatUserFont = chatUserFont.save
 
-export function loadChatUserFont(db: SQLiteDatabase) {
-  return getFlag(db, USER_FONT_KEY, false)
-}
+// The pattern behind a chat that has no picture of its own, from the Penpot page
+// "Background Pattern"; 'none' is the plain theme background.
+export const CHAT_PATTERNS = ['none', 'stars', 'two-stars', 'big-star', 'diagonal', 'scattered', 'rings', 'rings-centered', 'dots'] as const
+export type ChatPatternId = (typeof CHAT_PATTERNS)[number]
 
-export function saveChatUserFont(db: SQLiteDatabase, on: boolean) {
-  return setFlag(db, USER_FONT_KEY, on)
-}
+const chatPattern = defineChoice('chat_pattern', CHAT_PATTERNS, 'none')
+export const loadChatPattern = chatPattern.load
+export const saveChatPattern = chatPattern.save
 
 export async function loadChatTextScale(db: SQLiteDatabase) {
   const value = Number(await getSetting(db, CHAT_TEXT_SCALE_KEY))

@@ -1,4 +1,4 @@
-import { Link, useRouter, useFocusEffect } from 'expo-router'
+import { Link, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
@@ -6,10 +6,10 @@ import ReorderableList from 'react-native-reorderable-list'
 
 import { Button } from '@/components/Button'
 import { CONTINUE_BUTTON_SPACE } from '@/components/ContinueButton'
-import { EmptyState, ListSeparator } from '@/components/EmptyState'
+import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/EmptyState'
 import { GlassButton } from '@/components/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/GlassHeader'
-import { HomePattern } from '@/components/HomePattern'
+import { Pattern } from '@/components/Pattern'
 import type { MenuItem } from '@/components/NativeMenu'
 import { RoomCard } from '@/components/RoomCard'
 import { listCharacters } from '@/db/characters'
@@ -18,14 +18,13 @@ import { useDatabase } from '@/db/provider'
 import { deleteRoom, listRooms, setRoomOrder, type RoomPreview } from '@/db/rooms'
 import { useFeaturedFill } from '@/hooks/useFeaturedFill'
 import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
+import { useReloadOnFocus } from '@/hooks/useChatListActions'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { removeAvatar } from '@/lib/avatars'
 import { confirmDeletion } from '@/lib/confirmDelete'
-import { FEATURED_GAP } from '@/lib/featuredLayout'
 import { useStyles, type Colors } from '@/theme'
 
-const FeaturedSeparator = () => <View style={{ height: FEATURED_GAP }} />
 
 export default function RoomsScreen() {
   const db = useDatabase()
@@ -48,11 +47,7 @@ export default function RoomsScreen() {
     await reloadLastChat()
   }, [db, reloadLastChat])
 
-  useFocusEffect(
-    useCallback(() => {
-      reload()
-    }, [reload])
-  )
+  useReloadOnFocus(reload)
 
   const reorder = useReorder(rooms, setRooms, (ids) => setRoomOrder(db, ids))
 
@@ -64,8 +59,6 @@ export default function RoomsScreen() {
     confirmDeletion({
       title: t('roomEditor.deleteConfirmTitle'),
       message: t('rooms.deleteConfirmMessage', { name: room.name }),
-      confirmLabel: t('common.delete'),
-      destructive: true,
       onConfirm: async () => {
         await deleteRoom(db, room.id)
         if (room.background) removeAvatar(room.background, 'backgrounds')
@@ -85,7 +78,7 @@ export default function RoomsScreen() {
       anchor.onLayout()
       fill.onLayout(e)
     }}>
-      <HomePattern />
+      <Pattern id="stars" />
       <ReorderableList
         data={rooms ?? []}
         keyExtractor={(r) => String(r.id)}
@@ -102,7 +95,7 @@ export default function RoomsScreen() {
                 characterCount >= 2 ? (
                   <Link href="/room/new" asChild>
                     <Link.AppleZoom>
-                      <Button variant="glass" label={t('rooms.createRoom')} style={styles.emptyButton} />
+                      <Button variant="glass" label={t('rooms.createRoom')} style={emptyButtonStyle} />
                     </Link.AppleZoom>
                   </Link>
                 ) : undefined
@@ -139,5 +132,4 @@ export default function RoomsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    emptyButton: { minWidth: 200 },
   })

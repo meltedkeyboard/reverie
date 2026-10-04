@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Slider from '@react-native-community/slider'
 import { useMemo, useRef } from 'react'
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
+import { Pattern } from '@/components/Pattern'
 import { FormScreenHeader } from '@/components/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/Glass'
 import { useScreenPadding } from '@/components/GlassHeader'
@@ -11,17 +12,23 @@ import { FieldRow } from '@/components/motifs/FieldRow'
 import type { MenuItem } from '@/components/NativeMenu'
 import { PillButton } from '@/components/PillButton'
 import { ToggleRow } from '@/components/ToggleRow'
-import { CHAT_TEXT_SCALE_RANGE, DEFAULT_CHAT_FONT, SYSTEM_FONT } from '@/db/settings'
+import { CHAT_PATTERNS, CHAT_TEXT_SCALE_RANGE, DEFAULT_CHAT_FONT, SYSTEM_FONT } from '@/db/settings'
 import { useTranslation } from '@/i18n'
 import { CHAT_METRICS, useChatTextSettings } from '@/lib/chatText'
 import * as Haptics from '@/lib/haptics'
 import { installedFontFamilies } from '../modules/reverie-fonts'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { isAndroid } from '@/lib/platform'
 
 const FIELD_HEIGHT = 48
+// A tile shows a whole 393 x 852 board, small.
+const TILE_WIDTH = 84
+const TILE_BORDER = 2
+const TILE_INNER = TILE_WIDTH - TILE_BORDER * 2
+const TILE_HEIGHT = (TILE_INNER * 852) / 393 + TILE_BORDER * 2
 
 const FALLBACK_FAMILIES =
-  Platform.OS === 'android'
+  isAndroid
     ? ['serif', 'sans-serif', 'sans-serif-light', 'sans-serif-condensed', 'serif-monospace', 'monospace', 'casual', 'cursive']
     : ['Georgia', 'Palatino', 'Iowan Old Style', 'Charter', 'Avenir Next', 'Times New Roman', 'Helvetica Neue', 'Menlo']
 
@@ -37,7 +44,7 @@ export default function ChatTextScreen() {
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const { font, userFont, setUserFont, scale, setFont, setScale, reset } = useChatTextSettings()
+  const { font, userFont, setUserFont, pattern, setPattern, scale, setFont, setScale, reset } = useChatTextSettings()
   const untouched = font === DEFAULT_CHAT_FONT && !userFont && scale === CHAT_TEXT_SCALE_RANGE.default
   const fontFamily = font
   const scaled = (value: number) => value * scale
@@ -77,7 +84,7 @@ export default function ChatTextScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={padding}>
+      <ScrollView contentContainerStyle={padding}>
         {/* A made-up exchange, so a change shows at once as it will look in a chat. */}
         <View style={styles.card}>
           <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
@@ -120,7 +127,7 @@ export default function ChatTextScreen() {
             onSlidingComplete={(v) => setScale(snap(v))}
             minimumTrackTintColor={colors.accent}
             maximumTrackTintColor={colors.borderStrong}
-            thumbTintColor="#FFFFFF"
+            thumbTintColor={ON_ACCENT}
             accessibilityLabel={t('settings.chatTextSize')}
             style={styles.slider}
           />
@@ -129,7 +136,7 @@ export default function ChatTextScreen() {
 
         <FieldRow
           star={false}
-          label={t('settings.chatFont')}
+          label={t('settings.chatFontField')}
           value={font === SYSTEM_FONT ? t('chatFont.system') : font}
           menu={items}
         />
@@ -141,10 +148,38 @@ export default function ChatTextScreen() {
           onValueChange={setUserFont}
         />
 
+        <Text style={styles.sectionLabel}>{t('settings.chatPattern')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
+          {CHAT_PATTERNS.map((id) => {
+            const selected = id === pattern
+            return (
+              <Pressable
+                key={id}
+                onPress={() => {
+                  if (!selected) Haptics.selectionAsync()
+                  setPattern(id)
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={t(`chatPattern.${id}`)}
+                style={styles.tileButton}
+              >
+                <View style={[styles.tile, selected && styles.tileSelected]}>
+                  <Pattern id={id} scale={TILE_INNER / 393} />
+                </View>
+                <Text style={[styles.tileLabel, selected && { color: colors.text }]} numberOfLines={1}>
+                  {t(`chatPattern.${id}`)}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+        <Text style={styles.hint}>{t('settings.chatPatternHint')}</Text>
+
         <PillButton label={t('settings.chatReset')} onPress={reset} disabled={untouched} style={styles.reset} />
 
         <Text style={styles.hint}>{t('settings.chatTextHint')}</Text>
-      </View>
+      </ScrollView>
       <FormScreenHeader title={t('settings.chatFont')} />
     </View>
   )
@@ -209,6 +244,21 @@ const createStyles = (colors: Colors) =>
     small: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
     large: { color: colors.textMuted, fontSize: 24, fontWeight: '600' },
     slider: { flex: 1, height: 40, marginHorizontal: 12 },
+    sectionLabel: { color: colors.textMuted, fontSize: 13, fontWeight: '600', marginTop: 20, marginBottom: 10, paddingHorizontal: 8 },
+    tiles: { gap: 12, paddingHorizontal: 4 },
+    tileButton: { width: TILE_WIDTH, alignItems: 'center', gap: 6 },
+    tile: {
+      width: TILE_WIDTH,
+      height: TILE_HEIGHT,
+      borderRadius: 14,
+      borderCurve: 'continuous',
+      overflow: 'hidden',
+      backgroundColor: colors.bg,
+      borderWidth: TILE_BORDER,
+      borderColor: colors.border,
+    },
+    tileSelected: { borderColor: colors.accent },
+    tileLabel: { color: colors.textMuted, fontSize: 12 },
     reset: { alignSelf: 'center', marginTop: 8 },
     hint: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 12, paddingHorizontal: 8 },
   })

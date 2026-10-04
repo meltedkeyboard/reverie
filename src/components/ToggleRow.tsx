@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import * as Haptics from '@/lib/haptics'
-import { useStyles, type Colors } from '@/theme'
+import { type Colors, textStyles, useStyles } from '@/theme'
 
 import { StarToggle } from './motifs/StarToggle'
 
@@ -43,5 +43,5 @@ const createStyles = (colors: Colors) =>
     body: { flex: 1 },
     disabled: { opacity: 0.5 },
     label: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 12 },
+    note: { ...textStyles(colors).note, marginBottom: 12 },
   })

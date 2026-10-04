@@ -1,18 +1,16 @@
 import { Stack, useRouter } from 'expo-router'
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { StyleSheet, View, useWindowDimensions } from 'react-native'
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
-import { fonts, HEADER_FONT_SCALE, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { EdgeFade } from './BarChrome'
 import { GlassButton } from './Glass'
-import { useHeaderHeight } from './GlassHeader'
-import { Star } from './motifs/Star'
+import { TabTitle, useHeaderHeight } from './GlassHeader'
 import { SFIcon } from './SFIcon'
 
-const ON_ACCENT = '#FFFFFF'
 
 // The transparent native header of a form-style screen: a red star and a title on the
 // left, with the content fading out underneath. Rendered inside the screen it belongs to.
@@ -115,15 +113,10 @@ export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLa
 
 function FormTitle({ title }: { title: string }) {
   const titleMaxWidth = useWindowDimensions().width - 160
-  const colors = useColors()
-  const styles = useStyles(createStyles)
   return (
-    <View style={[styles.titleRow, { maxWidth: titleMaxWidth }]}>
-      <Star size={22} color={colors.danger} rotation={-14} style={styles.star} />
-      <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
-        {title}
-      </Text>
-    </View>
+    <TabTitle maxWidth={titleMaxWidth} fit>
+      {title}
+    </TabTitle>
   )
 }
 
@@ -140,7 +133,4 @@ const createStyles = (colors: Colors) =>
     },
     // Centered on the whole bar like a native title view, not on the room between buttons.
     titleSlot: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
-    star: { marginTop: 2 },
-    title: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
   })

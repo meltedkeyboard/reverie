@@ -1,4 +1,4 @@
-import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
@@ -7,18 +7,19 @@ import ReorderableList from 'react-native-reorderable-list'
 import { Avatar } from '@/components/Avatar'
 import { Button } from '@/components/Button'
 import { ChatCard } from '@/components/ChatCard'
-import { EmptyState, ListSeparator } from '@/components/EmptyState'
+import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/EmptyState'
 import { GlassGroup } from '@/components/Glass'
 import { IconButton } from '@/components/IconButton'
 import { BackButton, GlassHeader, useScreenPadding } from '@/components/GlassHeader'
 import type { MenuItem } from '@/components/NativeMenu'
+import { Pattern } from '@/components/Pattern'
 import { getCharacter, type Character } from '@/db/characters'
-import { deleteChat, duplicateChat, listChats, pruneUntouchedChats, setChatOrder, setChatTitle, type ChatPreview } from '@/db/chats'
+import { listChats, pruneUntouchedChats, setChatOrder, type ChatPreview } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { importChatToRoom } from '@/db/rooms'
+import { useChatListActions, useReloadOnFocus } from '@/hooks/useChatListActions'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
-import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { fonts, HEADER_FONT_SCALE, useStyles, type Colors } from '@/theme'
 
 export default function CharacterChatsScreen() {
@@ -39,11 +40,8 @@ export default function CharacterChatsScreen() {
     setChats(await listChats(db, found.id))
   }, [db, characterId, router])
 
-  useFocusEffect(
-    useCallback(() => {
-      reload()
-    }, [reload])
-  )
+  useReloadOnFocus(reload)
+  const { duplicate, rename: promptRename, remove: confirmDelete } = useChatListActions(reload)
 
   const reorder = useReorder(chats, setChats, (ids) => setChatOrder(db, ids))
 
@@ -54,12 +52,6 @@ export default function CharacterChatsScreen() {
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(chat) },
   ]
 
-  const duplicate = async (chat: ChatPreview) => {
-    const title = chat.title ? `${chat.title} (${t('characters.copySuffix')})` : null
-    await duplicateChat(db, chat.id, title)
-    reload()
-  }
-
   // The chat is copied, so the one-on-one version stays where it was. The new room's
   // editor opens over the scene, to add the rest of the cast right away.
   const moveToRoom = async (chat: ChatPreview) => {
@@ -68,22 +60,9 @@ export default function CharacterChatsScreen() {
     router.push(`/room/${roomId}`)
   }
 
-  const promptRename = (chat: ChatPreview) => {
-    promptRenameChat(chat.title, async (text) => {
-      await setChatTitle(db, chat.id, text)
-      reload()
-    })
-  }
-
-  const confirmDelete = (chat: ChatPreview) => {
-    confirmDeleteChat(async () => {
-      await deleteChat(db, chat.id)
-      reload()
-    })
-  }
-
   return (
     <View style={styles.screen}>
+      <Pattern id="two-stars" />
       <ReorderableList
         data={chats ?? []}
         keyExtractor={(c) => String(c.id)}
@@ -98,7 +77,7 @@ export default function CharacterChatsScreen() {
               action={
                 <Link href={`/chat/new?character=${characterId}`} asChild>
                   <Link.AppleZoom>
-                    <Button variant="glass" label={t('chatsList.startChat')} style={styles.emptyButton} />
+                    <Button variant="glass" label={t('chatsList.startChat')} style={emptyButtonStyle} />
                   </Link.AppleZoom>
                 </Link>
               }
@@ -152,6 +131,5 @@ export default function CharacterChatsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
-  emptyButton: { minWidth: 200 },
+  name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
 })

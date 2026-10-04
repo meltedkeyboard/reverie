@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { getFlag, getSetting, setFlag, setSetting } from '@/db/settings'
+import { defineFlag, getSetting, setFlag, setSetting } from '@/db/settings'
 
 // Folder sync keeps its state here, on this device only: app_settings never leaves it.
 const ENABLED_KEY = 'folder_sync'
@@ -10,13 +10,10 @@ const DIRTY_KEY = 'sync_dirty'
 const REV_KEY = 'sync_rev'
 const SYNCED_AT_KEY = 'sync_at'
 
-export function isCloudSyncEnabled(db: SQLiteDatabase) {
-  return getFlag(db, ENABLED_KEY, false)
-}
+const cloudSync = defineFlag(ENABLED_KEY, false)
 
-export function setCloudSyncEnabled(db: SQLiteDatabase, enabled: boolean) {
-  return setFlag(db, ENABLED_KEY, enabled)
-}
+export const isCloudSyncEnabled = cloudSync.load
+export const setCloudSyncEnabled = cloudSync.save
 
 export async function getSyncState(db: SQLiteDatabase) {
   const [dirty, rev, syncedAt] = await Promise.all([getSetting(db, DIRTY_KEY), getSetting(db, REV_KEY), getSetting(db, SYNCED_AT_KEY)])

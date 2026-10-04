@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, w
 import { GlassSurface } from '@/components/Glass'
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { Star } from './Star'
 
@@ -55,7 +55,7 @@ export function StarToggle({ value, onValueChange }: { value: boolean; onValueCh
         fallbackStyle={value ? styles.solidOn : styles.solidOff}
       >
         <Animated.View style={starStyle}>
-          <Star size={26} color={value ? '#FFFFFF' : colors.textFaint} filled={value} />
+          <Star size={26} color={value ? ON_ACCENT : colors.textFaint} filled={value} />
         </Animated.View>
       </GlassSurface>
     </Pressable>

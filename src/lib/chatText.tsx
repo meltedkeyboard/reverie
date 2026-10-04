@@ -1,17 +1,21 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useDatabase } from '@/db/provider'
 import {
   CHAT_TEXT_SCALE_RANGE,
   DEFAULT_CHAT_FONT,
   loadChatFont,
+  loadChatPattern,
   loadChatTextScale,
   loadChatUserFont,
   saveChatFont,
+  saveChatPattern,
   saveChatTextScale,
   saveChatUserFont,
   type ChatFont,
+  type ChatPatternId,
 } from '@/db/settings'
+import { createRequiredContext } from '@/lib/requiredContext'
 
 // Base size and line height of the chat texts, before the chosen scale.
 export const CHAT_METRICS = {
@@ -25,6 +29,9 @@ type ChatTextValue = {
   // Whether the user's own messages use the font too, not the system one.
   userFont: boolean
   setUserFont: (on: boolean) => void
+  // The pattern behind chats that have no picture of their own.
+  pattern: ChatPatternId
+  setPattern: (pattern: ChatPatternId) => void
   // How much the chat text is enlarged: 1 is the regular size.
   scale: number
   setFont: (font: ChatFont) => void
@@ -33,15 +40,17 @@ type ChatTextValue = {
   reset: () => void
 }
 
-const ChatTextContext = createContext<ChatTextValue | null>(null)
+export const [ChatTextContext, useChatTextSettings] = createRequiredContext<ChatTextValue>('useChatTextSettings must be used within ChatTextProvider')
 
 export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   const db = useDatabase()
   const [font, setFontState] = useState<ChatFont>(DEFAULT_CHAT_FONT)
   const [scale, setScaleState] = useState<number>(CHAT_TEXT_SCALE_RANGE.default)
   const [userFont, setUserFontState] = useState(false)
+  const [pattern, setPatternState] = useState<ChatPatternId>('none')
 
   useEffect(() => {
+    loadChatPattern(db).then(setPatternState)
     loadChatFont(db).then(setFontState)
     loadChatTextScale(db).then(setScaleState)
     loadChatUserFont(db).then(setUserFontState)
@@ -68,6 +77,13 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     },
     [db]
   )
+  const setPattern = useCallback(
+    (next: ChatPatternId) => {
+      setPatternState(next)
+      saveChatPattern(db, next)
+    },
+    [db]
+  )
   const reset = useCallback(() => {
     setFont(DEFAULT_CHAT_FONT)
     setUserFont(false)
@@ -75,16 +91,10 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   }, [setFont, setScale, setUserFont])
 
   const value = useMemo(
-    () => ({ font, userFont, setUserFont, scale, setFont, setScale, reset }),
-    [font, userFont, setUserFont, scale, setFont, setScale, reset]
+    () => ({ font, userFont, setUserFont, pattern, setPattern, scale, setFont, setScale, reset }),
+    [font, userFont, setUserFont, pattern, setPattern, scale, setFont, setScale, reset]
   )
   return <ChatTextContext.Provider value={value}>{children}</ChatTextContext.Provider>
-}
-
-export function useChatTextSettings() {
-  const ctx = useContext(ChatTextContext)
-  if (!ctx) throw new Error('useChatTextSettings must be used within ChatTextProvider')
-  return ctx
 }
 
 // What a style of chat text takes from the settings: the family, and sizes that are

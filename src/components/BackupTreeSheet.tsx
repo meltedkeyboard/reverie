@@ -35,7 +35,7 @@ import {
   type Selection,
   type TreeNode,
 } from '@/lib/backupSelection'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 type Props = {
   // The sheet is open while there is a tree.
@@ -321,7 +321,7 @@ const createStyles = (colors: Colors) =>
     count: { color: colors.textFaint, fontSize: 13 },
     action: { color: colors.accent, fontSize: 17 },
     confirm: { minHeight: 36, paddingHorizontal: 18, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-    confirmLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    confirmLabel: { color: ON_ACCENT, fontSize: 16, fontWeight: '600' },
     roomIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
     note: { color: colors.textFaint, fontSize: 13, marginTop: 16 },
   })

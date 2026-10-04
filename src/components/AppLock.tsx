@@ -1,14 +1,15 @@
 import { BlurView } from 'expo-blur'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, AppState, Platform, StyleSheet, Text, View } from 'react-native'
+import { Animated, AppState, StyleSheet, Text, View } from 'react-native'
 
 import { PillButton } from '@/components/PillButton'
 import { Star } from '@/components/motifs/Star'
 import { isAppLockEnabled, isAppLockEnabledCached } from '@/db/appLock'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
-import { fonts, useColors, useTheme } from '@/theme'
+import { FILL, fonts, useColors, useTheme } from '@/theme'
+import { isAndroid } from '@/lib/platform'
 
 // Covers the app with a lock screen until Face ID, a fingerprint or the passcode succeeds — on launch
 // and after the app has been in the background. It also blurs the app in the app
@@ -84,7 +85,7 @@ export function AppLock({ children }: { children: ReactNode }) {
       {children}
       {shielded && !locked ? (
         <Animated.View pointerEvents="none" style={[styles.cover, { opacity: shieldOpacity }]}>
-          {Platform.OS === 'android' ? (
+          {isAndroid ? (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
           ) : (
             <BlurView tint={scheme} intensity={100} style={StyleSheet.absoluteFill} />
@@ -103,6 +104,6 @@ export function AppLock({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 20, zIndex: 1000 },
+  cover: { ...FILL, alignItems: 'center', justifyContent: 'center', gap: 20, zIndex: 1000 },
   title: { fontFamily: fonts.prose, fontWeight: '700', fontSize: 24 },
 })

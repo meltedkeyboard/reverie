@@ -1,10 +1,8 @@
-import * as DocumentPicker from 'expo-document-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { File } from 'expo-file-system'
-import * as ImagePicker from 'expo-image-picker'
 
 import { t } from '@/i18n'
-import { pickUris, requireCamera, newAvatarName, type ImageSource } from '@/lib/images'
+import { newAvatarName, pickUris, type ImageSource } from '@/lib/images'
 import { avatarLimitBytes } from '@/lib/fileLimits'
 import { extensionOf, movingKind } from '@/lib/media'
 import { readAvatarBase64, removeAvatar, writeAvatarBase64, type ImageKind } from './avatarStore'
@@ -32,26 +30,13 @@ export function cropFromJson(json: string | null): CropRect | null {
   }
 }
 
-// A photo from the camera, as it is: like the others it is framed on /avatar-crop, so the
-// whole shot is kept.
-export async function pickAvatarPhoto() {
-  await requireCamera()
-  const picked = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 })
-  return picked.canceled ? null : picked.assets[0].uri
-}
-
-// A picture, GIF or video from the photo library, as it is. The system editor would flatten
-// a GIF and only trims a video, so nothing is edited here: a still picture is framed on
-// /avatar-crop, while a moving one goes through acceptMoving.
-export async function pickAvatarLibrary() {
-  const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 1 })
-  return picked.canceled ? null : picked.assets[0].uri
-}
-
-// A file as it is; same as the library, the Files picker has no editor.
-export async function pickAvatarFile() {
-  const picked = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'video/*'], copyToCacheDirectory: true })
-  return picked.canceled ? null : picked.assets[0].uri
+// A picture, GIF or video as it is, from the camera, the library or the Files picker. The
+// system editor would flatten a GIF and only trims a video, so nothing is edited here: a
+// still picture is framed on /avatar-crop, a camera shot included so the whole shot is kept,
+// while a moving one goes through acceptMoving.
+export async function pickAvatar(source: ImageSource) {
+  const [uri] = await pickUris(source, false, true)
+  return uri ?? null
 }
 
 // Whether the file is a moving avatar to be stored untouched. Throws when it is too big.

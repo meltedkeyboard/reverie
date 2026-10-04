@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { getFlag, getSetting, setFlag, setSetting } from '@/db/settings'
+import { defineFlag, getFlag, getSetting, setFlag, setSetting } from '@/db/settings'
 
 // The buttons back into the last chat on the Characters and Rooms tabs. They are on unless
 // turned off in Settings; a swipe hides one only until the user opens a chat of its kind again.
@@ -17,22 +17,14 @@ const OPENED_KEYS: Record<ContinueKind, string> = {
   room: 'continue_opened_room',
 }
 
-export function isContinueEnabled(db: SQLiteDatabase) {
-  return getFlag(db, ENABLED_KEY, true)
-}
-
-export function setContinueEnabled(db: SQLiteDatabase, enabled: boolean) {
-  return setFlag(db, ENABLED_KEY, enabled)
-}
+const continueButton = defineFlag(ENABLED_KEY, true)
+export const isContinueEnabled = continueButton.load
+export const setContinueEnabled = continueButton.save
 
 // Whether the button leads to the chat opened last or to the one written in last.
-export function isContinueByVisit(db: SQLiteDatabase) {
-  return getFlag(db, BY_VISIT_KEY, true)
-}
-
-export function setContinueByVisit(db: SQLiteDatabase, byVisit: boolean) {
-  return setFlag(db, BY_VISIT_KEY, byVisit)
-}
+const continueByVisit = defineFlag(BY_VISIT_KEY, true)
+export const isContinueByVisit = continueByVisit.load
+export const setContinueByVisit = continueByVisit.save
 
 export function isContinueHidden(db: SQLiteDatabase, kind: ContinueKind) {
   return getFlag(db, HIDDEN_KEYS[kind], false)

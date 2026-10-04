@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { columnInset, FORM_COLUMN } from '@/hooks/useLayoutMode'
@@ -10,6 +10,7 @@ import { BlurBar, EdgeFade } from './BarChrome'
 import { GlassButton } from './Glass'
 import { IconButton } from './IconButton'
 import { Star } from './motifs/Star'
+import { isIOS } from '@/lib/platform'
 
 type Props = {
   left?: React.ReactNode
@@ -49,13 +50,20 @@ export function HeaderTitle({ children }: { children: React.ReactNode }) {
 }
 
 // The large title of a tab: a red star and the name in the prose face.
-export function TabTitle({ children }: { children: React.ReactNode }) {
+// With `fit` a long name shrinks to the room it has instead of being cut off.
+export function TabTitle({ children, maxWidth, fit }: { children: React.ReactNode; maxWidth?: number; fit?: boolean }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
-    <View style={styles.tabTitleRow}>
+    <View style={[styles.tabTitleRow, maxWidth !== undefined && { maxWidth }]}>
       <Star size={22} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
-      <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.tabTitle} numberOfLines={1}>
+      <Text
+        maxFontSizeMultiplier={HEADER_FONT_SCALE}
+        style={styles.tabTitle}
+        numberOfLines={1}
+        adjustsFontSizeToFit={fit}
+        minimumFontScale={fit ? 0.5 : undefined}
+      >
         {children}
       </Text>
     </View>
@@ -68,7 +76,7 @@ export function BackButton({ close }: { close?: boolean }) {
   const name = close ? 'close' : 'chevron-back'
   const size = close ? 24 : 26
   // iOS keeps the plain icon; elsewhere it sits on the round surface like the other bar buttons.
-  if (Platform.OS === 'ios') return <IconButton name={name} size={size} onPress={() => router.back()} />
+  if (isIOS) return <IconButton name={name} size={size} onPress={() => router.back()} />
   return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
 }
 
@@ -104,7 +112,7 @@ export function GlassHeader({ left, right, children, floating }: Props) {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
-    tabTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    tabTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
     tabTitleStar: { marginTop: 2 },
     tabTitle: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
     root: {

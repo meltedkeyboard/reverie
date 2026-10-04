@@ -1,5 +1,7 @@
-import { createContext, useContext, useEffect, useMemo } from 'react'
-import { Appearance, Platform, useColorScheme } from 'react-native'
+import { useEffect, useMemo } from 'react'
+import { Appearance, useColorScheme } from 'react-native'
+import { FONTS, isWeb } from '@/lib/platform'
+import { createRequiredContext } from '@/lib/requiredContext'
 
 export type Scheme = 'light' | 'dark'
 export type ThemePreference = Scheme | 'system'
@@ -80,10 +82,13 @@ const palettes: Record<Scheme, Colors> = { dark: darkColors, light: lightColors 
 // open) and so can't read a stored preference — they fall back to the dark palette.
 export const colors = darkColors
 
-export const fonts = {
-  // Android has no Georgia; its serif is the closest system face.
-  prose: Platform.OS === 'android' ? 'serif' : 'Georgia',
-} as const
+export const fonts = { prose: FONTS.prose } as const
+
+// A layer that covers its parent exactly (spread into a style).
+export const FILL = { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 } as const
+
+// Ink on an accent-coloured fill.
+export const ON_ACCENT = '#FFFFFF'
 
 export const HEADER_ROW_HEIGHT = 52
 
@@ -100,7 +105,7 @@ type ThemeContextValue = {
   setPreference: (pref: ThemePreference) => void
 }
 
-const ThemeContext = createContext<ThemeContextValue | null>(null)
+const [ThemeContext, useThemeContext] = createRequiredContext<ThemeContextValue>('useColors/useTheme must be used within ThemeContextProvider')
 
 export function ThemeContextProvider({
   preference,
@@ -122,7 +127,7 @@ export function ThemeContextProvider({
   // On the web (the desktop app) the scrollbars are drawn by the browser; they are
   // restyled from the palette so they match the theme instead of the OS default.
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return
+    if (!isWeb || typeof document === 'undefined') return
     const c = palettes[scheme]
     const thumb = scheme === 'dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.22)'
     const thumbHover = scheme === 'dark' ? 'rgba(255, 255, 255, 0.32)' : 'rgba(0, 0, 0, 0.38)'
@@ -154,12 +159,6 @@ export function ThemeContextProvider({
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
-function useThemeContext() {
-  const ctx = useContext(ThemeContext)
-  if (!ctx) throw new Error('useColors/useTheme must be used within ThemeContextProvider')
-  return ctx
-}
-
 export function useColors() {
   return useThemeContext().colors
 }
@@ -172,6 +171,14 @@ export function useTheme() {
 // There are only two palettes, so each factory's result is kept for each of them and
 // every instance of a component shares it instead of building its own.
 const styleCache = new WeakMap<object, WeakMap<Colors, unknown>>()
+
+// Small text the screens share: a muted note under a control, a link, a status line.
+export const textStyles = (colors: Colors) =>
+  ({
+    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+    link: { color: colors.accent, fontSize: 15 },
+    linkMuted: { color: colors.textMuted, fontSize: 15 },
+  }) as const
 
 export function useStyles<T>(factory: (c: Colors) => T): T {
   const colors = useColors()

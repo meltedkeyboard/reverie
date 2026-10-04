@@ -14,11 +14,12 @@ export async function requireCamera() {
   if (!permission.granted) throw new Error(t('images.cameraPermission'))
 }
 
-// The uris of the pictures the user chose; several only when asked for (the camera gives one).
-export async function pickUris(source: ImageSource, multiple: boolean) {
+// The uris of the pictures the user chose; several only when asked for (the camera gives
+// one). `moving` lets GIFs and videos through as well, for the library and the Files picker.
+export async function pickUris(source: ImageSource, multiple: boolean, moving = false) {
   if (source === 'files') {
     const picked = await DocumentPicker.getDocumentAsync({
-      type: 'image/*',
+      type: moving ? ['image/*', 'video/*'] : 'image/*',
       multiple,
       copyToCacheDirectory: true,
     })
@@ -30,7 +31,7 @@ export async function pickUris(source: ImageSource, multiple: boolean) {
     return shot.canceled ? [] : shot.assets.map((asset) => asset.uri)
   }
   const picked = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images'],
+    mediaTypes: moving ? ['images', 'videos'] : ['images'],
     quality: 1,
     allowsMultipleSelection: multiple,
     selectionLimit: MAX_PICKED,

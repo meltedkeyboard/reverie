@@ -10,7 +10,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 |---|---|
 | A request to the model, SSE parsing, thinking mode | `src/api/llm.ts` |
 | How much history is sent as context | `fitHistory` in `src/lib/context.ts` (the token estimate, the slider's steps); `selectHistory` picks by the mode (`contextMode`: the last `chatMessages` messages of a chat and `roomMessages` of a room, 20 and 30 by default and typed in Settings > Server, or the token window); the window `contextTokens` is a slider in Settings > Server, shown in tokens mode once the Play button has loaded the model |
-| Send / regenerate / variants / edit / delete logic | `src/hooks/useChat.ts` (rooms: `src/hooks/useRoom.ts`) |
+| Send / regenerate / variants / edit / delete logic | `src/hooks/useChat.ts` (rooms: `src/hooks/useRoom.ts`), both on the shared `src/hooks/useConversation.ts` (message list, variants, edit, delete, title, discard) |
 | Who speaks next in a room, whispers, eavesdropping | `src/lib/room/floor.ts`, `src/lib/room/audience.ts` |
 | What a room character sees of the scene | `src/lib/room/prompt.ts` |
 | The director request | `src/lib/room/director.ts` |
@@ -25,8 +25,8 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Merging two identical characters (a card dropped next to its twin on the Characters tab) | `sameCharacter` (name, prompt and greeting) and `mergeCharacters` in `src/db/characters.ts` (chats, room seats, speaker and audience ids move to the kept one, the dropped one is deleted), the offer in `onReorder` of `(tabs)/index.tsx`: after a drag it checks the card it displaced, then the other neighbour; the one dropped on is kept |
 | Auto chat title | `src/lib/titles.ts` |
 | System prompt / greeting generator | `src/lib/promptGen.ts` and `src/components/PromptGenModal.tsx` |
-| Colors, fonts, light/dark | `src/theme.tsx` |
-| Font and text size of chats | `src/lib/chatText.tsx`, the installed families from `modules/reverie-fonts` (`ChatTextProvider`, `useChatText`), stored by `src/db/settings.ts`; applied in `MessageRow` and `AsidePanel` (the user's own messages keep the system font unless `userFont` is on, a switch on the same screen), chosen on its own screen, `app/chat-text.tsx`, opened from a row in Settings > Chats |
+| Colors, fonts, light/dark | `src/theme.tsx`; also `ON_ACCENT` (ink on an accent fill), `FILL` (a layer covering its parent, spread into a style) and `textStyles(colors)` (`note`, `link`, `linkMuted`) |
+| Font, text size and background pattern of chats | `src/lib/chatText.tsx`, the installed families from `modules/reverie-fonts` (`ChatTextProvider`, `useChatText`), stored by `src/db/settings.ts`; applied in `MessageRow` and `AsidePanel` (the user's own messages keep the system font unless `userFont` is on, a switch on the same screen), chosen on its own screen, `app/chat-text.tsx` ("Appearance"), opened from a row in Settings > Chats; the same context holds the `pattern` (`ChatPatternId` in `src/db/settings.ts`), drawn by `src/components/Pattern.tsx` (the one component for every pattern, the home screen's stars too) behind a chat or room that has no picture of its own |
 | Long text fields of the editors and their full-screen editor | `FieldRow` with `expandTitle`, `app/text-editor.tsx`, `src/lib/textDraft.ts` |
 | UI strings | `src/locales/en.json`, `src/locales/ru.json`; lookup in `src/i18n.tsx` |
 | iOS permission texts | `app.json` plugins (English) and `permissions/ru.json` (Russian) |
@@ -40,7 +40,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | Brand assets and generated icons | `assets/brand/`, `scripts/build-icons.mjs` |
 | The alternate app icons and their picker | the SVGs in `assets/brand/alt/` (drawn in Penpot), their list in `app.json` (the `expo-alternate-app-icons` plugin) and in `src/lib/appIcons.ts`, the picker `app/app-icon.tsx`; see Alternate app icons below |
 | CI build | `.github/workflows/ios.yml`, `build-ipa.sh`, `.github/workflows/android.yml` |
-| Android differences | `Platform.OS === 'android'` checks: `src/lib/dialogs.tsx` + `DialogHost`, `src/lib/storage.ts`, `BarChrome.tsx`, `AppLock.tsx`, the tabs layout, fonts in `theme.tsx` and `db/settings.ts`; see the Android section below |
+| Android and web differences | the `isIOS` / `isAndroid` / `isWeb` constants and the `FONTS` families of `src/lib/platform.ts` (no direct `Platform.OS` elsewhere, except `Platform.select`): `src/lib/dialogs.tsx` + `DialogHost`, `src/lib/storage.ts`, `BarChrome.tsx`, `AppLock.tsx`, the tabs layout; see the Android section below |
 
 ## Screens (`app/`)
 
@@ -65,7 +65,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 | `/text-editor` | `text-editor.tsx` | A long form text (system prompt, greeting, scene) on the whole screen, like a note; each change goes straight back to the form. Opens without the keyboard; a wrapper takes the JS touch (`onStartShouldSetResponderCapture`), because `TextInput` focuses itself when any touch ends, a scroll included |
 | `/onboarding` | `onboarding.tsx` | First-run pages, including server setup |
 | `/viewer` | `viewer.tsx` | Full-screen images: pinch and double-tap zoom, swipe between several (a room's cast) |
-| `/chat-text` | `chat-text.tsx` | Font (a native menu of every installed family) and text size of chats, with a preview |
+| `/chat-text` | `chat-text.tsx` | Appearance: font (a native menu of every installed family), text size and background pattern of chats, with a preview |
 | `/app-icon` | `app-icon.tsx` | The app icon picker: the standard icon and nine alternates in a grid, the chosen one ringed. Opened from the App icon row in Settings, which exists only where the native module does |
 | `/about` | `about.tsx` | About page |
 
@@ -125,15 +125,15 @@ Everything goes through `expo-sqlite`. Components get the database from `useData
 | `chats.ts` | Chat CRUD, duplicate, ordering, `pruneUntouchedChats`, `getLastChat` |
 | `search.ts` | `listSearchChats` (every chat with its owner's name and avatar), `searchMessages` |
 | `messages.ts` | Message CRUD, variants (`withNewVariant`, `withVariant`), images and thoughts as JSON columns |
-| `settings.ts` | Key/value helpers (`getSetting`, `getFlag`), server settings, theme and locale preference |
-| `appLock.ts`, `confirmDelete.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts`, `suggestions.ts` | One feature flag each, stored as `'1'`/`'0'` in `app_settings` via `getFlag`/`setFlag` |
+| `settings.ts` | Key/value helpers (`getSetting`, `getFlag`), the `defineFlag` / `defineChoice` factories every `db/<name>.ts` switch is built from (`defineFlag(key, default, onChange?)` also mirrors the value into a synchronous in-memory copy), `positiveInt` / `typedCount` for number fields, server settings, theme and locale preference |
+| `appLock.ts`, `confirmDelete.ts`, `haptics.ts`, `onboarding.ts`, `privateChat.ts`, `suggestions.ts` (and the switches in `continue.ts`, `cloudSync.ts`, `recentAttachments.ts`) | One feature flag each, a `defineFlag(key, default, onChange?)` exporting its `load` and `save`; stored as `'1'`/`'0'` in `app_settings` |
 | `attachments.ts` | The pictures of messages are files in the `attachments` folder (next to `avatars`, `backgrounds`), and `messages.images` holds `[{file, width, height, moving?}]`: `file` is the still JPEG the model gets, `moving` an untouched GIF / animated WebP or APNG (a second file in the same folder, up to the attachment limit) that the composer, the chat, Private and the viewer show instead (`pictureUri`). Backup, folder sync and the sweep treat it like `file`. `listRecentAttachments` gives the user's latest pictures across all chats, each file once, newest first (`null` for no limit looks back over the latest 2000 messages; files gone from disk are skipped); the composer attaches them again as the same files. `convertLegacyAttachments` moves the base64 older versions kept in the row into files (at every start and after a pull; it keeps `sync_dirty` as it was), `pruneAttachments` deletes files no message points at once they are a day old (chats go by cascade and duplicates share files, so it sweeps instead of tracking deletes). Both run when the database opens |
 | `fileLimits.ts` | The size limits of moving avatars and message pictures: the off switch and the two numbers in MB (`limits_off`, `limit_avatar_mb`, `limit_attachment_mb`); `loadFileLimits` also fills the in-memory copy in `src/lib/fileLimits.ts` |
 | `recentAttachments.ts` | The row of recent pictures in the attach menu: on (default), how many (8 by default) and no limit; the list itself comes from `listRecentAttachments` in `attachments.ts` |
 | `cloudSync.ts` | Folder sync state, local only: on/off, `sync_dirty` (set by triggers on the synced tables, see the last migration), the revision last synced and when |
 | `continue.ts` | The Continue capsule: on/off, last visited or last message (`isContinueByVisit`), swiped away per kind, and the id of the chat opened last per kind (`setLastOpened`, written by `chat/[id].tsx`) |
 
-Flags that many call sites need synchronously keep an in-memory copy: `src/lib/hapticsState.ts`, `src/lib/confirmDelete.ts`, `src/lib/fileLimits.ts`, `isAppLockEnabledCached`.
+Flags that many call sites need synchronously keep an in-memory copy, which the flag's `onChange` fills on every load and save: `src/lib/hapticsState.ts`, `src/lib/confirmDelete.ts`, `src/lib/fileLimits.ts`, `isAppLockEnabledCached`.
 
 ## Data on disk
 
@@ -163,12 +163,12 @@ It is missing in Expo Go, and then the Settings block is hidden (`cloudSyncAvail
 
 | Group | Files |
 |---|---|
-| Images | `images.ts` (pick, resize, data URLs), `attachments.ts` (`pickMessageImages` stores a picked picture as a 1024 px JPEG attachment and, if it moves, also as it is (`moving`), `attachmentUri` for a file and `pictureUri` for what to show of a picture, `withInlinedImages` turns the file uris of a request into data URLs just before `runReplyStream` sends it), `avatars.ts` (pick avatar/background: `pickAvatarPhoto` camera, `pickAvatarLibrary` and `pickAvatarFile` raw, a still one then framed on `/avatar-crop`, a moving one kept by `acceptMoving`; `squareAvatar` cuts a given square, `frameBackground` makes the shown background from an original and a frame, copy), `avatarStore.ts` (files, avatars and backgrounds in separate folders), `media.ts` (which files are video, by extension, or a moving picture, by what the file itself says: `movingFormat` reads the header, `GIF8`, an `ANIM` chunk in a WebP, `acTL` in a PNG, whatever the name), `fileLimits.ts` (the size limits, see Settings > Size limits) |
+| Images | `images.ts` (pick, resize, data URLs), `attachments.ts` (`pickMessageImages` stores a picked picture as a 1024 px JPEG attachment and, if it moves, also as it is (`moving`), `attachmentUri` for a file and `pictureUri` for what to show of a picture, `withInlinedImages` turns the file uris of a request into data URLs just before `runReplyStream` sends it), `avatars.ts` (pick avatar/background: `pickAvatar(source)` takes a picture, GIF or video raw from the camera, the library or Files (`pickUris(source, multiple, moving)` in `images.ts`), a still one then framed on `/avatar-crop`, a moving one kept by `acceptMoving`; `squareAvatar` cuts a given square, `frameBackground` makes the shown background from an original and a frame, copy), `avatarStore.ts` (files, avatars and backgrounds in separate folders), `media.ts` (which files are video, by extension, or a moving picture, by what the file itself says: `movingFormat` reads the header, `GIF8`, an `ANIM` chunk in a WebP, `acTL` in a PNG, whatever the name), `fileLimits.ts` (the size limits, see Settings > Size limits) |
 | Backup | `backup.ts` (export, import, wipe), `backupArchive.ts` (the backup zip: `manifest.json`, `characters/`, `rooms/` with their members, `chats/` with their messages, `avatars/` and `backgrounds/` with the files as they are, `attachments/` with the pictures of messages (a message lists `{file, width, height, moving?}`, as in the app); `fflate`; `pickBackup.ts` picks a zip or an old single JSON, which `openBackup` still reads), `download.ts` (`saveFile` / `saveJson`: a file through the Files "Save as" sheet from `modules/reverie-save-as`, or to a picked folder without it; `saveImage` / `saveImageBytes`: an image straight to Photos with `expo-media-library`, add-only permission), `pickJson.ts` |
-| Dialogs | `dialogs.tsx` (native alerts and sheets, for choices that must block; a `SheetAction` with `children` opens a sheet of its own), `chatDialogs.ts` |
+| Dialogs | `dialogs.tsx` (native alerts and sheets, for choices that must block; a `SheetAction` with `children` opens a sheet of its own), `dialogStore.ts` (the slot that carries a request to the dialogs the app draws itself: `DialogHost` on Android, `WebDialogs` on the web), `chatDialogs.ts` |
 | Character cards | `characterCard.ts` (reads and writes the `chara` / `ccv3` text chunk of a PNG, maps a card to a character and back), `importCard.ts` (the pickers, the avatar, saving to Files or Photos), `cardPlaceholder.ts` (the picture that carries a card for a character without an avatar) |
 | Toasts | `toast.ts`: one message at a time with a tone (`success`, `error`, `info`) and optional buttons, gone after a few seconds. `ToastHost` drops it in from the top on a spring over the screen, on glass like the other controls; a tap or a swipe up sends it back. It takes no touches outside itself, unlike an alert. Settings and folder sync use it for every notice; only the wipe confirmation stays an `Alert`, and so does a conflict found by a quiet sync on another screen (a sheet) |
-| Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, plurals), `errors.ts` |
+| Text | `roleplay.ts` (splits `*actions*` from speech, previews), `format.ts` (dates, `countLabel('chat', n, locale)` for counted nouns), `errors.ts`, `report.ts` (`reportError` as a toast, `alertError` as a dialog), `requiredContext.ts` (`createRequiredContext`: a context whose hook throws without a provider; theme, locale, database, sync, chat text and the continue button use it), `platform.ts` (`isIOS` / `isAndroid` / `isWeb` and the `FONTS` prose and mono families) |
 | AI helpers | `promptGen.ts`, `titles.ts`, `aside.ts` (the Private request, `characterScene`/`roomScene`) |
 | Platform | `haptics.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` (where the data lives, the "show in Files" toggle, see below) |
 | Sync | `cloudSync.ts` (folder sync, see above) |
@@ -179,7 +179,12 @@ It is missing in Expo Go, and then the Settings block is hidden (`cloudSyncAvail
 
 | Hook | Purpose |
 |---|---|
-| `useChat` | Conversation state, streaming, variants, editing |
+| `useConversation` | What a chat and a scene share: the message list, variants, edit, delete, title and asking for one, discarding a reply in flight |
+| `useChat` | A one-on-one chat on top of it: streaming, regenerate, continue |
+| `useChatScreenActions` | `useMessageActions` (the menu on a message) and `useChatMenuActions` (rename, suggest a title, delete) for `chat/[id].tsx` and `RoomView` |
+| `useChatListActions` | Rename / duplicate / delete of the chats listed under a character or a room, and `useReloadOnFocus` |
+| `useImageSlot` | An avatar or a background being edited: the fresh pick kept apart until Save, the stored files replaced on save |
+| `useServerForm` | The server fields shared by Settings and onboarding: stored values, model menu, connection test |
 | `useRoom` | A room scene: the speaker queue, director, autoplay, nudges |
 | `useAside` | The Private thread with the model beside a chat or a scene, in memory only |
 | `useCharacterActions` | New chat / edit / duplicate / export / delete actions for a character |
@@ -187,18 +192,20 @@ It is missing in Expo Go, and then the Settings block is hidden (`cloudSyncAvail
 | `useLastChat` | The chat behind the "Continue" capsule on the Characters and Rooms tabs: the one opened last, or the one written in last, as set in Settings. Chats without a user message never count. `LastChatProvider` in the tabs layout holds both kinds for the one shared button; `useContinueAnchor` on a tab's root view tells it where the content ends (inside a tab the safe area includes the tab bar); only the focused tab reports, re-measuring on focus and every half second |
 | `useConnectionTest` | "Test connection" button state |
 | `useReorder` | Drag-to-reorder lists (`react-native-reorderable-list`) |
-| `useStoredFlag` | React state bound to an `app_settings` flag |
+| `useStoredFlag` | `useStoredValue(load, save, initial)` is React state bound to an `app_settings` value (theme and language in `_layout.tsx`); `useStoredFlag` is its boolean form, and `useChatSwitches` gives a chat and a scene the private-button and suggestion switches |
+| `useChatShell` | What `chat/[id].tsx` and `RoomView` keep around the message list: the list handle, the composer's measurements, the Private thread's open state and toggle, the empty-chat intro's style |
+| `usePromptState`, `useWindowKey` | The text of a prompt dialog and its submit, shared by `DialogHost` and `WebDialogs`; a window key handler for the web (Escape, Enter, Ctrl+B) |
 | `useAbortable` | `AbortController` tied to component lifetime |
 | `useElapsedSeconds`, `useShake` | Timer, shake animation |
 
 ## `src/components`
 
-- **Chat:** `MessageRow`, `Composer` (with `ComposerSwap` and `ComposerFloat`), `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `Markdown` (replies and Private answers: `marked` lexer, rendered to native text; `*emphasis*` is a roleplay action, muted in a reply; text is a read-only `TextInput` (`SelectableText`), since only a UITextView gives the system selection with handles, while a selectable `Text` can only copy all of it. Paragraphs, headings, lists and quotes of a reply are joined into one such view, lists and quotes drawn with characters, so a selection runs through the whole reply and stops only at a code block or a table; a long press on a reply selects text, while the user's own bubble keeps the long-press menu), `AsidePanel` (Private).
+- **Chat:** `ChatChrome` (`ChatSurface`: the owner's picture or the chosen pattern behind a chat or a scene; `bubbleOpacityOf`; `AsideToggleButton`, the eye in the header), `MessageRow`, `Composer` (with `ComposerSwap` and `ComposerFloat`), `ConversationList` (the inverted list, jump button, error card, scroll to `focusId`), `Flash` (fading tint behind what a screen was opened at), `AttachButton`, `ImageSourceMenu`, `TypingIndicator`, `ChatBackground`, `Markdown` (replies and Private answers: `marked` lexer, rendered to native text; `*emphasis*` is a roleplay action, muted in a reply; text is a read-only `TextInput` (`SelectableText`), since only a UITextView gives the system selection with handles, while a selectable `Text` can only copy all of it. Paragraphs, headings, lists and quotes of a reply are joined into one such view, lists and quotes drawn with characters, so a selection runs through the whole reply and stops only at a code block or a table; a long press on a reply selects text, while the user's own bubble keeps the long-press menu), `AsidePanel` (Private).
 - **Rooms:** `RoomView` (its `RoomIntro`, the avatars, name and scene description, is never clamped: in an empty scene it sits in a `ScrollView` between the header and the composer, so a long scene scrolls; once there are messages it is the list footer), `CastBar`, `CastSheet`, `AvatarStack`, `RoomCard`. `Check` is the checkmark of a picked sheet row.
-- **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton` (one for both home tabs, drawn by `(tabs)/_layout.tsx` over them as `HomeContinueButton`; slides its content out and in when it comes to lead to another chat; on a switch between Characters and Rooms the content just changes), `EmptyState`.
+- **Lists:** `CharacterCard`, `ChatCard`, `ListCard`, `SwipeToDelete`, `ContinueButton` (one for both home tabs, drawn by `(tabs)/_layout.tsx` over them as `HomeContinueButton`; slides its content out and in when it comes to lead to another chat; on a switch between Characters and Rooms the content just changes), `EmptyState` (also `ListSeparator`, `FeaturedSeparator`, `emptyButtonStyle`).
 - **Forms:** `Field`, `ToggleRow`, `Segmented`, `ChipGroup` (a row of `Chip`: they stretch to fill the width, or keep their own width and scroll sideways under fixed fades at both edges, `fadeColor` being what the row sits on, when they do not fit), `ParamSlider`, `FormScreenHeader`, `PromptGenModal`, `PickerBox` (a field chosen from the system menu rather than typed, `NativeMenu` around the box; `FieldRow` with `menu`). The server's models go through it in Settings and onboarding once the connection test has listed them; in onboarding, while none is picked, the main button is the menu's trigger (a menu cannot be opened from code).
-- **Chrome and glass:** `MenuGlassButton` (a round glass header button that opens a menu), `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs), `BarChrome`, `NativeMenu`, `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `PillButton`, `Chip`, `SFIcon`.
-- **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `Picture` (one picture by file: expo-image, or a looping muted `expo-video` player for MP4/MOV/M4V; used by `Avatar`, `ExpandingAvatar` and the viewer), `ExpandingAvatar` (the character editor's), `ImageLink`, `HomePattern`, `Wordmark`.
+- **Chrome and glass:** `MenuGlassButton` (a round glass header button that opens a menu), `Glass`, `GlassHeader` (also `TabTitle`, the star title of the tabs and of the form headers; `fit` shrinks a long one), `BarChrome`, `NativeMenu` (and `TapTrigger`, its trigger where there is no native menu, also used by `ImageSourceMenu` on the web), `PageSheet`, `BottomSheet`, `IconButton`, `Button`, `PillButton`, `Chip`, `SFIcon`.
+- **App-level:** `AppLock` (Face ID gate), `StartupBoundary` (shows DB open errors), `Pager` (onboarding), `Avatar`, `Picture` (one picture by file: expo-image, or a looping muted `expo-video` player for MP4/MOV/M4V; used by `Avatar`, `ExpandingAvatar` and the viewer), `ExpandingAvatar` (the character editor's), `ImageLink`, `Pattern`, `Wordmark`.
 - **`motifs/`:** small brand decorations (`Star*`, `Divider`, `Eyebrow`, `FieldRow`). `Eyebrow` is the section heading everywhere: Georgia 19 pt, regular, no star, no caps, as in the first releases.
 
 ### Liquid Glass
@@ -229,7 +236,7 @@ Nine icons besides the standard one (which follows the light and dark look from 
 
 - Screens stay thin: data access in `src/db`, logic in `src/lib` or hooks.
 - Strings always go through `t('key')`; add the key to both locale files.
-- New setting flag: new `src/db/<name>.ts` with `getFlag`/`setFlag`, a row in `(tabs)/settings.tsx`, strings in both locales. To make it findable, wrap the row in `block('<section>', …)`, add the id to `SettingsSection` and an entry to the settings list in `(tabs)/search/index.tsx`.
+- New setting flag: new `src/db/<name>.ts` with `defineFlag(key, default)`, a row in `(tabs)/settings.tsx`, strings in both locales. To make it findable, wrap the row in `block('<section>', …)`, add the id to `SettingsSection` and an entry to the settings list in `(tabs)/search/index.tsx`.
 - New column: append a migration, extend the `*_COLUMNS` constant and the type, and bump `BACKUP_VERSION` in `backup.ts` if the backup should carry it (older backups must still import).
 - Check types with `npm run typecheck`.
 
@@ -238,7 +245,7 @@ Nine icons besides the standard one (which follows the light and dark look from 
 The same code base, with the iOS-only parts replaced or left out.
 
 - `nativeUI.ts` loads `@expo/ui` (SwiftUI) and `expo-glass-effect` only on iOS, so `swiftUI` and `liquidGlass` are null on Android and every component takes its fallback path. `ExpoUI` registers a module on Android too, which is why the platform is checked and not only the module.
-- `ActionSheetIOS` and `Alert.prompt` do not exist on Android. `showSheet` and `promptText` in `src/lib/dialogs.tsx` hand the request to `src/lib/androidDialog.ts`, and `DialogHost` (mounted in `app/_layout.tsx`) draws it in a `Modal`. `NativeMenu` falls back to `showSheet`, so its menus are a bottom sheet there. A `MenuItem` with `children` is a submenu: a nested SwiftUI `Menu` on iOS, a second sheet opened by the first elsewhere.
+- `ActionSheetIOS` and `Alert.prompt` do not exist on Android. `showSheet` and `promptText` in `src/lib/dialogs.tsx` hand the request to `src/lib/dialogStore.ts`, and `DialogHost` (mounted in `app/_layout.tsx`) draws it in a `Modal`. `NativeMenu` falls back to `showSheet`, so its menus are a bottom sheet there. A `MenuItem` with `children` is a submenu: a nested SwiftUI `Menu` on iOS, a second sheet opened by the first elsewhere.
 - Tabs: `NativeTabs` has Material icons (`md`) next to the SF Symbols and, unlike iOS, insets the content by the tab bar itself.
 - Storage: no `Library` folder and no Files app. The data sits in `files/Reverie` and the "show in Files" toggle is hidden (`settings.tsx`, search entries).
 - No blur on Android (it costs a copy of the screen per frame): `BlurBar` is a nearly opaque tint, the app lock shield a solid color.

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
@@ -31,32 +31,19 @@ import {
 } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import { useCardExport } from '@/hooks/useCardExport'
+import { useImageSlot } from '@/hooks/useImageSlot'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
 import { setAvatarCropDraft } from '@/lib/avatarCrop'
-import {
-  avatarUri,
-  cropFromJson,
-  cropToJson,
-  persistAvatar,
-  persistOriginal,
-  acceptMoving,
-  pickAvatarFile,
-  pickAvatarLibrary,
-  pickAvatarPhoto,
-  pickBackground,
-  removeAvatar,
-  removeCharacterImages,
-  type CropRect,
-} from '@/lib/avatars'
+import { acceptMoving, pickAvatar, pickBackground, type CropRect } from '@/lib/avatars'
 import { movingKind } from '@/lib/media'
 import { setBackgroundDraft } from '@/lib/backgroundDraft'
 import type { ImageSource } from '@/lib/images'
 import { confirmDeletion } from '@/lib/confirmDelete'
-import { showMessage } from '@/lib/dialogs'
-import { errorMessage } from '@/lib/errors'
-import { plural } from '@/lib/format'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { countLabel } from '@/lib/format'
+import { alertError } from '@/lib/report'
+import { type Colors, textStyles, useColors, useStyles } from '@/theme'
+import { isAndroid } from '@/lib/platform'
 
 export default function CharacterEditorScreen() {
   const { id, profile } = useLocalSearchParams<{ id: string; profile?: string }>()
@@ -89,9 +76,7 @@ export default function CharacterEditorScreen() {
   // fresh pick is kept apart as temporary files until Save.
   const [avatarOriginal, setAvatarOriginal] = useState<string | null>(null)
   const [avatarCrop, setAvatarCrop] = useState<string | null>(null)
-  const [pickedUri, setPickedUri] = useState<string | null>(null)
-  const [pickedOriginalUri, setPickedOriginalUri] = useState<string | null>(null)
-  const [pickedCrop, setPickedCrop] = useState<CropRect | null>(null)
+  const avatarSlot = useImageSlot('avatars')
   const [temperature, setTemperature] = useState<number>(DEFAULT_SAMPLING.temperature)
   const [maxTokens, setMaxTokens] = useState<number>(DEFAULT_SAMPLING.maxTokens)
   const [topP, setTopP] = useState<number>(DEFAULT_SAMPLING.topP)
@@ -100,9 +85,7 @@ export default function CharacterEditorScreen() {
   const [background, setBackground] = useState<string | null>(null)
   const [backgroundOriginal, setBackgroundOriginal] = useState<string | null>(null)
   const [backgroundCrop, setBackgroundCrop] = useState<string | null>(null)
-  const [bgPickedUri, setBgPickedUri] = useState<string | null>(null)
-  const [bgPickedOriginalUri, setBgPickedOriginalUri] = useState<string | null>(null)
-  const [bgPickedCrop, setBgPickedCrop] = useState<CropRect | null>(null)
+  const bgSlot = useImageSlot('backgrounds')
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>('blur')
   const [bgIntensity, setBgIntensity] = useState(0.5)
   const [bgBubbleTransparency, setBgBubbleTransparency] = useState(0.3)
@@ -110,10 +93,6 @@ export default function CharacterEditorScreen() {
   // What the prompt and greeting were before the last AI result replaced them, until
   // the user edits the prompt by hand.
   const [beforeGen, setBeforeGen] = useState<{ prompt: string; greeting: string } | null>(null)
-  const storedAvatar = useRef<string | null>(null)
-  const storedBackground = useRef<string | null>(null)
-  const storedAvatarOriginal = useRef<string | null>(null)
-  const storedBackgroundOriginal = useRef<string | null>(null)
 
   useEffect(() => {
     if (isNew) return
@@ -136,10 +115,8 @@ export default function CharacterEditorScreen() {
       setBgEffect(found.backgroundEffect)
       setBgIntensity(found.backgroundIntensity)
       setBgBubbleTransparency(found.backgroundBubbleTransparency)
-      storedAvatar.current = found.avatar
-      storedBackground.current = found.background
-      storedAvatarOriginal.current = found.avatarOriginal
-      storedBackgroundOriginal.current = found.backgroundOriginal
+      avatarSlot.remember({ file: found.avatar, original: found.avatarOriginal })
+      bgSlot.remember({ file: found.background, original: found.backgroundOriginal })
       setReady(true)
     })
   }, [db, id, isNew, router])
@@ -153,12 +130,8 @@ export default function CharacterEditorScreen() {
       uri,
       crop,
       onDone: (framed, rect) => {
-        setPickedUri(framed)
-        setPickedCrop(rect)
-        if (original) {
-          setPickedOriginalUri(original)
-          setAvatarOriginal(null)
-        }
+        avatarSlot.setFramed(framed, rect, original)
+        if (original) setAvatarOriginal(null)
       },
     })
     router.push('/avatar-crop')
@@ -166,41 +139,33 @@ export default function CharacterEditorScreen() {
 
   const onPickAvatar = async (source: ImageSource) => {
     try {
-      const file = source === 'camera' ? await pickAvatarPhoto() : source === 'files' ? await pickAvatarFile() : await pickAvatarLibrary()
+      const file = await pickAvatar(source)
       if (!file) return
       // A GIF or a video keeps its motion, so it skips the crop and is shown by its middle.
       if (acceptMoving(file)) {
-        setPickedUri(file)
-        setPickedOriginalUri(null)
-        setPickedCrop(null)
+        avatarSlot.setUnframed(file)
         setAvatarOriginal(null)
         return
       }
       openCrop(file, null, file)
     } catch (err) {
-      showMessage(t('editor.avatarFailedTitle'), errorMessage(err))
+      alertError(t('editor.avatarFailedTitle'), err)
     }
   }
 
-  // The frame is redone on the original; an avatar saved before originals were kept has
-  // only its framed copy, which then becomes the original.
   const onRecropAvatar = () => {
-    if (pickedOriginalUri) return openCrop(pickedOriginalUri, pickedCrop, null)
-    if (avatarOriginal) return openCrop(avatarUri(avatarOriginal)!, cropFromJson(avatarCrop), null)
-    const shown = pickedUri ?? (avatar ? avatarUri(avatar) : null)
-    if (shown) openCrop(shown, null, shown)
+    const source = avatarSlot.adjustSource({ file: avatar, original: avatarOriginal, crop: avatarCrop })
+    if (source) openCrop(source.uri, source.crop, source.original)
   }
 
   const onClearAvatar = () => {
-    setPickedUri(null)
-    setPickedOriginalUri(null)
-    setPickedCrop(null)
+    avatarSlot.clearPicked()
     setAvatar(null)
     setAvatarOriginal(null)
   }
 
   // The picture now behind the chat: a fresh pick, else the one already stored.
-  const backgroundUri = bgPickedUri ?? (background ? avatarUri(background, 'backgrounds') : null)
+  const backgroundUri = bgSlot.shown(background)
 
   // The effect is tried out on its own screen; what it returns is kept until Save.
   // `original` is what gets stored beside the framed copy, as for the avatar.
@@ -213,12 +178,8 @@ export default function CharacterEditorScreen() {
       intensity: bgIntensity,
       bubbleTransparency: bgBubbleTransparency,
       onDone: (result) => {
-        setBgPickedUri(result.uri)
-        setBgPickedCrop(result.crop)
-        if (original) {
-          setBgPickedOriginalUri(original)
-          setBackgroundOriginal(null)
-        }
+        bgSlot.setFramed(result.uri, result.crop, original)
+        if (original) setBackgroundOriginal(null)
         setBgEffect(result.effect)
         setBgIntensity(result.intensity)
         setBgBubbleTransparency(result.bubbleTransparency)
@@ -232,20 +193,17 @@ export default function CharacterEditorScreen() {
       const uri = await pickBackground(source)
       if (uri) openBackground(uri, null, uri)
     } catch (err) {
-      showMessage(t('background.failedTitle'), errorMessage(err))
+      alertError(t('background.failedTitle'), err)
     }
   }
 
   const onAdjustBackground = () => {
-    if (bgPickedOriginalUri) return openBackground(bgPickedOriginalUri, bgPickedCrop, null)
-    if (backgroundOriginal) return openBackground(avatarUri(backgroundOriginal, 'backgrounds')!, cropFromJson(backgroundCrop), null)
-    if (backgroundUri) openBackground(backgroundUri, null, backgroundUri)
+    const source = bgSlot.adjustSource({ file: background, original: backgroundOriginal, crop: backgroundCrop })
+    if (source) openBackground(source.uri, source.crop, source.original)
   }
 
   const onClearBackground = () => {
-    setBgPickedUri(null)
-    setBgPickedOriginalUri(null)
-    setBgPickedCrop(null)
+    bgSlot.clearPicked()
     setBackground(null)
     setBackgroundOriginal(null)
   }
@@ -254,12 +212,10 @@ export default function CharacterEditorScreen() {
     if (!canSave) return
     setSaving(true)
     try {
-      const nextAvatar = pickedUri ? await persistAvatar(pickedUri) : avatar
-      const nextAvatarOriginal = pickedOriginalUri ? await persistOriginal(pickedOriginalUri) : avatarOriginal
-      const nextAvatarCrop = pickedUri ? cropToJson(pickedCrop) : avatarCrop
-      const nextBackground = bgPickedUri ? await persistAvatar(bgPickedUri, 'backgrounds') : background
-      const nextBackgroundOriginal = bgPickedOriginalUri ? await persistOriginal(bgPickedOriginalUri, 'backgrounds') : backgroundOriginal
-      const nextBackgroundCrop = bgPickedUri ? cropToJson(bgPickedCrop) : backgroundCrop
+      const nextAvatarValue = await avatarSlot.persist({ file: avatar, original: avatarOriginal, crop: avatarCrop })
+      const nextBackgroundValue = await bgSlot.persist({ file: background, original: backgroundOriginal, crop: backgroundCrop })
+      const { file: nextAvatar, original: nextAvatarOriginal, crop: nextAvatarCrop } = nextAvatarValue
+      const { file: nextBackground, original: nextBackgroundOriginal, crop: nextBackgroundCrop } = nextBackgroundValue
       await saveCharacter(db, isNew ? null : Number(id), {
         name,
         avatar: nextAvatar,
@@ -279,36 +235,22 @@ export default function CharacterEditorScreen() {
         backgroundIntensity: bgIntensity,
         backgroundBubbleTransparency: bgBubbleTransparency,
       })
-      if (storedAvatar.current && storedAvatar.current !== nextAvatar) removeAvatar(storedAvatar.current)
-      if (storedBackground.current && storedBackground.current !== nextBackground) removeAvatar(storedBackground.current, 'backgrounds')
-      if (storedAvatarOriginal.current && storedAvatarOriginal.current !== nextAvatarOriginal) removeAvatar(storedAvatarOriginal.current)
-      if (storedBackgroundOriginal.current && storedBackgroundOriginal.current !== nextBackgroundOriginal) {
-        removeAvatar(storedBackgroundOriginal.current, 'backgrounds')
-      }
+      avatarSlot.settle(nextAvatarValue)
+      bgSlot.settle(nextBackgroundValue)
       if (!asProfile) return router.back()
       // Back to the profile, now showing what was saved.
-      storedAvatar.current = nextAvatar
-      storedBackground.current = nextBackground
-      storedAvatarOriginal.current = nextAvatarOriginal
-      storedBackgroundOriginal.current = nextBackgroundOriginal
       setAvatar(nextAvatar)
       setAvatarOriginal(nextAvatarOriginal)
       setAvatarCrop(nextAvatarCrop)
-      setPickedUri(null)
-      setPickedOriginalUri(null)
-      setPickedCrop(null)
       setBackground(nextBackground)
       setBackgroundOriginal(nextBackgroundOriginal)
       setBackgroundCrop(nextBackgroundCrop)
-      setBgPickedUri(null)
-      setBgPickedOriginalUri(null)
-      setBgPickedCrop(null)
       setSaving(false)
       setEditing(false)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (err) {
       setSaving(false)
-      showMessage(t('editor.saveFailedTitle'), errorMessage(err))
+      alertError(t('editor.saveFailedTitle'), err)
     }
   }
 
@@ -316,16 +258,10 @@ export default function CharacterEditorScreen() {
     confirmDeletion({
       title: t('editor.deleteConfirmTitle'),
       message: t('editor.deleteConfirmMessage'),
-      confirmLabel: t('common.delete'),
-      destructive: true,
       onConfirm: async () => {
         await deleteCharacter(db, Number(id))
-        removeCharacterImages({
-          avatar: storedAvatar.current,
-          avatarOriginal: storedAvatarOriginal.current,
-          background: storedBackground.current,
-          backgroundOriginal: storedBackgroundOriginal.current,
-        })
+        avatarSlot.removeStored()
+        bgSlot.removeStored()
         router.dismissTo('/')
       },
     })
@@ -344,7 +280,7 @@ export default function CharacterEditorScreen() {
     setBeforeGen(null)
   }
 
-  const photoUri = pickedUri ?? (avatar ? avatarUri(avatar) : null)
+  const photoUri = avatarSlot.shown(avatar)
   const hasPhoto = Boolean(photoUri)
   const canRecrop = hasPhoto && !movingKind(photoUri!)
   // The character's own name heads the screen once it has one.
@@ -352,7 +288,7 @@ export default function CharacterEditorScreen() {
 
   const thinkingLabel = THINKING_OPTIONS.find((option) => option.value === thinking)?.label ?? ''
   const replyLengthLabel = replyLimit
-    ? `${replyLimit} ${plural(replyLimit, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`
+    ? countLabel(replyLimit, 'paragraph', locale)
     : t('editor.unlimited')
 
   const scrollY = useSharedValue(0)
@@ -407,7 +343,7 @@ export default function CharacterEditorScreen() {
   return (
     <View style={styles.screen}>
       {ready ? (
-        <PullHost gesture={Platform.OS === 'android' ? androidPull : null}>
+        <PullHost gesture={isAndroid ? androidPull : null}>
         <KeyboardAwareScrollView
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
@@ -425,13 +361,13 @@ export default function CharacterEditorScreen() {
                 scrollY={scrollY}
                 dragging={dragging}
                 progress={photoSpread}
-                pull={Platform.OS === 'android' ? pull : undefined}
+                pull={isAndroid ? pull : undefined}
                 top={padding.paddingTop}
                 side={padding.paddingHorizontal}
               />
             ) : editing ? (
               <ImageSourceMenu onPick={onPickAvatar}>
-                <Avatar name={name} file={avatar} uri={pickedUri} size={96} />
+                <Avatar name={name} file={avatar} uri={avatarSlot.uri} size={96} />
               </ImageSourceMenu>
             ) : (
               <Avatar name={name} file={avatar} size={96} viewable={false} />
@@ -528,7 +464,7 @@ export default function CharacterEditorScreen() {
                   min={0}
                   max={6}
                   step={1}
-                  formatValue={(v) => (v === 0 ? t('editor.unlimited') : `${v} ${plural(v, locale, ['абзац', 'абзаца', 'абзацев'], ['paragraph', 'paragraphs'])}`)}
+                  formatValue={(v) => (v === 0 ? t('editor.unlimited') : countLabel(v, 'paragraph', locale))}
                   onChange={(v) => setReplyLimit(v === 0 ? null : v)}
                 />
                 <Text style={styles.note}>{t('editor.replyLengthHint')}</Text>
@@ -652,7 +588,7 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     chips: { marginBottom: 16 },
-    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+    note: textStyles(colors).note,
     aiButton: { alignSelf: 'flex-start', marginBottom: 12 },
     avatarBlock: { alignItems: 'center', marginBottom: 12 },
     avatarActions: { flexDirection: 'row', gap: 20, alignSelf: 'center', marginBottom: 24 },
@@ -665,8 +601,8 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.surfaceRaised,
     },
     backgroundActions: { flex: 1, gap: 12, alignItems: 'flex-start' },
-    link: { color: colors.accent, fontSize: 15 },
-    linkMuted: { color: colors.textMuted, fontSize: 15 },
+    link: textStyles(colors).link,
+    linkMuted: textStyles(colors).linkMuted,
     systemPromptHeader: {
       flexDirection: 'row',
       alignItems: 'center',

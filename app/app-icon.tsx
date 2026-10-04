@@ -6,9 +6,8 @@ import { FormScreenHeader } from '@/components/FormScreenHeader'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { useTranslation } from '@/i18n'
 import { APP_ICONS, currentAppIcon, DEFAULT_ICON_PREVIEW, setAppIcon } from '@/lib/appIcons'
-import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
-import { showToast } from '@/lib/toast'
+import { reportError } from '@/lib/report'
 import { useStyles, useTheme, type Colors } from '@/theme'
 
 const COLUMNS = 3
@@ -35,7 +34,7 @@ export default function AppIconScreen() {
       await setAppIcon(name)
       setCurrent(name)
     } catch (err) {
-      showToast({ tone: 'error', title: t('appIcon.failed'), message: errorMessage(err) })
+      reportError(t('appIcon.failed'), err)
     }
   }
 

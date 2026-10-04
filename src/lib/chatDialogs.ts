@@ -17,8 +17,6 @@ export function confirmDeleteChat(onConfirm: () => void) {
   confirmDeletion({
     title: t('chat.deleteChatTitle'),
     message: t('chat.deleteChatMessage'),
-    confirmLabel: t('common.delete'),
-    destructive: true,
     onConfirm,
   })
 }

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { FlatList, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
+import { FlatList, ScrollView, StyleSheet, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -11,16 +11,16 @@ import { Picture } from '@/components/Picture'
 import { SFIcon } from '@/components/SFIcon'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
-import { showMessage } from '@/lib/dialogs'
 import { saveImage } from '@/lib/download'
 import { viewerImages, type ViewerImage } from '@/lib/viewer'
+import { alertError } from '@/lib/report'
+import { isIOS } from '@/lib/platform'
 import { useStyles, useTheme, type Colors } from '@/theme'
 
 const MAX_SCALE = 5
 const DOUBLE_TAP_SCALE = 2.5
 const EASE = { duration: 220 }
 const TAP_SLOP = 10
-const NATIVE = Platform.OS === 'ios'
 
 export default function ViewerScreen() {
   const router = useRouter()
@@ -52,7 +52,7 @@ export default function ViewerScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
       setSaved(true)
     } catch (err) {
-      showMessage(t('images.saveFailed'), err instanceof Error ? err.message : String(err))
+      alertError(t('images.saveFailed'), err)
     }
   }
 
@@ -74,7 +74,7 @@ export default function ViewerScreen() {
           setIndex(Math.min(images.length - 1, Math.max(0, page)))
         }}
         renderItem={({ item }) =>
-          NATIVE ? (
+          isIOS ? (
             <NativeZoomImage
               image={item}
               width={window.width}

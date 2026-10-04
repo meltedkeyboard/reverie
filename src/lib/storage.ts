@@ -1,6 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system'
-import { Platform } from 'react-native'
 import type { SQLiteDatabase } from 'expo-sqlite'
+import { isAndroid, isWeb } from '@/lib/platform'
 
 // Everything Reverie keeps on disk (the database and the images) lives in one of two
 // places: the Documents folder, which the Files app shows, or a private folder next to it
@@ -20,7 +20,7 @@ const library = new Directory(Paths.document.parentDirectory, 'Library')
 // back to a dot-folder inside Documents, which Files doesn't list either.
 function pickHiddenRoot() {
   // Android keeps the app's files private anyway, and has no Library folder.
-  if (Platform.OS === 'android') {
+  if (isAndroid) {
     const dir = new Directory(Paths.document, 'Reverie')
     dir.create({ intermediates: true, idempotent: true })
     return dir
@@ -227,7 +227,7 @@ export async function keepCopy(db: SQLiteDatabase) {
   const shelf = new Directory(hiddenRoot, 'earlier-databases', `${Date.now()}-before-sync`)
   shelf.create({ intermediates: true, idempotent: true })
   // On the web the database is not a file SQLite can write to, so its bytes are saved.
-  if (Platform.OS === 'web') {
+  if (isWeb) {
     new File(shelf, DATABASE_NAME).write(await db.serializeAsync('main'))
     return
   }

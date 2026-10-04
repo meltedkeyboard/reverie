@@ -26,3 +26,21 @@ export function plural(count: number, locale: Locale, ru: [one: string, few: str
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return ru[1]
   return ru[2]
 }
+
+// The nouns that get counted, with their forms in each language.
+const UNITS = {
+  chat: { ru: ['чат', 'чата', 'чатов'], en: ['chat', 'chats'] },
+  scene: { ru: ['сцена', 'сцены', 'сцен'], en: ['scene', 'scenes'] },
+  message: { ru: ['сообщение', 'сообщения', 'сообщений'], en: ['message', 'messages'] },
+  word: { ru: ['слово', 'слова', 'слов'], en: ['word', 'words'] },
+  paragraph: { ru: ['абзац', 'абзаца', 'абзацев'], en: ['paragraph', 'paragraphs'] },
+  line: { ru: ['реплика', 'реплики', 'реплик'], en: ['line', 'lines'] },
+} as const satisfies Record<string, { ru: [string, string, string]; en: [string, string] }>
+
+export type CountUnit = keyof typeof UNITS
+
+// "3 chats" / "3 чата"
+export function countLabel(count: number, unit: CountUnit, locale: Locale) {
+  const { ru, en } = UNITS[unit]
+  return `${count} ${plural(count, locale, [...ru] as [string, string, string], [...en] as [string, string])}`
+}

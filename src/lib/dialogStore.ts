@@ -1,8 +1,8 @@
 import type { SheetAction, TextPrompt } from './dialogs'
 
-// Android has no action sheet and no text prompt in Alert, so those two are drawn by
+// Android has no action sheet and no text prompt in Alert, and the web has none of the three, so they are drawn by
 // DialogHost; this is the slot that carries the request from dialogs.tsx to it.
-export type AndroidDialog =
+export type AppDialog =
   | {
       kind: 'sheet'
       title?: string
@@ -14,26 +14,26 @@ export type AndroidDialog =
   | { kind: 'confirm'; title: string; message?: string; confirmLabel: string; destructive?: boolean; cancelable: boolean; onConfirm: () => void }
   | { kind: 'prompt'; prompt: TextPrompt }
 
-let current: AndroidDialog | null = null
+let current: AppDialog | null = null
 const listeners = new Set<() => void>()
 
-export function openAndroidDialog(dialog: AndroidDialog) {
+export function openDialog(dialog: AppDialog) {
   current = dialog
   listeners.forEach((fn) => fn())
 }
 
-export function closeAndroidDialog() {
+export function closeDialog() {
   current = null
   listeners.forEach((fn) => fn())
 }
 
-export function subscribeAndroidDialog(fn: () => void) {
+export function subscribeDialog(fn: () => void) {
   listeners.add(fn)
   return () => {
     listeners.delete(fn)
   }
 }
 
-export function getAndroidDialog() {
+export function getDialog() {
   return current
 }

@@ -1,7 +1,7 @@
 import Slider from '@react-native-community/slider'
 import { StyleSheet, Text, View } from 'react-native'
 
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 type Props = {
   label: string
@@ -32,7 +32,7 @@ export function ParamSlider({ label, value, min, max, step, digits = 0, formatVa
         onValueChange={onChange}
         minimumTrackTintColor={colors.accent}
         maximumTrackTintColor={colors.borderStrong}
-        thumbTintColor="#FFFFFF"
+        thumbTintColor={ON_ACCENT}
         style={styles.slider}
       />
     </View>

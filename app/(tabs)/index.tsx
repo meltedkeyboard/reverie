@@ -1,4 +1,4 @@
-import { Link, useRouter, useFocusEffect } from 'expo-router'
+import { Link, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
@@ -7,10 +7,10 @@ import ReorderableList, { type ReorderableListReorderEvent } from 'react-native-
 import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
 import { CONTINUE_BUTTON_SPACE } from '@/components/ContinueButton'
-import { EmptyState, ListSeparator } from '@/components/EmptyState'
+import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/EmptyState'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/GlassHeader'
-import { HomePattern } from '@/components/HomePattern'
+import { Pattern } from '@/components/Pattern'
 import { MenuGlassButton } from '@/components/MenuGlassButton'
 import { SFIcon } from '@/components/SFIcon'
 import { listCharacters, mergeCharacters, sameCharacter, setCharacterOrder, type CharacterPreview } from '@/db/characters'
@@ -20,21 +20,20 @@ import { loadSettings } from '@/db/settings'
 import { useCharacterActions } from '@/hooks/useCharacterActions'
 import { useFeaturedFill } from '@/hooks/useFeaturedFill'
 import { useContinueAnchor, useLastChat } from '@/hooks/useLastChat'
+import { useReloadOnFocus } from '@/hooks/useChatListActions'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
 import { removeCharacterImages } from '@/lib/avatars'
 import { confirm } from '@/lib/dialogs'
-import { errorMessage } from '@/lib/errors'
-import { FEATURED_GAP } from '@/lib/featuredLayout'
 import { importCharacterCard, type CardSource } from '@/lib/importCard'
 import { liquidGlass } from '@/lib/nativeUI'
 import { showToast } from '@/lib/toast'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { reportError } from '@/lib/report'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 // The server notice above the list: its height and the margin under it.
 const NOTICE_HEIGHT = 74
 
-const FeaturedSeparator = () => <View style={{ height: FEATURED_GAP }} />
 
 export default function CharactersScreen() {
   const db = useDatabase()
@@ -58,11 +57,7 @@ export default function CharactersScreen() {
     await reloadLastChat()
   }, [db, reloadLastChat])
 
-  useFocusEffect(
-    useCallback(() => {
-      reload()
-    }, [reload])
-  )
+  useReloadOnFocus(reload)
 
   const onImportCard = async (source: CardSource) => {
     try {
@@ -71,7 +66,7 @@ export default function CharactersScreen() {
       showToast({ tone: 'success', title: t('card.importDone'), message: name })
       reload()
     } catch (err) {
-      showToast({ tone: 'error', title: t('card.importFailed'), message: errorMessage(err) })
+      reportError(t('card.importFailed'), err)
     }
   }
 
@@ -99,7 +94,7 @@ export default function CharactersScreen() {
           removeCharacterImages(dragged)
           showToast({ tone: 'success', title: t('characters.mergeDone'), message: target.name })
         } catch (err) {
-          showToast({ tone: 'error', title: t('characters.mergeFailed'), message: errorMessage(err) })
+          reportError(t('characters.mergeFailed'), err)
         }
         reload()
       },
@@ -119,7 +114,7 @@ export default function CharactersScreen() {
       anchor.onLayout()
       fill.onLayout(e)
     }}>
-      <HomePattern />
+      <Pattern id="stars" />
       <ReorderableList
         data={characters ?? []}
         keyExtractor={(c) => String(c.id)}
@@ -139,7 +134,7 @@ export default function CharactersScreen() {
             >
               {liquidGlass ? <GlassSurface interactive variant="clear" style={styles.noticeLayer} /> : null}
               <View style={styles.noticeTile}>
-                <SFIcon name="server.rack" fallback="server" size={15} color="#FFFFFF" />
+                <SFIcon name="server.rack" fallback="server" size={15} color={ON_ACCENT} />
               </View>
               <View style={styles.noticeBody}>
                 <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
@@ -157,7 +152,7 @@ export default function CharactersScreen() {
               action={
                 <Link href="/character/new" asChild>
                   <Link.AppleZoom>
-                    <Button variant="glass" label={t('characters.createCharacter')} style={styles.emptyButton} />
+                    <Button variant="glass" label={t('characters.createCharacter')} style={emptyButtonStyle} />
                   </Link.AppleZoom>
                 </Link>
               }
@@ -238,6 +233,5 @@ const createStyles = (colors: Colors) =>
   noticeBody: { flex: 1 },
   noticeTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 2 },
   noticeText: { color: colors.textMuted, fontSize: 14, lineHeight: 19 },
-  emptyButton: { minWidth: 200 },
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 })

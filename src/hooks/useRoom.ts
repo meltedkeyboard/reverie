@@ -1,22 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { setChatTitle, type Chat } from '@/db/chats'
-import {
-  addMessage,
-  addVariant,
-  deleteMessage,
-  listMessages,
-  selectVariant as storeVariant,
-  updateMessage,
-  type Message,
-  type MessageImage,
-  type MessageKind,
-  type Thought,
-} from '@/db/messages'
+import { type Chat } from '@/db/chats'
+import { addMessage, addVariant, listMessages, type Message, type MessageImage, type MessageKind, type Thought } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { setMemberPresent, type Room, type RoomMember } from '@/db/rooms'
 import { loadSettings } from '@/db/settings'
-import { useAbortable } from '@/hooks/useAbortable'
+import { useConversation } from '@/hooks/useConversation'
 import { t } from '@/i18n'
 import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
@@ -35,7 +24,6 @@ import {
   type TurnPlan,
 } from '@/lib/room/floor'
 import { buildRoomRequest, cleanLine, userNameOf } from '@/lib/room/prompt'
-import { suggestTitle } from '@/lib/titles'
 
 // 'directing' is the short wait while the director decides who speaks, 'staging' while
 // it checks whether a line walked someone out of the scene or in.
@@ -69,35 +57,43 @@ type Spoken = { line: Message | null; ok: boolean }
 export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembersChange: (next: RoomMember[]) => void) {
   const chatId = chat.id
   const db = useDatabase()
-  const [messages, setMessagesState] = useState<Message[]>([])
-  const [loaded, setLoaded] = useState(false)
+  const membersRef = useRef(members)
+  membersRef.current = members
+  const nameOf = useCallback((id: number | null) => {
+    return membersRef.current.find((m) => m.characterId === id)?.character.name ?? t('room.deletedCharacter')
+  }, [])
+  const {
+    messages,
+    messagesRef,
+    setMessages,
+    loaded,
+    setLoaded,
+    error,
+    setError,
+    title,
+    titleRef,
+    naming,
+    rename,
+    autoName,
+    task,
+    discarded,
+    selectVariant,
+    editMessage,
+    removeMessage,
+    discard,
+  } = useConversation(chat, (m) => (m.kind === 'narration' ? t('room.narrator') : nameOf(m.speakerId)))
   const [draft, setDraft] = useState<RoomDraft | null>(null)
   const [phase, setPhase] = useState<RoomPhase>('idle')
-  const [error, setError] = useState<string | null>(null)
-  const [title, setTitleState] = useState(chat.title)
-  const [naming, setNaming] = useState(false)
   const [replacingId, setReplacingId] = useState<number | null>(null)
   // Who is lined up to speak after the current line.
   const [queue, setQueue] = useState<Planned[]>([])
   const [auto, setAuto] = useState<{ done: number; total: number } | null>(null)
 
-  const messagesRef = useRef<Message[]>([])
   const roomRef = useRef(room)
   roomRef.current = room
-  const membersRef = useRef(members)
-  membersRef.current = members
   const castRef = useRef(onMembersChange)
   castRef.current = onMembersChange
-  const task = useAbortable()
-  const discarded = useRef(new WeakSet<AbortController>())
-  const titleRef = useRef(chat.title)
-  const namingRef = useRef(false)
   const failure = useRef<Failure | null>(null)
-
-  const setMessages = useCallback((next: Message[]) => {
-    messagesRef.current = next
-    setMessagesState(next)
-  }, [])
 
   useEffect(() => {
     let alive = true
@@ -109,39 +105,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     return () => {
       alive = false
     }
-  }, [db, chatId, setMessages])
-
-  const nameOf = useCallback((id: number | null) => {
-    return membersRef.current.find((m) => m.characterId === id)?.character.name ?? t('room.deletedCharacter')
-  }, [])
-
-  const rename = useCallback(
-    async (next: string | null) => {
-      const saved = await setChatTitle(db, chatId, next)
-      titleRef.current = saved
-      setTitleState(saved)
-    },
-    [db, chatId]
-  )
-
-  const autoName = useCallback(async () => {
-    if (namingRef.current) return null
-    namingRef.current = true
-    setNaming(true)
-    try {
-      const cfg = await loadSettings(db)
-      const next = await suggestTitle(
-        cfg,
-        (m) => (m.kind === 'narration' ? t('room.narrator') : nameOf(m.speakerId)),
-        messagesRef.current
-      )
-      if (next) await rename(next)
-      return next
-    } finally {
-      namingRef.current = false
-      setNaming(false)
-    }
-  }, [db, rename, nameOf])
+  }, [db, chatId, setMessages, setLoaded])
 
   // A line from the narrator, e.g. someone walking in.
   const narrate = useCallback(
@@ -496,49 +460,9 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     }
   }, [task, begin, runQueue, settle, regenerate])
 
-  const replaceMessage = useCallback(
-    (next: Message) => setMessages(messagesRef.current.map((m) => (m.id === next.id ? next : m))),
-    [setMessages]
-  )
-
-  const selectVariant = useCallback(
-    async (id: number, variant: number) => {
-      const target = messagesRef.current.find((m) => m.id === id)
-      if (!target || variant < 0 || variant >= target.variants.length || variant === target.variant) return
-      Haptics.selectionAsync()
-      replaceMessage(await storeVariant(db, target, variant))
-    },
-    [db, replaceMessage]
-  )
-
-  const editMessage = useCallback(
-    async (id: number, content: string) => {
-      const target = messagesRef.current.find((m) => m.id === id)
-      if (target) replaceMessage(await updateMessage(db, target, content))
-    },
-    [db, replaceMessage]
-  )
-
-  const removeMessage = useCallback(
-    async (id: number) => {
-      await deleteMessage(db, id)
-      setMessages(messagesRef.current.filter((m) => m.id !== id))
-      setError(null)
-    },
-    [db, setMessages]
-  )
-
   const stop = useCallback(() => {
     setQueue([])
     task.stop()
-  }, [task])
-
-  // The scene is about to be deleted, so the partial line must not be written into it.
-  const discard = useCallback(() => {
-    const running = task.current()
-    if (!running) return
-    discarded.current.add(running)
-    running.abort()
   }, [task])
 
   return {

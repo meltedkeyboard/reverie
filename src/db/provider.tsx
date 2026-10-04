@@ -1,9 +1,10 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { convertLegacyAttachments, pruneAttachments } from '@/db/attachments'
 import { migrate } from '@/db/schema'
 import { databaseDirectory, discardInactiveDatabase, moveStorage } from '@/lib/storage'
+import { createRequiredContext } from '@/lib/requiredContext'
 
 type DatabaseContextValue = {
   db: SQLiteDatabase
@@ -11,7 +12,7 @@ type DatabaseContextValue = {
   reload: () => Promise<void>
 }
 
-const DatabaseContext = createContext<DatabaseContextValue | null>(null)
+const [DatabaseContext, useDatabaseContext] = createRequiredContext<DatabaseContextValue>('useDatabase must be used within a <DatabaseProvider>')
 
 // expo-sqlite hands out one cached connection per path, and closing the old one would close
 // that too, so a reload of the same file asks for a new connection.
@@ -106,12 +107,6 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   if (error) throw error
   if (!value) return null
   return <DatabaseContext.Provider value={value}>{children}</DatabaseContext.Provider>
-}
-
-function useDatabaseContext() {
-  const value = useContext(DatabaseContext)
-  if (!value) throw new Error('useDatabase must be used within a <DatabaseProvider>')
-  return value
 }
 
 export function useDatabase() {

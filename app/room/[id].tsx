@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
@@ -30,15 +30,15 @@ import {
   type MemberSettings,
   type RoomFields,
 } from '@/db/rooms'
+import { useImageSlot } from '@/hooks/useImageSlot'
 import { useTranslation } from '@/i18n'
-import { avatarUri, cropFromJson, cropToJson, persistAvatar, persistOriginal, pickBackground, removeAvatar, type CropRect } from '@/lib/avatars'
+import { pickBackground, type CropRect } from '@/lib/avatars'
 import { setBackgroundDraft } from '@/lib/backgroundDraft'
 import { confirmDeletion } from '@/lib/confirmDelete'
-import { showMessage } from '@/lib/dialogs'
-import { errorMessage } from '@/lib/errors'
 import * as Haptics from '@/lib/haptics'
 import type { ImageSource } from '@/lib/images'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { alertError } from '@/lib/report'
+import { type Colors, textStyles, useColors, useStyles } from '@/theme'
 
 type Member = MemberSettings & { character: Character }
 
@@ -67,13 +67,7 @@ export default function RoomEditorScreen() {
   const [characters, setCharacters] = useState<CharacterPreview[]>([])
   const [picking, setPicking] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
-  // A fresh pick: the framed copy, the original and the frame, kept as temporary files
-  // until Save.
-  const [bgPickedUri, setBgPickedUri] = useState<string | null>(null)
-  const [bgPickedOriginalUri, setBgPickedOriginalUri] = useState<string | null>(null)
-  const [bgPickedCrop, setBgPickedCrop] = useState<CropRect | null>(null)
-  const storedBackground = useRef<string | null>(null)
-  const storedBackgroundOriginal = useRef<string | null>(null)
+  const bgSlot = useImageSlot('backgrounds')
 
   const set = <K extends keyof RoomFields>(key: K, value: RoomFields[K]) => setFields((f) => ({ ...f, [key]: value }))
 
@@ -86,8 +80,7 @@ export default function RoomEditorScreen() {
       const { id: _id, createdAt: _createdAt, ...rest } = room
       setFields(rest)
       setMembers(await listRoomMembers(db, room.id))
-      storedBackground.current = room.background
-      storedBackgroundOriginal.current = room.backgroundOriginal
+      bgSlot.remember({ file: room.background, original: room.backgroundOriginal })
       setReady(true)
     })()
   }, [db, id, isNew, router])
@@ -112,7 +105,8 @@ export default function RoomEditorScreen() {
     )
   }
 
-  const backgroundUri = bgPickedUri ?? (fields.background ? avatarUri(fields.background, 'backgrounds') : null)
+  const backgroundValue = { file: fields.background, original: fields.backgroundOriginal, crop: fields.backgroundCrop }
+  const backgroundUri = bgSlot.shown(fields.background)
 
   // `original` is what gets stored beside the framed copy: a temporary file for a fresh
   // pick, or null when the stored original is reframed.
@@ -125,9 +119,7 @@ export default function RoomEditorScreen() {
       intensity: fields.backgroundIntensity,
       bubbleTransparency: fields.backgroundBubbleTransparency,
       onDone: (result) => {
-        setBgPickedUri(result.uri)
-        setBgPickedCrop(result.crop)
-        if (original) setBgPickedOriginalUri(original)
+        bgSlot.setFramed(result.uri, result.crop, original)
         setFields((f) => ({
           ...f,
           backgroundOriginal: original ? null : f.backgroundOriginal,
@@ -145,24 +137,17 @@ export default function RoomEditorScreen() {
       const uri = await pickBackground(source)
       if (uri) openBackground(uri, null, uri)
     } catch (err) {
-      showMessage(t('background.failedTitle'), errorMessage(err))
+      alertError(t('background.failedTitle'), err)
     }
   }
 
-  // The frame is redone on the original; a background saved before originals were kept has
-  // only its framed copy, which then becomes the original.
-  const onAdjustBackground = (shown: string) => {
-    if (bgPickedOriginalUri) return openBackground(bgPickedOriginalUri, bgPickedCrop, null)
-    if (fields.backgroundOriginal) {
-      return openBackground(avatarUri(fields.backgroundOriginal, 'backgrounds')!, cropFromJson(fields.backgroundCrop), null)
-    }
-    openBackground(shown, null, shown)
+  const onAdjustBackground = () => {
+    const source = bgSlot.adjustSource(backgroundValue)
+    if (source) openBackground(source.uri, source.crop, source.original)
   }
 
   const onClearBackground = () => {
-    setBgPickedUri(null)
-    setBgPickedOriginalUri(null)
-    setBgPickedCrop(null)
+    bgSlot.clearPicked()
     setFields((f) => ({ ...f, background: null, backgroundOriginal: null, backgroundCrop: null }))
   }
 
@@ -170,24 +155,20 @@ export default function RoomEditorScreen() {
     if (!canSave) return
     setSaving(true)
     try {
-      const background = bgPickedUri ? await persistAvatar(bgPickedUri, 'backgrounds') : fields.background
-      const backgroundOriginal = bgPickedOriginalUri ? await persistOriginal(bgPickedOriginalUri, 'backgrounds') : fields.backgroundOriginal
-      const backgroundCrop = bgPickedUri ? cropToJson(bgPickedCrop) : fields.backgroundCrop
+      const nextBackground = await bgSlot.persist(backgroundValue)
+      const { file: background, original: backgroundOriginal, crop: backgroundCrop } = nextBackground
       const roomId = await saveRoom(
         db,
         isNew ? null : Number(id),
         { ...fields, name: fields.name.trim() || defaultName(), background, backgroundOriginal, backgroundCrop },
         members
       )
-      if (storedBackground.current && storedBackground.current !== background) removeAvatar(storedBackground.current, 'backgrounds')
-      if (storedBackgroundOriginal.current && storedBackgroundOriginal.current !== backgroundOriginal) {
-        removeAvatar(storedBackgroundOriginal.current, 'backgrounds')
-      }
+      bgSlot.settle(nextBackground)
       if (isNew) router.replace(`/rooms/${roomId}`)
       else router.back()
     } catch (err) {
       setSaving(false)
-      showMessage(t('editor.saveFailedTitle'), errorMessage(err))
+      alertError(t('editor.saveFailedTitle'), err)
     }
   }
 
@@ -195,12 +176,9 @@ export default function RoomEditorScreen() {
     confirmDeletion({
       title: t('roomEditor.deleteConfirmTitle'),
       message: t('roomEditor.deleteConfirmMessage'),
-      confirmLabel: t('common.delete'),
-      destructive: true,
       onConfirm: async () => {
         await deleteRoom(db, Number(id))
-        if (storedBackground.current) removeAvatar(storedBackground.current, 'backgrounds')
-        if (storedBackgroundOriginal.current) removeAvatar(storedBackgroundOriginal.current, 'backgrounds')
+        bgSlot.removeStored()
         router.dismissTo('/rooms')
       },
     })
@@ -380,7 +358,7 @@ export default function RoomEditorScreen() {
               </ImageSourceMenu>
               {backgroundUri ? (
                 <>
-                  <Pressable onPress={() => onAdjustBackground(backgroundUri)} hitSlop={8}>
+                  <Pressable onPress={() => onAdjustBackground()} hitSlop={8}>
                     <Text style={styles.link}>{t('background.adjust')}</Text>
                   </Pressable>
                   <Pressable onPress={onClearBackground} hitSlop={8}>
@@ -457,12 +435,12 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     chips: { marginBottom: 16 },
-    note: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+    note: textStyles(colors).note,
     hint: { color: colors.textFaint, fontSize: 12, lineHeight: 17, marginTop: -4, marginBottom: 16 },
     gap: { height: 16 },
     gapBelow: { marginBottom: 16 },
-    link: { color: colors.accent, fontSize: 15 },
-    linkMuted: { color: colors.textMuted, fontSize: 15 },
+    link: textStyles(colors).link,
+    linkMuted: textStyles(colors).linkMuted,
     linkDanger: { color: colors.danger, fontSize: 15, marginTop: 4 },
     member: {
       borderWidth: 1,

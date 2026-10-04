@@ -1,15 +1,14 @@
 import { requireOptionalNativeModule } from 'expo'
-import { Platform } from 'react-native'
+import { isIOS } from '@/lib/platform'
 
 // @expo/ui and expo-glass-effect register their native views as soon as they are
 // imported, so each package is loaded only when its module is part of the build.
 // Without them the screens keep their regular, non-glass look. Both are SwiftUI and
 // UIKit only: ExpoUI also registers a module on Android, so the platform is checked too.
 
-const ios = Platform.OS === 'ios'
 
 export const swiftUI =
-  ios && requireOptionalNativeModule('ExpoUI')
+  isIOS && requireOptionalNativeModule('ExpoUI')
     ? {
         ui: require('@expo/ui/swift-ui') as typeof import('@expo/ui/swift-ui'),
         modifiers: require('@expo/ui/swift-ui/modifiers') as typeof import('@expo/ui/swift-ui/modifiers'),
@@ -17,7 +16,7 @@ export const swiftUI =
     : null
 
 const glassModule =
-  ios && requireOptionalNativeModule('ExpoGlassEffect')
+  isIOS && requireOptionalNativeModule('ExpoGlassEffect')
     ? (require('expo-glass-effect') as typeof import('expo-glass-effect'))
     : null
 
@@ -30,4 +29,4 @@ export const liquidGlass = glassEffect !== null
 // The iOS 26 look of the bars: no bar at all, round controls floating over the content
 // with a fade under them. Android and the desktop get it with plain round surfaces in
 // place of the glass; only an iOS without Liquid Glass keeps the frosted bar.
-export const floatingBars = liquidGlass || Platform.OS !== 'ios'
+export const floatingBars = liquidGlass || !isIOS

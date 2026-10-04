@@ -14,9 +14,9 @@ import { GlassHeader, HeaderTitle } from '@/components/GlassHeader'
 import { useTranslation } from '@/i18n'
 import { avatarCropDraft } from '@/lib/avatarCrop'
 import { squareAvatar } from '@/lib/avatars'
-import { showMessage } from '@/lib/dialogs'
-import { errorMessage } from '@/lib/errors'
+import { alertError } from '@/lib/report'
 import { HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
+import { isWeb } from '@/lib/platform'
 
 const MAX_ZOOM = 4
 // The hint and the button under the window.
@@ -41,7 +41,7 @@ export default function AvatarCropScreen() {
     ImageManipulator.manipulate(draft.uri)
       .renderAsync()
       .then((picture) => setNatural({ width: picture.width, height: picture.height }))
-      .catch((err) => showMessage(t('editor.avatarFailedTitle'), errorMessage(err)))
+      .catch((err) => alertError(t('editor.avatarFailedTitle'), err))
   }, [draft, t])
 
   // The window is the largest circle that fits between the header and the button.
@@ -118,6 +118,28 @@ export default function AvatarCropScreen() {
       offsetX.value = clampX(offsetX.value, k)
       offsetY.value = clampY(offsetY.value, k)
     })
+  // A mouse cannot pinch: on the desktop the wheel (and a trackpad pinch, which arrives as a
+  // wheel with ctrl held) zooms around the cursor. Taken in the capture phase, like the chat list.
+  const screen = useRef<View>(null)
+  useEffect(() => {
+    const node = screen.current as unknown as HTMLElement | null
+    if (!isWeb || !node) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const box = node.getBoundingClientRect()
+      const px = e.clientX - box.left - cx
+      const py = e.clientY - box.top - cy
+      const from = zoom.value
+      const to = Math.min(MAX_ZOOM, Math.max(1, from * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))))
+      zoom.value = to
+      offsetX.value = clampX(px - (px - offsetX.value) * (to / from), to)
+      offsetY.value = clampY(py - (py - offsetY.value) * (to / from), to)
+    }
+    node.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => node.removeEventListener('wheel', onWheel, { capture: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cx, cy])
+
   const pictureStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: offsetX.value }, { translateY: offsetY.value }, { scale: zoom.value }],
   }))
@@ -144,7 +166,7 @@ export default function AvatarCropScreen() {
       close()
     } catch (err) {
       setSaving(false)
-      showMessage(t('editor.avatarFailedTitle'), errorMessage(err))
+      alertError(t('editor.avatarFailedTitle'), err)
     }
   }
 
@@ -153,7 +175,7 @@ export default function AvatarCropScreen() {
   const shade = `M0 0H${frame.width}V${frame.height}H0Z M${cx - r} ${cy} a${r} ${r} 0 1 0 ${diameter} 0 a${r} ${r} 0 1 0 ${-diameter} 0Z`
 
   return (
-    <View style={styles.screen} onLayout={onLayout}>
+    <View ref={screen} style={styles.screen} onLayout={onLayout}>
       <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
         <View style={StyleSheet.absoluteFill}>
           {draft && natural && diameter ? (

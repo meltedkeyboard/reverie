@@ -2,9 +2,9 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import type { RoomPreview } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
-import { plural } from '@/lib/format'
+import { countLabel } from '@/lib/format'
 import { plainPreview } from '@/lib/roleplay'
-import { useStyles, type Colors } from '@/theme'
+import { type Colors, FILL, ON_ACCENT, useStyles } from '@/theme'
 
 import { AnimatedFill } from './AnimatedFill'
 import { Avatar } from './Avatar'
@@ -37,7 +37,7 @@ function RoomCardContent({ room, onOpen, onDelete, menu, fillHeight }: Props) {
   const scenes = room.chatCount
   const count = scenes > 0 ? (
     <Text style={styles.count}>
-      {scenes} {plural(scenes, locale, ['сцена', 'сцены', 'сцен'], ['scene', 'scenes'])}
+      {countLabel(scenes, 'scene', locale)}
     </Text>
   ) : null
   if (fillHeight !== undefined) {
@@ -69,7 +69,7 @@ function RoomCardContent({ room, onOpen, onDelete, menu, fillHeight }: Props) {
         </View>
         <FeaturedBody
           name={room.name}
-          count={scenes > 0 ? `${scenes} ${plural(scenes, locale, ['сцена', 'сцены', 'сцен'], ['scene', 'scenes'])}` : null}
+          count={scenes > 0 ? countLabel(scenes, 'scene', locale) : null}
           preview={preview}
         />
       </ListCard>
@@ -114,8 +114,8 @@ const createStyles = (colors: Colors) =>
     tileWhole: { width: '100%', aspectRatio: 1 },
     tileHalf: { width: '50%', aspectRatio: 1, borderWidth: 1, borderColor: colors.bg },
     empty: { backgroundColor: colors.surfaceRaised },
-    more: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' },
-    moreText: { color: '#FFFFFF', fontSize: 22, fontWeight: '600' },
+    more: { ...FILL, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' },
+    moreText: { color: ON_ACCENT, fontSize: 22, fontWeight: '600' },
     nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 3 },
     name: { flexShrink: 1, color: colors.text, fontSize: 17, fontWeight: '600' },
     count: { color: colors.textFaint, fontSize: 13 },

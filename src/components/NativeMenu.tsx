@@ -30,6 +30,22 @@ type Props = {
 // Whether NativeMenu draws the glass behind its children itself when given glassRadius.
 export const nativeMenuGlass = swiftUI !== null && liquidGlass
 
+// A trigger that simply runs `onPress`, dimming while it is held: what a menu is where there
+// is no native menu to open.
+export function TapTrigger({ onPress, disabled, style, children }: { onPress: () => void; disabled?: boolean; style?: StyleProp<ViewStyle>; children: ReactNode }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={4}
+      pressRetentionOffset={PRESS_ANYWHERE}
+      style={({ pressed }) => [style, pressed && { opacity: 0.6 }]}
+    >
+      {children}
+    </Pressable>
+  )
+}
+
 type SymbolName = NonNullable<ComponentProps<NonNullable<typeof swiftUI>['ui']['Image']>['systemName']>
 
 // The trigger is drawn by React Native, so it matches the rest of the screen exactly.
@@ -41,15 +57,9 @@ export function NativeMenu({ items, children, style, disabled = false, glassRadi
 
   if (!swiftUI) {
     return (
-      <Pressable
-        onPress={() => showSheet(undefined, items)}
-        disabled={disabled}
-        hitSlop={4}
-        pressRetentionOffset={PRESS_ANYWHERE}
-        style={({ pressed }) => [style, pressed && { opacity: 0.6 }]}
-      >
+      <TapTrigger onPress={() => showSheet(undefined, items)} disabled={disabled} style={style}>
         {children}
-      </Pressable>
+      </TapTrigger>
     )
   }
 

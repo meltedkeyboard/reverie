@@ -10,7 +10,7 @@ import type { ContinueKind } from '@/db/continue'
 import { useLastChatContext } from '@/hooks/useLastChat'
 import { useTranslation } from '@/i18n'
 import { formatWhen } from '@/lib/format'
-import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { GlassSurface } from './Glass'
@@ -27,7 +27,6 @@ type Props = {
 }
 
 // Text on the accent-tinted glass, as on the glass Button.
-const ON_ACCENT = '#FFFFFF'
 const ON_ACCENT_MUTED = 'rgba(255, 255, 255, 0.75)'
 const ON_ACCENT_FAINT = 'rgba(255, 255, 255, 0.6)'
 

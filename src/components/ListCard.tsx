@@ -6,7 +6,7 @@ import { useTranslation } from '@/i18n'
 import { isConfirmDeleteOn } from '@/lib/confirmDelete'
 import { showSheet } from '@/lib/dialogs'
 import { liquidGlass, swiftUI } from '@/lib/nativeUI'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from './Glass'
 import { IconButton } from './IconButton'
@@ -42,7 +42,7 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, c
   const drag = useReorderableDrag()
   const openSheet = () => showSheet(menuTitle, menu)
   // In a vertical card the ellipsis floats over the picture, on a dark disc to stay readable.
-  const iconColor = vertical ? '#FFFFFF' : colors.textFaint
+  const iconColor = vertical ? ON_ACCENT : colors.textFaint
   const menuButton = swiftUI ? (
     // Claims the touch, so the card does not open under the menu.
     <View onStartShouldSetResponder={() => true} style={vertical && styles.floating}>

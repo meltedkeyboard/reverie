@@ -1,17 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Image } from 'expo-image'
 import { useEffect, useMemo, useRef } from 'react'
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, {
   useAnimatedStyle,
@@ -28,7 +18,7 @@ import type { AsideQuestion, AsideTurn } from '@/lib/aside'
 import { pictureUri } from '@/lib/attachments'
 import type { ReplyFrame } from '@/lib/replyStream'
 import { useChatText } from '@/lib/chatText'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, FILL, useColors, useStyles } from '@/theme'
 
 import { ErrorCard } from './ConversationList'
 import { GlassSurface } from './Glass'
@@ -37,6 +27,7 @@ import { ImageLink } from './ImageLink'
 import { Markdown } from './Markdown'
 import { ThoughtBlock } from './MessageRow'
 import { TypingIndicator } from './TypingIndicator'
+import { isWeb } from '@/lib/platform'
 
 type Props = {
   turns: AsideTurn[]
@@ -112,7 +103,7 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
 
   return (
     // The desktop window has no keyboard to ride and the swap already brings the panel up with its field.
-    <Animated.View entering={Platform.OS === 'web' ? undefined : unfold} style={[styles.slot, fit]}>
+    <Animated.View entering={isWeb ? undefined : unfold} style={[styles.slot, fit]}>
       {/* The glass is a layer beside the content, not around it: clipped to scroll the
           thread inside, it would lose its material. The content is clipped instead. */}
       <View style={styles.panel}>
@@ -194,10 +185,10 @@ const createStyles = (colors: Colors) =>
       paddingHorizontal: 10,
       marginBottom: 8,
       transformOrigin: 'bottom',
-      ...(Platform.OS === 'web' ? { maxWidth: CHAT_COLUMN + 20 } : null),
+      ...(isWeb ? { maxWidth: CHAT_COLUMN + 20 } : null),
     },
     panel: { flexShrink: 1 },
-    layer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 24, borderCurve: 'continuous' },
+    layer: { ...FILL, borderRadius: 24, borderCurve: 'continuous' },
     clip: { flexShrink: 1, borderRadius: 24, borderCurve: 'continuous', overflow: 'hidden' },
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     head: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },

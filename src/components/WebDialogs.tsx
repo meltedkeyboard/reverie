@@ -4,13 +4,15 @@ import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View, type
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 
+import { isKey, useWindowKey } from '@/hooks/useWindowKey'
+import { usePromptState } from '@/hooks/usePromptState'
 import { useTranslation } from '@/i18n'
-import { closeAndroidDialog, getAndroidDialog, subscribeAndroidDialog, type AndroidDialog } from '@/lib/androidDialog'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { closeDialog, getDialog, subscribeDialog, type AppDialog } from '@/lib/dialogStore'
+import { type Colors, FILL, ON_ACCENT, useColors, useStyles } from '@/theme'
 
-type Sheet = Extract<AndroidDialog, { kind: 'sheet' }>
-type Confirm = Extract<AndroidDialog, { kind: 'confirm' }>
-type Prompt = Extract<AndroidDialog, { kind: 'prompt' }>['prompt']
+type Sheet = Extract<AppDialog, { kind: 'sheet' }>
+type Confirm = Extract<AppDialog, { kind: 'confirm' }>
+type Prompt = Extract<AppDialog, { kind: 'prompt' }>['prompt']
 
 const EDGE = 8
 
@@ -23,12 +25,12 @@ const popIn = (pop: SharedValue<number>) => {
 // question or a text field is a small window in the middle. Neither is a sheet from the
 // bottom, which is a phone's way. Esc closes any of them.
 export function WebDialogHost() {
-  const live = useSyncExternalStore(subscribeAndroidDialog, getAndroidDialog)
+  const live = useSyncExternalStore(subscribeDialog, getDialog)
   const styles = useStyles(createStyles)
   // The last dialog stays on screen while it plays its exit.
   const [dialog, setDialog] = useState(live)
   const pop = useSharedValue(0)
-  const shownRef = useRef<AndroidDialog | null>(null)
+  const shownRef = useRef<AppDialog | null>(null)
 
   useEffect(() => {
     if (live) {
@@ -47,20 +49,13 @@ export function WebDialogHost() {
 
   const dimStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, pop.value) }))
 
-  useEffect(() => {
-    if (!live) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeAndroidDialog()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [live])
+  useWindowKey(isKey('Escape'), closeDialog, !!live)
 
   if (!dialog) return null
   const menu = dialog.kind === 'sheet'
   return (
     <View style={styles.layer} pointerEvents={live ? 'auto' : 'none'}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={closeAndroidDialog} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={closeDialog} />
       {menu ? null : <Animated.View style={[StyleSheet.absoluteFill, styles.dim, dimStyle]} pointerEvents="none" />}
       {dialog.kind === 'sheet' ? <Menu key={dialog.title} dialog={dialog} pop={pop} /> : null}
       {dialog.kind === 'confirm' ? <Question dialog={dialog} pop={pop} /> : null}
@@ -114,7 +109,7 @@ function Menu({ dialog, pop }: { dialog: Sheet; pop: SharedValue<number> }) {
           <Pressable
             style={[styles.menuRow, hovered === index && { backgroundColor: colors.surfaceRaised }]}
             onPress={() => {
-              closeAndroidDialog()
+              closeDialog()
               action.onSelect()
             }}
           >
@@ -141,24 +136,18 @@ function Question({ dialog, pop }: { dialog: Confirm; pop: SharedValue<number> }
   const popStyle = useWindowPop(pop)
   const accept = () => {
     // The window lingers for its exit; Enter must not confirm it a second time.
-    if (getAndroidDialog() !== dialog) return
-    closeAndroidDialog()
+    if (getDialog() !== dialog) return
+    closeDialog()
     dialog.onConfirm()
   }
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') accept()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
+  useWindowKey(isKey('Enter'), accept)
   return (
     <Animated.View style={[styles.window, popStyle]}>
       <Text style={styles.windowTitle}>{dialog.title}</Text>
       {dialog.message ? <Text style={styles.windowMessage}>{dialog.message}</Text> : null}
       <View style={styles.buttons}>
         {dialog.cancelable ? (
-          <Pressable style={[styles.button, styles.buttonPlain]} onPress={closeAndroidDialog}>
+          <Pressable style={[styles.button, styles.buttonPlain]} onPress={closeDialog}>
             <Text style={[styles.buttonLabel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
           </Pressable>
         ) : null}
@@ -166,7 +155,7 @@ function Question({ dialog, pop }: { dialog: Confirm; pop: SharedValue<number> }
           style={[styles.button, { backgroundColor: dialog.destructive ? colors.danger : colors.accent }]}
           onPress={accept}
         >
-          <Text style={[styles.buttonLabel, { color: '#FFFFFF' }]}>{dialog.confirmLabel}</Text>
+          <Text style={[styles.buttonLabel, { color: ON_ACCENT }]}>{dialog.confirmLabel}</Text>
         </Pressable>
       </View>
     </Animated.View>
@@ -177,12 +166,8 @@ function TextWindow({ title, message, initial, confirmLabel, onSubmit, pop }: Pr
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
-  const [text, setText] = useState(initial ?? '')
+  const { text, setText, submit } = usePromptState(initial, onSubmit)
   const popStyle = useWindowPop(pop)
-  const submit = () => {
-    closeAndroidDialog()
-    onSubmit(text)
-  }
   return (
     <Animated.View style={[styles.window, popStyle]}>
       <Text style={styles.windowTitle}>{title}</Text>
@@ -198,11 +183,11 @@ function TextWindow({ title, message, initial, confirmLabel, onSubmit, pop }: Pr
         selectionColor={colors.accent}
       />
       <View style={styles.buttons}>
-        <Pressable style={[styles.button, styles.buttonPlain]} onPress={closeAndroidDialog}>
+        <Pressable style={[styles.button, styles.buttonPlain]} onPress={closeDialog}>
           <Text style={[styles.buttonLabel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
         </Pressable>
         <Pressable style={[styles.button, { backgroundColor: colors.accent }]} onPress={submit}>
-          <Text style={[styles.buttonLabel, { color: '#FFFFFF' }]}>{confirmLabel}</Text>
+          <Text style={[styles.buttonLabel, { color: ON_ACCENT }]}>{confirmLabel}</Text>
         </Pressable>
       </View>
     </Animated.View>
@@ -211,7 +196,7 @@ function TextWindow({ title, message, initial, confirmLabel, onSubmit, pop }: Pr
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    layer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, alignItems: 'center', justifyContent: 'center' },
+    layer: { ...FILL, zIndex: 1000, alignItems: 'center', justifyContent: 'center' },
     dim: { backgroundColor: 'rgba(0, 0, 0, 0.5)' },
     menu: {
       position: 'absolute',

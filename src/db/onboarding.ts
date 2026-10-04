@@ -1,13 +1,6 @@
-import type { SQLiteDatabase } from 'expo-sqlite'
+import { defineFlag } from '@/db/settings'
 
-import { getFlag, setFlag } from '@/db/settings'
+const onboarding = defineFlag('onboarding_completed', false)
 
-const KEY = 'onboarding_completed'
-
-export function isOnboardingComplete(db: SQLiteDatabase) {
-  return getFlag(db, KEY, false)
-}
-
-export function setOnboardingComplete(db: SQLiteDatabase, done: boolean) {
-  return setFlag(db, KEY, done)
-}
+export const isOnboardingComplete = onboarding.load
+export const setOnboardingComplete = onboarding.save

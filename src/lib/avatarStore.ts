@@ -12,6 +12,20 @@ export type ImageKind = 'avatars' | 'backgrounds' | 'attachments'
 // container changes between installs and updates, so it is resolved on read.
 const folder = (kind: ImageKind) => new Directory(dataDirectory(), kind)
 
+// The folder of a kind, created when it is first written to.
+function writableFolder(kind: ImageKind) {
+  const dir = folder(kind)
+  dir.create({ intermediates: true, idempotent: true })
+  return dir
+}
+
+// A temporary file copied into the store under a new name.
+async function copyIntoStore(tempUri: string, kind: ImageKind, extension: string) {
+  const name = newAvatarName(extension)
+  await new File(tempUri).copy(new File(writableFolder(kind), name))
+  return name
+}
+
 // Backgrounds used to be saved next to the avatars, so a name that isn't in its own
 // folder is looked for there.
 function imageFile(name: string, kind: ImageKind) {
@@ -28,19 +42,13 @@ export function avatarUri(name: string, kind: ImageKind = 'avatars'): string | n
 }
 
 export async function persistAvatar(tempUri: string, kind: ImageKind = 'avatars') {
-  folder(kind).create({ intermediates: true, idempotent: true })
   // A moving avatar keeps its own format; everything else was already made a JPEG.
-  const name = newAvatarName(movingKind(tempUri) === 'video' ? extensionOf(tempUri) : (movingFormat(tempUri) ?? 'jpg'))
-  await new File(tempUri).copy(new File(folder(kind), name))
-  return name
+  return copyIntoStore(tempUri, kind, movingKind(tempUri) === 'video' ? extensionOf(tempUri) : (movingFormat(tempUri) ?? 'jpg'))
 }
 
 // An original is kept exactly as it was picked, in its own format, next to the framed copy.
 export async function persistOriginal(tempUri: string, kind: ImageKind = 'avatars') {
-  folder(kind).create({ intermediates: true, idempotent: true })
-  const name = newAvatarName(extensionOf(tempUri) || 'jpg')
-  await new File(tempUri).copy(new File(folder(kind), name))
-  return name
+  return copyIntoStore(tempUri, kind, extensionOf(tempUri) || 'jpg')
 }
 
 export function removeAvatar(name: string, kind: ImageKind = 'avatars') {
@@ -59,13 +67,11 @@ export async function readAvatarBytes(name: string, kind: ImageKind = 'avatars')
 }
 
 export function writeAvatarBytes(name: string, bytes: Uint8Array, kind: ImageKind = 'avatars') {
-  folder(kind).create({ intermediates: true, idempotent: true })
-  new File(folder(kind), name).write(bytes)
+  new File(writableFolder(kind), name).write(bytes)
 }
 
 export async function writeAvatarBase64(name: string, base64: string, kind: ImageKind = 'avatars') {
-  folder(kind).create({ intermediates: true, idempotent: true })
-  new File(folder(kind), name).write(toByteArray(base64))
+  new File(writableFolder(kind), name).write(toByteArray(base64))
 }
 
 export function removeAllAvatars() {

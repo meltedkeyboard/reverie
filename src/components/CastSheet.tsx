@@ -18,7 +18,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 import type { RoomMember } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { Avatar } from './Avatar'
 import { BottomSheet, useSheetTones } from './BottomSheet'
@@ -345,7 +345,7 @@ function SwipeRow({ enabled, present, onToggle, onPress, onLongPress, name, chil
     <View>
       <Animated.View style={[styles.behind, { backgroundColor: present ? colors.danger : colors.success }, behind]}>
         <Animated.View style={[styles.behindLabel, icon]}>
-          <Ionicons name={present ? 'exit-outline' : 'enter-outline'} size={20} color="#FFFFFF" />
+          <Ionicons name={present ? 'exit-outline' : 'enter-outline'} size={20} color={ON_ACCENT} />
           <Text style={styles.behindText}>{action}</Text>
         </Animated.View>
       </Animated.View>
@@ -434,6 +434,6 @@ const createStyles = (colors: Colors) =>
       paddingRight: 22,
     },
     behindLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    behindText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+    behindText: { color: ON_ACCENT, fontSize: 15, fontWeight: '600' },
     hint: { color: colors.textMuted, fontSize: 14, lineHeight: 19, paddingHorizontal: 16, paddingTop: 12 },
   })

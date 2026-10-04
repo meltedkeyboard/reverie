@@ -1,7 +1,8 @@
-import { createContext, useContext, useMemo } from 'react'
+import { useMemo } from 'react'
 
 import ru from '@/locales/ru.json'
 import en from '@/locales/en.json'
+import { createRequiredContext } from '@/lib/requiredContext'
 
 export type Locale = 'ru' | 'en'
 export type LocalePreference = Locale | 'system'
@@ -42,7 +43,7 @@ type LocaleContextValue = {
   t: (key: string, vars?: Record<string, string | number>) => string
 }
 
-const LocaleContext = createContext<LocaleContextValue | null>(null)
+export const [LocaleContext, useTranslation] = createRequiredContext<LocaleContextValue>('useTranslation must be used within LocaleContextProvider')
 
 export function LocaleContextProvider({
   preference,
@@ -62,8 +63,3 @@ export function LocaleContextProvider({
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
 }
 
-export function useTranslation() {
-  const ctx = useContext(LocaleContext)
-  if (!ctx) throw new Error('useTranslation must be used within LocaleContextProvider')
-  return ctx
-}

@@ -1,8 +1,9 @@
 import { Lexer, type Token, type Tokens } from 'marked'
 import { Fragment, memo, useMemo, type ReactNode } from 'react'
-import { Platform, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle } from 'react-native'
+import { ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle } from 'react-native'
 
 import { useColors, useStyles, type Colors } from '@/theme'
+import { FONTS, isWeb } from '@/lib/platform'
 
 type Props = {
   text: string
@@ -13,7 +14,7 @@ type Props = {
 }
 
 const HEADING_SCALE = [1.35, 1.2, 1.1, 1, 1, 1]
-const CODE_FONT = Platform.OS === 'android' ? 'monospace' : 'Menlo'
+const CODE_FONT = FONTS.mono
 const INDENT = '    '
 
 // A selectable Text on iOS only offers to copy all of it. A read-only UITextView gives
@@ -21,7 +22,7 @@ const INDENT = '    '
 export function SelectableText({ style, children }: { style: StyleProp<TextStyle>; children: ReactNode }) {
   const colors = useColors()
   // A browser selects ordinary text by itself, and a <textarea> cannot hold nested Text.
-  if (Platform.OS === 'web') return <Text style={style}>{children}</Text>
+  if (isWeb) return <Text style={style}>{children}</Text>
   return (
     <TextInput
       editable={false}

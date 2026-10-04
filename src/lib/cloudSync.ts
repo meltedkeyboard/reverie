@@ -1,5 +1,4 @@
 import { Directory, File, Paths } from 'expo-file-system'
-import { Platform } from 'react-native'
 import { deserializeDatabaseAsync, openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
 
 import { getSyncState, markChecked, markSynced, setDirty } from '@/db/cloudSync'
@@ -8,6 +7,7 @@ import { t } from '@/i18n'
 import { convertLegacyAttachments } from '@/db/attachments'
 import { avatarUri, type ImageKind } from '@/lib/avatarStore'
 import { dataDirectory, databaseDirectory, keepCopy } from '@/lib/storage'
+import { isWeb } from '@/lib/platform'
 import { cloudFolder } from '../../modules/reverie-cloud-folder'
 
 // Sync with a folder the user picked (iCloud Drive, Google Drive, a local one), as whole
@@ -124,12 +124,11 @@ async function isEmpty(db: SQLiteDatabase) {
   return !row?.n
 }
 
-// The web has no files SQLite can write or attach (the database sits in the browser's own
+// The isWeb has no files SQLite can write or attach (the database sits in the browser's own
 // storage), so there the snapshot is made in memory, and the rows come over one by one.
-const web = Platform.OS === 'web'
 
 async function makeSnapshot(db: SQLiteDatabase, snapshot: File) {
-  if (web) {
+  if (isWeb) {
     const copy = await deserializeDatabaseAsync(await db.serializeAsync('main'))
     try {
       await copy.execAsync('DELETE FROM app_settings')
@@ -244,7 +243,7 @@ async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: Fi
 async function pull(db: SQLiteDatabase, manifest: Manifest) {
   const incoming = freshFile('incoming.db')
   await folder().copyIn(DATABASE, incoming.uri)
-  if (web) {
+  if (isWeb) {
     await pullInMemory(db, manifest, incoming)
     incoming.delete()
     return

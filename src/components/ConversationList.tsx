@@ -1,17 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactElement, type Ref } from 'react'
-import {
-  FlatList,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type ListRenderItemInfo,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  type ScrollViewProps,
-} from 'react-native'
+import { FlatList, Pressable, StyleSheet, Text, View, type ListRenderItemInfo, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming, Easing, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -25,6 +14,7 @@ import { useTranslation } from '@/i18n'
 import { liquidGlass } from '@/lib/nativeUI'
 import { PRESS_ANYWHERE } from '@/lib/press'
 import { useColors, useStyles, type Colors } from '@/theme'
+import { isWeb } from '@/lib/platform'
 
 // How far above the newest message the list has to be before the jump button shows up.
 const JUMP_THRESHOLD = 240
@@ -157,7 +147,7 @@ export function ConversationList({
   useAnimatedReaction(
     () => composerHeight.value,
     (height) => {
-      if (Platform.OS === 'web') scheduleOnRN(setComposerPad, height)
+      if (isWeb) scheduleOnRN(setComposerPad, height)
     }
   )
 
@@ -165,7 +155,7 @@ export function ConversationList({
   // delta, so the chat jumped a notch at a time. The wheel is taken over here in the capture
   // phase, before that handler, and the offset eases toward where the wheel points.
   useEffect(() => {
-    if (Platform.OS !== 'web') return
+    if (!isWeb) return
     const node = (listRef.current as unknown as { getScrollableNode?: () => HTMLElement } | null)?.getScrollableNode?.()
     const outer = node?.parentElement
     if (!node || !outer) return
@@ -202,7 +192,7 @@ export function ConversationList({
   // late show up as jumps while scrolling: more of them are kept ready, and the flipped
   // scroller gets its own layer.
   const webList =
-    Platform.OS === 'web'
+    isWeb
       ? {
           initialNumToRender: 20,
           maxToRenderPerBatch: 20,
@@ -248,12 +238,12 @@ export function ConversationList({
       extraData={extraData}
       keyExtractor={(row) => (row.streaming ? 'draft' : String(row.id))}
       renderItem={renderItem}
-      renderScrollComponent={Platform.OS === 'web' ? undefined : renderScroll}
+      renderScrollComponent={isWeb ? undefined : renderScroll}
       onScroll={onScroll}
       onScrollBeginDrag={() => setFollowTail(false)}
       onScrollToIndexFailed={onScrollToIndexFailed}
       maintainVisibleContentPosition={anchor !== null ? { minIndexForVisible: anchor } : undefined}
-      scrollEventThrottle={Platform.OS === 'web' ? 16 : 32}
+      scrollEventThrottle={isWeb ? 16 : 32}
       {...webList}
       ListHeaderComponent={header}
       ListFooterComponent={footer}
@@ -261,7 +251,7 @@ export function ConversationList({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
         // The list is inverted, so this visually sits just above the composer.
-        paddingTop: 8 + (Platform.OS === 'web' ? composerPad + 16 : 0),
+        paddingTop: 8 + (isWeb ? composerPad + 16 : 0),
         paddingBottom: headerHeight + 12,
       }}
     />

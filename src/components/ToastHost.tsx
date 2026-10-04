@@ -7,7 +7,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { GlassSurface, useGlassStyles } from './Glass'
 import { dismissToast, getToast, subscribeToast } from '@/lib/toast'
-import { fonts, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, FILL, fonts, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 
 const SWIPE_AWAY = 28
 // Past the top edge by the card's own height, its distance from the edge and its shadow.
@@ -100,7 +100,7 @@ const createStyles = (colors: Colors) =>
     card: { borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12 },
     body: {},
     // A failure is the same glass with a red cast.
-    failedTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 24, backgroundColor: colors.dangerSoft },
+    failedTint: { ...FILL, borderRadius: 24, backgroundColor: colors.dangerSoft },
     failedBorder: { borderColor: colors.dangerBorder },
     text: { flex: 1, gap: 2 },
     title: { color: colors.text, fontFamily: fonts.prose, fontSize: 16, fontWeight: '600' },

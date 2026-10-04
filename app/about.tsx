@@ -7,7 +7,6 @@ import { FormScreenHeader } from '@/components/FormScreenHeader'
 import { useScreenPadding } from '@/components/GlassHeader'
 import { Divider } from '@/components/motifs/Divider'
 import { Eyebrow } from '@/components/motifs/Eyebrow'
-import { Star } from '@/components/motifs/Star'
 import { Wordmark } from '@/components/Wordmark'
 import { setOnboardingComplete } from '@/db/onboarding'
 import { useDatabase } from '@/db/provider'
@@ -15,7 +14,7 @@ import { useShake } from '@/hooks/useShake'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/haptics'
 import { APP_VERSION } from '@/lib/version'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, textStyles, useColors, useStyles } from '@/theme'
 
 export default function AboutScreen() {
   const router = useRouter()
@@ -106,6 +105,6 @@ const createStyles = (colors: Colors) =>
     marginBottom: 8,
     marginHorizontal: 8,
   },
-  note: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginBottom: 14 },
+  note: { ...textStyles(colors).note, marginBottom: 14 },
   shakeHint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 24 },
 })

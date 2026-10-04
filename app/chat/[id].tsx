@@ -1,45 +1,39 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { AsideToggleButton, ChatSurface, bubbleOpacityOf } from '@/components/ChatChrome'
 import { AsidePanel } from '@/components/AsidePanel'
 import { Avatar } from '@/components/Avatar'
-import { ChatBackground } from '@/components/ChatBackground'
 import { Composer, ComposerFloat, ComposerSwap } from '@/components/Composer'
-import { ConversationList, ErrorCard, JumpButton, type ConversationHandle } from '@/components/ConversationList'
+import { ConversationList, ErrorCard, JumpButton } from '@/components/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/GlassHeader'
 import { MessageRow, type RowMessage } from '@/components/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/NativeMenu'
 import { RoomView } from '@/components/RoomView'
-import { SFIcon } from '@/components/SFIcon'
 import { ShimmerText } from '@/components/ShimmerText'
 import { getCharacter, type Character } from '@/db/characters'
-import { createChat, deleteChat, getChat, type Chat } from '@/db/chats'
+import { createChat, getChat, type Chat } from '@/db/chats'
 import { setContinueHidden, setLastOpened } from '@/db/continue'
 import { newMessage } from '@/db/messages'
-import { isPrivateChatEnabled } from '@/db/privateChat'
 import { useDatabase } from '@/db/provider'
 import { createRoomChat, getRoom, listRoomMembers, type Room, type RoomMember } from '@/db/rooms'
-import { isSuggestionsEnabled } from '@/db/suggestions'
 import { useAside } from '@/hooks/useAside'
 import { regenerateTargetAt, useChat } from '@/hooks/useChat'
 import { useLayoutMode } from '@/hooks/useLayoutMode'
+import { useChatMenuActions, useMessageActions } from '@/hooks/useChatScreenActions'
+import { useChatShell } from '@/hooks/useChatShell'
+import { useChatSwitches } from '@/hooks/useStoredFlag'
 import { useSuggestion } from '@/hooks/useSuggestion'
 import { useTranslation } from '@/i18n'
 import { characterScene } from '@/lib/aside'
-import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
-import { promptText, showMessage } from '@/lib/dialogs'
-import { avatarUri } from '@/lib/avatars'
-import { errorMessage } from '@/lib/errors'
 import { formatWhen } from '@/lib/format'
 import * as Haptics from '@/lib/haptics'
-import type { MessageAction } from '@/lib/messageActions'
 import { liquidGlass } from '@/lib/nativeUI'
 import { fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
@@ -127,12 +121,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const { t } = useTranslation()
   // The sidebar is the way out of a chat in a wide window.
   const wide = useLayoutMode() === 'wide'
-  const [privateEnabled, setPrivateEnabled] = useState(true)
-  const [suggestEnabled, setSuggestEnabled] = useState(false)
-  useEffect(() => {
-    isPrivateChatEnabled(db).then(setPrivateEnabled)
-    isSuggestionsEnabled(db).then(setSuggestEnabled)
-  }, [db])
+  const { privateEnabled, suggestEnabled } = useChatSwitches()
   const {
     messages,
     loaded,
@@ -156,36 +145,13 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
     rename,
     autoName,
   } = useChat(chat, character)
-  // The eye in the header opens a private thread with the model about this chat, like
-  // /btw: the model reads the conversation and answers aside, and nothing of it is kept.
-  const [asideOpen, setAsideOpen] = useState(false)
-  // What was typed to the characters waits here while the field asks the model aside.
-  const sceneDraft = useRef('')
   const scene = useMemo(() => characterScene(character), [character])
   const aside = useAside(scene, messages)
 
-  const listRef = useRef<ConversationHandle>(null)
-  const composerHeight = useSharedValue(0)
-  const composerTop = useSharedValue(0)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
-  const keyboard = useReanimatedKeyboardAnimation()
-
-
-  const toggleAside = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    if (asideOpen) aside.reset()
-    else setEditingRow(null)
-    setAsideOpen(!asideOpen)
-  }
-
-  // The empty-chat intro stays centered in the space left between the header and the
-  // composer, which moves up with the keyboard; the dock is lifted by the keyboard
-  // height minus the home indicator inset it already pads for.
-  const emptyStyle = useAnimatedStyle(() => ({
-    paddingTop: headerHeight,
-    paddingBottom: composerHeight.value + Math.max(0, Math.abs(keyboard.height.value) - insets.bottom),
-  }))
+  // The eye in the header opens a private thread with the model about this chat.
+  const { listRef, composerHeight, composerTop, asideOpen, toggleAside, sceneDraft, emptyStyle, scrollToNewest } = useChatShell(aside, () => setEditingRow(null))
 
   const idle = phase === 'idle'
   const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(scene, messages, suggestEnabled && idle && !asideOpen && !editingRow)
@@ -219,30 +185,11 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
     [editingRow]
   )
 
-  const scrollToNewest = () => listRef.current?.scrollToNewest()
-
-  const onAction = useCallback(
-    (message: RowMessage, action: MessageAction) => {
-      if (action === 'copy') Clipboard.setStringAsync(message.content)
-      else if (action === 'regenerate') regenerate(message.id)
-      else if (action === 'refine') {
-        promptText({
-          title: t('chat.refineTitle'),
-          message: t('chat.refineMessage'),
-          confirmLabel: t('chat.refineConfirm'),
-          onSubmit: (text) => {
-            if (text.trim()) regenerate(message.id, text)
-          },
-        })
-      }
-      else if (action === 'edit') setEditingRow(message)
-      else removeMessage(message.id)
-    },
-    [regenerate, removeMessage]
-  )
+  const onAction = useMessageActions({ regenerate, removeMessage, edit: setEditingRow })
+  const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard })
 
   // Over a chat background the user's bubbles can be made see-through.
-  const bubbleOpacity = character.background ? 1 - character.backgroundBubbleTransparency : 1
+  const bubbleOpacity = bubbleOpacityOf(character)
   const renderRow = useCallback(
     (row: RowMessage) => (
       <MessageRow
@@ -256,24 +203,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
     ),
     [regenerable, locked, onAction, selectVariant, bubbleOpacity]
   )
-
-  const confirmDelete = () => {
-    confirmDeleteChat(async () => {
-      discard()
-      await deleteChat(db, chatId)
-      router.back()
-    })
-  }
-
-  const promptRename = () => promptRenameChat(title, rename)
-
-  const suggestName = async () => {
-    try {
-      if (!(await autoName())) showMessage(t('chat.titleNotFoundTitle'), t('chat.titleNotFoundMessage'))
-    } catch (err) {
-      showMessage(t('chat.titleFailedTitle'), errorMessage(err))
-    }
-  }
 
   const chatMenu: MenuItem[] = [
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
@@ -301,13 +230,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
 
   return (
     <View style={styles.screen}>
-      {character.background ? (
-        <ChatBackground
-          uri={avatarUri(character.background, 'backgrounds') ?? ''}
-          effect={character.backgroundEffect}
-          intensity={character.backgroundIntensity}
-        />
-      ) : null}
+      <ChatSurface owner={character} />
       <View style={StyleSheet.absoluteFill}>
         <ConversationList
           ref={listRef}
@@ -333,21 +256,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
         left={wide ? undefined : <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
         right={
           <View style={styles.headerActions}>
-            {privateEnabled || asideOpen ? (
-              <GlassButton
-                icon={asideOpen ? 'eye-off' : 'eye-off-outline'}
-                onPress={toggleAside}
-                accessibilityLabel={t('chat.privateTitle')}
-              >
-                <SFIcon
-                  name={asideOpen ? 'eye.slash.fill' : 'eye.slash'}
-                  fallback={asideOpen ? 'eye-off' : 'eye-off-outline'}
-                  size={20}
-                  color={colors.text}
-                  animateChange={asideOpen}
-                />
-              </GlassButton>
-            ) : null}
+            <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
             <Link href={`/chat/new?character=${character.id}`} asChild>
               <Link.AppleZoom>
                 <GlassButton icon="create-outline" />

@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, t
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
 
 import { liquidGlass } from '@/lib/nativeUI'
-import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
+import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from './Glass'
 import { SFIcon } from './SFIcon'
@@ -36,7 +36,7 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
   const colors = useColors()
   const styles = useStyles(createStyles)
   const tint = color ?? colors.accent
-  const ink = filled ? ON_FILL : tint
+  const ink = filled ? ON_ACCENT : tint
   const sliding = useAtLeastOneLap(!!loading && !!icon?.slide)
   const inactive = disabled || loading || sliding
   return (
@@ -79,7 +79,6 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
   )
 }
 
-const ON_FILL = '#FFFFFF'
 
 // The timing of the continue button changing chats.
 const OUT_MS = 140

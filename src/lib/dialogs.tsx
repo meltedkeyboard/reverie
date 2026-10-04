@@ -1,8 +1,9 @@
-import { ActionSheetIOS, Alert, Platform } from 'react-native'
+import { ActionSheetIOS, Alert } from 'react-native'
 
 import { t } from '@/i18n'
 
-import { openAndroidDialog } from './androidDialog'
+import { openDialog } from './dialogStore'
+import { isIOS, isWeb } from './platform'
 import { lastPointer } from './pointer'
 
 export type SheetAction = {
@@ -35,8 +36,8 @@ export function showSheet(title: string | undefined, items: SheetAction[]) {
     destructive,
     onSelect: children ? () => showSheet(label, children) : (onSelect ?? (() => {})),
   }))
-  if (Platform.OS === 'web') return openAndroidDialog({ kind: 'sheet', title, actions, anchor: lastPointer() })
-  if (Platform.OS !== 'ios') return openAndroidDialog({ kind: 'sheet', title, actions })
+  // Everywhere but iOS the sheet is drawn by the app; on the web it opens where the click was.
+  if (!isIOS) return openDialog({ kind: 'sheet', title, actions, anchor: isWeb ? lastPointer() : undefined })
   const destructive = actions.findIndex((action) => action.destructive)
   ActionSheetIOS.showActionSheetWithOptions(
     {
@@ -51,8 +52,8 @@ export function showSheet(title: string | undefined, items: SheetAction[]) {
 
 export function confirm({ title, message, confirmLabel, destructive, onConfirm }: Confirmation) {
   // Alert.alert does nothing on the web, so the question is a sheet with one answer.
-  if (Platform.OS === 'web') {
-    return openAndroidDialog({ kind: 'confirm', title, message, confirmLabel, destructive, cancelable: true, onConfirm })
+  if (isWeb) {
+    return openDialog({ kind: 'confirm', title, message, confirmLabel, destructive, cancelable: true, onConfirm })
   }
   Alert.alert(title, message, [
     { text: t('common.cancel'), style: 'cancel' },
@@ -61,7 +62,7 @@ export function confirm({ title, message, confirmLabel, destructive, onConfirm }
 }
 
 export function promptText(prompt: TextPrompt) {
-  if (Platform.OS !== 'ios') return openAndroidDialog({ kind: 'prompt', prompt })
+  if (!isIOS) return openDialog({ kind: 'prompt', prompt })
   const { title, message, initial, confirmLabel, onSubmit } = prompt
   Alert.prompt(
     title,
@@ -76,8 +77,8 @@ export function promptText(prompt: TextPrompt) {
 }
 
 export function showMessage(title: string, message: string) {
-  if (Platform.OS === 'web') {
-    return openAndroidDialog({ kind: 'confirm', title, message, confirmLabel: t('common.ok'), cancelable: false, onConfirm: () => {} })
+  if (isWeb) {
+    return openDialog({ kind: 'confirm', title, message, confirmLabel: t('common.ok'), cancelable: false, onConfirm: () => {} })
   }
   Alert.alert(title, message)
 }
