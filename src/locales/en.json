@@ -318,6 +318,7 @@
   "chat.menuSuggestTitle": "Suggest a title",
   "chat.menuShowProfile": "Show profile",
   "chat.menuMoveToRoom": "Move to a room",
+  "chat.menuNewRoom": "New room",
   "chat.menuDuplicate": "Duplicate chat",
   "chat.menuDeleteChat": "Delete chat",
   "chat.retry": "Retry",

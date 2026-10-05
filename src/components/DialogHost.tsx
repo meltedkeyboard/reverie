@@ -33,9 +33,9 @@ function Sheet({ title, actions }: { title?: string; actions: { label: string; d
   return (
     <View style={styles.sheet}>
       {title ? <Text style={styles.title}>{title}</Text> : null}
-      {actions.map((action) => (
+      {actions.map((action, index) => (
         <Pressable
-          key={action.label}
+          key={index}
           style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceRaised }]}
           onPress={() => {
             closeDialog()

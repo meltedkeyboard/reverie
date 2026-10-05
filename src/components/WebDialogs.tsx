@@ -106,7 +106,7 @@ function Menu({ dialog, pop }: { dialog: Sheet; pop: SharedValue<number> }) {
         </Text>
       ) : null}
       {dialog.actions.map((action, index) => (
-        <View key={action.label} {...hoverOf(index)}>
+        <View key={index} {...hoverOf(index)}>
           <Pressable
             style={[styles.menuRow, hovered === index && { backgroundColor: colors.surfaceRaised }]}
             onPress={() => {

@@ -148,13 +148,7 @@ export default function ChatTextScreen() {
           </View>
           <MenuCell label={t('settings.chatFontField')} value={font === SYSTEM_FONT ? t('chatFont.system') : font} items={items} />
           <SwitchCell label={t('settings.chatUserFont')} value={userFont} onValueChange={setUserFont} />
-        </ListSection>
-
-        <ListSection>
           <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
-        </ListSection>
-
-        <ListSection header={t('settings.chatPattern')}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
             {CHAT_PATTERNS.map((id) => {
               const selected = id === pattern

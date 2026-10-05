@@ -70,14 +70,15 @@ export function NativeMenu({ items, children, style, disabled = false, glassRadi
 
   const { Host, Menu, Button } = swiftUI.ui
   const m = swiftUI.modifiers
-  const toView = (item: MenuItem): ReactNode =>
+  // Keyed by place, not by label: two items may read the same (rooms with one name).
+  const toView = (item: MenuItem, i: number): ReactNode =>
     item.children ? (
-      <Menu key={item.label} label={item.label} systemImage={item.systemImage}>
+      <Menu key={i} label={item.label} systemImage={item.systemImage}>
         {item.children.map(toView)}
       </Menu>
     ) : (
       <Button
-        key={item.label}
+        key={i}
         label={item.label}
         systemImage={item.systemImage as SymbolName | undefined}
         role={item.destructive ? 'destructive' : undefined}

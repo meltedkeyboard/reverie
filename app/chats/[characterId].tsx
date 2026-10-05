@@ -16,7 +16,7 @@ import { Pattern } from '@/components/Pattern'
 import { getCharacter, type Character } from '@/db/characters'
 import { listChats, pruneUntouchedChats, setChatOrder, type ChatPreview } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
-import { importChatToRoom } from '@/db/rooms'
+import { importChatToRoom, listRooms, type RoomPreview } from '@/db/rooms'
 import { useChatListActions, useReloadOnFocus } from '@/hooks/useChatListActions'
 import { useReorder } from '@/hooks/useReorder'
 import { useTranslation } from '@/i18n'
@@ -31,6 +31,7 @@ export default function CharacterChatsScreen() {
   const { t } = useTranslation()
   const [character, setCharacter] = useState<Character | null>(null)
   const [chats, setChats] = useState<ChatPreview[] | null>(null)
+  const [rooms, setRooms] = useState<RoomPreview[]>([])
 
   const reload = useCallback(async () => {
     const found = await getCharacter(db, Number(characterId))
@@ -38,6 +39,7 @@ export default function CharacterChatsScreen() {
     await pruneUntouchedChats(db)
     setCharacter(found)
     setChats(await listChats(db, found.id))
+    setRooms(await listRooms(db))
   }, [db, characterId, router])
 
   useReloadOnFocus(reload)
@@ -48,16 +50,26 @@ export default function CharacterChatsScreen() {
   const menuItems = (chat: ChatPreview): MenuItem[] => [
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: () => promptRename(chat) },
     { label: t('chat.menuDuplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(chat) },
-    { label: t('chat.menuMoveToRoom'), systemImage: 'person.3', onSelect: () => moveToRoom(chat) },
+    rooms.length
+      ? {
+          label: t('chat.menuMoveToRoom'),
+          systemImage: 'person.3',
+          children: [
+            { label: t('chat.menuNewRoom'), systemImage: 'plus', onSelect: () => moveToRoom(chat) },
+            ...rooms.map((room) => ({ label: room.name, onSelect: () => moveToRoom(chat, room.id) })),
+          ],
+        }
+      : { label: t('chat.menuMoveToRoom'), systemImage: 'person.3', onSelect: () => moveToRoom(chat) },
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(chat) },
   ]
 
-  // The chat is copied, so the one-on-one version stays where it was. The new room's
-  // editor opens over the scene, to add the rest of the cast right away.
-  const moveToRoom = async (chat: ChatPreview) => {
-    const { roomId, chatId: sceneId } = await importChatToRoom(db, chat.id, null)
+  // The chat is copied, so the one-on-one version stays where it was. In a room that
+  // exists the character joins the cast if not in it yet and the scene opens; a new
+  // room's editor opens over the scene, to add the rest of the cast right away.
+  const moveToRoom = async (chat: ChatPreview, roomId: number | null = null) => {
+    const { roomId: target, chatId: sceneId } = await importChatToRoom(db, chat.id, roomId)
     router.push(`/chat/${sceneId}`)
-    router.push(`/room/${roomId}`)
+    if (roomId === null) router.push(`/room/${target}`)
   }
 
   return (
