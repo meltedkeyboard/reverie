@@ -7,7 +7,7 @@ import { NativeMenu } from '@/components/NativeMenu'
 import { SlidingIcon, useAtLeastOneLap } from '@/components/PillButton'
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
-import { isIOS } from '@/lib/platform'
+import { isDesktop, isIOS } from '@/lib/platform'
 import { type Colors, useColors, useStyles } from '@/theme'
 
 // The inset grouped list of the iOS Settings app: a small header over a rounded group of
@@ -76,6 +76,8 @@ function CellSwitch({ value, onValueChange, disabled }: { value: boolean; onValu
         onValueChange(v)
       }}
       trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
+      // react-native-web paints the thumb in its own teal; here it is white either way.
+      {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
       style={liquidGlass ? switchNudge : undefined}
     />
   )
@@ -198,6 +200,12 @@ export function ButtonCell({
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
+    ...baseStyles(colors),
+    ...(isDesktop ? desktopOverrides(colors) : {}),
+  })
+
+const baseStyles = (colors: Colors) =>
+  ({
     section: { marginBottom: 28 },
     header: {
       color: colors.textMuted,
@@ -217,4 +225,21 @@ const createStyles = (colors: Colors) =>
     value: { color: colors.textMuted, fontSize: 17, flexShrink: 1, maxWidth: '55%' },
     inputLabel: { color: colors.text, fontSize: 17 },
     input: { flex: 1, color: colors.text, fontSize: 17, textAlign: 'right', paddingVertical: 0 },
-  })
+  }) as const
+
+// Desktop settings: a section title in plain bold text, groups in the secondary
+// grey with a modest rounding, smaller text, and hairlines from edge to edge.
+const desktopOverrides = (colors: Colors) => ({
+  section: { marginBottom: 24 },
+  header: { color: colors.text, fontSize: 15, fontWeight: '600' as const, paddingHorizontal: 16, marginBottom: 10 },
+  group: { backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden' as const },
+  separator: { height: 1, backgroundColor: colors.border, marginHorizontal: 16 },
+  footer: { color: colors.textMuted, fontSize: 12.5, lineHeight: 17, paddingHorizontal: 16, marginTop: 8 },
+  row: { minHeight: 52, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, paddingHorizontal: 20, paddingVertical: 12 },
+  pressed: { backgroundColor: colors.surfaceRaised },
+  label: { flex: 1, color: colors.text, fontSize: 14 },
+  value: { color: colors.textMuted, fontSize: 14, flexShrink: 1, maxWidth: '55%' as const },
+  inputLabel: { color: colors.text, fontSize: 14 },
+  input: { flex: 1, color: colors.text, fontSize: 14, textAlign: 'right' as const, paddingVertical: 0 },
+})
+

@@ -14,9 +14,10 @@ import { t, useTranslation } from '@/i18n'
 import { onChatsChanged } from '@/lib/chatEvents'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chatDialogs'
 import { showSheet } from '@/lib/dialogs'
+import { isDesktop } from '@/lib/platform'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
-export const SIDEBAR_WIDTH = 300
+export const SIDEBAR_WIDTH = isDesktop ? 260 : 300
 const RAIL_WIDTH = 54
 const SLIDE = { duration: 220, easing: Easing.out(Easing.cubic) }
 const COLLAPSED_KEY = 'reverie.sidebarCollapsed'
@@ -134,7 +135,7 @@ export function Sidebar() {
       style={[
         styles.root,
         rootStyle,
-        { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 8 },
+        { paddingTop: insets.top + (isDesktop ? 8 : 12), paddingBottom: insets.bottom + 8 },
       ]}
     >
       <Pressable
@@ -143,7 +144,7 @@ export function Sidebar() {
         style={styles.toggle}
         accessibilityLabel={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
       >
-        <Ionicons name="menu-outline" size={22} color={colors.textMuted} />
+        <Ionicons name={isDesktop ? 'reorder-two-outline' : 'menu-outline'} size={isDesktop ? 18 : 22} color={colors.textMuted} />
       </Pressable>
       <View style={styles.nav}>
         {nav.map((item) => (
@@ -152,7 +153,7 @@ export function Sidebar() {
             active={pathname === item.path}
             onPress={() => router.navigate(item.href as never)}
           >
-            <Ionicons name={item.icon} size={18} color={colors.textMuted} />
+            <Ionicons name={item.icon} size={isDesktop ? 16 : 18} color={colors.textMuted} />
             <Animated.Text numberOfLines={1} style={[styles.navLabel, fade]}>
               {item.label}
             </Animated.Text>
@@ -173,7 +174,7 @@ export function Sidebar() {
                 onPress={() => router.navigate(`/chat/${chat.id}` as never)}
                 onMenu={() => openMenu(chat)}
               >
-                <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={26} viewable={false} />
+                <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={isDesktop ? 20 : 26} viewable={false} />
                 <View style={styles.chatText}>
                   <Text style={styles.chatTitle} numberOfLines={1}>
                     {chat.title ?? chat.ownerName}
@@ -193,7 +194,7 @@ export function Sidebar() {
 
       <View style={styles.footer}>
         <SidebarRow active={pathname === '/settings'} onPress={() => router.navigate('/settings' as never)}>
-          <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
+          <Ionicons name="settings-outline" size={isDesktop ? 16 : 18} color={colors.textMuted} />
           <Animated.Text numberOfLines={1} style={[styles.navLabel, fade]}>
             {t('settings.title')}
           </Animated.Text>
@@ -225,13 +226,24 @@ function SidebarRow({ active, onPress, onMenu, children }: RowProps) {
         onPress={onPress}
         // Like the cards of the lists: the chosen row is a card with an outline, a hovered
         // one shows just the outline, and a press sinks it a little.
-        style={({ pressed }) => [
-          styles.row,
-          onMenu && styles.rowWithMenu,
-          hovered && { borderColor: colors.border },
-          active && { backgroundColor: colors.surface, borderColor: colors.borderStrong },
-          pressed && { transform: [{ scale: 0.985 }] },
-        ]}
+        // On the desktop it is flat: a grey fill under the pointer and a
+        // stronger one under the chosen row, no outline and no sinking.
+        style={({ pressed }) =>
+          isDesktop
+            ? [
+                styles.row,
+                onMenu && styles.rowWithMenu,
+                hovered && { backgroundColor: colors.surfaceRaised },
+                active && { backgroundColor: colors.border },
+              ]
+            : [
+                styles.row,
+                onMenu && styles.rowWithMenu,
+                hovered && { borderColor: colors.border },
+                active && { backgroundColor: colors.surface, borderColor: colors.borderStrong },
+                pressed && { transform: [{ scale: 0.985 }] },
+              ]
+        }
       >
         {children}
       </Pressable>
@@ -251,7 +263,7 @@ function SidebarRow({ active, onPress, onMenu, children }: RowProps) {
 }
 
 const createStyles = (colors: Colors) =>
-  StyleSheet.create({
+  StyleSheet.create(isDesktop ? desktopStyles(colors) : {
     root: {
       overflow: 'hidden',
       backgroundColor: colors.bg,
@@ -274,3 +286,28 @@ const createStyles = (colors: Colors) =>
     rowWithMenu: { paddingRight: 36 },
     more: { position: 'absolute', right: 8, top: 0, bottom: 0, width: 24, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
   })
+
+// The desktop sidebar: the secondary grey, small plain text, tight rows with a little rounding.
+const desktopStyles = (colors: Colors) => ({
+  root: {
+    overflow: 'hidden' as const,
+    backgroundColor: colors.surface,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+    paddingHorizontal: 8,
+  },
+  toggle: { width: 28, height: 28, borderRadius: 5, alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: 6, marginLeft: 3 },
+  nav: { gap: 1, paddingBottom: 8 },
+  list: { flex: 1 },
+  listContent: { paddingBottom: 8 },
+  footer: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6 },
+  row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, paddingHorizontal: 8, paddingVertical: 4, minHeight: 28, borderRadius: 5 },
+  navLabel: { flex: 1, color: colors.text, fontSize: 13.5 },
+  group: { color: colors.textFaint, fontSize: 12, fontWeight: '500' as const, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 4 },
+  empty: { color: colors.textFaint, fontSize: 13, padding: 8 },
+  chatText: { flex: 1 },
+  chatTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 14 },
+  chatOwner: { color: colors.textFaint, fontSize: 11.5, marginTop: 1 },
+  rowWithMenu: { paddingRight: 32 },
+  more: { position: 'absolute' as const, right: 6, top: 0, bottom: 0, width: 22, alignSelf: 'center' as const, alignItems: 'center' as const, justifyContent: 'center' as const },
+})

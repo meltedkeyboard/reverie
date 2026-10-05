@@ -1,9 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { View } from 'react-native'
 
+import { showSheet } from '@/lib/dialogs'
+import { isDesktop } from '@/lib/platform'
 import { useColors } from '@/theme'
 
 import { GlassSurface, useGlassStyles } from './Glass'
+import { IconButton } from './IconButton'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from './NativeMenu'
 
 type Props = {
@@ -25,6 +28,14 @@ export function MenuGlassButton({ icon, items, size = 44, disabled }: Props) {
       {glyph}
     </GlassSurface>
   )
+
+  // On the desktop the flat square of IconButton, like the buttons beside it; the menu is the
+  // same sheet NativeMenu opens on the web, at the pointer.
+  if (isDesktop) {
+    return (
+      <IconButton name={icon} disabled={disabled} onPress={() => showSheet(undefined, items)} />
+    )
+  }
 
   // With Liquid Glass the menu draws the circle's glass and hosts the icon inside its
   // label, so the menu morphs out of the button.

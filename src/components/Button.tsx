@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
 import { liquidGlass } from '@/lib/nativeUI'
+import { isDesktop } from '@/lib/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from './Glass'
@@ -29,7 +30,7 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
     <ActivityIndicator color={tint} />
   ) : (
     <>
-      {icon ? <Ionicons name={icon} size={variant === 'soft' ? 17 : 18} color={tint} /> : null}
+      {icon ? <Ionicons name={icon} size={isDesktop ? 15 : variant === 'soft' ? 17 : 18} color={tint} /> : null}
       <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
     </>
   )
@@ -39,7 +40,7 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
       <Pressable
         onPress={onPress}
         disabled={disabled || loading}
-        style={({ pressed }) => [!liquidGlass && pressed && { transform: [{ scale: 0.98 }] }, disabled && { opacity: 0.4 }]}
+        style={({ pressed }) => [!liquidGlass && !isDesktop && pressed && { transform: [{ scale: 0.98 }] }, isDesktop && pressed && { opacity: 0.85 }, disabled && { opacity: 0.4 }]}
       >
         <GlassSurface
           interactive
@@ -81,4 +82,17 @@ const createStyles = (colors: Colors) =>
     secondaryLabel: { color: colors.text, fontWeight: '500' },
     softLabel: { color: colors.accent, fontSize: 15 },
     glassLabel: { color: ON_ACCENT, fontSize: 17 },
+    ...(isDesktop ? desktopOverrides(colors) : {}),
   })
+
+// Desktop buttons: compact, a small rounding, the label at the size of the text around it.
+const desktopOverrides = (colors: Colors) => ({
+  base: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 6, borderRadius: 6 },
+  primary: { height: 34, paddingHorizontal: 16, backgroundColor: colors.accent },
+  secondary: { height: 34, paddingHorizontal: 14, backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.border },
+  soft: { height: 34, paddingHorizontal: 14, backgroundColor: colors.accentSoft },
+  glass: { height: 36, paddingHorizontal: 20, borderRadius: 6 },
+  label: { fontSize: 14, fontWeight: '500' as const },
+  softLabel: { color: colors.accent, fontSize: 14 },
+  glassLabel: { color: ON_ACCENT, fontSize: 14 },
+})

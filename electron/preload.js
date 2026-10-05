@@ -3,6 +3,10 @@ const { contextBridge, ipcRenderer } = require('electron')
 // The bridge to Node: the sync folder. Paths are relative to the folder the user picked;
 // the main process keeps them inside it.
 contextBridge.exposeInMainWorld('reverieDesktop', {
+  platform: process.platform,
+  // The window has no frame of its own: the page draws the title bar, and on Windows and
+  // Linux the system buttons are painted over its right end in these colors.
+  setTitleBar: (colors) => ipcRenderer.send('window:titleBar', colors),
   cloudFolder: {
     pick: () => ipcRenderer.invoke('cloud:pick'),
     name: () => ipcRenderer.sendSync('cloud:folderName'),

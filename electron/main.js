@@ -81,6 +81,16 @@ ipcMain.handle('cloud:write', (event, relative, bytes) => {
 
 ipcMain.handle('cloud:remove', (event, relative) => fs.rmSync(inside(relative), { force: true }))
 
+// The height of the title bar the page draws, kept the same as TITLE_BAR_HEIGHT there.
+const TITLE_BAR_HEIGHT = 36
+
+ipcMain.on('window:titleBar', (event, { color, symbolColor }) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win || process.platform === 'darwin') return
+  win.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR_HEIGHT })
+  win.setBackgroundColor(color)
+})
+
 // Wheel and touchpad scrolling eases instead of stepping, on every platform.
 app.commandLine.appendSwitch('enable-features', 'SmoothScrolling')
 
@@ -90,7 +100,13 @@ function createWindow() {
     height: 760,
     minWidth: 420,
     minHeight: 560,
-    backgroundColor: '#0F0F12',
+    backgroundColor: '#1E1E1E',
+    // No system frame: the page draws a title bar of its own, and the system's own
+    // buttons sit over it (the traffic lights on a Mac, the overlay elsewhere).
+    titleBarStyle: 'hidden',
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 14, y: 12 } }
+      : { titleBarOverlay: { color: '#262626', symbolColor: '#B3B3B3', height: TITLE_BAR_HEIGHT } }),
     icon: path.join(__dirname, '..', 'assets', 'images', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -99,6 +115,12 @@ function createWindow() {
     },
   })
   win.setMenuBarVisibility(false)
+  // An app, not a page: no pinch or Ctrl+wheel zoom of the whole window.
+  win.webContents.setVisualZoomLevelLimits(1, 1)
+  win.webContents.on('before-input-event', (event, input) => {
+    const zoomKey = (input.control || input.meta) && ['+', '-', '=', '0'].includes(input.key)
+    if (input.type === 'keyDown' && zoomKey) event.preventDefault()
+  })
   // Links to the outside go to the real browser, not into the app window.
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)

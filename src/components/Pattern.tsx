@@ -3,6 +3,7 @@ import { Image, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type V
 import Svg, { Circle, Defs, G, Path, Pattern as SvgPattern, Rect } from 'react-native-svg'
 
 import type { ChatPatternId } from '@/db/settings'
+import { isDesktop } from '@/lib/platform'
 import { FILL, useTheme } from '@/theme'
 
 const TILES = {
@@ -28,7 +29,12 @@ const STAR_MIDDLE = { x: 60.4, y: 95.2 }
 const STAR_TURN = 95
 const STAR_WIDTH = 340
 
-const COLORS = { light: '#ECECEF', dark: '#0A0A0D' }
+// The phone's backgrounds are #F5F5F7 and #0F0F12; the desktop's, #FFFFFF and
+// #1E1E1E. The stars keep the same small step from the background on both.
+const COLORS = isDesktop ? { light: '#F1F1F1', dark: '#191919' } : { light: '#ECECEF', dark: '#0A0A0D' }
+// The tiles of the stars are pictures made for the phone's background: on the desktop's
+// they are faded until they sit as close to it as they do there.
+const TILE_OPACITY = isDesktop ? { light: 0.6, dark: 0.3 } : { light: 1, dark: 1 }
 
 type StarProps = { x: number; y: number; size: number; turn?: number; fill: string }
 
@@ -161,7 +167,7 @@ function Tiles({ scheme, width, height, scale }: { scheme: 'light' | 'dark'; wid
         <Image
           key={`${row}:${column}`}
           source={TILES[scheme]}
-          style={{ position: 'absolute', width: tile.width, height: tile.height, left: column * tile.width, top: row * tile.height }}
+          style={{ position: 'absolute', width: tile.width, height: tile.height, left: column * tile.width, top: row * tile.height, opacity: TILE_OPACITY[scheme] }}
         />
       )
     }

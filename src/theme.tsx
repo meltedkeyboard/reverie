@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Appearance, useColorScheme } from 'react-native'
-import { FONTS, isWeb } from '@/lib/platform'
+import { applyDesktopChrome } from '@/lib/desktopChrome'
+import { FONTS, isDesktop, isWeb } from '@/lib/platform'
 import { createRequiredContext } from '@/lib/requiredContext'
 
 export type Scheme = 'light' | 'dark'
@@ -75,7 +76,46 @@ const lightColors: Colors = {
   cast: ['#C26A12', '#1F86B5', '#C0407F', '#2F8F3A', '#6D4FD1', '#9A7A00'],
 }
 
-const palettes: Record<Scheme, Colors> = { dark: darkColors, light: lightColors }
+// The desktop app takes flat neutral greys: the page a neutral grey rather than
+// the near-black of the phone, the sidebar and the groups of settings one step lighter
+// (or darker, in light), hairlines that show, and plainer text.
+const desktopDarkColors: Colors = {
+  ...darkColors,
+  bg: '#1E1E1E',
+  bgRgb: '30, 30, 30',
+  surface: '#262626',
+  surfaceRaised: '#303030',
+  bubble: '#303030',
+  border: '#363636',
+  borderStrong: '#424242',
+  text: '#DADADA',
+  textMuted: '#B3B3B3',
+  textFaint: '#7A7A7A',
+  accent: '#8A5CF5',
+  accentSoft: 'rgba(138, 92, 245, 0.18)',
+  accentBorder: 'rgba(138, 92, 245, 0.4)',
+}
+
+const desktopLightColors: Colors = {
+  ...lightColors,
+  bg: '#FFFFFF',
+  bgRgb: '255, 255, 255',
+  surface: '#F6F6F6',
+  surfaceRaised: '#EBEBEB',
+  bubble: '#EFEFEF',
+  border: '#E0E0E0',
+  borderStrong: '#D0D0D0',
+  text: '#222222',
+  textMuted: '#5C5C5C',
+  textFaint: '#ABABAB',
+  accent: '#7852EE',
+  accentSoft: 'rgba(120, 82, 238, 0.12)',
+  accentBorder: 'rgba(120, 82, 238, 0.35)',
+}
+
+const palettes: Record<Scheme, Colors> = isDesktop
+  ? { dark: desktopDarkColors, light: desktopLightColors }
+  : { dark: darkColors, light: lightColors }
 
 // Exported for the handful of places that render before ThemeContextProvider can mount
 // (StartupBoundary's error screen, which may appear if the database itself fails to
@@ -151,6 +191,7 @@ export function ThemeContextProvider({
       *::-webkit-scrollbar-thumb:hover { background-color: ${thumbHover}; }
       *::-webkit-scrollbar-thumb:active { background-color: ${c.accent}; }
     `
+    if (isDesktop) applyDesktopChrome(c)
   }, [scheme])
   const value = useMemo(
     () => ({ colors: palettes[scheme], scheme, preference, setPreference }),

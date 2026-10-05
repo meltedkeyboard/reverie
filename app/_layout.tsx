@@ -10,6 +10,7 @@ import { DialogHost } from '@/components/DialogHost'
 import { Sidebar } from '@/components/Sidebar'
 import { SplashOverlay } from '@/components/SplashOverlay'
 import { StartupBoundary } from '@/components/StartupBoundary'
+import { TitleBar } from '@/components/TitleBar'
 import { ToastHost } from '@/components/ToastHost'
 import { isConfirmDeleteEnabled } from '@/db/confirmDelete'
 import { loadFileLimits } from '@/db/fileLimits'
@@ -20,6 +21,7 @@ import { CloudSyncProvider } from '@/hooks/useCloudSync'
 import { useLayoutMode } from '@/hooks/useLayoutMode'
 import { useStoredValue } from '@/hooks/useStoredFlag'
 import { ChatTextProvider } from '@/lib/chatText'
+import { isDesktop } from '@/lib/platform'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
 
@@ -96,6 +98,7 @@ function AppShell() {
     <>
       <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
       <ThemeProvider value={navigationTheme}>
+        {isDesktop ? <TitleBar title="Reverie" /> : null}
         <View style={styles.shell}>
           {sidebar ? <Sidebar /> : null}
           <View style={styles.main}>

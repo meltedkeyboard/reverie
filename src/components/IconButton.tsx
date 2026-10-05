@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Pressable, type StyleProp, type ViewStyle } from 'react-native'
 
+import { isDesktop } from '@/lib/platform'
 import { PRESS_ANYWHERE } from '@/lib/press'
 import { useColors } from '@/theme'
 
@@ -27,14 +28,29 @@ export function IconButton({ name, onPress, size = 22, color, style, disabled, a
       accessibilityLabel={accessibilityLabel}
       hitSlop={8}
       pressRetentionOffset={PRESS_ANYWHERE}
-      style={({ pressed }) => [
-        { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
-        pressed && { opacity: 0.55, transform: [{ scale: 0.92 }] },
+      // On the desktop a flat square that greys under the pointer.
+      style={(state) => [
+        isDesktop
+          ? [
+              { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+              (state as { hovered?: boolean }).hovered && { backgroundColor: colors.surfaceRaised },
+              state.pressed && { backgroundColor: colors.border },
+            ]
+          : [
+              { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+              state.pressed && { opacity: 0.55, transform: [{ scale: 0.92 }] },
+            ],
         disabled && { opacity: 0.35 },
         style,
       ]}
     >
-      {children ?? <Ionicons name={name} size={size} color={color ?? colors.text} />}
+      {children ?? (
+        <Ionicons
+          name={name}
+          size={isDesktop ? Math.min(size, 18) : size}
+          color={color ?? (isDesktop ? colors.textMuted : colors.text)}
+        />
+      )}
     </Pressable>
   )
 }

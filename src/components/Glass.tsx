@@ -3,6 +3,7 @@ import type { ComponentProps } from 'react'
 import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
 
 import { floatingBars, glassEffect, liquidGlass } from '@/lib/nativeUI'
+import { isDesktop } from '@/lib/platform'
 import { useStyles, useTheme, type Colors } from '@/theme'
 
 import { IconButton } from './IconButton'
@@ -69,7 +70,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
         onPress={onPress}
         disabled={disabled}
         accessibilityLabel={accessibilityLabel}
-        style={[floatingBars && styles.circleSolid, fill ? { backgroundColor: fill } : undefined]}
+        style={[floatingBars && !isDesktop && styles.circleSolid, fill ? { backgroundColor: fill } : undefined]}
       >
         {children}
       </IconButton>

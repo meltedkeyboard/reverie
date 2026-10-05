@@ -10,7 +10,7 @@ import { BlurBar, EdgeFade } from './BarChrome'
 import { GlassButton } from './Glass'
 import { IconButton } from './IconButton'
 import { Star } from './motifs/Star'
-import { isIOS } from '@/lib/platform'
+import { isDesktop, isIOS } from '@/lib/platform'
 
 type Props = {
   left?: React.ReactNode
@@ -56,7 +56,7 @@ export function TabTitle({ children, maxWidth, fit }: { children: React.ReactNod
   const styles = useStyles(createStyles)
   return (
     <View style={[styles.tabTitleRow, maxWidth !== undefined && { maxWidth }]}>
-      <Star size={22} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
+      <Star size={isDesktop ? 18 : 22} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
       <Text
         maxFontSizeMultiplier={HEADER_FONT_SCALE}
         style={styles.tabTitle}
@@ -131,4 +131,13 @@ const createStyles = (colors: Colors) =>
     paddingHorizontal: 8,
   },
   center: { flex: 1, justifyContent: 'center', paddingHorizontal: 4 },
+  // The prose face stays, it is the app's own; on the desktop the titles are just smaller,
+  // in proportion to the compact chrome.
+  ...(isDesktop
+    ? {
+        title: { color: colors.text, fontFamily: fonts.prose, fontSize: 16, fontWeight: '600' as const },
+        tabTitleRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, flexShrink: 1 },
+        tabTitle: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700' as const, fontSize: 22, flexShrink: 1 },
+      }
+    : {}),
 })
