@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import ReorderableList, { type ReorderableListReorderEvent } from 'react-native-reorderable-list'
 
+import { isDesktop } from '@/lib/platform'
 import { Button } from '@/components/Button'
 import { CharacterCard } from '@/components/CharacterCard'
 import { CONTINUE_BUTTON_SPACE } from '@/components/ContinueButton'
@@ -202,9 +203,9 @@ const createStyles = (colors: Colors) =>
     alignItems: 'center',
     gap: 12,
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: isDesktop ? 0 : 1,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: isDesktop ? 8 : 20,
     borderCurve: 'continuous',
     paddingVertical: 12,
     paddingLeft: 14,

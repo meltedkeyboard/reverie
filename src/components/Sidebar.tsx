@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { usePathname, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -18,7 +18,9 @@ import { isDesktop } from '@/lib/platform'
 import { fonts, useColors, useStyles, type Colors } from '@/theme'
 
 export const SIDEBAR_WIDTH = isDesktop ? 260 : 300
-const RAIL_WIDTH = 54
+// On the desktop the rail is just wide enough for a square row (6 + 16 icon + 6), its
+// margins of 8 and the 1 pt line on the right.
+const RAIL_WIDTH = isDesktop ? 45 : 54
 const SLIDE = { duration: 220, easing: Easing.out(Easing.cubic) }
 const COLLAPSED_KEY = 'reverie.sidebarCollapsed'
 
@@ -35,6 +37,27 @@ function writeCollapsed(value: boolean) {
   try {
     globalThis.localStorage?.setItem(COLLAPSED_KEY, value ? '1' : '0')
   } catch {}
+}
+
+// Whether the sidebar is folded to a rail. Shared, so the desktop title bar can hold the
+// button that folds it.
+let collapsedNow = readCollapsed()
+const collapsedListeners = new Set<() => void>()
+
+export function toggleSidebar() {
+  collapsedNow = !collapsedNow
+  writeCollapsed(collapsedNow)
+  collapsedListeners.forEach((listener) => listener())
+}
+
+export function useSidebarCollapsed() {
+  return useSyncExternalStore(
+    (listener) => {
+      collapsedListeners.add(listener)
+      return () => collapsedListeners.delete(listener)
+    },
+    () => collapsedNow
+  )
 }
 
 type Group = { label: string; chats: SearchChat[] }
@@ -69,13 +92,7 @@ export function Sidebar() {
   const styles = useStyles(createStyles)
   const { t: tr } = useTranslation()
   const [chats, setChats] = useState<SearchChat[] | null>(null)
-  const [collapsed, setCollapsed] = useState(readCollapsed)
-  const toggle = useCallback(() => {
-    setCollapsed((old) => {
-      writeCollapsed(!old)
-      return !old
-    })
-  }, [])
+  const collapsed = useSidebarCollapsed()
   // 0 = open, 1 = a rail of icons. The width and the fade of the text follow it.
   const progress = useSharedValue(collapsed ? 1 : 0)
   useEffect(() => {
@@ -88,7 +105,7 @@ export function Sidebar() {
     (e) => (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b',
     (e) => {
       e.preventDefault()
-      toggle()
+      toggleSidebar()
     }
   )
 
@@ -138,14 +155,17 @@ export function Sidebar() {
         { paddingTop: insets.top + (isDesktop ? 8 : 12), paddingBottom: insets.bottom + 8 },
       ]}
     >
-      <Pressable
-        onPress={toggle}
-        hitSlop={6}
-        style={styles.toggle}
-        accessibilityLabel={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
-      >
-        <Ionicons name={isDesktop ? 'reorder-two-outline' : 'menu-outline'} size={isDesktop ? 18 : 22} color={colors.textMuted} />
-      </Pressable>
+      {/* On the desktop the button is in the title bar. */}
+      {isDesktop ? null : (
+        <Pressable
+          onPress={toggleSidebar}
+          hitSlop={6}
+          style={styles.toggle}
+          accessibilityLabel={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
+        >
+          <Ionicons name="menu-outline" size={22} color={colors.textMuted} />
+        </Pressable>
+      )}
       <View style={styles.nav}>
         {nav.map((item) => (
           <SidebarRow
@@ -296,12 +316,12 @@ const desktopStyles = (colors: Colors) => ({
     borderRightColor: colors.border,
     paddingHorizontal: 8,
   },
-  toggle: { width: 28, height: 28, borderRadius: 5, alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: 6, marginLeft: 3 },
+  toggle: {},
   nav: { gap: 1, paddingBottom: 8 },
   list: { flex: 1 },
   listContent: { paddingBottom: 8 },
   footer: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6 },
-  row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, paddingHorizontal: 8, paddingVertical: 4, minHeight: 28, borderRadius: 5 },
+  row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, paddingHorizontal: 6, paddingVertical: 4, minHeight: 28, borderRadius: 5 },
   navLabel: { flex: 1, color: colors.text, fontSize: 13.5 },
   group: { color: colors.textFaint, fontSize: 12, fontWeight: '500' as const, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 4 },
   empty: { color: colors.textFaint, fontSize: 13, padding: 8 },

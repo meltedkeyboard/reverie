@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useReorderableDrag } from 'react-native-reorderable-list'
 
+import { isDesktop } from '@/lib/platform'
 import { useTranslation } from '@/i18n'
 import { isConfirmDeleteOn } from '@/lib/confirmDelete'
 import { showSheet } from '@/lib/dialogs'
@@ -76,7 +77,12 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, c
       <Pressable
         onPress={onOpen}
         onLongPress={drag}
-        style={({ pressed }) => [cardStyle, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
+        // On the desktop a flat list row: no outline, greyer under the pointer.
+        style={(state) =>
+          isDesktop
+            ? [cardStyle, (state as { hovered?: boolean }).hovered && styles.hovered, state.pressed && styles.pressedFlat]
+            : [cardStyle, state.pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]
+        }
       >
         {children}
         {menuButton}
@@ -119,6 +125,22 @@ const createStyles = (colors: Colors) =>
     // The same box as the IconButton it replaces.
     menu: { width: 40, height: 40 },
     vertical: { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingVertical: 0, paddingLeft: 0, paddingRight: 0 },
+    ...(isDesktop
+      ? {
+          card: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            backgroundColor: colors.surface,
+            borderRadius: 8,
+            paddingVertical: 10,
+            paddingLeft: 14,
+            paddingRight: 6,
+          },
+        }
+      : {}),
+    hovered: { backgroundColor: colors.surfaceRaised },
+    pressedFlat: { backgroundColor: colors.border },
     floating: {
       position: 'absolute',
       top: 8,

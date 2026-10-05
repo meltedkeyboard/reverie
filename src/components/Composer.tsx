@@ -41,7 +41,7 @@ import type { ImageSource } from '@/lib/images'
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
 import { alertError } from '@/lib/report'
-import { isWeb } from '@/lib/platform'
+import { isDesktop, isWeb } from '@/lib/platform'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 type Props = {
@@ -872,7 +872,7 @@ const createStyles = (colors: Colors) =>
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
+    borderWidth: isDesktop ? 0 : 1,
     borderColor: colors.border,
   },
   plusAt: { position: 'absolute', left: EDGE, bottom: EDGE },

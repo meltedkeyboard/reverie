@@ -83,11 +83,13 @@ ipcMain.handle('cloud:remove', (event, relative) => fs.rmSync(inside(relative), 
 
 // The height of the title bar the page draws, kept the same as TITLE_BAR_HEIGHT there.
 const TITLE_BAR_HEIGHT = 36
+// The system buttons stop a point short, above the bar's bottom line, which they would cover.
+const OVERLAY_HEIGHT = TITLE_BAR_HEIGHT - 1
 
 ipcMain.on('window:titleBar', (event, { color, symbolColor }) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win || process.platform === 'darwin') return
-  win.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR_HEIGHT })
+  win.setTitleBarOverlay({ color, symbolColor, height: OVERLAY_HEIGHT })
   win.setBackgroundColor(color)
 })
 
@@ -106,7 +108,7 @@ function createWindow() {
     titleBarStyle: 'hidden',
     ...(process.platform === 'darwin'
       ? { trafficLightPosition: { x: 14, y: 12 } }
-      : { titleBarOverlay: { color: '#262626', symbolColor: '#B3B3B3', height: TITLE_BAR_HEIGHT } }),
+      : { titleBarOverlay: { color: '#262626', symbolColor: '#B3B3B3', height: OVERLAY_HEIGHT } }),
     icon: path.join(__dirname, '..', 'assets', 'images', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

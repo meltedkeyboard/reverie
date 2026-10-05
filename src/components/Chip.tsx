@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'rea
 
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
+import { isDesktop } from '@/lib/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from './Glass'
@@ -27,7 +28,7 @@ export function Chip({ label, active, onPress, style }: Props) {
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       // The glass is not interactive (its press spring pulls the chip along with a sideways scroll), so on glass nothing moves.
-      style={({ pressed }) => [style, !liquidGlass && pressed && { transform: [{ scale: 0.96 }] }]}
+      style={({ pressed }) => [style, !liquidGlass && !isDesktop && pressed && { transform: [{ scale: 0.96 }] }, isDesktop && pressed && { opacity: 0.8 }]}
     >
       <GlassSurface
         tintColor={active ? colors.accent : undefined}
@@ -48,4 +49,13 @@ const createStyles = (colors: Colors) =>
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     solidActive: { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.accent },
     label: { fontSize: 14, fontWeight: '600' },
+    // Segmented choices on the desktop: small flat tabs, the chosen one filled.
+    ...(isDesktop
+      ? {
+          chip: { minHeight: 28, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+          solid: { backgroundColor: colors.surfaceRaised, borderWidth: 0 },
+          solidActive: { backgroundColor: colors.accent, borderWidth: 0 },
+          label: { fontSize: 13, fontWeight: '500' },
+        }
+      : {}),
   })

@@ -1,5 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native'
 
+import { IconButton } from '@/components/IconButton'
+import { toggleSidebar, useSidebarCollapsed } from '@/components/Sidebar'
+import { t } from '@/i18n'
 import { desktopBridge } from '@/lib/desktopChrome'
 import { type Colors, useStyles } from '@/theme'
 
@@ -15,10 +18,23 @@ const mac = desktopBridge()?.platform === 'darwin'
 // The desktop window has no system frame, so the page draws the bar the window is dragged
 // by, in the sidebar's grey. The system buttons sit over one end of it:
 // the traffic lights on the left on a Mac, the overlay on the right elsewhere.
-export function TitleBar({ title }: { title: string }) {
+// With `sidebar` it holds, at its left end, the button that folds the sidebar.
+export function TitleBar({ title, sidebar }: { title: string; sidebar: boolean }) {
   const styles = useStyles(createStyles)
+  const collapsed = useSidebarCollapsed()
   return (
     <View style={[styles.root, mac ? styles.mac : styles.other]} {...dragRegion}>
+      <View style={[styles.side, mac && styles.macSide]}>
+        {sidebar ? (
+          <IconButton
+            name="reorder-two-outline"
+            size={18}
+            style={styles.toggle}
+            onPress={toggleSidebar}
+            accessibilityLabel={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
+          />
+        ) : null}
+      </View>
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
@@ -39,5 +55,9 @@ const createStyles = (colors: Colors) =>
     },
     mac: { paddingLeft: 80, paddingRight: 80 },
     other: { paddingLeft: 140, paddingRight: 140 },
+    // The left end, outside the centered title; past the traffic lights on a Mac.
+    side: { position: 'absolute', left: 6, top: 0, bottom: 0, justifyContent: 'center' },
+    macSide: { left: 80 },
+    toggle: { width: 28, height: 28 },
     title: { color: colors.textMuted, fontSize: 12, fontWeight: '500' },
   })

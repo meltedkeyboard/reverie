@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
+import { isDesktop } from '@/lib/platform'
 import { Avatar } from '@/components/Avatar'
 import { ChatBackground } from '@/components/ChatBackground'
 import { ChipGroup } from '@/components/ChipGroup'
@@ -443,7 +444,7 @@ const createStyles = (colors: Colors) =>
     linkMuted: textStyles(colors).linkMuted,
     linkDanger: { color: colors.danger, fontSize: 15, marginTop: 4 },
     member: {
-      borderWidth: 1,
+      borderWidth: isDesktop ? 0 : 1,
       borderColor: colors.border,
       backgroundColor: colors.surface,
       borderRadius: 16,

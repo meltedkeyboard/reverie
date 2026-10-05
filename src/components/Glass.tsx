@@ -98,6 +98,8 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
 // outside iOS 26 they are just the plain icon buttons side by side.
 export function GlassGroup({ children }: { children: React.ReactNode }) {
   const styles = useStyles(createStyles)
+  // On the desktop the buttons stand loose, flat, as in a toolbar.
+  if (isDesktop) return <View style={styles.desktopGroup}>{children}</View>
   return (
     <GlassSurface interactive style={styles.group} fallbackStyle={floatingBars && styles.solid}>
       {children}
@@ -118,4 +120,7 @@ const createStyles = (colors: Colors) =>
     circleSolid: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     disabled: { opacity: 0.35 },
+    desktopGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    // What stands in for glass on the desktop: a flat grey fill, no outline.
+    ...(isDesktop ? { solid: { backgroundColor: colors.surfaceRaised, borderWidth: 0 } } : {}),
   })

@@ -98,7 +98,7 @@ function AppShell() {
     <>
       <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
       <ThemeProvider value={navigationTheme}>
-        {isDesktop ? <TitleBar title="Reverie" /> : null}
+        {isDesktop ? <TitleBar title="Reverie" sidebar={sidebar} /> : null}
         <View style={styles.shell}>
           {sidebar ? <Sidebar /> : null}
           <View style={styles.main}>

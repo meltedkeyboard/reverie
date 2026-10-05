@@ -14,7 +14,7 @@ import { useTranslation } from '@/i18n'
 import { liquidGlass } from '@/lib/nativeUI'
 import { PRESS_ANYWHERE } from '@/lib/press'
 import { useColors, useStyles, type Colors } from '@/theme'
-import { isWeb } from '@/lib/platform'
+import { isDesktop, isWeb } from '@/lib/platform'
 
 // How far above the newest message the list has to be before the jump button shows up.
 const JUMP_THRESHOLD = 240
@@ -308,7 +308,7 @@ const createStyles = (colors: Colors) =>
       borderColor: colors.dangerBorder,
     },
     errorText: { color: colors.text, fontSize: 14, lineHeight: 20 },
-    retry: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.surfaceRaised },
+    retry: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: isDesktop ? 6 : 12, backgroundColor: colors.surfaceRaised },
     retryText: { color: colors.text, fontSize: 14, fontWeight: '600' },
     jumpSlot: { marginBottom: 12 },
     flash: { left: 8, right: 8, borderRadius: 18 },
@@ -319,7 +319,7 @@ const createStyles = (colors: Colors) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surfaceRaised,
-      borderWidth: 1,
+      borderWidth: isDesktop ? 0 : 1,
       borderColor: colors.border,
       shadowColor: '#000000',
       shadowOpacity: 0.35,

@@ -14,6 +14,7 @@ import {
 import { KeyboardAwareScrollView, useKeyboardState } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { isDesktop } from '@/lib/platform'
 import { Button } from '@/components/Button'
 import { Field, FieldLabel } from '@/components/Field'
 import { PickerBox } from '@/components/PickerBox'
@@ -300,7 +301,7 @@ const createStyles = (colors: Colors) =>
     pageText: { color: colors.textMuted, fontSize: 16, lineHeight: 22, textAlign: 'center', marginBottom: 32 },
     // Laid out as a Field, so the model sits in line with the address and the key.
     modelWrap: { marginBottom: 20 },
-    modelSolid: { borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    modelSolid: { borderRadius: isDesktop ? 8 : 14, backgroundColor: colors.surface, borderWidth: isDesktop ? 0 : 1, borderColor: colors.border },
     statusText: { ...textStyles(colors).note, textAlign: 'center', marginTop: 14 },
     later: { color: colors.textFaint, fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 14, marginHorizontal: 8 },
     footer: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 12 },

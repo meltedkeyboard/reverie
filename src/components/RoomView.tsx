@@ -6,6 +6,7 @@ import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { isDesktop } from '@/lib/platform'
 import { AsideToggleButton, ChatSurface, bubbleOpacityOf } from '@/components/ChatChrome'
 import { AsidePanel } from '@/components/AsidePanel'
 import { AvatarStack, castGallery } from '@/components/AvatarStack'
@@ -582,7 +583,7 @@ const createStyles = (colors: Colors) =>
       borderRadius: 18,
       maxWidth: 360,
     },
-    statusSolid: { backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.border },
+    statusSolid: { backgroundColor: colors.surfaceRaised, borderWidth: isDesktop ? 0 : 1, borderColor: colors.border },
     statusDots: { transform: [{ scale: 0.7 }], marginHorizontal: -6 },
     statusText: { color: colors.text, fontSize: 13, flexShrink: 1 },
     statusFaint: { color: colors.textMuted },

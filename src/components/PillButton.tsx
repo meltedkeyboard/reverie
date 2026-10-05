@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, t
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
 
 import { liquidGlass } from '@/lib/nativeUI'
+import { isDesktop } from '@/lib/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from './Glass'
@@ -46,7 +47,7 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       // Interactive glass springs under the finger by itself; a scale on top would fight it.
-      style={({ pressed }) => [style, inactive && !sliding && { opacity: 0.5 }, !liquidGlass && pressed && { transform: [{ scale: 0.97 }] }]}
+      style={({ pressed }) => [style, inactive && !sliding && { opacity: 0.5 }, !liquidGlass && !isDesktop && pressed && { transform: [{ scale: 0.97 }] }, isDesktop && pressed && { opacity: 0.8 }]}
     >
       <GlassSurface
         interactive={!inactive}
@@ -144,4 +145,13 @@ const createStyles = (colors: Colors) =>
     solid:{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     content: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     label: { fontSize: 16, fontWeight: '600' },
+    // A compact flat button on the desktop, like the rest of the desktop's.
+    ...(isDesktop
+      ? {
+          pill: { minHeight: 32, paddingHorizontal: 14, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+          circle: { width: 32, paddingHorizontal: 0 },
+          solid: { backgroundColor: colors.surfaceRaised, borderWidth: 0 },
+          label: { fontSize: 14, fontWeight: '500' },
+        }
+      : {}),
   })

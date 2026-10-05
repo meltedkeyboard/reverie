@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View, type
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 
+import { isDesktop } from '@/lib/platform'
 import { isKey, useWindowKey } from '@/hooks/useWindowKey'
 import { usePromptState } from '@/hooks/usePromptState'
 import { useTranslation } from '@/i18n'
@@ -211,7 +212,7 @@ const createStyles = (colors: Colors) =>
       boxShadow: '0 8px 28px rgba(0, 0, 0, 0.35)',
     },
     menuTitle: { color: colors.textFaint, fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 },
-    menuRow: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
+    menuRow: { paddingHorizontal: 10, paddingVertical: isDesktop ? 6 : 8, borderRadius: isDesktop ? 5 : 8 },
     menuLabel: { color: colors.text, fontSize: 14 },
     window: {
       width: '100%',
@@ -237,7 +238,7 @@ const createStyles = (colors: Colors) =>
       paddingVertical: 9,
     },
     buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
-    button: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, borderCurve: 'continuous' },
-    buttonPlain: { borderWidth: 1, borderColor: colors.borderStrong },
+    button: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: isDesktop ? 6 : 10, borderCurve: 'continuous' },
+    buttonPlain: isDesktop ? { backgroundColor: colors.surfaceRaised } : { borderWidth: 1, borderColor: colors.borderStrong },
     buttonLabel: { fontSize: 14, fontWeight: '600' },
   })

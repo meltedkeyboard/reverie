@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Pressable, StyleSheet } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated'
 
+import { isDesktop } from '@/lib/platform'
 import { GlassSurface } from '@/components/Glass'
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
@@ -65,6 +66,6 @@ export function StarToggle({ value, onValueChange }: { value: boolean; onValueCh
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     circle: { width: SIZE, height: SIZE, borderRadius: SIZE / 2, alignItems: 'center', justifyContent: 'center' },
-    solidOff: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-    solidOn: { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.accent },
+    solidOff: { backgroundColor: isDesktop ? colors.surfaceRaised : colors.surface, borderWidth: isDesktop ? 0 : 1, borderColor: colors.border },
+    solidOn: { backgroundColor: colors.accent, borderWidth: isDesktop ? 0 : 1, borderColor: colors.accent },
   })
