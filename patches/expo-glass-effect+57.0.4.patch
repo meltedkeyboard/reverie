@@ -1,8 +1,8 @@
 diff --git a/node_modules/expo-glass-effect/ios/GlassView.swift b/node_modules/expo-glass-effect/ios/GlassView.swift
-index 35cd8f3..8eb2fa8 100644
+index 1130937..50ef5c1 100644
 --- a/node_modules/expo-glass-effect/ios/GlassView.swift
 +++ b/node_modules/expo-glass-effect/ios/GlassView.swift
-@@ -214,10 +214,41 @@ public final class GlassView: ExpoView {
+@@ -271,10 +271,41 @@ public final class GlassView: ExpoView {
    func setTintColor(_ color: UIColor?) {
      if color != glassTintColor {
        glassTintColor = color

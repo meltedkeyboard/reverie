@@ -58,7 +58,10 @@ export default function ViewerScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* Keyed by the window: after a turn the pages are a new width, so the list is laid out
+          again at the picture that was open, and a zoom left over from the other way goes. */}
       <FlatList
+        key={`${window.width}x${window.height}`}
         data={images}
         keyExtractor={(image, i) => `${i}:${image.uri.slice(-40)}`}
         horizontal
@@ -73,6 +76,7 @@ export default function ViewerScreen() {
           const page = Math.round(e.nativeEvent.contentOffset.x / window.width)
           setIndex(Math.min(images.length - 1, Math.max(0, page)))
         }}
+        onLayout={() => setZoomed(false)}
         renderItem={({ item }) =>
           isIOS ? (
             <NativeZoomImage
@@ -87,7 +91,7 @@ export default function ViewerScreen() {
           )
         }
       />
-      <View style={[styles.bar, { top: insets.top + 4 }]} pointerEvents="box-none">
+      <View style={[styles.bar, { top: insets.top + 4, left: insets.left + 12, right: insets.right + 12 }]} pointerEvents="box-none">
         <GlassButton icon="chevron-back" iconSize={26} onPress={close} />
         {current ? (
           <GlassButton
@@ -315,7 +319,7 @@ function ZoomableImage({ image, width, height, onZoomChange, onTap }: ZoomablePr
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    bar: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' },
+    bar: { position: 'absolute', flexDirection: 'row', justifyContent: 'space-between' },
     counter: {
       position: 'absolute',
       alignSelf: 'center',

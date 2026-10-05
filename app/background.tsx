@@ -1,7 +1,7 @@
 import { ImageManipulator } from 'expo-image-manipulator'
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
@@ -40,11 +40,13 @@ import {
 import { withAlpha } from '@/lib/color'
 import * as Haptics from '@/lib/haptics'
 import { liquidGlass } from '@/lib/nativeUI'
-import { type Colors, FILL, useColors, useStyles } from '@/theme'
+import { type Colors, FILL, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 
 const DOUBLE_TAP_ZOOM = 2
 const SPRING = { damping: 22, stiffness: 220, mass: 0.9 }
 const FADE = { duration: 200 }
+// On a screen wider than tall the controls stand in a column on the right, this wide.
+const SIDE_PANEL = 340
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
 
@@ -252,7 +254,22 @@ export default function BackgroundScreen() {
   const gridStyle = useAnimatedStyle(() => ({ opacity: grid.value }))
   const hintStyle = useAnimatedStyle(() => ({ opacity: hint.value }))
 
-  const onLayout = (event: LayoutChangeEvent) => setFrame(event.nativeEvent.layout)
+  // A turn of the phone gives the picture a new covering size: the zoom stays, and the
+  // offsets are scaled with the picture and clamped, so roughly the same part stays in view.
+  const onLayout = (event: LayoutChangeEvent) => {
+    const next = { width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height }
+    if (placed.current && natural && cover && (next.width !== frame.width || next.height !== frame.height)) {
+      stopAll()
+      const nextCover = coverSize(natural, next)
+      const zoom = clamp(k.value, 1, MAX_ZOOM)
+      const limit = limits(nextCover, next, zoom)
+      const ratio = nextCover.width / cover.width
+      k.value = zoom
+      x.value = clamp(x.value * ratio, -limit.x, limit.x)
+      y.value = clamp(y.value * ratio, -limit.y, limit.y)
+    }
+    setFrame(next)
+  }
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
 
@@ -275,6 +292,10 @@ export default function BackgroundScreen() {
   }
 
   if (!draft) return <View style={styles.screen} />
+
+  const landscape = width > height
+  // What is left of the screen beside the side panel, where the chat's own things stand.
+  const chatRight = landscape ? insets.right + SIDE_PANEL : 0
 
   const options: { value: BackgroundEffect; label: string }[] = [
     { value: 'blur', label: t('background.effectBlur') },
@@ -314,14 +335,14 @@ export default function BackgroundScreen() {
         </View>
       </GestureDetector>
 
-      <View style={styles.empty} pointerEvents="none">
+      <View style={[styles.empty, { left: insets.left, right: chatRight }]} pointerEvents="none">
         <Text style={styles.emptyName}>{draft.characterName}</Text>
         <Text style={styles.emptyHint}>{t('chat.emptyHint')}</Text>
         <Animated.Text style={[styles.cropHint, hintStyle]}>{t('background.cropHint')}</Animated.Text>
       </View>
 
       {/* A message of the user's, to judge how see-through its bubble is. */}
-      <View style={styles.sample} pointerEvents="none">
+      <View style={[styles.sample, { right: chatRight + 16 }]} pointerEvents="none">
         <View style={[styles.bubble, { backgroundColor: withAlpha(colors.bubble, 1 - bubbleTransparency) }]}>
           <Text style={styles.bubbleText}>{t('background.sampleMessage')}</Text>
         </View>
@@ -335,39 +356,85 @@ export default function BackgroundScreen() {
         <HeaderTitle>{t('background.title')}</HeaderTitle>
       </GlassHeader>
 
-      <View style={[styles.dock, { paddingBottom: insets.bottom + 8 }]} pointerEvents="box-none">
-        {/* Stands in for the composer, so the picture is judged with the real bar on it. */}
-        <GlassSurface style={styles.fakeField} fallbackStyle={glass.solid}>
-          <Text style={styles.fakePlaceholder}>{t('chat.messagePlaceholder')}</Text>
-        </GlassSurface>
-
-        {/* With Liquid Glass each control is its own piece of glass, as glass on glass
-            would muddy both; without it they share one solid panel. */}
-        <View style={[styles.panel, !liquidGlass && glass.solid]}>
-          <ChipGroup options={options} value={effect} onChange={setEffect} />
-          <GlassSurface style={styles.slider}>
-            <ParamSlider
-              label={t('background.intensity')}
-              value={intensity}
-              min={0}
-              max={1}
-              step={0.05}
-              formatValue={percent}
-              onChange={setIntensity}
-            />
-            <ParamSlider
-              label={t('background.bubbleTransparency')}
-              value={bubbleTransparency}
-              min={0}
-              max={1}
-              step={0.05}
-              formatValue={percent}
-              onChange={setBubbleTransparency}
-            />
+      {landscape ? (
+        <>
+          <View
+            style={[styles.dock, { left: insets.left, right: chatRight, paddingBottom: insets.bottom + 8 }]}
+            pointerEvents="box-none"
+          >
+            {/* Stands in for the composer, so the picture is judged with the real bar on it. */}
+            <GlassSurface style={styles.fakeField} fallbackStyle={glass.solid}>
+              <Text style={styles.fakePlaceholder}>{t('chat.messagePlaceholder')}</Text>
+            </GlassSurface>
+          </View>
+          <ScrollView
+            style={[styles.sidePanel, { top: insets.top + HEADER_ROW_HEIGHT, right: insets.right }]}
+            contentContainerStyle={[styles.sidePanelContent, { paddingBottom: insets.bottom + 8 }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* With Liquid Glass each control is its own piece of glass, as glass on glass
+                would muddy both; without it they share one solid panel. */}
+            <View style={[styles.panel, !liquidGlass && glass.solid]}>
+              <ChipGroup options={options} value={effect} onChange={setEffect} />
+              <GlassSurface style={styles.slider}>
+                <ParamSlider
+                  label={t('background.intensity')}
+                  value={intensity}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  formatValue={percent}
+                  onChange={setIntensity}
+                />
+                <ParamSlider
+                  label={t('background.bubbleTransparency')}
+                  value={bubbleTransparency}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  formatValue={percent}
+                  onChange={setBubbleTransparency}
+                />
+              </GlassSurface>
+              <Button variant="glass" label={t('common.save')} onPress={done} disabled={saving} />
+            </View>
+          </ScrollView>
+        </>
+      ) : (
+        <View style={[styles.dock, { paddingBottom: insets.bottom + 8 }]} pointerEvents="box-none">
+          {/* Stands in for the composer, so the picture is judged with the real bar on it. */}
+          <GlassSurface style={styles.fakeField} fallbackStyle={glass.solid}>
+            <Text style={styles.fakePlaceholder}>{t('chat.messagePlaceholder')}</Text>
           </GlassSurface>
-          <Button variant="glass" label={t('common.save')} onPress={done} disabled={saving} />
+
+          {/* With Liquid Glass each control is its own piece of glass, as glass on glass
+              would muddy both; without it they share one solid panel. */}
+          <View style={[styles.panel, !liquidGlass && glass.solid]}>
+            <ChipGroup options={options} value={effect} onChange={setEffect} />
+            <GlassSurface style={styles.slider}>
+              <ParamSlider
+                label={t('background.intensity')}
+                value={intensity}
+                min={0}
+                max={1}
+                step={0.05}
+                formatValue={percent}
+                onChange={setIntensity}
+              />
+              <ParamSlider
+                label={t('background.bubbleTransparency')}
+                value={bubbleTransparency}
+                min={0}
+                max={1}
+                step={0.05}
+                formatValue={percent}
+                onChange={setBubbleTransparency}
+              />
+            </GlassSurface>
+            <Button variant="glass" label={t('common.save')} onPress={done} disabled={saving} />
+          </View>
         </View>
-      </View>
+      )}
     </View>
   )
 }
@@ -396,6 +463,8 @@ const createStyles = (colors: Colors) =>
     cropHint: { color: colors.textFaint, fontSize: 13, marginTop: 14 },
     fakeField: { borderRadius: 22, paddingVertical: 11, paddingHorizontal: 16 },
     fakePlaceholder: { color: colors.textFaint, fontSize: 16 },
+    sidePanel: { position: 'absolute', bottom: 0, width: SIDE_PANEL },
+    sidePanelContent: { flexGrow: 1, justifyContent: 'flex-end', paddingHorizontal: 10 },
     panel: { borderRadius: 24, padding: 12, gap: 10 },
     slider: { borderRadius: 22, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
   })

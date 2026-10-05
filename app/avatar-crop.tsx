@@ -21,6 +21,8 @@ import { isWeb } from '@/lib/platform'
 const MAX_ZOOM = 4
 // The hint and the button under the window.
 const DOCK_SPACE = 110
+// On a screen wider than tall they stand beside the window instead, in a column this wide.
+const SIDE_DOCK = 220
 
 // The Files picker has no editor of its own, so a picked file is framed here the way the
 // photo library frames a photo: moved and pinched under a round window.
@@ -45,10 +47,13 @@ export default function AvatarCropScreen() {
   }, [draft, t])
 
   // The window is the largest circle that fits between the header and the button.
+  const landscape = frame.width > frame.height
   const top = insets.top + HEADER_ROW_HEIGHT
-  const bottom = insets.bottom + DOCK_SPACE
-  const diameter = Math.max(0, Math.min(frame.width - 32, frame.height - top - bottom - 32))
-  const cx = frame.width / 2
+  const bottom = insets.bottom + (landscape ? 0 : DOCK_SPACE)
+  const left = insets.left
+  const right = landscape ? insets.right + SIDE_DOCK : 0
+  const diameter = Math.max(0, Math.min(frame.width - left - right - 32, frame.height - top - bottom - 32))
+  const cx = left + (frame.width - left - right) / 2
   const cy = top + (frame.height - top - bottom) / 2
   // At zoom 1 the picture just covers the window with its shorter side.
   const cover = natural && diameter ? diameter / Math.min(natural.width, natural.height) : 0
@@ -70,6 +75,17 @@ export default function AvatarCropScreen() {
     coverHeight.value = pictureHeight
     window.value = diameter
   }, [pictureWidth, pictureHeight, diameter, coverWidth, coverHeight, window])
+
+  // A turn of the phone changes the window: the offsets are in its points, so they are
+  // scaled with it and the same part of the picture stays in the circle.
+  const lastDiameter = useRef(0)
+  useEffect(() => {
+    const was = lastDiameter.current
+    lastDiameter.current = diameter
+    if (!was || !diameter || was === diameter) return
+    offsetX.value *= diameter / was
+    offsetY.value *= diameter / was
+  }, [diameter, offsetX, offsetY])
 
   // Framing redone starts from the old frame: the inverse of what `choose` computes.
   const placed = useRef(false)
@@ -203,7 +219,14 @@ export default function AvatarCropScreen() {
         <HeaderTitle>{t('avatarCrop.title')}</HeaderTitle>
       </GlassHeader>
 
-      <View style={[styles.dock, { paddingBottom: insets.bottom + 8 }]} pointerEvents="box-none">
+      <View
+        style={
+          landscape
+            ? [styles.sideDock, { top, right: insets.right + 16, bottom: insets.bottom + 16 }]
+            : [styles.dock, { paddingBottom: insets.bottom + 8 }]
+        }
+        pointerEvents="box-none"
+      >
         <Text style={styles.hint}>{t('avatarCrop.hint')}</Text>
         <Button variant="glass" label={t('avatarCrop.choose')} onPress={choose} disabled={!natural} loading={saving} />
       </View>
@@ -216,5 +239,6 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg, overflow: 'hidden' },
     picture: { position: 'absolute' },
     dock: { position: 'absolute', left: 16, right: 16, bottom: 0, gap: 12, alignItems: 'center' },
-    hint: { color: colors.textMuted, fontSize: 13 },
+    sideDock: { position: 'absolute', width: SIDE_DOCK - 32, gap: 12, justifyContent: 'center' },
+    hint: { color: colors.textMuted, fontSize: 13, textAlign: 'center' },
   })
