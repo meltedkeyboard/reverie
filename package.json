@@ -46,6 +46,7 @@
     "expo-system-ui": "^57.0.4",
     "expo-video": "~57.0.5",
     "fflate": "^0.8.3",
+    "lucide-react-native": "^1.52.0",
     "marked": "^18.0.14",
     "react": "19.2.3",
     "react-dom": "19.2.3",

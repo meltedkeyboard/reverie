@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import Slider from '@react-native-community/slider'
 import { useMemo, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -116,14 +116,14 @@ export default function ChatTextScreen() {
           </ScrollView>
           <View style={styles.composer}>
             <GlassSurface interactive style={[glass.circle, styles.circle]} fallbackStyle={glass.solid}>
-              <Ionicons name="add" size={24} color={colors.text} />
+              <Icon name="add" size={24} color={colors.text} />
             </GlassSurface>
             <GlassSurface interactive style={styles.field} fallbackStyle={glass.solid}>
               <Text style={styles.placeholder} numberOfLines={1}>
                 {t('chat.messagePlaceholder')}
               </Text>
               <View style={styles.send}>
-                <Ionicons name="arrow-up" size={18} color={colors.textFaint} />
+                <Icon name="arrow-up" size={18} color={colors.textFaint} />
               </View>
             </GlassSurface>
           </View>

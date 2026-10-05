@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { usePathname, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -163,7 +163,7 @@ export function Sidebar() {
           style={styles.toggle}
           accessibilityLabel={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
         >
-          <Ionicons name="menu-outline" size={22} color={colors.textMuted} />
+          <Icon name="menu-outline" size={22} color={colors.textMuted} />
         </Pressable>
       )}
       <View style={styles.nav}>
@@ -173,7 +173,7 @@ export function Sidebar() {
             active={pathname === item.path}
             onPress={() => router.navigate(item.href as never)}
           >
-            <Ionicons name={item.icon} size={isDesktop ? 16 : 18} color={colors.textMuted} />
+            <Icon name={item.icon} size={isDesktop ? 16 : 18} color={colors.textMuted} />
             <Animated.Text numberOfLines={1} style={[styles.navLabel, fade]}>
               {item.label}
             </Animated.Text>
@@ -214,7 +214,7 @@ export function Sidebar() {
 
       <View style={styles.footer}>
         <SidebarRow active={pathname === '/settings'} onPress={() => router.navigate('/settings' as never)}>
-          <Ionicons name="settings-outline" size={isDesktop ? 16 : 18} color={colors.textMuted} />
+          <Icon name="settings-outline" size={isDesktop ? 16 : 18} color={colors.textMuted} />
           <Animated.Text numberOfLines={1} style={[styles.navLabel, fade]}>
             {t('settings.title')}
           </Animated.Text>
@@ -275,7 +275,7 @@ function SidebarRow({ active, onPress, onMenu, children }: RowProps) {
           pointerEvents={hovered ? 'auto' : 'none'}
           accessibilityLabel="…"
         >
-          <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
+          <Icon name="ellipsis-horizontal" size={16} color={colors.textMuted} />
         </Pressable>
       ) : null}
     </View>

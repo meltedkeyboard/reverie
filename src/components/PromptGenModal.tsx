@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
@@ -349,7 +349,7 @@ export function PromptGenModal({ visible, name, currentPrompt, currentGreeting, 
               disabled={!note.trim()}
               style={[styles.sendButton, !note.trim() && { backgroundColor: colors.borderStrong }]}
             >
-              <Ionicons name="arrow-up" size={18} color={note.trim() ? ON_ACCENT : colors.textFaint} />
+              <Icon name="arrow-up" size={18} color={note.trim() ? ON_ACCENT : colors.textFaint} />
             </Pressable>
           </View>
         </View>

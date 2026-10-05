@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -32,7 +32,7 @@ export function PickerBox({ value, placeholder, items, accessibilityLabel, fallb
         <Text style={[styles.text, !value && styles.placeholder]} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <Ionicons name="chevron-expand" size={18} color={colors.textFaint} />
+        <Icon name="chevron-expand" size={18} color={colors.textFaint} />
       </View>
     </NativeMenu>
   )

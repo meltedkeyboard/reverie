@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -237,7 +237,7 @@ export default function RoomEditorScreen() {
                           })}
                     </Text>
                   </View>
-                  <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
+                  <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
                 </Pressable>
                 {open ? (
                   <View style={styles.memberSettings}>
@@ -403,7 +403,7 @@ export default function RoomEditorScreen() {
                 <Text style={styles.pickName} numberOfLines={1}>
                   {character.name}
                 </Text>
-                <Ionicons
+                <Icon
                   name={on ? 'checkmark-circle' : 'ellipse-outline'}
                   size={24}
                   color={on ? colors.accent : colors.textFaint}

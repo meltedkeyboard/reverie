@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { View } from 'react-native'
 
 import { showSheet } from '@/lib/dialogs'
@@ -10,7 +10,7 @@ import { IconButton } from './IconButton'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from './NativeMenu'
 
 type Props = {
-  icon: React.ComponentProps<typeof Ionicons>['name']
+  icon: React.ComponentProps<typeof Icon>['name']
   items: MenuItem[]
   size?: number
   disabled?: boolean
@@ -21,7 +21,7 @@ type Props = {
 export function MenuGlassButton({ icon, items, size = 44, disabled }: Props) {
   const colors = useColors()
   const styles = useGlassStyles()
-  const glyph = <Ionicons name={icon} size={22} color={colors.text} />
+  const glyph = <Icon name={icon} size={22} color={colors.text} />
   const shape = { width: size, height: size, borderRadius: size / 2 }
   const circle = (
     <GlassSurface interactive style={[styles.circle, shape]} fallbackStyle={styles.solid}>

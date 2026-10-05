@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { Image } from 'expo-image'
 import { useEffect, useMemo, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
@@ -110,10 +110,10 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
         <GlassSurface style={styles.layer} fallbackStyle={styles.solid} />
         <View style={styles.clip}>
           <View style={styles.head}>
-            <Ionicons name="eye-off" size={15} color={colors.textMuted} />
+            <Icon name="eye-off" size={15} color={colors.textMuted} />
             <Text style={styles.title}>{t('chat.privateTitle')}</Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-              <Ionicons name="close" size={20} color={colors.textMuted} />
+              <Icon name="close" size={20} color={colors.textMuted} />
             </Pressable>
           </View>
           <ScrollView

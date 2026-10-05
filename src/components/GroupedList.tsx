@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { Children, Fragment, isValidElement, type ComponentProps, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native'
 
@@ -102,7 +102,7 @@ export function CheckCell({ label, checked, onPress, disabled }: CellProps & { c
       style={({ pressed }) => [styles.row, pressed && styles.pressed, disabled && styles.disabled]}
     >
       <Text style={styles.label}>{label}</Text>
-      {checked ? <Ionicons name="checkmark" size={22} color={colors.accent} /> : null}
+      {checked ? <Icon name="checkmark" size={22} color={colors.accent} /> : null}
     </Pressable>
   )
 }
@@ -119,7 +119,7 @@ export function LinkCell({ label, value, onPress }: CellProps & { value?: string
           {value}
         </Text>
       ) : null}
-      <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+      <Icon name="chevron-forward" size={18} color={colors.textFaint} />
     </Pressable>
   )
 }
@@ -135,7 +135,7 @@ export function MenuCell({ label, value, placeholder, items }: CellProps & { val
         <Text style={[styles.value, !value && { color: colors.textFaint }]} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <Ionicons name="chevron-expand" size={16} color={colors.textFaint} />
+        <Icon name="chevron-expand" size={16} color={colors.textFaint} />
       </View>
     </NativeMenu>
   )
@@ -174,7 +174,7 @@ export function ButtonCell({
   onPress: () => void
   danger?: boolean
   loading?: boolean
-  icon?: { fallback: ComponentProps<typeof Ionicons>['name']; slide?: 'up' | 'down' }
+  icon?: { fallback: ComponentProps<typeof Icon>['name']; slide?: 'up' | 'down' }
 }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -190,7 +190,7 @@ export function ButtonCell({
       <Text style={[styles.label, { color: ink }]}>{label}</Text>
       {icon ? (
         <SlidingIcon direction={icon.slide} active={sliding}>
-          <Ionicons name={icon.fallback} size={20} color={ink} />
+          <Icon name={icon.fallback} size={20} color={ink} />
         </SlidingIcon>
       ) : null}
       {loading && !sliding ? <ActivityIndicator color={colors.textMuted} /> : null}

@@ -33,7 +33,7 @@ export function applyDesktopChrome(colors: Colors) {
     }
     a[href^="http"] { cursor: pointer !important; }
     :focus { outline: none; }
-    :focus-visible { outline: 2px solid ${colors.accentBorder}; outline-offset: 1px; border-radius: 6px; }
+    :not(input):not(textarea):not([contenteditable="true"]):focus-visible { outline: 2px solid ${colors.accentBorder}; outline-offset: 1px; border-radius: 6px; }
     ::selection { background: ${colors.accentSoft}; }
     [data-titlebar="drag"] { -webkit-app-region: drag; }
     [data-titlebar="drag"] [role="button"], [data-titlebar="nodrag"] { -webkit-app-region: no-drag; }

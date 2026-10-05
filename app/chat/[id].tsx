@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useMemo, useRef, useState } from 'react'
@@ -280,7 +280,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
                   <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
                     {character.name}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
+                  <Icon name="chevron-down" size={14} color={colors.textMuted} />
                 </View>
                 {naming ? (
                   <ShimmerText maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} text={title ?? t('chat.namingInProgress')} />

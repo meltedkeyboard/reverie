@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useState } from 'react'
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -151,7 +151,7 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
           accessibilityLabel={label}
           style={({ pressed: down }) => [styles.trash, { borderRadius: radius }, down && { opacity: 0.8 }]}
         >
-          <Ionicons name="trash" size={22} color={ON_ACCENT} />
+          <Icon name="trash" size={22} color={ON_ACCENT} />
         </Pressable>
       </Animated.View>
       <GestureDetector gesture={Gesture.Exclusive(pan, tap)}>

@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { FloorMode, RoomMember } from '@/db/rooms'
@@ -52,16 +52,16 @@ export function CastBar({ members, addressees, whisper, narration, onOpen }: Pro
     >
       {narration || !faces.length ? (
         <View style={[styles.icon, on && styles.iconOn]}>
-          <Ionicons name={narration ? 'book' : 'people'} size={14} color={on ? colors.accent : colors.textMuted} />
+          <Icon name={narration ? 'book' : 'people'} size={14} color={on ? colors.accent : colors.textMuted} />
         </View>
       ) : (
         <AvatarStack cast={faces} size={FACE} max={3} viewable={false} />
       )}
-      {hushed ? <Ionicons name="lock-closed" size={13} color={colors.accent} /> : null}
+      {hushed ? <Icon name="lock-closed" size={13} color={colors.accent} /> : null}
       <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={styles.label} numberOfLines={1}>
         {label}
       </Text>
-      <Ionicons name="chevron-expand" size={15} color={colors.textMuted} />
+      <Icon name="chevron-expand" size={15} color={colors.textMuted} />
     </Pressable>
   )
 }
@@ -90,7 +90,7 @@ export function FloorButton({ floor, onChange }: { floor: FloorMode; onChange: (
     <View accessible accessibilityRole="button" accessibilityLabel={t('room.menuFloor', { mode: t(`room.floor.${floor}`) })}>
       <NativeMenu items={items}>
         <View style={styles.round}>
-          <Ionicons name={FLOOR_ICONS[floor].icon} size={17} color={colors.text} />
+          <Icon name={FLOOR_ICONS[floor].icon} size={17} color={colors.text} />
         </View>
       </NativeMenu>
     </View>

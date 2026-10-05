@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useEffect, useRef, type ComponentProps } from 'react'
 import { View, type ColorValue } from 'react-native'
 
@@ -11,7 +11,7 @@ type Effect = Parameters<NonNullable<typeof swiftUI>['modifiers']['symbolEffect'
 type Props = {
   // SF Symbol, or the Ionicons glyph without @expo/ui (Expo Go).
   name: SymbolName
-  fallback: ComponentProps<typeof Ionicons>['name']
+  fallback: ComponentProps<typeof Icon>['name']
   size: number
   color: ColorValue
   effect?: Effect
@@ -31,7 +31,7 @@ type Props = {
 export const SFIcon = swiftUI ? NativeIcon : FallbackIcon
 
 function FallbackIcon({ fallback, size, color }: Props) {
-  return <Ionicons name={fallback} size={size} color={color} />
+  return <Icon name={fallback} size={size} color={color} />
 }
 
 function NativeIcon({ name, size, color, effect, trigger, active, animateChange, onAccent = false }: Props) {

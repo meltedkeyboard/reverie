@@ -1,4 +1,4 @@
-import type Ionicons from '@expo/vector-icons/Ionicons'
+import type { Icon } from '@/components/Icon'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native'
@@ -29,7 +29,7 @@ type SettingEntry = {
   // Other words the entry is found by: its options and the fields inside it.
   keywords: string[]
   symbol: React.ComponentProps<typeof SFIcon>['name']
-  fallback: React.ComponentProps<typeof Ionicons>['name']
+  fallback: React.ComponentProps<typeof Icon>['name']
   href: Href
   danger?: boolean
 }

@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import NativeMaskedView from '@react-native-masked-view/masked-view'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -424,7 +424,7 @@ export function Composer({
       accessibilityLabel={t('attach.title')}
       style={[styles.plus, picking && { opacity: 0.55 }]}
     >
-      <Ionicons name="add" size={24} color={colors.text} />
+      <Icon name="add" size={24} color={colors.text} />
     </Pressable>
   )
 
@@ -501,7 +501,7 @@ export function Composer({
         <View style={styles.field} onLayout={fit}>
         {editing ? (
           <View style={styles.banner} onLayout={(e) => setBannerH(e.nativeEvent.layout.height)}>
-            <Ionicons name="create-outline" size={15} color={colors.accent} />
+            <Icon name="create-outline" size={15} color={colors.accent} />
             <Text style={styles.bannerText}>{t('chat.editingMessage')}</Text>
             <IconButton name="close" size={18} color={colors.textMuted} onPress={onCancelEdit} style={styles.bannerClose} />
           </View>
@@ -521,7 +521,7 @@ export function Composer({
                   hitSlop={8}
                   style={styles.thumbRemove}
                 >
-                  <Ionicons name="close" size={13} color={ON_ACCENT} />
+                  <Icon name="close" size={13} color={ON_ACCENT} />
                 </Pressable>
               </View>
             ))}
@@ -719,7 +719,7 @@ export function Composer({
                       onAccessibilityTap={() => pickMenuItem(index)}
                       style={[styles.menuItem, menuHover === index && { backgroundColor: withAlpha(colors.text, 0.1) }]}
                     >
-                      <Ionicons name={item.icon} size={22} color={colors.text} />
+                      <Icon name={item.icon} size={22} color={colors.text} />
                       <Text style={styles.menuLabel}>{t(item.label)}</Text>
                     </View>
                   ))}

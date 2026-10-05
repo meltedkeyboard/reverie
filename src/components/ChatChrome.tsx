@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 
 import { ChatBackground } from '@/components/ChatBackground'
 import { GlassButton } from '@/components/Glass'
@@ -35,7 +35,7 @@ export function AsideToggleButton({ open, enabled, onPress }: { open: boolean; e
   const colors = useColors()
   const { t } = useTranslation()
   if (!enabled && !open) return null
-  const fallback: React.ComponentProps<typeof Ionicons>['name'] = open ? 'eye-off' : 'eye-off-outline'
+  const fallback: React.ComponentProps<typeof Icon>['name'] = open ? 'eye-off' : 'eye-off-outline'
   return (
     <GlassButton icon={fallback} onPress={onPress} accessibilityLabel={t('chat.privateTitle')}>
       <SFIcon name={open ? 'eye.slash.fill' : 'eye.slash'} fallback={fallback} size={20} color={colors.text} animateChange={open} />

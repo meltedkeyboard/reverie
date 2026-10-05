@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { View } from 'react-native'
 
 import { useColors } from '@/theme'
@@ -17,7 +17,7 @@ type Props = {
 export function AttachButton({ disabled, onPick, size = 44 }: Props) {
   const colors = useColors()
   const styles = useGlassStyles()
-  const icon = <Ionicons name="add" size={24} color={colors.text} />
+  const icon = <Icon name="add" size={24} color={colors.text} />
   const shape = { width: size, height: size, borderRadius: size / 2 }
   const circle = (
     <GlassSurface style={[styles.circle, shape]} fallbackStyle={styles.solid}>

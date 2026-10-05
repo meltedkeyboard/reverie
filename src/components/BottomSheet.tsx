@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useEffect, useRef, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -188,7 +188,7 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
                       accessibilityLabel={t('common.close')}
                       style={({ pressed }) => [styles.close, { backgroundColor: pressed ? tones.pressed : tones.card }]}
                     >
-                      <Ionicons name="close" size={24} color={colors.text} />
+                      <Icon name="close" size={24} color={colors.text} />
                     </Pressable>
                   )}
                   <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1}>

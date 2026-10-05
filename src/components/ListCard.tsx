@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useReorderableDrag } from 'react-native-reorderable-list'
 
@@ -48,7 +48,7 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, c
     // Claims the touch, so the card does not open under the menu.
     <View onStartShouldSetResponder={() => true} style={vertical && styles.floating}>
       <NativeMenu items={menu} style={styles.menu}>
-        <Ionicons name="ellipsis-horizontal" size={18} color={iconColor} />
+        <Icon name="ellipsis-horizontal" size={18} color={iconColor} />
       </NativeMenu>
     </View>
   ) : (

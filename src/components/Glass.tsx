@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import type { ComponentProps } from 'react'
 import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
 
@@ -42,7 +42,7 @@ export function GlassSurface({ style, fallbackStyle, interactive, tintColor, var
 }
 
 type ButtonProps = {
-  icon: ComponentProps<typeof Ionicons>['name']
+  icon: ComponentProps<typeof Icon>['name']
   iconSize?: number
   // Optional because a Link with asChild injects its own onPress.
   onPress?: () => void
@@ -87,7 +87,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
       <GlassSurface interactive={!disabled} tintColor={fill} style={styles.circle}>
         {/* Like a disabled bar button: the glass stays, only the glyph greys out. */}
         <View style={disabled && styles.disabled}>
-          {children ?? <Ionicons name={icon} size={iconSize - 2} color={colors.text} />}
+          {children ?? <Icon name={icon} size={iconSize - 2} color={colors.text} />}
         </View>
       </GlassSurface>
     </Pressable>

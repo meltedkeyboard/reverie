@@ -7,6 +7,7 @@ import type { MenuItem } from '@/components/NativeMenu'
 import { PickerBox } from '@/components/PickerBox'
 import { SFIcon } from '@/components/SFIcon'
 import { useTranslation } from '@/i18n'
+import { isDesktop } from '@/lib/platform'
 import { setTextDraft } from '@/lib/textDraft'
 import { useColors, useStyles, type Colors } from '@/theme'
 
@@ -58,7 +59,7 @@ export function FieldRow({ label, hint, minHeight, multiline, star = true, expan
   }
 
   const frame = (body: React.ReactNode) => (
-    <View style={[styles.box, focused && { borderColor: colors.accent }]}>{body}</View>
+    <View style={[styles.box, focused && !isDesktop && { borderColor: colors.accent }]}>{body}</View>
   )
 
   const field = menu ? (

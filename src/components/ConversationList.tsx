@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactElement, type Ref } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View, type ListRenderItemInfo, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
@@ -275,7 +275,7 @@ export function JumpButton({ visible, onPress }: { visible: boolean; onPress: ()
         <GlassButton icon="arrow-down" onPress={onPress} />
       ) : (
         <Pressable onPress={onPress} hitSlop={8} style={({ pressed }) => [styles.jump, pressed && { opacity: 0.7 }]}>
-          <Ionicons name="arrow-down" size={18} color={colors.text} />
+          <Icon name="arrow-down" size={18} color={colors.text} />
         </Pressable>
       )}
     </Animated.View>

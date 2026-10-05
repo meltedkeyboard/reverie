@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Image } from 'expo-image'
 import { memo, useEffect, useMemo, useState } from 'react'
@@ -124,7 +124,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
       <View style={styles.userRow}>
         {scene?.whisper || scene?.to ? (
           <View style={styles.caption}>
-            <Ionicons name={scene.whisper ? 'lock-closed' : 'arrow-forward'} size={11} color={colors.textFaint} />
+            <Icon name={scene.whisper ? 'lock-closed' : 'arrow-forward'} size={11} color={colors.textFaint} />
             <Text style={styles.captionText} numberOfLines={1}>
               {scene.whisper ? t('room.whisperTo', { names: scene.whisper }) : scene.to}
             </Text>
@@ -177,7 +177,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           </Text>
           {scene.to && !scene.whisper ? (
             <>
-              <Ionicons name="arrow-forward" size={11} color={colors.textFaint} />
+              <Icon name="arrow-forward" size={11} color={colors.textFaint} />
               <Text style={styles.captionText} numberOfLines={1}>
                 {scene.to}
               </Text>
@@ -185,7 +185,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           ) : null}
           {scene.whisper ? (
             <View style={styles.whisperBadge}>
-              <Ionicons name="lock-closed" size={10} color={colors.textMuted} />
+              <Icon name="lock-closed" size={10} color={colors.textMuted} />
               <Text style={styles.whisperText} numberOfLines={1}>
                 {t('room.whisperTo', { names: scene.whisper })}
               </Text>
@@ -211,7 +211,7 @@ function Overheard({ names, end = false }: { names: string; end?: boolean }) {
   const { t } = useTranslation()
   return (
     <View style={[styles.caption, styles.overheard, end && styles.captionEnd]}>
-      <Ionicons name="ear-outline" size={13} color={colors.textFaint} />
+      <Icon name="ear-outline" size={13} color={colors.textFaint} />
       <Text style={styles.captionText} numberOfLines={1}>
         {t('room.overheardBy', { names })}
       </Text>
@@ -303,7 +303,7 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant }: Acti
       {menu.length ? (
         <NativeMenu items={menu} style={styles.barButton}>
           {/* A plain glyph: a SwiftUI symbol inside the menu's label gets the accent tint. */}
-          <Ionicons name="ellipsis-horizontal" size={17} color={colors.textFaint} />
+          <Icon name="ellipsis-horizontal" size={17} color={colors.textFaint} />
         </NativeMenu>
       ) : null}
       {count > 1 ? (
@@ -365,7 +365,7 @@ export function ThoughtBlock({ text, ms }: ThoughtProps) {
           <Text style={styles.thoughtLabel}>{t('message.reasoning')}</Text>
         )}
         {shown > 0 ? <Text style={styles.thoughtTime}>{shown} {t('message.secondsShort')}</Text> : null}
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
       </Pressable>
       {open ? (
         <SelectableText style={styles.thoughtText}>{text}</SelectableText>

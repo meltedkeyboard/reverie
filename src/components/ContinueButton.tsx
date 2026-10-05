@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
@@ -136,7 +136,7 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
               </Text>
             </View>
           </Animated.View>
-          <Ionicons name="chevron-forward" size={18} color={ON_ACCENT_FAINT} />
+          <Icon name="chevron-forward" size={18} color={ON_ACCENT_FAINT} />
         </GlassSurface>
       </SwipeToDelete>
     </View>

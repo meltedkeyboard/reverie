@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -385,7 +385,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
                 <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
                   {room.name}
                 </Text>
-                <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
+                <Icon name="chevron-down" size={14} color={colors.textMuted} />
               </View>
               {naming ? (
                 <ShimmerText maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} text={title ?? t('chat.namingInProgress')} />

@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
@@ -62,7 +62,7 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
             {icon ? (
               <SlidingIcon direction={icon.slide} active={sliding}>
                 {icon.plain ? (
-                  <Ionicons name={icon.fallback} size={19} color={ink} />
+                  <Icon name={icon.fallback} size={19} color={ink} />
                 ) : (
                   <SFIcon name={icon.name} fallback={icon.fallback} size={19} color={filled ? ink : color ?? colors.text} onAccent={filled} />
                 )}

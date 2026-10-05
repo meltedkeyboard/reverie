@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { Pressable, type StyleProp, type ViewStyle } from 'react-native'
 
 import { isDesktop } from '@/lib/platform'
@@ -6,7 +6,7 @@ import { PRESS_ANYWHERE } from '@/lib/press'
 import { useColors } from '@/theme'
 
 type Props = {
-  name: React.ComponentProps<typeof Ionicons>['name']
+  name: React.ComponentProps<typeof Icon>['name']
   // Optional because a Link with asChild injects its own onPress.
   onPress?: () => void
   size?: number
@@ -45,7 +45,7 @@ export function IconButton({ name, onPress, size = 22, color, style, disabled, a
       ]}
     >
       {children ?? (
-        <Ionicons
+        <Icon
           name={name}
           size={isDesktop ? Math.min(size, 18) : size}
           color={color ?? (isDesktop ? colors.textMuted : colors.text)}

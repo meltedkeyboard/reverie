@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { Fragment, useEffect } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -196,7 +196,7 @@ export function CastSheet({
             style={({ pressed }) => [styles.row, { backgroundColor: pressed ? tones.pressed : tones.row }]}
           >
             <Animated.View style={[styles.modeIcon, { opacity: canWhisper ? 1 : AWAY }, FADE]}>
-              <Ionicons name="lock-closed" size={18} color={colors.accent} />
+              <Icon name="lock-closed" size={18} color={colors.accent} />
             </Animated.View>
             <View style={styles.body}>
               <Animated.Text style={[styles.name, { opacity: canWhisper ? 1 : AWAY }, FADE]}>{t('room.whisper')}</Animated.Text>
@@ -233,7 +233,7 @@ function ModeRow({ icon, title, hint, on, onPress }: ModeRowProps) {
       style={({ pressed }) => [styles.row, { backgroundColor: pressed ? tones.pressed : tones.row }]}
     >
       <View style={styles.modeIcon}>
-        <Ionicons name={icon} size={20} color={colors.accent} />
+        <Icon name={icon} size={20} color={colors.accent} />
       </View>
       <View style={styles.body}>
         <Text style={styles.name}>{title}</Text>
@@ -345,7 +345,7 @@ function SwipeRow({ enabled, present, onToggle, onPress, onLongPress, name, chil
     <View>
       <Animated.View style={[styles.behind, { backgroundColor: present ? colors.danger : colors.success }, behind]}>
         <Animated.View style={[styles.behindLabel, icon]}>
-          <Ionicons name={present ? 'exit-outline' : 'enter-outline'} size={20} color={ON_ACCENT} />
+          <Icon name={present ? 'exit-outline' : 'enter-outline'} size={20} color={ON_ACCENT} />
           <Text style={styles.behindText}>{action}</Text>
         </Animated.View>
       </Animated.View>

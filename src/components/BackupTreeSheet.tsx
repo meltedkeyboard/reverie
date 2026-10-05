@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
@@ -57,7 +57,7 @@ function CheckMark({ state }: { state: CheckState }) {
         exiting={ZoomOut.duration(120)}
         style={{ position: 'absolute' }}
       >
-        <Ionicons name={name} size={24} color={state === 'none' ? colors.textFaint : colors.accent} />
+        <Icon name={name} size={24} color={state === 'none' ? colors.textFaint : colors.accent} />
       </Animated.View>
     </View>
   )
@@ -120,7 +120,7 @@ function Chevron({ open }: { open: boolean }) {
   const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value * 180}deg` }] }))
   return (
     <Animated.View style={style}>
-      <Ionicons name="chevron-down" size={16} color={colors.textFaint} />
+      <Icon name="chevron-down" size={16} color={colors.textFaint} />
     </Animated.View>
   )
 }
@@ -179,7 +179,7 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
                       <Avatar name={node.name} file={node.avatar} uri={node.avatarUri} size={40} viewable={false} />
                     ) : (
                       <View style={styles.roomIcon}>
-                        <Ionicons name="people" size={20} color={colors.accent} />
+                        <Icon name="people" size={20} color={colors.accent} />
                       </View>
                     )}
                   </Ring>

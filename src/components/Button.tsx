@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Icon } from '@/components/Icon'
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
 import { liquidGlass } from '@/lib/nativeUI'
@@ -11,7 +11,7 @@ type Variant = 'primary' | 'secondary' | 'soft' | 'glass'
 
 type Props = {
   label: string
-  icon?: React.ComponentProps<typeof Ionicons>['name']
+  icon?: React.ComponentProps<typeof Icon>['name']
   // Optional because a Link with asChild injects its own onPress.
   onPress?: () => void
   disabled?: boolean
@@ -30,7 +30,7 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
     <ActivityIndicator color={tint} />
   ) : (
     <>
-      {icon ? <Ionicons name={icon} size={isDesktop ? 15 : variant === 'soft' ? 17 : 18} color={tint} /> : null}
+      {icon ? <Icon name={icon} size={isDesktop ? 15 : variant === 'soft' ? 17 : 18} color={tint} /> : null}
       <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
     </>
   )
