@@ -84,7 +84,7 @@
           {
             "name": "VioletGradient",
             "ios": "./assets/images/alt/icon-02-violet-gradient.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-02-violet-gradient-foreground.png", "backgroundColor": "#6D3FC4" }
+            "android": { "foregroundImage": "./assets/images/alt/icon-02-violet-gradient-foreground.png", "backgroundColor": "#594ABA" }
           },
           {
             "name": "CoralSunrise",
@@ -99,7 +99,7 @@
           {
             "name": "VioletSun",
             "ios": "./assets/images/alt/icon-05-violet-solid-sun.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-05-violet-solid-sun-foreground.png", "backgroundColor": "#8B5CF6" }
+            "android": { "foregroundImage": "./assets/images/alt/icon-05-violet-solid-sun-foreground.png", "backgroundColor": "#5F55E0" }
           },
           {
             "name": "Outline",
@@ -114,7 +114,7 @@
           {
             "name": "Metal",
             "ios": "./assets/images/alt/icon-08-metal.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-08-metal-foreground.png", "backgroundColor": "#8A1A5C" }
+            "android": { "foregroundImage": "./assets/images/alt/icon-08-metal-foreground.png", "backgroundColor": "#840F41" }
           },
           {
             "name": "RetroSticker",
@@ -124,7 +124,7 @@
           {
             "name": "ToneOnTone",
             "ios": "./assets/images/alt/icon-10-tone-on-tone.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-10-tone-on-tone-foreground.png", "backgroundColor": "#8B5CF6" }
+            "android": { "foregroundImage": "./assets/images/alt/icon-10-tone-on-tone-foreground.png", "backgroundColor": "#5F55E0" }
           }
         ]
       ]

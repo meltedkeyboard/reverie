@@ -17,7 +17,7 @@ function body(svg) {
 // icon from its luminance.
 const tinted = dark
   .replace(/fill="#0F0F12"/i, 'fill="#000000"')
-  .replace(/fill="#8B5CF6"/i, 'fill="#FFFFFF"')
+  .replace(/fill="#5F55E0"/i, 'fill="#FFFFFF"')
   .replace(/fill="#F0616D"/i, 'fill="#8E8E93"')
   .replace(/clip_dark/g, 'clip_tinted')
 
@@ -91,18 +91,18 @@ const VARIANTS = {
     other: 'dark',
     // The ink outlines and the sticker's hard shadow turn cream, to stay visible on the dark.
     colors: [['#fff1d6', '#1d1912'], ['#0b0d17', '#fff1d6'], ['0 0 0 0 0.04 0 0 0 0 0.05 0 0 0 0 0.09', '0 0 0 0 1 0 0 0 0 0.945 0 0 0 0 0.84']],
-    tinted: [['#fff1d6', '#000000'], ['#8b5cf6', '#ffffff'], ['#ffd166', '#8e8e93'], ['#0b0d17', '#000000']],
+    tinted: [['#fff1d6', '#000000'], ['#5F55E0', '#ffffff'], ['#ffd166', '#8e8e93'], ['#0b0d17', '#000000']],
   },
   'icon-06-outline': {
     other: 'light',
-    colors: [['#0b0d17', '#f5f5f7'], ['#a78bfa', '#7c3aed']],
-    tinted: [['#0b0d17', '#000000'], ['#a78bfa', '#ffffff'], ['#f0616d', '#8e8e93']],
+    colors: [['#0b0d17', '#f5f5f7'], ['#8675F0', '#4C42C8']],
+    tinted: [['#0b0d17', '#000000'], ['#8675F0', '#ffffff'], ['#f0616d', '#8e8e93']],
   },
   'icon-07-neon-glow': {
     other: 'light',
     // A pale lavender glow, the letter and the spark deep enough to read on it; the halos softer.
-    colors: [['#1b1038', '#ffffff'], ['#05040c', '#e6defb'], ['#c4b5fd', '#7c3aed'], ['#ff5c8a', '#f0336d'], [' 0 0 0 0.95 0', ' 0 0 0 0.45 0']],
-    tinted: [['#1b1038', '#000000'], ['#05040c', '#000000'], ['#c4b5fd', '#ffffff'], ['#ff5c8a', '#8e8e93']],
+    colors: [['#130F33', '#ffffff'], ['#05040c', '#E1DFFB'], ['#B0A8FA', '#4C42C8'], ['#ff5c8a', '#f0336d'], [' 0 0 0 0.95 0', ' 0 0 0 0.45 0']],
+    tinted: [['#130F33', '#000000'], ['#05040c', '#000000'], ['#B0A8FA', '#ffffff'], ['#ff5c8a', '#8e8e93']],
   },
 }
 

@@ -44,9 +44,9 @@ const darkColors: Colors = {
   text: '#F2F2F5',
   textMuted: 'rgba(255, 255, 255, 0.65)',
   textFaint: 'rgba(255, 255, 255, 0.4)',
-  accent: '#8B5CF6',
-  accentSoft: 'rgba(139, 92, 246, 0.16)',
-  accentBorder: 'rgba(139, 92, 246, 0.35)',
+  accent: '#756DE9',
+  accentSoft: 'rgba(117, 109, 233, 0.16)',
+  accentBorder: 'rgba(117, 109, 233, 0.35)',
   danger: '#F0616D',
   dangerSoft: 'rgba(240, 97, 109, 0.1)',
   dangerBorder: 'rgba(240, 97, 109, 0.3)',
@@ -65,9 +65,9 @@ const lightColors: Colors = {
   text: '#17171B',
   textMuted: 'rgba(0, 0, 0, 0.6)',
   textFaint: 'rgba(0, 0, 0, 0.38)',
-  accent: '#7C3AED',
-  accentSoft: 'rgba(124, 58, 237, 0.12)',
-  accentBorder: 'rgba(124, 58, 237, 0.3)',
+  accent: '#5F55E0',
+  accentSoft: 'rgba(95, 85, 224, 0.12)',
+  accentBorder: 'rgba(95, 85, 224, 0.3)',
   danger: '#D6394A',
   dangerSoft: 'rgba(214, 57, 74, 0.08)',
   dangerBorder: 'rgba(214, 57, 74, 0.3)',
@@ -91,9 +91,6 @@ const desktopDarkColors: Colors = {
   text: '#DADADA',
   textMuted: '#B3B3B3',
   textFaint: '#7A7A7A',
-  accent: '#8A5CF5',
-  accentSoft: 'rgba(138, 92, 245, 0.18)',
-  accentBorder: 'rgba(138, 92, 245, 0.4)',
 }
 
 const desktopLightColors: Colors = {
@@ -108,9 +105,6 @@ const desktopLightColors: Colors = {
   text: '#222222',
   textMuted: '#5C5C5C',
   textFaint: '#ABABAB',
-  accent: '#7852EE',
-  accentSoft: 'rgba(120, 82, 238, 0.12)',
-  accentBorder: 'rgba(120, 82, 238, 0.35)',
 }
 
 const palettes: Record<Scheme, Colors> = isDesktop
