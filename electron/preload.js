@@ -7,6 +7,12 @@ contextBridge.exposeInMainWorld('reverieDesktop', {
   // The window has no frame of its own: the page draws the title bar, and on Windows and
   // Linux the system buttons are painted over its right end in these colors.
   setTitleBar: (colors) => ipcRenderer.send('window:titleBar', colors),
+  // Ctrl+W, caught by the main process before the window's menu closes the window.
+  onCloseTab: (listener) => {
+    const handler = () => listener()
+    ipcRenderer.on('tabs:close', handler)
+    return () => ipcRenderer.removeListener('tabs:close', handler)
+  },
   cloudFolder: {
     pick: () => ipcRenderer.invoke('cloud:pick'),
     name: () => ipcRenderer.sendSync('cloud:folderName'),

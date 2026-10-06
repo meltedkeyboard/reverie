@@ -10,6 +10,7 @@ import { DialogHost } from '@/components/overlays/DialogHost'
 import { Sidebar } from '@/components/chrome/Sidebar'
 import { SplashOverlay } from '@/components/startup/SplashOverlay'
 import { StartupBoundary } from '@/components/startup/StartupBoundary'
+import { TabBar } from '@/components/chrome/TabBar'
 import { TitleBar } from '@/components/chrome/TitleBar'
 import { ToastHost } from '@/components/overlays/ToastHost'
 import { isConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
@@ -21,7 +22,7 @@ import { CloudSyncProvider } from '@/hooks/features/useCloudSync'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
 import { ChatTextProvider } from '@/lib/chat/chatText'
-import { isDesktop } from '@/lib/core/platform'
+import { isElectron, isWeb } from '@/lib/core/platform'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
 
@@ -98,10 +99,12 @@ function AppShell() {
     <>
       <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
       <ThemeProvider value={navigationTheme}>
-        {isDesktop ? <TitleBar title="Reverie" sidebar={sidebar} /> : null}
+        {isElectron ? <TitleBar sidebar={sidebar} pathname={pathname} /> : null}
         <View style={styles.shell}>
           {sidebar ? <Sidebar /> : null}
           <View style={styles.main}>
+            {/* Tabs only where there is a pointer to drive them; the desktop app has them in its title bar. */}
+            {sidebar && isWeb && !isElectron ? <TabBar pathname={pathname} /> : null}
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
               {/* Opens in a blink; closed by the button or a tap, so no swipe-back either. */}
               <Stack.Screen name="viewer" options={{ animation: 'fade', animationDuration: 120, gestureEnabled: false }} />

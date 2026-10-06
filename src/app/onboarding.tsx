@@ -14,7 +14,7 @@ import {
 import { KeyboardAwareScrollView, useKeyboardState } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { isDesktop } from '@/lib/core/platform'
+import { isDesktop, isWeb } from '@/lib/core/platform'
 import { Button } from '@/components/controls/Button'
 import { Field, FieldLabel } from '@/components/controls/Field'
 import { PickerBox } from '@/components/controls/PickerBox'
@@ -87,9 +87,9 @@ export default function OnboardingScreen() {
     AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
       if (reduced) rise.setValue(0)
       Animated.parallel([
-        Animated.timing(appear, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(appear, { toValue: 1, duration: 400, useNativeDriver: !isWeb }),
         // Critically damped: it settles without overshoot.
-        Animated.spring(rise, { toValue: 0, stiffness: 180, damping: 27, mass: 1, useNativeDriver: true }),
+        Animated.spring(rise, { toValue: 0, stiffness: 180, damping: 27, mass: 1, useNativeDriver: !isWeb }),
       ]).start()
     })
   }, [appear, rise])
@@ -99,7 +99,7 @@ export default function OnboardingScreen() {
     setOnServer(true)
     AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
       if (reduced) turn.setValue(1)
-      else Animated.spring(turn, { toValue: 1, stiffness: 170, damping: 26, mass: 1, useNativeDriver: true }).start()
+      else Animated.spring(turn, { toValue: 1, stiffness: 170, damping: 26, mass: 1, useNativeDriver: !isWeb }).start()
     })
   }
 

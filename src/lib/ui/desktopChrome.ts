@@ -1,6 +1,10 @@
 import type { Colors } from '@/theme'
 
-type DesktopBridge = { platform: string; setTitleBar?: (colors: { color: string; symbolColor: string }) => void }
+type DesktopBridge = {
+  platform: string
+  setTitleBar?: (colors: { color: string; symbolColor: string }) => void
+  onCloseTab?: (listener: () => void) => () => void
+}
 
 export function desktopBridge(): DesktopBridge | null {
   return (globalThis as { reverieDesktop?: DesktopBridge }).reverieDesktop ?? null

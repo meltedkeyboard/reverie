@@ -1,26 +1,28 @@
+import { Image } from 'expo-image'
+
 import { Icon } from '@/components/visuals/Icon'
 import { usePathname, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated'
+import Animated, { useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Avatar } from '@/components/visuals/Avatar'
+import { openInNewTab, useMiddleClick, wantsNewTab } from '@/components/chrome/TabBar'
 import { deleteChat, setChatTitle } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { listSearchChats, type SearchChat } from '@/db/search'
+import { RAIL_WIDTH, SIDEBAR_WIDTH, sidebarFold, sidebarWidthAt, useMarkSidebarShown } from '@/hooks/util/sidebarMotion'
 import { useWindowKey } from '@/hooks/util/useWindowKey'
 import { t, useTranslation } from '@/i18n'
 import { onChatsChanged } from '@/lib/chat/chatEvents'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chat/chatDialogs'
 import { showSheet } from '@/lib/ui/dialogs'
-import { isDesktop } from '@/lib/core/platform'
-import { fonts, useColors, useStyles, type Colors } from '@/theme'
+import { isDesktop, isElectron, isWeb } from '@/lib/core/platform'
+import { fonts, useColors, useStyles, useTheme, type Colors } from '@/theme'
 
-export const SIDEBAR_WIDTH = isDesktop ? 260 : 300
-// On the desktop the rail is just wide enough for a square row (6 + 16 icon + 6), its
-// margins of 8 and the 1 pt line on the right.
-const RAIL_WIDTH = isDesktop ? 45 : 54
+export { SIDEBAR_WIDTH }
+const LABEL_GAP = isDesktop ? 8 : 10
 const SLIDE = { duration: 220, easing: Easing.out(Easing.cubic) }
 const COLLAPSED_KEY = 'reverie.sidebarCollapsed'
 
@@ -60,6 +62,40 @@ export function useSidebarCollapsed() {
   )
 }
 
+const ICON_LIGHT = require('../../../assets/brand/icon-light.svg')
+const ICON_DARK = require('../../../assets/brand/icon-dark.svg')
+
+// The button that folds the sidebar. On the web it is the square app icon, so the logo stays
+// in sight; on a tablet, the usual three lines.
+export function SidebarToggle() {
+  const colors = useColors()
+  const { scheme } = useTheme()
+  const collapsed = useSidebarCollapsed()
+  return (
+    <Pressable
+      onPress={toggleSidebar}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
+      style={(state) => [toggleStyles.button, isWeb && (state as { hovered?: boolean }).hovered && { backgroundColor: colors.surfaceRaised }]}
+    >
+      {isWeb ? (
+        <Image source={scheme === 'light' ? ICON_LIGHT : ICON_DARK} style={[toggleStyles.logo, { borderColor: colors.borderStrong }]} />
+      ) : (
+        <Icon name="menu-outline" size={22} color={colors.textMuted} />
+      )}
+    </Pressable>
+  )
+}
+
+const toggleStyles = StyleSheet.create({
+  button: isWeb
+    ? { width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }
+    : { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  // The icon's own fill is close to the bar's grey; the outline keeps it a square.
+  logo: { width: 20, height: 20, borderRadius: 5, borderWidth: 1 },
+})
+
 type Group = { label: string; chats: SearchChat[] }
 
 // Chats by the day of their last line, newest first, like the sidebar of ChatGPT.
@@ -94,12 +130,29 @@ export function Sidebar() {
   const [chats, setChats] = useState<SearchChat[] | null>(null)
   const collapsed = useSidebarCollapsed()
   // 0 = open, 1 = a rail of icons. The width and the fade of the text follow it.
-  const progress = useSharedValue(collapsed ? 1 : 0)
+  const progress = sidebarFold
+  useMarkSidebarShown()
+  // On mounting it takes its state at once; after that each fold slides.
+  const mounted = useRef(false)
   useEffect(() => {
-    progress.value = withTiming(collapsed ? 1 : 0, SLIDE)
+    progress.value = mounted.current ? withTiming(collapsed ? 1 : 0, SLIDE) : collapsed ? 1 : 0
+    mounted.current = true
+    setTip(null)
   }, [collapsed, progress])
-  const rootStyle = useAnimatedStyle(() => ({ width: SIDEBAR_WIDTH + (RAIL_WIDTH - SIDEBAR_WIDTH) * progress.value }))
+  // In the rail a row under the pointer shows its name beside it. The root clips what is
+  // past its width, so the label is drawn by the shell around it.
+  const shellRef = useRef<View>(null)
+  const [tip, setTip] = useState<{ label: string; top: number } | null>(null)
+  const tipFor = (label: string) => (target: HTMLElement | null) => {
+    const shell = shellRef.current as unknown as HTMLElement | null
+    if (!collapsed || !target || !shell) return setTip(null)
+    const row = target.getBoundingClientRect()
+    setTip({ label, top: row.top - shell.getBoundingClientRect().top + row.height / 2 })
+  }
+  const rootStyle = useAnimatedStyle(() => ({ width: sidebarWidthAt(progress.value) }))
   const fade = useAnimatedStyle(() => ({ opacity: 1 - progress.value }))
+  // The space before a label closes with it, or in the rail it squeezed the icon.
+  const labelFade = useAnimatedStyle(() => ({ opacity: 1 - progress.value, marginLeft: LABEL_GAP * (1 - progress.value) }))
   // Ctrl+B, as in many editors and chat apps.
   useWindowKey(
     (e) => (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b',
@@ -119,6 +172,10 @@ export function Sidebar() {
 
   const groups = useMemo(() => (chats ? groupChats(chats) : []), [chats, tr])
   const activeChat = pathname.startsWith('/chat/') ? Number(pathname.split('/')[2]) : null
+
+  // On the web, with Ctrl or the middle button, a place opens in a tab of its own.
+  const go = (href: string) => (event?: unknown) =>
+    isWeb && wantsNewTab(event) ? openInNewTab(href) : router.navigate(href as never)
 
   const openMenu = (chat: SearchChat) => {
     showSheet(chat.title ?? chat.ownerName, [
@@ -148,6 +205,7 @@ export function Sidebar() {
   ]
 
   return (
+    <View ref={shellRef} style={styles.shell}>
     <Animated.View
       style={[
         styles.root,
@@ -155,26 +213,23 @@ export function Sidebar() {
         { paddingTop: insets.top + (isDesktop ? 8 : 12), paddingBottom: insets.bottom + 8 },
       ]}
     >
-      {/* On the desktop the button is in the title bar. */}
-      {isDesktop ? null : (
-        <Pressable
-          onPress={toggleSidebar}
-          hitSlop={6}
-          style={styles.toggle}
-          accessibilityLabel={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
-        >
-          <Icon name="menu-outline" size={22} color={colors.textMuted} />
-        </Pressable>
+      {/* In the desktop app the button is in the title bar. */}
+      {isElectron ? null : (
+        <View style={styles.toggleRow}>
+          <SidebarToggle />
+        </View>
       )}
       <View style={styles.nav}>
         {nav.map((item) => (
           <SidebarRow
             key={item.path}
             active={pathname === item.path}
-            onPress={() => router.navigate(item.href as never)}
+            onPress={go(item.href)}
+            onMiddle={() => openInNewTab(item.href)}
+            onHover={tipFor(item.label)}
           >
             <Icon name={item.icon} size={isDesktop ? 16 : 18} color={colors.textMuted} />
-            <Animated.Text numberOfLines={1} style={[styles.navLabel, fade]}>
+            <Animated.Text numberOfLines={1} style={[styles.navLabel, labelFade]}>
               {item.label}
             </Animated.Text>
           </SidebarRow>
@@ -191,7 +246,8 @@ export function Sidebar() {
               <SidebarRow
                 key={chat.id}
                 active={activeChat === chat.id}
-                onPress={() => router.navigate(`/chat/${chat.id}` as never)}
+                onPress={go(`/chat/${chat.id}`)}
+                onMiddle={() => openInNewTab(`/chat/${chat.id}`)}
                 onMenu={() => openMenu(chat)}
               >
                 <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={isDesktop ? 20 : 26} viewable={false} />
@@ -213,35 +269,62 @@ export function Sidebar() {
       </Animated.View>
 
       <View style={styles.footer}>
-        <SidebarRow active={pathname === '/settings'} onPress={() => router.navigate('/settings' as never)}>
+        <SidebarRow
+          active={pathname === '/settings'}
+          onPress={go('/settings')}
+          onMiddle={() => openInNewTab('/settings')}
+          onHover={tipFor(t('settings.title'))}
+        >
           <Icon name="settings-outline" size={isDesktop ? 16 : 18} color={colors.textMuted} />
-          <Animated.Text numberOfLines={1} style={[styles.navLabel, fade]}>
+          <Animated.Text numberOfLines={1} style={[styles.navLabel, labelFade]}>
             {t('settings.title')}
           </Animated.Text>
         </SidebarRow>
       </View>
     </Animated.View>
+      {tip ? (
+        <View style={[styles.tip, { top: tip.top }]} pointerEvents="none">
+          <Text style={styles.tipText} numberOfLines={1}>
+            {tip.label}
+          </Text>
+        </View>
+      ) : null}
+    </View>
   )
 }
 
 type RowProps = {
   active: boolean
-  onPress: () => void
+  onPress: (event?: unknown) => void
+  // The middle button, which gives no press; opens the row in a new tab.
+  onMiddle?: () => void
   // Shows the "..." button while the pointer is over the row.
   onMenu?: () => void
+  // Told the row's element when the pointer comes onto it, and null when it leaves.
+  onHover?: (target: HTMLElement | null) => void
   children: React.ReactNode
 }
 
-function SidebarRow({ active, onPress, onMenu, children }: RowProps) {
+function SidebarRow({ active, onPress, onMiddle, onMenu, onHover, children }: RowProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const [hovered, setHovered] = useState(false)
+  const middleRef = useMiddleClick(() => onMiddle?.())
   // The hover sits on a wrapper that holds the row and the "..." button side by side. With
   // the button inside the row, pointing at it counted as leaving the row, and it vanished.
   // mouseenter and mouseleave do not fire for the children, so the wrapper keeps it.
-  const hover = { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) }
+  const hover = {
+    onMouseEnter: (e: { currentTarget: unknown }) => {
+      setHovered(true)
+      onHover?.(e.currentTarget as HTMLElement)
+    },
+    onMouseLeave: () => {
+      setHovered(false)
+      onHover?.(null)
+    },
+  }
   return (
-    <View {...hover}>
+    <View ref={middleRef} {...hover}>
       <Pressable
         onPress={onPress}
         // Like the cards of the lists: the chosen row is a card with an outline, a hovered
@@ -284,50 +367,58 @@ function SidebarRow({ active, onPress, onMenu, children }: RowProps) {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create(isDesktop ? desktopStyles(colors) : {
+    shell: { zIndex: 1 },
     root: {
+      flex: 1,
       overflow: 'hidden',
       backgroundColor: colors.bg,
       borderRightWidth: StyleSheet.hairlineWidth,
       borderRightColor: colors.border,
       paddingHorizontal: 8,
     },
-    toggle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+    toggleRow: { alignItems: 'flex-start', marginBottom: 6 },
     nav: { gap: 2, paddingBottom: 8 },
     list: { flex: 1 },
     listContent: { paddingBottom: 8 },
     footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 8 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 14, borderCurve: 'continuous', borderWidth: 1, borderColor: 'transparent' },
+    row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 14, borderCurve: 'continuous', borderWidth: 1, borderColor: 'transparent' },
     navLabel: { flex: 1, color: colors.text, fontSize: 15 },
     group: { color: colors.textFaint, fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingTop: 14, paddingBottom: 4 },
     empty: { color: colors.textFaint, fontSize: 14, padding: 12 },
-    chatText: { flex: 1 },
+    chatText: { flex: 1, marginLeft: LABEL_GAP },
     chatTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 15 },
     chatOwner: { color: colors.textFaint, fontSize: 12, marginTop: 1 },
     rowWithMenu: { paddingRight: 36 },
+    tip: { position: 'absolute', left: RAIL_WIDTH + 6, transform: 'translateY(-50%)', backgroundColor: colors.surfaceRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+    tipText: { color: colors.text, fontSize: 13 },
     more: { position: 'absolute', right: 8, top: 0, bottom: 0, width: 24, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
   })
 
 // The desktop sidebar: the secondary grey, small plain text, tight rows with a little rounding.
 const desktopStyles = (colors: Colors) => ({
+  shell: { zIndex: 1 },
   root: {
+    flex: 1,
     overflow: 'hidden' as const,
     backgroundColor: colors.surface,
     borderRightWidth: 1,
     borderRightColor: colors.border,
     paddingHorizontal: 8,
   },
-  toggle: {},
+  toggleRow: { alignItems: 'flex-start' as const, marginBottom: 4 },
   nav: { gap: 1, paddingBottom: 8 },
   list: { flex: 1 },
   listContent: { paddingBottom: 8 },
   footer: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6 },
-  row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, paddingHorizontal: 6, paddingVertical: 4, minHeight: 28, borderRadius: 5 },
+  row: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 6, paddingVertical: 4, minHeight: 28, borderRadius: 5 },
   navLabel: { flex: 1, color: colors.text, fontSize: 13.5 },
   group: { color: colors.textFaint, fontSize: 12, fontWeight: '500' as const, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 4 },
   empty: { color: colors.textFaint, fontSize: 13, padding: 8 },
-  chatText: { flex: 1 },
+  chatText: { flex: 1, marginLeft: LABEL_GAP },
   chatTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 14 },
   chatOwner: { color: colors.textFaint, fontSize: 11.5, marginTop: 1 },
   rowWithMenu: { paddingRight: 32 },
+  tip: { position: 'absolute' as const, left: RAIL_WIDTH + 6, transform: 'translateY(-50%)', backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.border, borderRadius: 5, paddingHorizontal: 8, paddingVertical: 4 },
+  tipText: { color: colors.text, fontSize: 12.5 },
   more: { position: 'absolute' as const, right: 6, top: 0, bottom: 0, width: 22, alignSelf: 'center' as const, alignItems: 'center' as const, justifyContent: 'center' as const },
 })

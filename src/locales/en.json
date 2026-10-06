@@ -395,6 +395,8 @@
   "sidebar.earlier": "Earlier",
   "sidebar.noChats": "No chats yet",
   "sidebar.untitled": "New chat",
+  "tabs.new": "New tab",
+  "tabs.close": "Close tab",
 
   "rooms.title": "Rooms",
   "rooms.emptyTitle": "No rooms yet",

@@ -122,6 +122,12 @@ function createWindow() {
   win.webContents.on('before-input-event', (event, input) => {
     const zoomKey = (input.control || input.meta) && ['+', '-', '=', '0'].includes(input.key)
     if (input.type === 'keyDown' && zoomKey) event.preventDefault()
+    // Ctrl+W closes a tab of the page, not the window, as in an editor.
+    const closeKey = (input.control || input.meta) && !input.shift && !input.alt && input.code === 'KeyW'
+    if (input.type === 'keyDown' && closeKey) {
+      event.preventDefault()
+      win.webContents.send('tabs:close')
+    }
   })
   // Links to the outside go to the real browser, not into the app window.
   win.webContents.setWindowOpenHandler(({ url }) => {

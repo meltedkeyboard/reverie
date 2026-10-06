@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Image, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
+import { Image, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
+import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 import Svg, { Circle, Defs, G, Path, Pattern as SvgPattern, Rect } from 'react-native-svg'
 
 import type { ChatPatternId } from '@/db/prefs/settings'
+import { RAIL_WIDTH, SIDEBAR_WIDTH, sidebarFold, sidebarWidthAt, useSidebarShown } from '@/hooks/util/sidebarMotion'
 import { isDesktop } from '@/lib/core/platform'
 import { FILL, useTheme } from '@/theme'
 
@@ -80,7 +82,7 @@ type Placed = { dx: number; dy: number }
 
 function Stars({ list, fill, width, at }: { list: typeof SCATTERED; fill: string; width: number; at: Placed }) {
   // Copies side by side, so a wide window is not left with one column of stars.
-  const sides = Math.ceil(width / BOARD.width / 2)
+  const sides = Math.ceil(width / BOARD.width / 2) + 1
   const copies = Array.from({ length: sides * 2 + 1 }, (_, i) => i - sides)
   return (
     <>
@@ -95,7 +97,7 @@ function Stars({ list, fill, width, at }: { list: typeof SCATTERED; fill: string
   )
 }
 
-function Drawing({ id, fill, width, height }: { id: Exclude<ChatPatternId, 'none' | 'stars'>; fill: string; width: number; height: number }) {
+function Drawing({ id, fill, width, height, lead }: { id: Exclude<ChatPatternId, 'none' | 'stars'>; fill: string; width: number; height: number; lead: number }) {
   const center = { dx: (width - BOARD.width) / 2, dy: (height - BOARD.height) / 2 }
   const corner = { dx: width - BOARD.width, dy: height - BOARD.height }
   switch (id) {
@@ -142,7 +144,7 @@ function Drawing({ id, fill, width, height }: { id: Exclude<ChatPatternId, 'none
               <Circle cx={56} cy={86} r={4} fill={fill} />
             </SvgPattern>
           </Defs>
-          <Rect width={width} height={height} fill={`url(#${name})`} />
+          <Rect x={-lead} width={width + lead} height={height} fill={`url(#${name})`} />
         </>
       )
     }
@@ -158,16 +160,17 @@ type Props = {
 
 // The star pattern of the home screen, laid out tile by tile from the top left corner:
 // resizeMode="repeat" does not fill the view on every platform.
-function Tiles({ scheme, width, height, scale }: { scheme: 'light' | 'dark'; width: number; height: number; scale: number }) {
+// `lead` is room on the left before the first whole column, which more columns cover.
+function Tiles({ scheme, width, height, scale, lead }: { scheme: 'light' | 'dark'; width: number; height: number; scale: number; lead: number }) {
   const tile = { width: TILE.width * scale, height: TILE.height * scale }
   const tiles = []
   for (let row = 0; row < Math.ceil(height / tile.height); row++) {
-    for (let column = 0; column < Math.ceil(width / tile.width); column++) {
+    for (let column = -Math.ceil(lead / tile.width); column < Math.ceil((width - lead) / tile.width); column++) {
       tiles.push(
         <Image
           key={`${row}:${column}`}
           source={TILES[scheme]}
-          style={{ position: 'absolute', width: tile.width, height: tile.height, left: column * tile.width, top: row * tile.height, opacity: TILE_OPACITY[scheme] }}
+          style={{ position: 'absolute', width: tile.width, height: tile.height, left: lead + column * tile.width, top: row * tile.height, opacity: TILE_OPACITY[scheme] }}
         />
       )
     }
@@ -177,21 +180,36 @@ function Tiles({ scheme, width, height, scale }: { scheme: 'light' | 'dark'; wid
 
 // Every pattern of the app, in the colors of the theme: the one of the home screen and the
 // ones to choose behind chats. It fills its parent.
+//
+// Beside the sidebar a full-size pattern is laid out for the screen as it is with the
+// sidebar open, and stays put in the window while the sidebar folds and opens: the drawing
+// reaches left by as much as the sidebar can give up and moves against its width each
+// frame, so the screen only uncovers more of it.
 export function Pattern({ id, scale = 1, style }: Props) {
   const { scheme } = useTheme()
   const [size, setSize] = useState({ width: 0, height: 0 })
+  const screen = useWindowDimensions()
+  const anchored = useSidebarShown() && scale === 1
+  const lead = anchored ? SIDEBAR_WIDTH - RAIL_WIDTH : 0
+  const stage = anchored ? screen.width - SIDEBAR_WIDTH : size.width
+  const follow = useAnimatedStyle(() => ({
+    transform: [{ translateX: anchored ? SIDEBAR_WIDTH - sidebarWidthAt(sidebarFold.value) : 0 }],
+  }))
   if (id === 'none') return null
   const onLayout = (event: LayoutChangeEvent) => setSize(event.nativeEvent.layout)
-  const width = size.width / scale
+  const width = stage / scale
   const height = size.height / scale
+  const full = { width: stage + lead, height: size.height }
   return (
     <View pointerEvents="none" style={[styles.pattern, style]} onLayout={onLayout}>
-      {size.width && id === 'stars' ? <Tiles scheme={scheme} width={size.width} height={size.height} scale={scale} /> : null}
-      {size.width && id !== 'stars' ? (
-        <Svg width={size.width} height={size.height} viewBox={`0 0 ${width} ${height}`}>
-          <Drawing id={id} fill={COLORS[scheme]} width={width} height={height} />
-        </Svg>
-      ) : null}
+      <Animated.View style={[{ position: 'absolute', top: 0, left: -lead, ...full }, follow]}>
+        {size.width && id === 'stars' ? <Tiles scheme={scheme} {...full} scale={scale} lead={lead} /> : null}
+        {size.width && id !== 'stars' ? (
+          <Svg {...full} viewBox={`${-lead / scale} 0 ${width + lead / scale} ${height}`}>
+            <Drawing id={id} fill={COLORS[scheme]} width={width} height={height} lead={lead / scale} />
+          </Svg>
+        ) : null}
+      </Animated.View>
     </View>
   )
 }

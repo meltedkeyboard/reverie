@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 
-import { IconButton } from '@/components/controls/IconButton'
-import { toggleSidebar, useSidebarCollapsed } from '@/components/chrome/Sidebar'
-import { t } from '@/i18n'
+import { SidebarToggle } from '@/components/chrome/Sidebar'
+import { TabBar } from '@/components/chrome/TabBar'
+import { Wordmark } from '@/components/visuals/Wordmark'
 import { desktopBridge } from '@/lib/ui/desktopChrome'
 import { type Colors, useStyles } from '@/theme'
 
@@ -18,26 +18,22 @@ const mac = desktopBridge()?.platform === 'darwin'
 // The desktop window has no system frame, so the page draws the bar the window is dragged
 // by, in the sidebar's grey. The system buttons sit over one end of it:
 // the traffic lights on the left on a Mac, the overlay on the right elsewhere.
-// With `sidebar` it holds, at its left end, the button that folds the sidebar.
-export function TitleBar({ title, sidebar }: { title: string; sidebar: boolean }) {
+// With `sidebar` it holds, at its left end, the button that folds the sidebar, and the
+// tabs in place of the wordmark, as in Obsidian.
+export function TitleBar({ sidebar, pathname }: { sidebar: boolean; pathname: string }) {
   const styles = useStyles(createStyles)
-  const collapsed = useSidebarCollapsed()
+  const toggle = <SidebarToggle />
+  if (sidebar) {
+    return (
+      <View style={[styles.root, styles.tabbed, mac ? styles.macTabbed : styles.otherTabbed]} {...dragRegion}>
+        <View style={styles.tabbedSide}>{toggle}</View>
+        <TabBar pathname={pathname} embedded />
+      </View>
+    )
+  }
   return (
     <View style={[styles.root, mac ? styles.mac : styles.other]} {...dragRegion}>
-      <View style={[styles.side, mac && styles.macSide]}>
-        {sidebar ? (
-          <IconButton
-            name="reorder-two-outline"
-            size={18}
-            style={styles.toggle}
-            onPress={toggleSidebar}
-            accessibilityLabel={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
-          />
-        ) : null}
-      </View>
-      <Text style={styles.title} numberOfLines={1}>
-        {title}
-      </Text>
+      <Wordmark width={64} optical />
     </View>
   )
 }
@@ -55,9 +51,9 @@ const createStyles = (colors: Colors) =>
     },
     mac: { paddingLeft: 80, paddingRight: 80 },
     other: { paddingLeft: 140, paddingRight: 140 },
-    // The left end, outside the centered title; past the traffic lights on a Mac.
-    side: { position: 'absolute', left: 6, top: 0, bottom: 0, justifyContent: 'center' },
-    macSide: { left: 80 },
-    toggle: { width: 28, height: 28 },
-    title: { color: colors.textMuted, fontSize: 12, fontWeight: '500' },
+    tabbed: { justifyContent: 'flex-start', alignItems: 'stretch' },
+    // Past the traffic lights on a Mac, short of the system buttons elsewhere.
+    macTabbed: { paddingLeft: 80, paddingRight: 8 },
+    otherTabbed: { paddingLeft: 6, paddingRight: 140 },
+    tabbedSide: { justifyContent: 'center', marginRight: 4 },
   })

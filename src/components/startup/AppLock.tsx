@@ -9,7 +9,7 @@ import { isAppLockEnabled, isAppLockEnabledCached } from '@/db/prefs/appLock'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { FILL, fonts, useColors, useTheme } from '@/theme'
-import { isAndroid } from '@/lib/core/platform'
+import { isAndroid, isWeb } from '@/lib/core/platform'
 
 // Covers the app with a lock screen until Face ID, a fingerprint or the passcode succeeds — on launch
 // and after the app has been in the background. It also blurs the app in the app
@@ -62,7 +62,7 @@ export function AppLock({ children }: { children: ReactNode }) {
         }
       } else {
         // Dissolve the blur on the way back in.
-        Animated.timing(shieldOpacity, { toValue: 0, duration: 175, useNativeDriver: true }).start(({ finished }) => {
+        Animated.timing(shieldOpacity, { toValue: 0, duration: 175, useNativeDriver: !isWeb }).start(({ finished }) => {
           if (finished) setShielded(false)
         })
       }
