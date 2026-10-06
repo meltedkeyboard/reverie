@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { convertLegacyAttachments, pruneAttachments } from '@/db/attachments'
 import { migrate } from '@/db/schema'
-import { databaseDirectory, discardInactiveDatabase, moveStorage } from '@/lib/storage'
-import { createRequiredContext } from '@/lib/requiredContext'
+import { databaseDirectory, discardInactiveDatabase, moveStorage } from '@/lib/core/storage'
+import { createRequiredContext } from '@/lib/core/requiredContext'
 
 type DatabaseContextValue = {
   db: SQLiteDatabase

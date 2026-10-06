@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 import type { Character } from '@/db/characters'
 import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
-import { notifyChatsChanged } from '@/lib/chatEvents'
+import { notifyChatsChanged } from '@/lib/chat/chatEvents'
 
 // Exactly one of characterId and roomId is set: a chat is either one-on-one or a scene.
 export type Chat = { id: number; characterId: number | null; roomId: number | null; title: string | null; createdAt: number }

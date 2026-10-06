@@ -1,7 +1,7 @@
 # Builds the Electron desktop app: a Windows installer, a macOS .dmg and, for Linux, an
 # AppImage and a .tar.gz with the plain executable, all unsigned. Started from the Actions tab, or by pushing a v* tag, which also attaches
 # the files to a GitHub release. The files are named Reverie-<version>.<ext>, the
-# version being package.json's (see artifactName in electron-builder.yml).
+# version being package.json's (see build.artifactName in package.json).
 name: Desktop build
 
 on:

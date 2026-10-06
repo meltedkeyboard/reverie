@@ -2,9 +2,9 @@ import { Directory, File } from 'expo-file-system'
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import type { MessageImage } from '@/db/messages'
-import { avatarUri, writeAvatarBase64 } from '@/lib/avatarStore'
-import { newAvatarName } from '@/lib/images'
-import { dataDirectory } from '@/lib/storage'
+import { avatarUri, writeAvatarBase64 } from '@/lib/images/avatarStore'
+import { newAvatarName } from '@/lib/images/images'
+import { dataDirectory } from '@/lib/core/storage'
 
 const LEGACY = `images LIKE '%"base64"%'`
 const DAY = 24 * 60 * 60 * 1000

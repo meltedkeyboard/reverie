@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 import { CHARACTER_COLUMNS, type BackgroundEffect, type Character } from '@/db/characters'
 import { CHAT_COLUMNS, PREVIEW, type Chat, type ChatPreview } from '@/db/chats'
 import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
-import { notifyChatsChanged } from '@/lib/chatEvents'
+import { notifyChatsChanged } from '@/lib/chat/chatEvents'
 
 // Who may speak after the addressee has answered: nobody, others with a short reaction,
 // or anyone the line concerns, with a full reply of their own.

@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import { Appearance, useColorScheme } from 'react-native'
-import { applyDesktopChrome } from '@/lib/desktopChrome'
-import { FONTS, isDesktop, isWeb } from '@/lib/platform'
-import { createRequiredContext } from '@/lib/requiredContext'
+import { applyDesktopChrome } from '@/lib/ui/desktopChrome'
+import { FONTS, isDesktop, isWeb } from '@/lib/core/platform'
+import { createRequiredContext } from '@/lib/core/requiredContext'
 
 export type Scheme = 'light' | 'dark'
 export type ThemePreference = Scheme | 'system'

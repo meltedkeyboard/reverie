@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { notifyChatsChanged } from '@/lib/chatEvents'
+import { notifyChatsChanged } from '@/lib/chat/chatEvents'
 
 export type Role = 'user' | 'assistant'
 

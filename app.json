@@ -76,7 +76,7 @@
         }
       ],
       "expo-font",
-      "./plugins/android-lint",
+      "./tools/plugins/android-lint",
       ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }],
       [
         "expo-alternate-app-icons",
@@ -130,7 +130,7 @@
       ]
     ],
     "locales": {
-      "ru": "./permissions/ru.json"
+      "ru": "./src/locales/permissions/ru.json"
     },
     "experiments": {
       "typedRoutes": false

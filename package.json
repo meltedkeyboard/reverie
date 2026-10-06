@@ -2,16 +2,16 @@
   "name": "reverie",
   "version": "4.5.0",
   "private": true,
-  "main": "index",
+  "main": "src/index",
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
-    "desktop": "node scripts/desktop-dev.mjs",
+    "desktop": "node tools/desktop-dev.mjs",
     "desktop:preview": "expo export -p web && electron electron/main.js",
     "desktop:build": "expo export -p web && electron-builder",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/build-icons.mjs",
-    "postinstall": "patch-package && node scripts/build-icons.mjs"
+    "icons": "node tools/build-icons.mjs",
+    "postinstall": "patch-package --patch-dir tools/patches && node tools/build-icons.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
@@ -68,5 +68,36 @@
     "electron-builder": "^26.15.3",
     "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
+  },
+  "build": {
+    "appId": "reverie.app",
+    "productName": "Reverie",
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**",
+      "dist/**",
+      "package.json"
+    ],
+    "icon": "assets/images/icon.png",
+    "artifactName": "${productName}-${version}.${ext}",
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.entertainment"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ],
+      "category": "Network"
+    }
   }
 }

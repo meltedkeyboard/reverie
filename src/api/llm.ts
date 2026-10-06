@@ -2,9 +2,9 @@ import { fetch } from 'expo/fetch'
 import { AppState } from 'react-native'
 
 import type { ThinkingMode } from '@/db/characters'
-import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/settings'
+import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/prefs/settings'
 import { t } from '@/i18n'
-import { errorMessage } from '@/lib/errors'
+import { errorMessage } from '@/lib/core/errors'
 
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 

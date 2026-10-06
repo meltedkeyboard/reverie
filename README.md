@@ -51,7 +51,7 @@ An unsigned `Reverie.ipa` is built by GitHub Actions (`.github/workflows/ios.yml
 
 Sign and install it with Sideloadly or AltStore using your Apple ID. A free account gives a 7-day signature.
 
-To build locally on a Mac, run `./build-ipa.sh` (needs Xcode, CocoaPods, Node 24).
+To build locally on a Mac, run `./tools/build-ipa.sh` (needs Xcode, CocoaPods, Node 24).
 
 ## Desktop client (Electron, experimental)
 
@@ -64,9 +64,9 @@ npm install
 npm run desktop
 ```
 
-`npm run desktop` (`scripts/desktop-dev.mjs`) starts Metro on port 8081, waits for it and opens the window; edits to `app/` and `src/` reload live. If the port is busy it says so and stops, close the old `expo start` first.
+`npm run desktop` (`tools/desktop-dev.mjs`) starts Metro on port 8081, waits for it and opens the window; edits to `src/app/` and `src/` reload live. If the port is busy it says so and stops, close the old `expo start` first.
 
-To run the production build without making an installer: `npm run desktop:preview`. To make one: `npm run desktop:build`; it runs `expo export -p web`, then electron-builder (`electron-builder.yml`) writes an NSIS installer, a `.dmg` or an AppImage into `release/`. Build on the system you build for.
+To run the production build without making an installer: `npm run desktop:preview`. To make one: `npm run desktop:build`; it runs `expo export -p web`, then electron-builder (the `build` key of `package.json`) writes an NSIS installer, a `.dmg` or an AppImage into `release/`. Build on the system you build for.
 
 In the built app the page is served from `app://` by `electron/main.js` with cross-origin isolation, which the SQLite worker needs.
 
@@ -74,24 +74,24 @@ Data (the database and the images) is for now kept in the browser storage of the
 
 ## Project layout
 
-- `app/` - screens (expo-router): character list, character chats, chat, character editor, chat background, settings, onboarding, about, image viewer.
+- `src/app/` - screens (expo-router): character list, character chats, chat, character editor, chat background, settings, onboarding, about, image viewer.
 - `src/api/llm.ts` - server requests, SSE parsing, context window (`CONTEXT_WINDOW`, 20 messages).
 - `src/hooks/` - `useChat` (conversation state and streaming), `useRoom` (group scenes) and smaller UI hooks.
-- `src/lib/room/` - room logic: who speaks next, who hears what, the director request, each speaker's view of the scene.
+- `src/lib/chat/room/` - room logic: who speaks next, who hears what, the director request, each speaker's view of the scene.
 - `src/db/` - expo-sqlite schema and queries (`characters`, `chats`, `messages`, `app_settings` and per-feature flags).
 - `src/lib/` - avatars, backup, dialogs, prompt generation, `*action*` parsing, haptics.
 - `src/components/` - UI components.
-- `src/locales/` - `en.json` and `ru.json`. `permissions/ru.json` holds localized iOS permission strings.
+- `src/locales/` - `en.json` and `ru.json`. `src/locales/permissions/ru.json` holds localized iOS permission strings.
 
 A detailed map of the code (where to change what, data flow, conventions) is in [CODEBASE.md](CODEBASE.md).
 
 ## Implementation notes
 
 - Streaming uses `fetch` from `expo/fetch`, because the React Native `fetch` does not expose the response body incrementally.
-- Native menus (the "+" button, the message "..." menu, the chat title capsule) are SwiftUI `Menu` from `@expo/ui`. The button is drawn by React Native and embedded via `RNHostView`, so the menu morphs out of the button. Without the `ExpoUI` module (Expo Go) an action sheet is shown instead (`src/components/NativeMenu.tsx`).
-- Native modules for the glass UI are loaded in `src/lib/nativeUI.ts` only if they exist in the build.
+- Native menus (the "+" button, the message "..." menu, the chat title capsule) are SwiftUI `Menu` from `@expo/ui`. The button is drawn by React Native and embedded via `RNHostView`, so the menu morphs out of the button. Without the `ExpoUI` module (Expo Go) an action sheet is shown instead (`src/components/overlays/NativeMenu.tsx`).
+- Native modules for the glass UI are loaded in `src/lib/ui/nativeUI.ts` only if they exist in the build.
 - The database lives in iOS Documents. Avatars are files, the database stores only the file name.
 - Plain HTTP servers are allowed through `NSAllowsArbitraryLoads` in `app.json`.
 - A chat where the user wrote nothing is deleted when returning to the list.
-- The "Continue" capsule state is stored in `app_settings` (`src/db/continue.ts`).
+- The "Continue" capsule state is stored in `app_settings` (`src/db/prefs/continue.ts`).
 - Folder sync does not use the iCloud entitlement (CloudKit or an app container), which a free Apple ID cannot sign. The user picks a folder through the system picker instead (the document picker on iOS, the folder picker of the Storage Access Framework on Android), and the app keeps a bookmark or a persisted permission for it (`modules/reverie-cloud-folder`). The whole database and the pictures go there as a snapshot; when both devices changed since the last sync, the user picks which copy wins.

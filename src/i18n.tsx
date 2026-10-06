@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 
 import ru from '@/locales/ru.json'
 import en from '@/locales/en.json'
-import { createRequiredContext } from '@/lib/requiredContext'
+import { createRequiredContext } from '@/lib/core/requiredContext'
 
 export type Locale = 'ru' | 'en'
 export type LocalePreference = Locale | 'system'

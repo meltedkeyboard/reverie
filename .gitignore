@@ -4,7 +4,7 @@ dist/
 /ios/
 *.log
 
-# Rendered from assets/brand by scripts/build-icons.mjs
+# Rendered from assets/brand by tools/build-icons.mjs
 assets/images/
 
 # Internal notes, never committed

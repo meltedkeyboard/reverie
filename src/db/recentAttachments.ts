@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { defineFlag, getFlag, getSetting, positiveInt, setFlag, setSetting } from '@/db/settings'
+import { defineFlag, getFlag, getSetting, positiveInt, setFlag, setSetting } from '@/db/prefs/settings'
 
 // The row of the latest pictures sent, at the top of the attach menu. On unless turned off
 // in Settings; how many it shows is a number there, or no limit at all.
