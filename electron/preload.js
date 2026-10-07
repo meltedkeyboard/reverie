@@ -7,6 +7,14 @@ contextBridge.exposeInMainWorld('reverieDesktop', {
   // The window has no frame of its own: the page draws the title bar, and on Windows and
   // Linux the system buttons are painted over its right end in these colors.
   setTitleBar: (colors) => ipcRenderer.send('window:titleBar', colors),
+  // The zoom the main process gives the page by the screen, and its changes when the
+  // window goes to another screen.
+  zoom: () => ipcRenderer.sendSync('window:zoom'),
+  onZoom: (listener) => {
+    const handler = (_event, zoom) => listener(zoom)
+    ipcRenderer.on('window:zoom', handler)
+    return () => ipcRenderer.removeListener('window:zoom', handler)
+  },
   // Ctrl+W, caught by the main process before the window's menu closes the window.
   onCloseTab: (listener) => {
     const handler = () => listener()

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, protocol, net, shell } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, protocol, net, screen, shell } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { pathToFileURL } = require('url')
@@ -86,11 +86,58 @@ const TITLE_BAR_HEIGHT = 36
 // The system buttons stop a point short, above the bar's bottom line, which they would cover.
 const OVERLAY_HEIGHT = TITLE_BAR_HEIGHT - 1
 
+// The page is laid out for a screen of about 1600 points across; on a larger one the whole
+// page grows with it, up to half again, as with Ctrl+= in an editor, so it doesn't sit small
+// in the middle of a big window. Taken again when the window moves to another screen.
+const BASE_SCREEN = 1600
+// The page's wide layout (the sidebar) needs this much, as WIDE_BREAKPOINT and
+// WIDE_MIN_HEIGHT in useLayoutMode.ts: a smaller window is zoomed less, never below 1,
+// so it doesn't drop to the phone's layout.
+const WIDE = { width: 900, height: 600 }
+
+function zoomFor(win) {
+  const { width } = screen.getDisplayMatching(win.getBounds()).workAreaSize
+  const [inner, innerHeight] = win.getContentSize()
+  const fit = Math.min(inner / WIDE.width, innerHeight / WIDE.height)
+  const zoom = Math.floor(Math.min(width / BASE_SCREEN, fit) * 20) / 20
+  return Math.min(1.5, Math.max(1, zoom))
+}
+
+// The colors of the title bar, which the page sends; kept to size the system buttons anew
+// after a change of zoom.
+const barColors = new WeakMap()
+
+// The system buttons don't follow the page's zoom, so they are sized to the zoomed bar.
+function fitButtons(win) {
+  const height = Math.round(TITLE_BAR_HEIGHT * win.webContents.getZoomFactor())
+  if (process.platform === 'darwin') {
+    // The traffic lights are 16 high; they stay in the middle of the bar.
+    win.setWindowButtonPosition({ x: 14, y: Math.round((height - 16) / 2) })
+    return
+  }
+  const colors = barColors.get(win)
+  if (colors) win.setTitleBarOverlay({ ...colors, height: height - 1 })
+}
+
+function applyZoom(win) {
+  const zoom = zoomFor(win)
+  if (zoom === win.webContents.getZoomFactor()) return
+  win.webContents.setZoomFactor(zoom)
+  fitButtons(win)
+  win.webContents.send('window:zoom', zoom)
+}
+
+ipcMain.on('window:zoom', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  event.returnValue = win ? zoomFor(win) : 1
+})
+
 ipcMain.on('window:titleBar', (event, { color, symbolColor }) => {
   const win = BrowserWindow.fromWebContents(event.sender)
-  if (!win || process.platform === 'darwin') return
-  win.setTitleBarOverlay({ color, symbolColor, height: OVERLAY_HEIGHT })
-  win.setBackgroundColor(color)
+  if (!win) return
+  barColors.set(win, { color, symbolColor })
+  fitButtons(win)
+  if (process.platform !== 'darwin') win.setBackgroundColor(color)
 })
 
 // Wheel and touchpad scrolling eases instead of stepping, on every platform.
@@ -117,6 +164,13 @@ function createWindow() {
     },
   })
   win.setMenuBarVisibility(false)
+  // Set on every load: Chromium keeps a zoom per page and may bring back an old one.
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.setZoomFactor(zoomFor(win))
+    fitButtons(win)
+  })
+  win.on('moved', () => applyZoom(win))
+  win.on('resize', () => applyZoom(win))
   // An app, not a page: no pinch or Ctrl+wheel zoom of the whole window.
   win.webContents.setVisualZoomLevelLimits(1, 1)
   win.webContents.on('before-input-event', (event, input) => {
