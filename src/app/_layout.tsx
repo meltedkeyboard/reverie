@@ -110,6 +110,24 @@ function AppShell() {
               <Stack.Screen name="viewer" options={{ animation: 'fade', animationDuration: 120, gestureEnabled: false }} />
               <Stack.Screen name="background" options={{ animation: 'fade' }} />
               <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
+              {/* The system sheet with a grabber, pulled down to close; its bar is set by the screen. */}
+              <Stack.Screen
+                name="generate"
+                options={{
+                  presentation: 'formSheet',
+                  // Until the sheet sets its own title, rather than the name of the route.
+                  title: '',
+                  sheetAllowedDetents: [1],
+                  sheetGrabberVisible: true,
+                  sheetExpandsWhenScrolledToEdge: false,
+                  headerShown: true,
+                  headerShadowVisible: false,
+                  headerBackVisible: false,
+                  headerStyle: { backgroundColor: colors.bg },
+                  headerTintColor: colors.accent,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
             </Stack>
           </View>
         </View>

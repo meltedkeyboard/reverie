@@ -111,6 +111,9 @@ const palettes: Record<Scheme, Colors> = isDesktop
   ? { dark: desktopDarkColors, light: desktopLightColors }
   : { dark: darkColors, light: lightColors }
 
+// A palette by its scheme, for what keeps one look whatever the theme.
+export const paletteOf = (scheme: Scheme): Colors => palettes[scheme]
+
 // Exported for the handful of places that render before ThemeContextProvider can mount
 // (StartupBoundary's error screen, which may appear if the database itself fails to
 // open) and so can't read a stored preference — they fall back to the dark palette.

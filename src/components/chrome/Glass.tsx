@@ -17,6 +17,14 @@ type SurfaceProps = ViewProps & {
   variant?: 'regular' | 'clear'
 }
 
+// Glass pieces that melt into one another when they come close, as when an interactive
+// one is pulled towards its neighbour; on its own each piece is drawn apart. A plain view
+// without Liquid Glass.
+export function GlassMerge({ spacing = 8, ...props }: ViewProps & { spacing?: number }) {
+  if (!glassEffect) return <View {...props} />
+  return <glassEffect.GlassContainer spacing={spacing} {...props} />
+}
+
 export function GlassSurface({ style, fallbackStyle, interactive, tintColor, variant = 'regular', children, ...rest }: SurfaceProps) {
   const { scheme } = useTheme()
   if (!glassEffect) {

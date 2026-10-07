@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
 import * as Haptics from '@/lib/ui/haptics'
@@ -6,17 +7,25 @@ import { isDesktop } from '@/lib/core/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from '../chrome/Glass'
+import { SFIcon } from '../visuals/SFIcon'
 
 type Props = {
   label: string
   active: boolean
   onPress: () => void
   style?: StyleProp<ViewStyle>
+  // Shows the symbol instead of the label, which is then only read out.
+  icon?: { symbol: ComponentProps<typeof SFIcon>['name']; fallback: ComponentProps<typeof SFIcon>['fallback'] }
+  // The ink while not chosen, as colors.danger for removing.
+  ink?: string
+  // Interactive glass springs under the finger. Off by default: in a row that scrolls
+  // sideways the spring pulls the chip along with the scroll.
+  interactive?: boolean
 }
 
 // A small Liquid Glass capsule to pick from a row of them; the chosen one is tinted
 // with the accent. Outside iOS 26 it is the plain surface, filled when chosen.
-export function Chip({ label, active, onPress, style }: Props) {
+export function Chip({ label, active, onPress, style, icon, ink, interactive = false }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
@@ -26,18 +35,24 @@ export function Chip({ label, active, onPress, style }: Props) {
         onPress()
       }}
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected: active }}
       // The glass is not interactive (its press spring pulls the chip along with a sideways scroll), so on glass nothing moves.
       style={({ pressed }) => [style, !liquidGlass && !isDesktop && pressed && { transform: [{ scale: 0.96 }] }, isDesktop && pressed && { opacity: 0.8 }]}
     >
       <GlassSurface
+        interactive={interactive}
         tintColor={active ? colors.accent : undefined}
         style={styles.chip}
         fallbackStyle={active ? styles.solidActive : styles.solid}
       >
-        <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color: active ? ON_ACCENT : colors.textMuted }]} numberOfLines={1}>
-          {label}
-        </Text>
+        {icon ? (
+          <SFIcon name={icon.symbol} fallback={icon.fallback} size={18} color={active ? ON_ACCENT : (ink ?? colors.textMuted)} />
+        ) : (
+          <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color: active ? ON_ACCENT : (ink ?? colors.textMuted) }]} numberOfLines={1}>
+            {label}
+          </Text>
+        )}
       </GlassSurface>
     </Pressable>
   )

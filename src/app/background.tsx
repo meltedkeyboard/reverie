@@ -1,4 +1,4 @@
-import { ImageManipulator } from 'expo-image-manipulator'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
@@ -53,6 +53,9 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
 const bump = () => Haptics.selectionAsync()
 
 // An empty chat with the picture behind it, to try the effect on before it is kept.
+// The longer side of the preview, the size the chat background is stored at.
+const PREVIEW_SIDE = 1600
+
 export default function BackgroundScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -64,6 +67,7 @@ export default function BackgroundScreen() {
   const [draft] = useState(backgroundDraft)
   const [effect, setEffect] = useState<BackgroundEffect>(draft?.effect ?? 'blur')
   const [intensity, setIntensity] = useState(draft?.intensity ?? 0.5)
+  const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [bubbleTransparency, setBubbleTransparency] = useState(draft?.bubbleTransparency ?? 0.3)
 
   const [saving, setSaving] = useState(false)
@@ -91,7 +95,17 @@ export default function BackgroundScreen() {
     if (!draft) return
     ImageManipulator.manipulate(draft.uri)
       .renderAsync()
-      .then((picture) => setNatural({ width: picture.width, height: picture.height }))
+      .then(async (picture) => {
+        setNatural({ width: picture.width, height: picture.height })
+        // A blur is worked out over every pixel of the picture, and an original from the
+        // camera is several times the size the chat shows; the preview is drawn from a
+        // copy that size, which blurs as the chat will and keeps up with the slider.
+        const side = Math.max(picture.width, picture.height)
+        if (side <= PREVIEW_SIDE) return
+        const resize = picture.width >= picture.height ? { width: PREVIEW_SIDE } : { height: PREVIEW_SIDE }
+        const small = await ImageManipulator.manipulate(picture).resize(resize).renderAsync()
+        setPreviewUri((await small.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 })).uri)
+      })
       .catch(() => {})
   }, [draft])
 
@@ -297,10 +311,17 @@ export default function BackgroundScreen() {
   // What is left of the screen beside the side panel, where the chat's own things stand.
   const chatRight = landscape ? insets.right + SIDE_PANEL : 0
 
-  const options: { value: BackgroundEffect; label: string }[] = [
-    { value: 'blur', label: t('background.effectBlur') },
-    { value: 'dim', label: t('background.effectDim') },
+  // Dim opens a menu of the color it lays over the picture: the theme's, light or dark.
+  const dimItems = (['dim', 'dim-light', 'dim-dark'] as const).map((value) => ({
+    label: t(value === 'dim' ? 'background.dimTheme' : value === 'dim-light' ? 'background.dimLight' : 'background.dimDark'),
+    systemImage: effect === value ? 'checkmark' : undefined,
+    onSelect: () => setEffect(value),
+  }))
+  const options = [
+    { value: 'blur' as const, label: t('background.effectBlur') },
+    { value: 'dim' as const, label: t('background.effectDim'), menu: dimItems },
   ]
+  const kind = effect === 'blur' ? 'blur' : 'dim'
 
   return (
     <View style={styles.screen} onLayout={onLayout}>
@@ -319,7 +340,7 @@ export default function BackgroundScreen() {
                 pictureStyle,
               ]}
             >
-              <ChatBackground uri={draft.uri} effect={effect} intensity={intensity} />
+              <ChatBackground uri={previewUri ?? draft.uri} effect={effect} intensity={intensity} />
             </Animated.View>
           ) : null}
 
@@ -375,14 +396,14 @@ export default function BackgroundScreen() {
             {/* With Liquid Glass each control is its own piece of glass, as glass on glass
                 would muddy both; without it they share one solid panel. */}
             <View style={[styles.panel, !liquidGlass && glass.solid]}>
-              <ChipGroup options={options} value={effect} onChange={setEffect} />
+              <ChipGroup options={options} value={kind} onChange={setEffect} />
               <GlassSurface style={styles.slider}>
                 <ParamSlider
                   label={t('background.intensity')}
                   value={intensity}
                   min={0}
                   max={1}
-                  step={0.05}
+                  step={0.01}
                   formatValue={percent}
                   onChange={setIntensity}
                 />
@@ -410,14 +431,14 @@ export default function BackgroundScreen() {
           {/* With Liquid Glass each control is its own piece of glass, as glass on glass
               would muddy both; without it they share one solid panel. */}
           <View style={[styles.panel, !liquidGlass && glass.solid]}>
-            <ChipGroup options={options} value={effect} onChange={setEffect} />
+            <ChipGroup options={options} value={kind} onChange={setEffect} />
             <GlassSurface style={styles.slider}>
               <ParamSlider
                 label={t('background.intensity')}
                 value={intensity}
                 min={0}
                 max={1}
-                step={0.05}
+                step={0.01}
                 formatValue={percent}
                 onChange={setIntensity}
               />

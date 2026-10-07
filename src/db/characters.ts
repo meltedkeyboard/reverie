@@ -32,7 +32,10 @@ export type CharacterFields = {
 
 export type ThinkingMode = 'auto' | 'on' | 'off'
 
-export type BackgroundEffect = 'blur' | 'dim'
+// 'dim' lays the theme's own background over the picture; 'dim-light' and 'dim-dark' lay
+// the light or the dark one whatever the theme. Stored as text, so older rows and
+// backups read as they were.
+export type BackgroundEffect = 'blur' | 'dim' | 'dim-light' | 'dim-dark'
 
 export type Character = CharacterFields & { id: number; createdAt: number }
 

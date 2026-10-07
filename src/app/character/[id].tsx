@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
@@ -9,18 +9,11 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/visuals/Avatar'
 import { CharacterProfile } from '@/components/cast/CharacterProfile'
-import { ChatBackground } from '@/components/chat/ChatBackground'
-import { ImageSourceMenu } from '@/components/overlays/ImageSourceMenu'
-import { ChipGroup } from '@/components/controls/ChipGroup'
+import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
+import { BackgroundSection, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
 import { ExpandingAvatar, useSpreadPush } from '@/components/cast/ExpandingAvatar'
 import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
-import { Divider } from '@/components/visuals/motifs/Divider'
-import { Eyebrow } from '@/components/visuals/motifs/Eyebrow'
-import { FieldRow } from '@/components/visuals/motifs/FieldRow'
-import { PillButton } from '@/components/controls/PillButton'
-import { ParamSlider } from '@/components/controls/ParamSlider'
-import { PromptGenModal, type GeneratedCharacter } from '@/components/overlays/PromptGenModal'
 import {
   DEFAULT_SAMPLING,
   deleteCharacter,
@@ -35,6 +28,7 @@ import { useImageSlot } from '@/hooks/features/useImageSlot'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/ui/haptics'
 import { setAvatarCropDraft } from '@/lib/images/avatarCrop'
+import { setGenDraft } from '@/lib/chat/genDraft'
 import { acceptMoving, pickAvatar, pickBackground, type CropRect } from '@/lib/images/avatars'
 import { movingKind } from '@/lib/images/media'
 import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
@@ -42,7 +36,7 @@ import type { ImageSource } from '@/lib/images/images'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { countLabel } from '@/lib/core/format'
 import { alertError } from '@/lib/transfer/report'
-import { type Colors, textStyles, useColors, useStyles } from '@/theme'
+import { type Colors, useColors, useStyles } from '@/theme'
 import { isAndroid } from '@/lib/core/platform'
 
 export default function CharacterEditorScreen() {
@@ -77,6 +71,14 @@ export default function CharacterEditorScreen() {
   const [avatarOriginal, setAvatarOriginal] = useState<string | null>(null)
   const [avatarCrop, setAvatarCrop] = useState<string | null>(null)
   const avatarSlot = useImageSlot('avatars')
+  // The avatar as it was before Remove, put back by Return until another one is picked or
+  // the editor is saved.
+  const [removedAvatar, setRemovedAvatar] = useState<{
+    file: string | null
+    original: string | null
+    crop: string | null
+    picked: ReturnType<typeof avatarSlot.snapshot>
+  } | null>(null)
   const [temperature, setTemperature] = useState<number>(DEFAULT_SAMPLING.temperature)
   const [maxTokens, setMaxTokens] = useState<number>(DEFAULT_SAMPLING.maxTokens)
   const [topP, setTopP] = useState<number>(DEFAULT_SAMPLING.topP)
@@ -89,10 +91,11 @@ export default function CharacterEditorScreen() {
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>('blur')
   const [bgIntensity, setBgIntensity] = useState(0.5)
   const [bgBubbleTransparency, setBgBubbleTransparency] = useState(0.3)
-  const [showPromptGen, setShowPromptGen] = useState(false)
-  // What the prompt and greeting were before the last AI result replaced them, until
-  // the user edits the prompt by hand.
-  const [beforeGen, setBeforeGen] = useState<{ prompt: string; greeting: string } | null>(null)
+  // The greeting before the generated one replaced it, until it is edited by hand.
+  const [beforeGreeting, setBeforeGreeting] = useState<string | null>(null)
+  // What the prompt was before the last AI result replaced it, until the user edits the
+  // prompt by hand.
+  const [beforeGen, setBeforeGen] = useState<string | null>(null)
 
   useEffect(() => {
     if (isNew) return
@@ -130,6 +133,7 @@ export default function CharacterEditorScreen() {
       uri,
       crop,
       onDone: (framed, rect) => {
+        setRemovedAvatar(null)
         avatarSlot.setFramed(framed, rect, original)
         if (original) setAvatarOriginal(null)
       },
@@ -143,6 +147,7 @@ export default function CharacterEditorScreen() {
       if (!file) return
       // A GIF or a video keeps its motion, so it skips the crop and is shown by its middle.
       if (acceptMoving(file)) {
+        setRemovedAvatar(null)
         avatarSlot.setUnframed(file)
         setAvatarOriginal(null)
         return
@@ -159,9 +164,19 @@ export default function CharacterEditorScreen() {
   }
 
   const onClearAvatar = () => {
+    setRemovedAvatar({ file: avatar, original: avatarOriginal, crop: avatarCrop, picked: avatarSlot.snapshot() })
     avatarSlot.clearPicked()
     setAvatar(null)
     setAvatarOriginal(null)
+  }
+
+  const onRestoreAvatar = () => {
+    if (!removedAvatar) return
+    setAvatar(removedAvatar.file)
+    setAvatarOriginal(removedAvatar.original)
+    setAvatarCrop(removedAvatar.crop)
+    avatarSlot.restore(removedAvatar.picked)
+    setRemovedAvatar(null)
   }
 
   // The picture now behind the chat: a fresh pick, else the one already stored.
@@ -236,6 +251,7 @@ export default function CharacterEditorScreen() {
         backgroundBubbleTransparency: bgBubbleTransparency,
       })
       avatarSlot.settle(nextAvatarValue)
+      setRemovedAvatar(null)
       bgSlot.settle(nextBackgroundValue)
       if (!asProfile) return router.back()
       // Back to the profile, now showing what was saved.
@@ -267,16 +283,36 @@ export default function CharacterEditorScreen() {
     })
   }
 
-  const applyGenerated = (result: GeneratedCharacter) => {
-    setBeforeGen({ prompt: systemPrompt, greeting })
-    setSystemPrompt(result.prompt)
-    if (result.greeting !== null) setGreeting(result.greeting)
+  // The generators open as a form sheet of the stack, app/generate.tsx.
+  const openPromptGen = () => {
+    setGenDraft({ kind: 'prompt', name, currentPrompt: systemPrompt, onApply: applyGenerated })
+    router.push('/generate')
+  }
+
+  const openGreetingGen = () => {
+    setGenDraft({ kind: 'greeting', name, systemPrompt, currentGreeting: greeting, onApply: applyGreeting })
+    router.push('/generate')
+  }
+
+  const applyGreeting = (text: string) => {
+    setBeforeGreeting(greeting)
+    setGreeting(text)
+  }
+
+  const undoGreeting = () => {
+    if (beforeGreeting === null) return
+    setGreeting(beforeGreeting)
+    setBeforeGreeting(null)
+  }
+
+  const applyGenerated = (prompt: string) => {
+    setBeforeGen(systemPrompt)
+    setSystemPrompt(prompt)
   }
 
   const undoGenerated = () => {
-    if (!beforeGen) return
-    setSystemPrompt(beforeGen.prompt)
-    setGreeting(beforeGen.greeting)
+    if (beforeGen === null) return
+    setSystemPrompt(beforeGen)
     setBeforeGen(null)
   }
 
@@ -352,9 +388,40 @@ export default function CharacterEditorScreen() {
           onScroll={onScroll}
         >
           <View style={styles.avatarBlock}>
-            {/* With a photo the tap opens it and a pull spreads it out; without one the
-                tap picks a photo. */}
-            {photoUri ? (
+            {/* In the profile a tap on the photo opens it and a pull spreads it out. */}
+            {editing ? (
+              // In the editor the circle stands on the left and what is done with it on
+              // the right; the spreading photo is the profile's.
+              <View style={styles.editorAvatar}>
+                <Avatar name={name} file={avatar} uri={avatarSlot.uri} size={96} viewable={hasPhoto} />
+                <View style={styles.editorAvatarActions}>
+                  <ListSection>
+                    <SourceCell label={hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')} onPick={onPickAvatar} />
+                    {hasPhoto || removedAvatar ? (
+                      <ChipRowCell
+                        actions={[
+                          ...(canRecrop
+                            ? [{ label: t('editor.recropPhoto'), icon: { symbol: 'crop', fallback: 'crop-outline' } as const, onPress: onRecropAvatar }]
+                            : []),
+                          removedAvatar
+                            ? {
+                                label: t('editor.restorePhoto'),
+                                icon: { symbol: 'arrow.uturn.backward', fallback: 'arrow-undo-outline' } as const,
+                                onPress: onRestoreAvatar,
+                              }
+                            : {
+                                label: t('editor.removePhoto'),
+                                icon: { symbol: 'trash', fallback: 'trash-outline' } as const,
+                                onPress: onClearAvatar,
+                                ink: colors.danger,
+                              },
+                        ]}
+                      />
+                    ) : null}
+                  </ListSection>
+                </View>
+              </View>
+            ) : photoUri ? (
               <ExpandingAvatar
                 name={name}
                 uri={photoUri}
@@ -365,10 +432,6 @@ export default function CharacterEditorScreen() {
                 top={padding.paddingTop}
                 side={padding.paddingHorizontal}
               />
-            ) : editing ? (
-              <ImageSourceMenu onPick={onPickAvatar}>
-                <Avatar name={name} file={avatar} uri={avatarSlot.uri} size={96} />
-              </ImageSourceMenu>
             ) : (
               <Avatar name={name} file={avatar} size={96} viewable={false} />
             )}
@@ -378,151 +441,107 @@ export default function CharacterEditorScreen() {
           <Animated.View style={pushed}>
             {editing ? (
               <>
-                <View style={styles.avatarActions}>
-                  <ImageSourceMenu onPick={onPickAvatar}>
-                    <Text style={styles.link}>{hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')}</Text>
-                  </ImageSourceMenu>
-                  {canRecrop ? (
-                    <Pressable onPress={onRecropAvatar} hitSlop={8}>
-                      <Text style={styles.link}>{t('editor.recropPhoto')}</Text>
-                    </Pressable>
-                  ) : null}
-                  {hasPhoto ? (
-                    <Pressable onPress={onClearAvatar} hitSlop={8}>
-                      <Text style={styles.linkMuted}>{t('editor.removePhoto')}</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
+                <ListSection>
+                  <InputCell
+                    label={t('editor.nameLabel')}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={t('editor.namePlaceholder')}
+                    autoCapitalize="sentences"
+                  />
+                </ListSection>
 
-                <Eyebrow label={t('background.title')} color={colors.text} />
-                <View style={styles.backgroundRow}>
-                  <View style={styles.backgroundThumb}>
-                    {backgroundUri ? <ChatBackground uri={backgroundUri} effect={bgEffect} intensity={bgIntensity} /> : null}
-                  </View>
-                  <View style={styles.backgroundActions}>
-                    <ImageSourceMenu onPick={onPickBackground}>
-                      <Text style={styles.link}>{backgroundUri ? t('background.change') : t('background.choose')}</Text>
-                    </ImageSourceMenu>
-                    {backgroundUri ? (
-                      <>
-                        <Pressable onPress={onAdjustBackground} hitSlop={8}>
-                          <Text style={styles.link}>{t('background.adjust')}</Text>
-                        </Pressable>
-                        <Pressable onPress={onClearBackground} hitSlop={8}>
-                          <Text style={styles.linkMuted}>{t('background.remove')}</Text>
-                        </Pressable>
-                      </>
-                    ) : null}
-                  </View>
-                </View>
+                <ListSection header={t('editor.systemPromptLabel')} footer={t('editor.systemPromptHint')}>
+                  <TextCell
+                    title={t('editor.systemPromptLabel')}
+                    value={systemPrompt}
+                    placeholder={t('editor.systemPromptPlaceholder')}
+                    onChangeText={(v) => {
+                      setSystemPrompt(v)
+                      setBeforeGen(null)
+                    }}
+                    lines={6}
+                  />
+                  <ButtonCell
+                    label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
+                    onPress={openPromptGen}
+                  />
+                  {beforeGen !== null ? <ButtonCell label={t('editor.undoGenerated')} onPress={undoGenerated} /> : null}
+                </ListSection>
 
-                <Divider />
+                <ListSection header={t('editor.greetingLabel')} footer={t('editor.greetingHint')}>
+                  <TextCell
+                    title={t('editor.greetingLabel')}
+                    value={greeting}
+                    placeholder={t('editor.greetingPlaceholder')}
+                    onChangeText={(v) => {
+                      setGreeting(v)
+                      setBeforeGreeting(null)
+                    }}
+                  />
+                  {/* Written from the system prompt, so there must be one first. */}
+                  <ButtonCell
+                    label={t('editor.generateGreeting')}
+                    onPress={openGreetingGen}
+                    disabled={!systemPrompt.trim()}
+                  />
+                  {beforeGreeting !== null ? <ButtonCell label={t('editor.undoGenerated')} onPress={undoGreeting} /> : null}
+                </ListSection>
 
-                <FieldRow
-                  label={t('editor.nameLabel')}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder={t('editor.namePlaceholder')}
-                  autoCapitalize="sentences"
+                <BackgroundSection
+                  uri={backgroundUri}
+                  effect={bgEffect}
+                  intensity={bgIntensity}
+                  onPick={onPickBackground}
+                  onAdjust={onAdjustBackground}
+                  onClear={onClearBackground}
                 />
 
-                <Divider />
-
-                <Eyebrow label={t('editor.genParamsSection')} color={colors.text} />
-                <ParamSlider
-                  label={t('editor.temperature')}
-                  value={temperature}
-                  min={0}
-                  max={2}
-                  step={0.05}
-                  digits={2}
-                  onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
-                />
-                <ParamSlider label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={setMaxTokens} />
-                <ParamSlider
-                  label={t('editor.topP')}
-                  value={topP}
-                  min={0.1}
-                  max={1}
-                  step={0.01}
-                  digits={2}
-                  onChange={(v) => setTopP(Math.round(v * 100) / 100)}
-                />
-
-                <Divider />
-
-                <Eyebrow label={t('editor.thinkingSection')} color={colors.text} />
-                <ChipGroup style={styles.chips} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
-                <Text style={styles.note}>{t('editor.thinkingHint')}</Text>
-
-                <Divider />
-
-                <Eyebrow label={t('editor.replyLengthSection')} color={colors.text} />
-                <ParamSlider
-                  label={t('editor.paragraphLimit')}
-                  value={replyLimit ?? 0}
-                  min={0}
-                  max={6}
-                  step={1}
-                  formatValue={(v) => (v === 0 ? t('editor.unlimited') : countLabel(v, 'paragraph', locale))}
-                  onChange={(v) => setReplyLimit(v === 0 ? null : v)}
-                />
-                <Text style={styles.note}>{t('editor.replyLengthHint')}</Text>
-
-                <Divider />
-
-                <Eyebrow label={t('editor.greetingLabel')} color={colors.text} />
-                <FieldRow
-                  hint={t('editor.greetingHint')}
-                  value={greeting}
-                  onChangeText={setGreeting}
-                  placeholder={t('editor.greetingPlaceholder')}
-                  multiline
-                  expandTitle={t('editor.greetingLabel')}
-                />
-
-                <Divider />
-
-                <View style={styles.systemPromptHeader}>
-                  <Eyebrow label={t('editor.systemPromptLabel')} color={colors.text} />
-                  {beforeGen ? (
-                    <Pressable onPress={undoGenerated} hitSlop={8}>
-                      <Text style={styles.linkMuted}>{t('editor.undoGenerated')}</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-                <PillButton
-                  label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
-                  onPress={() => setShowPromptGen(true)}
-                  style={styles.aiButton}
-                />
-                <FieldRow
-                  hint={t('editor.systemPromptHint')}
-                  value={systemPrompt}
-                  onChangeText={(v) => {
-                    setSystemPrompt(v)
-                    setBeforeGen(null)
-                  }}
-                  placeholder={t('editor.systemPromptPlaceholder')}
-                  multiline
-                  minHeight={180}
-                  expandTitle={t('editor.systemPromptLabel')}
-                />
-
-                <PromptGenModal
-                  visible={showPromptGen}
-                  name={name}
-                  currentPrompt={systemPrompt}
-                  currentGreeting={greeting}
-                  onClose={() => setShowPromptGen(false)}
-                  onApply={applyGenerated}
-                />
+                <ListSection
+                  header={t('editor.genParamsSection')}
+                  footer={
+                    <>
+                      <ListFooter>{t('editor.replyLengthHint')}</ListFooter>
+                      <ListFooter>{t('editor.thinkingHint')}</ListFooter>
+                    </>
+                  }
+                >
+                  <SliderCell
+                    label={t('editor.temperature')}
+                    value={temperature}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    digits={2}
+                    onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
+                  />
+                  <SliderCell label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={setMaxTokens} />
+                  <SliderCell
+                    label={t('editor.topP')}
+                    value={topP}
+                    min={0.1}
+                    max={1}
+                    step={0.01}
+                    digits={2}
+                    onChange={(v) => setTopP(Math.round(v * 100) / 100)}
+                  />
+                  <SliderCell
+                    label={t('editor.paragraphLimit')}
+                    value={replyLimit ?? 0}
+                    min={0}
+                    max={6}
+                    step={1}
+                    formatValue={(v) => (v === 0 ? t('editor.unlimited') : countLabel(v, 'paragraph', locale))}
+                    onChange={(v) => setReplyLimit(v === 0 ? null : v)}
+                  />
+                  {/* Segments rather than a menu: the system menu jumps as it closes on iOS 26 and 27. */}
+                  <SegmentCell label={t('editor.thinkingSection')} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
+                </ListSection>
 
                 {!isNew ? (
-                  <>
-                    <Divider />
-                    <PillButton filled label={t('editor.deleteCharacter')} onPress={confirmDelete} color={colors.danger} />
-                  </>
+                  <ListSection>
+                    <ButtonCell danger label={t('editor.deleteCharacter')} onPress={confirmDelete} />
+                  </ListSection>
                 ) : null}
               </>
             ) : (
@@ -587,25 +606,8 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    chips: { marginBottom: 16 },
-    note: textStyles(colors).note,
-    aiButton: { alignSelf: 'flex-start', marginBottom: 12 },
-    avatarBlock: { alignItems: 'center', marginBottom: 12 },
-    avatarActions: { flexDirection: 'row', gap: 20, alignSelf: 'center', marginBottom: 24 },
-    backgroundRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 4 },
-    backgroundThumb: {
-      width: 72,
-      height: 96,
-      borderRadius: 14,
-      overflow: 'hidden',
-      backgroundColor: colors.surfaceRaised,
-    },
-    backgroundActions: { flex: 1, gap: 12, alignItems: 'flex-start' },
-    link: textStyles(colors).link,
-    linkMuted: textStyles(colors).linkMuted,
-    systemPromptHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
+    avatarBlock: { alignItems: 'center', marginBottom: 24 },
+    editorAvatar: { flexDirection: 'row', alignItems: 'center', gap: 16, alignSelf: 'stretch' },
+    // The group's own bottom margin is the block's.
+    editorAvatarActions: { flex: 1, marginBottom: -28 },
   })

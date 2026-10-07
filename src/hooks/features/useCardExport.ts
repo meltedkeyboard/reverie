@@ -1,5 +1,6 @@
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { useTranslation } from '@/i18n'
+import { isWeb } from '@/lib/core/platform'
 import { exportCharacterCard, type CardCharacter } from '@/lib/transfer/importCard'
 import { showToast } from '@/lib/ui/toast'
 import { reportError } from '@/lib/transfer/report'
@@ -20,17 +21,18 @@ export function useCardExport() {
     }
   }
 
+  // The web build (the desktop app too) has no Photos, so only the file is left there.
   const exportTargets = (load: () => Promise<CardCharacter | null | undefined>): MenuItem[] => [
     { label: t('card.saveToFiles'), systemImage: 'folder', onSelect: () => run(load, 'files') },
-    { label: t('card.saveToPhotos'), systemImage: 'photo', onSelect: () => run(load, 'photos') },
+    ...(isWeb ? [] : [{ label: t('card.saveToPhotos'), systemImage: 'photo', onSelect: () => run(load, 'photos') }]),
   ]
 
-  // The same two choices as one item that unfolds, for a menu that has other items too.
-  const exportItem = (load: () => Promise<CardCharacter | null | undefined>): MenuItem => ({
-    label: t('card.export'),
-    systemImage: 'square.and.arrow.up',
-    children: exportTargets(load),
-  })
+  // The same choices as one item that unfolds, for a menu that has other items too; with
+  // only the file to choose, the item saves it straight away.
+  const exportItem = (load: () => Promise<CardCharacter | null | undefined>): MenuItem =>
+    isWeb
+      ? { label: t('card.export'), systemImage: 'square.and.arrow.up', onSelect: () => run(load, 'files') }
+      : { label: t('card.export'), systemImage: 'square.and.arrow.up', children: exportTargets(load) }
 
   return { exportTargets, exportItem }
 }

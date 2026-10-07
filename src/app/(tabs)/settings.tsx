@@ -4,11 +4,10 @@ import * as LocalAuthentication from 'expo-local-authentication'
 import { StyleSheet, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
-import { ButtonCell, CheckCell, InputCell, LinkCell, ListFooter, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
+import { ButtonCell, CheckCell, InputCell, LinkCell, ListFooter, ListSection, MenuCell, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
 import { loadModel } from '@/api/llm'
 import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
-import { ParamSlider } from '@/components/controls/ParamSlider'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/prefs/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/prefs/continue'
@@ -523,17 +522,15 @@ export default function SettingsScreen() {
         ) : null}
         {cfg.contextMode === 'tokens' && modelLoaded ? (
           // A step of the slider, not a token count: the sizes models come in are doublings.
-          <View style={styles.sliderCell}>
-            <ParamSlider
-              label={t('settings.contextTokensLabel')}
-              value={Math.max(0, CONTEXT_STEPS.indexOf(cfg.contextTokens as (typeof CONTEXT_STEPS)[number]))}
-              min={0}
-              max={CONTEXT_STEPS.length - 1}
-              step={1}
-              formatValue={(i) => `${CONTEXT_STEPS[i] / 1024}K`}
-              onChange={(i) => update({ contextTokens: CONTEXT_STEPS[i] })}
-            />
-          </View>
+          <SliderCell
+            label={t('settings.contextTokensLabel')}
+            value={Math.max(0, CONTEXT_STEPS.indexOf(cfg.contextTokens as (typeof CONTEXT_STEPS)[number]))}
+            min={0}
+            max={CONTEXT_STEPS.length - 1}
+            step={1}
+            formatValue={(i) => `${CONTEXT_STEPS[i] / 1024}K`}
+            onChange={(i) => update({ contextTokens: CONTEXT_STEPS[i] })}
+          />
         ) : null}
       </ListSection>
     </>
@@ -670,5 +667,4 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     // Reaches a little past the block, so the tint frames it instead of hugging the text.
     flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 30 },
-    sliderCell: { paddingHorizontal: 16, paddingTop: 12 },
   })

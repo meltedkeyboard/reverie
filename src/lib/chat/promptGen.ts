@@ -52,29 +52,61 @@ function systemRules(input: PromptGenInput) {
   ].join('\n')
 }
 
-function requestText(input: PromptGenInput) {
-  if (input.base === null) return input.description.trim()
-  const changes = input.description.trim() || 'No specific requests: fill gaps, remove contradictions and make the character more vivid while keeping its core.'
-  return `Here is the current system prompt:\n\n${input.base.trim()}\n\nRewrite it. Requested changes: ${changes}`
+type TextKind = 'prompt' | 'greeting'
+
+const KIND_NAME: Record<TextKind, string> = {
+  prompt: 'system prompt of a roleplay character',
+  greeting: 'opening message of a roleplay character',
 }
 
-// A revision only resends the latest draft, not the whole chain of drafts, so a long
-// back-and-forth doesn't eat into the model's context.
-export function buildPromptMessages(input: PromptGenInput, revision?: { draft: string; note: string }): ChatTurn[] {
-  const messages: ChatTurn[] = [
-    { role: 'system', content: systemRules(input) },
-    { role: 'user', content: requestText(input) },
+// A change to a text that is already there is an edit, not a new text: asked from scratch
+// with the rules of length and format, the model wrote it over in its own way and lost the
+// details, the sample lines and the layout. So the edit is a request of its own, with
+// nothing but the text and the change.
+function buildEditMessages(kind: TextKind, text: string, change: string): ChatTurn[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        `You edit the ${KIND_NAME[kind]}. You do not rewrite it.`,
+        'Change only what the request asks for. Everything else stays word for word: every sentence, detail, example, sample line of dialogue, list, heading, *action* and line break, in the same order and the same formatting.',
+        'Do not reword, summarize, reorder or restyle the parts the request does not touch, and add no new sections or headings unless asked.',
+        'To shorten, cut the least important sentences and keep the rest as written; to add, put new sentences where they belong and keep the rest as written.',
+        'Keep the language of the text.',
+        `Reply with the whole edited ${kind === 'prompt' ? 'prompt' : 'message'} only: no preface, no comments, no quotes or code fences around it.`,
+      ].join('\n'),
+    },
+    { role: 'user', content: `The text:\n\n${text.trim()}\n\nThe change: ${change.trim()}` },
   ]
-  if (revision) {
-    messages.push(
-      { role: 'assistant', content: revision.draft },
-      { role: 'user', content: `Revise the prompt: ${revision.note.trim()}\nReply with the full revised prompt only.` }
-    )
-  }
-  return messages
 }
 
-export function buildGreetingMessages(prompt: string, name: string, locale: Locale): ChatTurn[] {
+// Improving the prompt there is, with no requests, adds and fixes rather than starts over.
+const IMPROVE_DEFAULT =
+  'fill the gaps and remove contradictions, making the character more vivid by adding concrete details; keep what is written'
+
+// From scratch, a description becomes a prompt by the rules of length and format. Improving
+// the current prompt and revising a version are edits of the text given. A revision only
+// resends the latest draft, not the whole chain of drafts, so a long back-and-forth doesn't
+// eat into the model's context.
+export function buildPromptMessages(input: PromptGenInput, revision?: { draft: string; note: string }): ChatTurn[] {
+  if (revision) return buildEditMessages('prompt', revision.draft, revision.note)
+  if (input.base !== null) return buildEditMessages('prompt', input.base, input.description.trim() || IMPROVE_DEFAULT)
+  return [
+    { role: 'system', content: systemRules(input) },
+    { role: 'user', content: input.description.trim() },
+  ]
+}
+
+// `wishes` is what the user asked the greeting to be; empty leaves it to the model. A
+// revision resends only the latest draft, as for the prompt.
+export function buildGreetingMessages(
+  prompt: string,
+  name: string,
+  locale: Locale,
+  wishes = '',
+  revision?: { draft: string; note: string }
+): ChatTurn[] {
+  if (revision) return buildEditMessages('greeting', revision.draft, revision.note)
   return [
     {
       role: 'system',
@@ -82,6 +114,7 @@ export function buildGreetingMessages(prompt: string, name: string, locale: Loca
         "You write the opening message a roleplay character sends when a new chat starts. You receive the character's system prompt.",
         'Write it fully in character: one to three short paragraphs that set the scene and give the user something to react to. Put actions and scene description in *asterisks*.',
         name.trim() ? `The character's name is ${name.trim()}.` : '',
+        wishes.trim() ? `The user wants the greeting to be: ${wishes.trim()}` : '',
         languageRule(locale),
         'Reply with the message text only.',
       ]
@@ -92,12 +125,25 @@ export function buildGreetingMessages(prompt: string, name: string, locale: Loca
   ]
 }
 
-export function streamGeneration(cfg: ServerSettings, messages: ChatTurn[], signal: AbortSignal): AsyncGenerator<StreamPart> {
+// `thinking` is the switch of the generator sheet, for this request only. An edit runs
+// cooler, so the model copies what it should keep instead of inventing it anew.
+export function streamGeneration(
+  cfg: ServerSettings,
+  messages: ChatTurn[],
+  signal: AbortSignal,
+  options: { thinking: boolean; edit: boolean }
+): AsyncGenerator<StreamPart> {
   return streamChat(
     cfg,
     // The token budget is generous because reasoning models spend part of it thinking
     // before the prompt itself starts.
-    { messages, temperature: 0.9, maxTokens: 3000, topP: 0.95, thinking: 'auto' },
+    {
+      messages,
+      temperature: options.edit ? 0.4 : 0.9,
+      maxTokens: 3000,
+      topP: 0.95,
+      thinking: options.thinking ? 'on' : 'off',
+    },
     signal
   )
 }

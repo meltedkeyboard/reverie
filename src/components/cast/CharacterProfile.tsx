@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient'
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
@@ -8,10 +8,8 @@ import { useTranslation } from '@/i18n'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 import { ChatBackground } from '../chat/ChatBackground'
-import { Divider } from '../visuals/motifs/Divider'
-import { Eyebrow } from '../visuals/motifs/Eyebrow'
-import { NativeMenu, type MenuItem } from '../overlays/NativeMenu'
-import { PillButton } from '../controls/PillButton'
+import { ButtonCell, ListSection } from '../lists/GroupedList'
+import type { MenuItem } from '../overlays/NativeMenu'
 
 type Props = {
   greeting: string
@@ -24,62 +22,53 @@ type Props = {
 }
 
 // A character to look at rather than to edit, as a Telegram profile: under the avatar
-// what the character is, and how it answers. The name stays in the header, from where it
+// what the character is, and how it answers, in the grouped look of the editor. The name stays in the header, from where it
 // moves onto the photo when the avatar spreads. Empty parts are left out.
 export function CharacterProfile({ greeting, systemPrompt, params, background, exportItems }: Props) {
   const styles = useStyles(createStyles)
-  const colors = useColors()
   const { t } = useTranslation()
 
-  const sections = [
-    systemPrompt.trim() ? (
-      <Fragment key="prompt">
-        <Eyebrow label={t('editor.systemPromptLabel')} color={colors.text} />
-        <ClampedText text={systemPrompt} lines={6} />
-      </Fragment>
-    ) : null,
-    greeting.trim() ? (
-      <Fragment key="greeting">
-        <Eyebrow label={t('editor.greetingLabel')} color={colors.text} />
-        <ClampedText text={greeting} lines={4} />
-      </Fragment>
-    ) : null,
-    <Fragment key="params">
-      <Eyebrow label={t('editor.genParamsSection')} color={colors.text} />
-      <View style={styles.params}>
-        {params.map((param, i) => (
-          <View key={param.label} style={[styles.param, i > 0 && styles.paramRule]}>
+  return (
+    <View>
+      {systemPrompt.trim() ? (
+        <ListSection header={t('editor.systemPromptLabel')}>
+          <View style={styles.textCell}>
+            <ClampedText text={systemPrompt} lines={6} />
+          </View>
+        </ListSection>
+      ) : null}
+      {greeting.trim() ? (
+        <ListSection header={t('editor.greetingLabel')}>
+          <View style={styles.textCell}>
+            <ClampedText text={greeting} lines={4} />
+          </View>
+        </ListSection>
+      ) : null}
+      <ListSection header={t('editor.genParamsSection')}>
+        {params.map((param) => (
+          <View key={param.label} style={styles.param}>
             <Text style={styles.paramLabel}>{param.label}</Text>
             <Text style={styles.paramValue}>{param.value}</Text>
           </View>
         ))}
-      </View>
-    </Fragment>,
-    background ? (
-      <Fragment key="background">
-        <Eyebrow label={t('background.title')} color={colors.text} />
-        <View style={styles.backgroundThumb}>
-          <ChatBackground uri={background.uri} effect={background.effect} intensity={background.intensity} />
-        </View>
-      </Fragment>
-    ) : null,
-  ].filter(Boolean)
-
-  return (
-    <View style={styles.profile}>
-      {sections.map((section, i) => (
-        <Fragment key={i}>
-          {i > 0 ? <Divider /> : null}
-          {section}
-        </Fragment>
-      ))}
+      </ListSection>
+      {background ? (
+        <ListSection header={t('background.title')}>
+          <View style={styles.backgroundCell}>
+            <View style={styles.backgroundThumb}>
+              <ChatBackground uri={background.uri} effect={background.effect} intensity={background.intensity} />
+            </View>
+          </View>
+        </ListSection>
+      ) : null}
+      {/* Each way out is a row of its own rather than a menu: the system menu jumps
+          behind the scroll as it closes on iOS 26 and 27. */}
       {exportItems ? (
-        <>
-          <Divider />
-          <NativeMenu items={exportItems} style={styles.export}>
-            <PillButton label={t('card.export')} icon={{ name: 'square.and.arrow.up', fallback: 'share-outline', plain: true }} />
-          </NativeMenu>
-        </>
+        <ListSection header={t('card.export')}>
+          {exportItems.map((item) => (
+            <ButtonCell key={item.label} label={item.label} onPress={() => item.onSelect?.()} />
+          ))}
+        </ListSection>
       ) : null}
     </View>
   )
@@ -133,7 +122,8 @@ function ClampedText({ text, lines }: { text: string; lines: number }) {
   const expanded = useAnimatedStyle(() => ({ opacity: progress.value }))
 
   const hidden = { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants', pointerEvents: 'none' } as const
-  const bg = colors.bg
+  // The text now sits in a group, so "more" and its fade take the group's fill.
+  const bg = colors.surface
   return (
     <View>
       <Text style={[styles.text, styles.measure]} onLayout={(e) => setWhole(e.nativeEvent.layout.height)} {...hidden}>
@@ -179,8 +169,7 @@ const LESS_HEIGHT = 34
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    // Where the editor has the photo links, so the first section sits at the same height.
-    profile: { marginTop: 12 },
+    textCell: { paddingHorizontal: 16, paddingVertical: 14 },
     text: { color: colors.text, fontSize: 16, lineHeight: LINE_HEIGHT },
     // Out of the flow and unseen, only to measure the text cut and whole.
     measure: { position: 'absolute', left: 0, right: 0, opacity: 0 },
@@ -191,16 +180,16 @@ const createStyles = (colors: Colors) =>
     moreButton: { justifyContent: 'center', paddingLeft: 2 },
     less: { justifyContent: 'flex-end', alignItems: 'flex-start' },
     link: { color: colors.accent, fontSize: 16, lineHeight: LINE_HEIGHT },
-    export: { alignSelf: 'center' },
-    params: { marginTop: 2 },
-    param: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, paddingVertical: 11 },
-    paramRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-    paramLabel: { flexShrink: 1, color: colors.textMuted, fontSize: 15 },
-    paramValue: { color: colors.text, fontSize: 15, fontVariant: ['tabular-nums'], textAlign: 'right' },
+    // A label and its value, as a row of Settings > General > About.
+    param: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingHorizontal: 16 },
+    paramLabel: { flexShrink: 1, color: colors.text, fontSize: 17 },
+    paramValue: { color: colors.textMuted, fontSize: 17, fontVariant: ['tabular-nums'], textAlign: 'right' },
+    backgroundCell: { alignItems: 'center', paddingVertical: 12 },
     backgroundThumb: {
-      width: 72,
-      height: 96,
+      width: 90,
+      height: 120,
       borderRadius: 14,
+      borderCurve: 'continuous',
       overflow: 'hidden',
       backgroundColor: colors.surfaceRaised,
     },

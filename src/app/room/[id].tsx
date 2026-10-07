@@ -1,23 +1,16 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
-import { isDesktop } from '@/lib/core/platform'
 import { Avatar } from '@/components/visuals/Avatar'
-import { ChatBackground } from '@/components/chat/ChatBackground'
-import { ChipGroup } from '@/components/controls/ChipGroup'
+import { Segmented } from '@/components/controls/Segmented'
 import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
-import { ImageSourceMenu } from '@/components/overlays/ImageSourceMenu'
-import { Divider } from '@/components/visuals/motifs/Divider'
-import { Eyebrow } from '@/components/visuals/motifs/Eyebrow'
-import { FieldRow } from '@/components/visuals/motifs/FieldRow'
-import { PillButton } from '@/components/controls/PillButton'
+import { ButtonCell, InputCell, ListFooter, ListSection, SliderCell, SwitchCell, TextCell } from '@/components/lists/GroupedList'
+import { BackgroundSection } from '@/components/lists/PictureCells'
 import { PageSheet } from '@/components/overlays/PageSheet'
-import { ParamSlider } from '@/components/controls/ParamSlider'
-import { ToggleRow } from '@/components/controls/ToggleRow'
 import { listCharacters, type Character, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import {
@@ -39,7 +32,7 @@ import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
-import { type Colors, textStyles, useColors, useStyles } from '@/theme'
+import { type Colors, useColors, useStyles } from '@/theme'
 
 type Member = MemberSettings & { character: Character }
 
@@ -186,6 +179,8 @@ export default function RoomEditorScreen() {
   }
 
   const title = isNew ? t('roomEditor.newTitle') : t('roomEditor.title')
+  // While a member is open, its notes stand under the group rather than beside each row.
+  const memberOpen = members.some((m) => m.characterId === expanded)
 
   return (
     <View style={styles.screen}>
@@ -196,185 +191,168 @@ export default function RoomEditorScreen() {
           keyboardDismissMode="interactive"
           contentContainerStyle={padding}
         >
-          <FieldRow
-            label={t('roomEditor.nameLabel')}
-            value={fields.name}
-            onChangeText={(v) => set('name', v)}
-            placeholder={defaultName() || t('roomEditor.namePlaceholder')}
-            autoCapitalize="sentences"
-          />
+          <ListSection>
+            <InputCell
+              label={t('roomEditor.nameLabel')}
+              value={fields.name}
+              onChangeText={(v) => set('name', v)}
+              placeholder={defaultName() || t('roomEditor.namePlaceholder')}
+              autoCapitalize="sentences"
+            />
+          </ListSection>
 
-          <Divider />
-
-          <View style={styles.sectionHeader}>
-            <Eyebrow label={t('roomEditor.membersSection')} color={colors.text} />
-            <Pressable onPress={() => setPicking(true)} hitSlop={8}>
-              <Text style={styles.link}>{t('roomEditor.addMembers')}</Text>
-            </Pressable>
-          </View>
-          {members.length ? null : <Text style={styles.note}>{t('roomEditor.noMembers')}</Text>}
-          {members.map((member, index) => {
-            const open = expanded === member.characterId
-            return (
-              <View key={member.characterId} style={styles.member}>
-                <Pressable
-                  onPress={() => setExpanded(open ? null : member.characterId)}
-                  style={({ pressed }) => [styles.memberHead, pressed && { opacity: 0.7 }]}
-                >
-                  <Avatar name={member.character.name} file={member.character.avatar} size={36} />
-                  <View style={styles.memberBody}>
-                    <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
-                      {member.character.name}
-                    </Text>
-                    <Text style={styles.memberMeta} numberOfLines={1}>
-                      {!member.present
-                        ? t('roomEditor.outOfScene')
-                        : member.muted
-                        ? t('roomEditor.listensOnly')
-                        : t('roomEditor.memberSummary', {
-                            talk: percent(member.talkativeness),
-                            ear: percent(member.perception),
-                          })}
-                    </Text>
-                  </View>
-                  <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
-                </Pressable>
-                {open ? (
-                  <View style={styles.memberSettings}>
-                    <ParamSlider
-                      label={t('roomEditor.talkativeness')}
-                      value={member.talkativeness}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      formatValue={percent}
-                      onChange={(v) => updateMember(member.characterId, { talkativeness: Math.round(v * 100) / 100 })}
-                    />
-                    <ParamSlider
-                      label={t('roomEditor.perception')}
-                      value={member.perception}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      formatValue={percent}
-                      onChange={(v) => updateMember(member.characterId, { perception: Math.round(v * 100) / 100 })}
-                    />
-                    <Text style={styles.hint}>{t('roomEditor.perceptionHint')}</Text>
-                    <FieldRow
-                      label={t('roomEditor.triggers')}
-                      hint={t('roomEditor.triggersHint')}
-                      value={member.triggers}
-                      onChangeText={(v) => updateMember(member.characterId, { triggers: v })}
-                      placeholder={t('roomEditor.triggersPlaceholder')}
-                      star={false}
-                    />
-                    <ToggleRow
-                      label={t('roomEditor.present')}
-                      note={t('roomEditor.presentNote')}
-                      value={member.present}
-                      onValueChange={(v) => updateMember(member.characterId, { present: v })}
-                    />
-                    <ToggleRow
-                      label={t('roomEditor.muted')}
-                      note={t('roomEditor.mutedNote')}
-                      value={member.muted}
-                      onValueChange={(v) => updateMember(member.characterId, { muted: v })}
-                    />
-                    <Pressable
-                      onPress={() => setMembers((list) => list.filter((m) => m.characterId !== member.characterId))}
-                      hitSlop={8}
-                    >
-                      <Text style={styles.linkDanger}>{t('roomEditor.removeMember')}</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-              </View>
-            )
-          })}
-
-          <Divider />
-
-          <Eyebrow label={t('roomEditor.floorSection')} color={colors.text} />
-          <ChipGroup style={styles.chips} options={FLOOR_OPTIONS} value={fields.floor} onChange={(v) => set('floor', v)} />
-          <Text style={styles.note}>{t(`room.floorHint.${fields.floor}`)}</Text>
-          <View style={styles.gap} />
-          <ParamSlider
-            label={t('roomEditor.maxChain')}
-            value={fields.maxChain}
-            min={1}
-            max={5}
-            step={1}
-            onChange={(v) => set('maxChain', v)}
-          />
-          <Text style={[styles.hint, styles.gapBelow]}>{t('roomEditor.maxChainHint')}</Text>
-          <ToggleRow
-            label={t('roomEditor.director')}
-            note={t('roomEditor.directorNote')}
-            value={fields.director}
-            onValueChange={(v) => set('director', v)}
-          />
-
-          <Divider />
-
-          <Eyebrow label={t('roomEditor.sceneSection')} color={colors.text} />
-          <FieldRow
-            label={t('roomEditor.scenario')}
-            hint={t('roomEditor.scenarioHint')}
-            value={fields.scenario}
-            onChangeText={(v) => set('scenario', v)}
-            placeholder={t('roomEditor.scenarioPlaceholder')}
-            multiline
-            expandTitle={t('roomEditor.scenario')}
-          />
-          <FieldRow
-            label={t('roomEditor.opening')}
-            hint={t('roomEditor.openingHint')}
-            value={fields.opening}
-            onChangeText={(v) => set('opening', v)}
-            placeholder={t('roomEditor.openingPlaceholder')}
-            multiline
-            expandTitle={t('roomEditor.opening')}
-          />
-          <FieldRow
-            label={t('roomEditor.userName')}
-            hint={t('roomEditor.userNameHint')}
-            value={fields.userName}
-            onChangeText={(v) => set('userName', v)}
-            placeholder={t('roomEditor.userNamePlaceholder')}
-            autoCapitalize="words"
-          />
-
-          <Divider />
-
-          <Eyebrow label={t('background.title')} color={colors.text} />
-          <View style={styles.backgroundRow}>
-            <View style={styles.backgroundThumb}>
-              {backgroundUri ? (
-                <ChatBackground uri={backgroundUri} effect={fields.backgroundEffect} intensity={fields.backgroundIntensity} />
-              ) : null}
-            </View>
-            <View style={styles.backgroundActions}>
-              <ImageSourceMenu onPick={onPickBackground}>
-                <Text style={styles.link}>{backgroundUri ? t('background.change') : t('background.choose')}</Text>
-              </ImageSourceMenu>
-              {backgroundUri ? (
+          <ListSection
+            header={t('roomEditor.membersSection')}
+            footer={
+              memberOpen ? (
                 <>
-                  <Pressable onPress={() => onAdjustBackground()} hitSlop={8}>
-                    <Text style={styles.link}>{t('background.adjust')}</Text>
-                  </Pressable>
-                  <Pressable onPress={onClearBackground} hitSlop={8}>
-                    <Text style={styles.linkMuted}>{t('background.remove')}</Text>
-                  </Pressable>
+                  <ListFooter>{t('roomEditor.perceptionHint')}</ListFooter>
+                  <ListFooter>{t('roomEditor.triggersHint')}</ListFooter>
+                  <ListFooter>{t('roomEditor.presentNote')}</ListFooter>
+                  <ListFooter>{t('roomEditor.mutedNote')}</ListFooter>
                 </>
-              ) : null}
+              ) : members.length ? undefined : (
+                t('roomEditor.noMembers')
+              )
+            }
+          >
+            {members.map((member, index) => {
+              const open = expanded === member.characterId
+              // An open member's own rows follow it in the group.
+              return (
+                <Fragment key={member.characterId}>
+                  <Pressable
+                    onPress={() => setExpanded(open ? null : member.characterId)}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: open }}
+                    style={({ pressed }) => [styles.memberHead, pressed && styles.pressed]}
+                  >
+                    <Avatar name={member.character.name} file={member.character.avatar} size={36} />
+                    <View style={styles.memberBody}>
+                      <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
+                        {member.character.name}
+                      </Text>
+                      <Text style={styles.memberMeta} numberOfLines={1}>
+                        {!member.present
+                          ? t('roomEditor.outOfScene')
+                          : member.muted
+                            ? t('roomEditor.listensOnly')
+                            : t('roomEditor.memberSummary', {
+                                talk: percent(member.talkativeness),
+                                ear: percent(member.perception),
+                              })}
+                      </Text>
+                    </View>
+                    <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
+                  </Pressable>
+                  {open ? (
+                    <>
+                      <SliderCell
+                        label={t('roomEditor.talkativeness')}
+                        value={member.talkativeness}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        formatValue={percent}
+                        onChange={(v) => updateMember(member.characterId, { talkativeness: Math.round(v * 100) / 100 })}
+                      />
+                      <SliderCell
+                        label={t('roomEditor.perception')}
+                        value={member.perception}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        formatValue={percent}
+                        onChange={(v) => updateMember(member.characterId, { perception: Math.round(v * 100) / 100 })}
+                      />
+                      <InputCell
+                        label={t('roomEditor.triggers')}
+                        value={member.triggers}
+                        onChangeText={(v) => updateMember(member.characterId, { triggers: v })}
+                        placeholder={t('roomEditor.triggersPlaceholder')}
+                      />
+                      <SwitchCell
+                        label={t('roomEditor.present')}
+                        value={member.present}
+                        onValueChange={(v) => updateMember(member.characterId, { present: v })}
+                      />
+                      <SwitchCell
+                        label={t('roomEditor.muted')}
+                        value={member.muted}
+                        onValueChange={(v) => updateMember(member.characterId, { muted: v })}
+                      />
+                      <ButtonCell
+                        danger
+                        label={t('roomEditor.removeMember')}
+                        onPress={() => setMembers((list) => list.filter((m) => m.characterId !== member.characterId))}
+                      />
+                    </>
+                  ) : null}
+                </Fragment>
+              )
+            })}
+            <ButtonCell label={t('roomEditor.addMembers')} onPress={() => setPicking(true)} />
+          </ListSection>
+
+          <ListSection
+            header={t('roomEditor.floorSection')}
+            footer={
+              <>
+                <ListFooter>{t(`room.floorHint.${fields.floor}`)}</ListFooter>
+                <ListFooter>{t('roomEditor.maxChainHint')}</ListFooter>
+                <ListFooter>{t('roomEditor.directorNote')}</ListFooter>
+              </>
+            }
+          >
+            <View style={styles.segmentRow}>
+              <Segmented options={FLOOR_OPTIONS} value={fields.floor} onChange={(v) => set('floor', v)} />
             </View>
-          </View>
+            <SliderCell label={t('roomEditor.maxChain')} value={fields.maxChain} min={1} max={5} step={1} onChange={(v) => set('maxChain', v)} />
+            <SwitchCell label={t('roomEditor.director')} value={fields.director} onValueChange={(v) => set('director', v)} />
+          </ListSection>
+
+          <ListSection header={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>
+            <TextCell
+              title={t('roomEditor.scenario')}
+              value={fields.scenario}
+              placeholder={t('roomEditor.scenarioPlaceholder')}
+              onChangeText={(v) => set('scenario', v)}
+              lines={6}
+            />
+          </ListSection>
+
+          <ListSection header={t('roomEditor.opening')} footer={t('roomEditor.openingHint')}>
+            <TextCell
+              title={t('roomEditor.opening')}
+              value={fields.opening}
+              placeholder={t('roomEditor.openingPlaceholder')}
+              onChangeText={(v) => set('opening', v)}
+            />
+          </ListSection>
+
+          <ListSection footer={t('roomEditor.userNameHint')}>
+            <InputCell
+              label={t('roomEditor.userName')}
+              value={fields.userName}
+              onChangeText={(v) => set('userName', v)}
+              placeholder={t('roomEditor.userNamePlaceholder')}
+              autoCapitalize="words"
+            />
+          </ListSection>
+
+          <BackgroundSection
+            uri={backgroundUri}
+            effect={fields.backgroundEffect}
+            intensity={fields.backgroundIntensity}
+            onPick={onPickBackground}
+            onAdjust={onAdjustBackground}
+            onClear={onClearBackground}
+          />
 
           {!isNew ? (
-            <>
-              <Divider />
-              <PillButton filled label={t('roomEditor.deleteRoom')} onPress={confirmDelete} color={colors.danger} />
-            </>
+            <ListSection>
+              <ButtonCell danger label={t('roomEditor.deleteRoom')} onPress={confirmDelete} />
+            </ListSection>
           ) : null}
         </KeyboardAwareScrollView>
       ) : null}
@@ -383,6 +361,7 @@ export default function RoomEditorScreen() {
         visible={picking}
         onClose={() => setPicking(false)}
         title={t('roomEditor.pickTitle')}
+        background={colors.bg}
         right={
           <Pressable onPress={() => setPicking(false)} hitSlop={8}>
             <Text style={styles.done}>{t('roomEditor.done')}</Text>
@@ -390,27 +369,26 @@ export default function RoomEditorScreen() {
         }
       >
         <ScrollView contentContainerStyle={styles.pickList}>
-          {characters.length ? null : <Text style={styles.note}>{t('roomEditor.noCharacters')}</Text>}
-          {characters.map((character) => {
-            const on = members.some((m) => m.characterId === character.id)
-            return (
-              <Pressable
-                key={character.id}
-                onPress={() => toggleCharacter(character)}
-                style={({ pressed }) => [styles.pickRow, pressed && { opacity: 0.7 }]}
-              >
-                <Avatar name={character.name} file={character.avatar} size={40} viewable={false} />
-                <Text style={styles.pickName} numberOfLines={1}>
-                  {character.name}
-                </Text>
-                <Icon
-                  name={on ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={24}
-                  color={on ? colors.accent : colors.textFaint}
-                />
-              </Pressable>
-            )
-          })}
+          <ListSection footer={characters.length ? undefined : t('roomEditor.noCharacters')}>
+            {characters.map((character) => {
+              const on = members.some((m) => m.characterId === character.id)
+              return (
+                <Pressable
+                  key={character.id}
+                  onPress={() => toggleCharacter(character)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  style={({ pressed }) => [styles.pickRow, pressed && styles.pressed]}
+                >
+                  <Avatar name={character.name} file={character.avatar} size={36} viewable={false} />
+                  <Text style={styles.pickName} numberOfLines={1}>
+                    {character.name}
+                  </Text>
+                  {on ? <Icon name="checkmark" size={22} color={colors.accent} /> : null}
+                </Pressable>
+              )
+            })}
+          </ListSection>
         </ScrollView>
       </PageSheet>
 
@@ -434,39 +412,14 @@ export default function RoomEditorScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    chips: { marginBottom: 16 },
-    note: textStyles(colors).note,
-    hint: { color: colors.textFaint, fontSize: 12, lineHeight: 17, marginTop: -4, marginBottom: 16 },
-    gap: { height: 16 },
-    gapBelow: { marginBottom: 16 },
-    link: textStyles(colors).link,
-    linkMuted: textStyles(colors).linkMuted,
-    linkDanger: { color: colors.danger, fontSize: 15, marginTop: 4 },
-    member: {
-      borderWidth: isDesktop ? 0 : 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      marginBottom: 10,
-      overflow: 'hidden',
-    },
-    memberHead: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 },
+    pressed: { backgroundColor: colors.surfaceRaised },
+    memberHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
     memberBody: { flex: 1 },
-    memberName: { fontSize: 16, fontWeight: '600' },
+    memberName: { fontSize: 17, fontWeight: '600' },
     memberMeta: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-    memberSettings: {
-      paddingHorizontal: 14,
-      paddingTop: 6,
-      paddingBottom: 16,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.border,
-    },
-    backgroundRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 4 },
-    backgroundThumb: { width: 72, height: 96, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surfaceRaised },
-    backgroundActions: { flex: 1, gap: 12, alignItems: 'flex-start' },
-    done: { color: colors.accent, fontSize: 16, fontWeight: '600' },
-    pickList: { padding: 16, gap: 4 },
-    pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
-    pickName: { flex: 1, color: colors.text, fontSize: 16 },
+    segmentRow: { paddingHorizontal: 16, paddingVertical: 12 },
+    done: { color: colors.accent, fontSize: 17, fontWeight: '600' },
+    pickList: { padding: 16 },
+    pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8, minHeight: 52 },
+    pickName: { flex: 1, color: colors.text, fontSize: 17 },
   })

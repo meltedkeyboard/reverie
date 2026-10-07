@@ -1,10 +1,15 @@
 import { Icon } from '@/components/visuals/Icon'
+import { Link } from 'expo-router'
 import { Children, Fragment, isValidElement, type ComponentProps, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native'
 
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { NativeMenu } from '@/components/overlays/NativeMenu'
+import { ParamSlider } from '@/components/controls/ParamSlider'
+import { Segmented } from '@/components/controls/Segmented'
 import { SlidingIcon, useAtLeastOneLap } from '@/components/controls/PillButton'
+import { setTextDraft } from '@/lib/chat/textDraft'
+import { SFIcon } from '@/components/visuals/SFIcon'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { isDesktop, isIOS } from '@/lib/core/platform'
@@ -198,6 +203,87 @@ export function ButtonCell({
   )
 }
 
+// Text typed over several lines right in the group, as a note in a form; it grows with the
+// text up to `maxHeight`, then scrolls.
+export function AreaCell({ minHeight = 88, maxHeight = 220, ...input }: Omit<TextInputProps, 'style' | 'multiline'> & { minHeight?: number; maxHeight?: number }) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  return (
+    <View style={styles.areaRow}>
+      <TextInput
+        {...input}
+        multiline
+        placeholderTextColor={colors.textFaint}
+        selectionColor={colors.accent}
+        style={[styles.area, { minHeight, maxHeight }]}
+      />
+    </View>
+  )
+}
+
+// A choice of a few, as segments under a small caps label, like the sliders.
+export function SegmentCell<T extends string>({
+  label,
+  ...segmented
+}: { label: string } & ComponentProps<typeof Segmented<T>>) {
+  const styles = useStyles(createStyles)
+  return (
+    <View style={styles.segmentCell}>
+      <Text style={styles.capsLabel}>{label}</Text>
+      <Segmented {...segmented} />
+    </View>
+  )
+}
+
+// A slider in a row of its own: the label and the value above the track.
+export function SliderCell(props: ComponentProps<typeof ParamSlider>) {
+  const styles = useStyles(createStyles)
+  return (
+    <View style={styles.sliderCell}>
+      <ParamSlider {...props} />
+    </View>
+  )
+}
+
+// A long text shown by its first lines; a tap opens it for editing on the whole screen
+// (app/text-editor.tsx), zooming out of the row on iOS.
+export function TextCell({
+  title,
+  value,
+  placeholder,
+  onChangeText,
+  lines = 4,
+}: {
+  title: string
+  value: string
+  placeholder?: string
+  onChangeText: (text: string) => void
+  lines?: number
+}) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  // Runs before the link navigates, so the editor finds the text waiting.
+  const prepareEditor = () => setTextDraft({ title, value, placeholder, onChange: onChangeText })
+  return (
+    <Link href="/text-editor" onPress={prepareEditor} asChild>
+      <Link.AppleZoom>
+        {/* The look is on a view inside: Link with asChild passes on a plain style but not
+            a style function, so the padding was lost on the Pressable itself. */}
+        <Pressable accessibilityRole="button" accessibilityLabel={title}>
+          <View style={styles.textRow}>
+            <Text style={[styles.textPreview, !value && { color: colors.textFaint }]} numberOfLines={lines}>
+              {value || placeholder}
+            </Text>
+            <View style={styles.expand} pointerEvents="none">
+              <SFIcon name="arrow.up.left.and.arrow.down.right" fallback="expand-outline" size={15} color={colors.textFaint} />
+            </View>
+          </View>
+        </Pressable>
+      </Link.AppleZoom>
+    </Link>
+  )
+}
+
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     ...baseStyles(colors),
@@ -225,6 +311,17 @@ const baseStyles = (colors: Colors) =>
     value: { color: colors.textMuted, fontSize: 17, flexShrink: 1, maxWidth: '55%' },
     inputLabel: { color: colors.text, fontSize: 17 },
     input: { flex: 1, color: colors.text, fontSize: 17, textAlign: 'right', paddingVertical: 0 },
+    sliderCell: { paddingHorizontal: INSET, paddingTop: 12 },
+    segmentCell: { paddingHorizontal: INSET, paddingTop: 12, paddingBottom: 14, gap: 10 },
+    // The caps label of ParamSlider, for the rows that stand beside sliders.
+    capsLabel: { color: colors.textFaint, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+    areaRow: { paddingHorizontal: INSET, paddingVertical: 12 },
+    area: { color: colors.text, fontSize: 17, lineHeight: 22, padding: 0, textAlignVertical: 'top' },
+    // The text starts where the label of a one-line row does; the right side keeps room
+    // for the expand mark in the corner.
+    textRow: { minHeight: ROW_HEIGHT + 8, paddingVertical: 15, paddingLeft: INSET, paddingRight: INSET + 28 },
+    textPreview: { color: colors.text, fontSize: 17, lineHeight: 22 },
+    expand: { position: 'absolute', top: 12, right: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   }) as const
 
 // Desktop settings: a section title in plain bold text, groups in the secondary
@@ -241,5 +338,11 @@ const desktopOverrides = (colors: Colors) => ({
   value: { color: colors.textMuted, fontSize: 14, flexShrink: 1, maxWidth: '55%' as const },
   inputLabel: { color: colors.text, fontSize: 14 },
   input: { flex: 1, color: colors.text, fontSize: 14, textAlign: 'right' as const, paddingVertical: 0 },
+  sliderCell: { paddingHorizontal: 20, paddingTop: 12 },
+  segmentCell: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14, gap: 10 },
+  areaRow: { paddingHorizontal: 20, paddingVertical: 12 },
+  area: { color: colors.text, fontSize: 14, lineHeight: 20, padding: 0, textAlignVertical: 'top' as const },
+  textRow: { minHeight: 52, paddingVertical: 16, paddingLeft: 20, paddingRight: 48 },
+  textPreview: { color: colors.text, fontSize: 14, lineHeight: 20 },
 })
 

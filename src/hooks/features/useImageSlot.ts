@@ -53,6 +53,16 @@ export function useImageSlot(kind: ImageKind) {
     setCrop(null)
   }
 
+  // The fresh pick as it is, to be put back by `restore` after a removal. Removing only
+  // forgets it, the temporary files stay until the screen is left.
+  const snapshot = () => ({ uri, originalUri, crop })
+
+  const restore = (picked: ReturnType<typeof snapshot>) => {
+    setUri(picked.uri)
+    setOriginalUri(picked.originalUri)
+    setCrop(picked.crop)
+  }
+
   // What the frame is redone on: the original, and an image saved before originals were
   // kept has only its shown copy, which then becomes the original.
   const adjustSource = (value: SlotValue) => {
@@ -84,5 +94,5 @@ export function useImageSlot(kind: ImageKind) {
     if (original) removeAvatar(original, kind)
   }
 
-  return { uri, shown, remember, setFramed, setUnframed, clearPicked, adjustSource, persist, settle, removeStored }
+  return { uri, shown, remember, setFramed, setUnframed, clearPicked, snapshot, restore, adjustSource, persist, settle, removeStored }
 }
