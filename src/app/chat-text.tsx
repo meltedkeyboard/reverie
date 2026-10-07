@@ -1,4 +1,5 @@
 import { Icon } from '@/components/visuals/Icon'
+import { SFIcon } from '@/components/visuals/SFIcon'
 import Slider from '@react-native-community/slider'
 import { useMemo, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -49,6 +50,10 @@ export default function ChatTextScreen() {
     { value: 'dark', label: t('theme.dark') },
   ]
   const { font, userFont, setUserFont, userMarkdown, setUserMarkdown, pattern, setPattern, scale, setFont, setScale, reset } = useChatTextSettings()
+  const resetSize = () => {
+    Haptics.selectionAsync()
+    setScale(CHAT_TEXT_SCALE_RANGE.default)
+  }
   const untouched = font === DEFAULT_CHAT_FONT && !userFont && scale === CHAT_TEXT_SCALE_RANGE.default
   const fontFamily = font
   const scaled = (value: number) => value * scale
@@ -145,6 +150,22 @@ export default function ChatTextScreen() {
               style={styles.slider}
             />
             <Text style={styles.large}>A</Text>
+            {/* Only the size back to the default; the button below resets everything. */}
+            <Pressable
+              onPress={resetSize}
+              disabled={scale === CHAT_TEXT_SCALE_RANGE.default}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.chatResetSize')}
+              style={({ pressed }) => [styles.sizeReset, pressed && { opacity: 0.5 }]}
+            >
+              <SFIcon
+                name="arrow.counterclockwise"
+                fallback="refresh"
+                size={20}
+                color={scale === CHAT_TEXT_SCALE_RANGE.default ? colors.textFaint : colors.accent}
+              />
+            </Pressable>
           </View>
           <MenuCell label={t('settings.chatFontField')} value={font === SYSTEM_FONT ? t('chatFont.system') : font} items={items} />
           <SwitchCell label={t('settings.chatUserFont')} value={userFont} onValueChange={setUserFont} />
@@ -234,6 +255,7 @@ const createStyles = (colors: Colors) =>
     small: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
     large: { color: colors.textMuted, fontSize: 24, fontWeight: '600' },
     slider: { flex: 1, height: 40, marginHorizontal: 12 },
+    sizeReset: { marginLeft: 14 },
     tiles: { gap: 12, padding: 16 },
     tileButton: { width: TILE_WIDTH, alignItems: 'center', gap: 6 },
     tile: {

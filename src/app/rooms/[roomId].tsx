@@ -97,9 +97,7 @@ export default function RoomScenesScreen() {
               text={t('rooms.scenesEmptyText')}
               action={
                 <Link href={`/chat/new?room=${roomId}`} asChild>
-                  <Link.AppleZoom>
-                    <Button variant="glass" label={t('rooms.startScene')} style={emptyButtonStyle} />
-                  </Link.AppleZoom>
+                  <Button variant="glass" label={t('rooms.startScene')} style={emptyButtonStyle} />
                 </Link>
               }
             />
@@ -128,9 +126,7 @@ export default function RoomScenesScreen() {
               <IconButton name="download-outline" onPress={chooseImport} />
               <IconButton name="options-outline" onPress={() => router.push(`/room/${room.id}`)} />
               <Link href={`/chat/new?room=${room.id}`} asChild>
-                <Link.AppleZoom>
-                  <IconButton name="add" size={26} />
-                </Link.AppleZoom>
+                <IconButton name="add" size={26} />
               </Link>
             </GlassGroup>
           ) : null

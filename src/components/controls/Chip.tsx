@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
@@ -7,6 +7,7 @@ import { isDesktop } from '@/lib/core/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from '../chrome/Glass'
+import { SlidingIcon, useAtLeastOneLap } from './PillButton'
 import { SFIcon } from '../visuals/SFIcon'
 
 type Props = {
@@ -21,15 +22,27 @@ type Props = {
   // Interactive glass springs under the finger. Off by default: in a row that scrolls
   // sideways the spring pulls the chip along with the scroll.
   interactive?: boolean
+  // The label beside the symbol rather than only read out.
+  labeled?: boolean
+  // Busy: the symbol runs away `slide` and back, at least one lap, or a spinner takes its
+  // place. Neither busy nor disabled fades the chip (glass under opacity is not drawn), its
+  // ink goes faint instead.
+  loading?: boolean
+  slide?: 'up' | 'down'
+  disabled?: boolean
 }
 
 // A small Liquid Glass capsule to pick from a row of them; the chosen one is tinted
 // with the accent. Outside iOS 26 it is the plain surface, filled when chosen.
-export function Chip({ label, active, onPress, style, icon, ink, interactive = false }: Props) {
+export function Chip({ label, active, onPress, style, icon, ink, interactive = false, labeled, loading, slide, disabled }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
+  const sliding = useAtLeastOneLap(!!loading && !!slide)
+  const busy = !!loading || sliding
+  const color = active ? ON_ACCENT : disabled && !busy ? colors.textFaint : (ink ?? colors.textMuted)
   return (
     <Pressable
+      disabled={disabled || busy}
       onPress={() => {
         if (!active) Haptics.selectionAsync()
         onPress()
@@ -46,13 +59,20 @@ export function Chip({ label, active, onPress, style, icon, ink, interactive = f
         style={styles.chip}
         fallbackStyle={active ? styles.solidActive : styles.solid}
       >
-        {icon ? (
-          <SFIcon name={icon.symbol} fallback={icon.fallback} size={18} color={active ? ON_ACCENT : (ink ?? colors.textMuted)} />
-        ) : (
-          <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color: active ? ON_ACCENT : (ink ?? colors.textMuted) }]} numberOfLines={1}>
-            {label}
-          </Text>
-        )}
+        <View style={styles.content}>
+          {loading && !sliding ? (
+            <ActivityIndicator size="small" color={color} />
+          ) : icon ? (
+            <SlidingIcon direction={slide} active={sliding}>
+              <SFIcon name={icon.symbol} fallback={icon.fallback} size={18} color={color} />
+            </SlidingIcon>
+          ) : null}
+          {!icon || labeled ? (
+            <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color }]} numberOfLines={1}>
+              {label}
+            </Text>
+          ) : null}
+        </View>
       </GlassSurface>
     </Pressable>
   )
@@ -64,6 +84,7 @@ const createStyles = (colors: Colors) =>
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     solidActive: { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.accent },
     label: { fontSize: 14, fontWeight: '600' },
+    content: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     // Segmented choices on the desktop: small flat tabs, the chosen one filled.
     ...(isDesktop
       ? {

@@ -7,6 +7,8 @@ import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { NativeMenu } from '@/components/overlays/NativeMenu'
 import { ParamSlider } from '@/components/controls/ParamSlider'
 import { Segmented } from '@/components/controls/Segmented'
+import { Chip } from '@/components/controls/Chip'
+import { FadingRow } from '@/components/controls/ChipGroup'
 import { SlidingIcon, useAtLeastOneLap } from '@/components/controls/PillButton'
 import { setTextDraft } from '@/lib/chat/textDraft'
 import { SFIcon } from '@/components/visuals/SFIcon'
@@ -179,7 +181,8 @@ export function ButtonCell({
   onPress: () => void
   danger?: boolean
   loading?: boolean
-  icon?: { fallback: ComponentProps<typeof Icon>['name']; slide?: 'up' | 'down' }
+  // `symbol` is the SF Symbol drawn on iOS, `fallback` the icon elsewhere (or everywhere without one).
+  icon?: { symbol?: ComponentProps<typeof SFIcon>['name']; fallback: ComponentProps<typeof Icon>['name']; slide?: 'up' | 'down' }
 }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -195,7 +198,11 @@ export function ButtonCell({
       <Text style={[styles.label, { color: ink }]}>{label}</Text>
       {icon ? (
         <SlidingIcon direction={icon.slide} active={sliding}>
-          <Icon name={icon.fallback} size={20} color={ink} />
+          {icon.symbol ? (
+            <SFIcon name={icon.symbol} fallback={icon.fallback} size={20} color={ink} />
+          ) : (
+            <Icon name={icon.fallback} size={20} color={ink} />
+          )}
         </SlidingIcon>
       ) : null}
       {loading && !sliding ? <ActivityIndicator color={colors.textMuted} /> : null}
@@ -231,6 +238,23 @@ export function SegmentCell<T extends string>({
     <View style={styles.segmentCell}>
       <Text style={styles.capsLabel}>{label}</Text>
       <Segmented {...segmented} />
+    </View>
+  )
+}
+
+// One of many, as plain chips in a row that scrolls sideways under a small caps label: the
+// row runs to the edges of the group and fades there while it scrolls.
+export function ChipChoiceCell({ label, options, value, onChange }: { label: string; options: string[]; value: string; onChange: (value: string) => void }) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  return (
+    <View style={styles.choiceCell}>
+      <Text style={[styles.capsLabel, styles.choiceLabel]}>{label}</Text>
+      <FadingRow fadeColor={colors.surface} inset={INSET}>
+        {options.map((o) => (
+          <Chip key={o} label={o} active={o === value} onPress={() => onChange(o)} />
+        ))}
+      </FadingRow>
     </View>
   )
 }
@@ -313,6 +337,8 @@ const baseStyles = (colors: Colors) =>
     input: { flex: 1, color: colors.text, fontSize: 17, textAlign: 'right', paddingVertical: 0 },
     sliderCell: { paddingHorizontal: INSET, paddingTop: 12 },
     segmentCell: { paddingHorizontal: INSET, paddingTop: 12, paddingBottom: 14, gap: 10 },
+    choiceCell: { paddingTop: 12, paddingBottom: 14, gap: 10 },
+    choiceLabel: { paddingHorizontal: INSET },
     // The caps label of ParamSlider, for the rows that stand beside sliders.
     capsLabel: { color: colors.textFaint, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
     areaRow: { paddingHorizontal: INSET, paddingVertical: 12 },

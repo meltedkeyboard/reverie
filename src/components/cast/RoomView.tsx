@@ -37,6 +37,7 @@ import { roomScene } from '@/lib/chat/aside'
 import { promptRenameChat } from '@/lib/chat/chatDialogs'
 import { showSheet } from '@/lib/ui/dialogs'
 import { countLabel } from '@/lib/core/format'
+import { showToastOnce } from '@/lib/ui/toast'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { USER } from '@/lib/chat/room/audience'
@@ -322,6 +323,8 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
   const cast = useMemo(() => members.map((m) => ({ name: m.character.name, avatar: m.character.avatar })), [members])
   const empty = loaded && rows.length === 0
+  // Nothing written yet: a new chat from here would be the same as this one.
+  const fresh = loaded && !rows.some((r) => r.role === 'user')
 
   const asidePanel = asideOpen ? (
     <AsidePanel
@@ -369,11 +372,13 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
         right={
           <View style={styles.headerActions}>
             <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
-            <Link href={`/chat/new?room=${room.id}`} asChild>
-              <Link.AppleZoom>
+            {fresh ? (
+              <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
+            ) : (
+              <Link href={`/chat/new?room=${room.id}`} asChild>
                 <GlassButton icon="create-outline" />
-              </Link.AppleZoom>
-            </Link>
+              </Link>
+            )}
           </View>
         }
       >

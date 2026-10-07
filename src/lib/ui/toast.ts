@@ -32,6 +32,13 @@ export function showToast(toast: Toast) {
   emit()
 }
 
+// The same toast while it is still on screen: tapping again neither restarts it nor
+// makes it jump, so a button pressed over and over shows it once.
+export function showToastOnce(toast: Toast) {
+  if (current?.title === toast.title) return
+  showToast(toast)
+}
+
 export function dismissToast() {
   clearTimeout(timer)
   if (!current) return

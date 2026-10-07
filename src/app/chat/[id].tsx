@@ -34,6 +34,7 @@ import { useTranslation } from '@/i18n'
 import { characterScene } from '@/lib/chat/aside'
 import { formatWhen } from '@/lib/core/format'
 import * as Haptics from '@/lib/ui/haptics'
+import { showToastOnce } from '@/lib/ui/toast'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
@@ -227,6 +228,8 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const errorCard = error ? <ErrorCard message={error} onRetry={retry} /> : null
 
   const empty = loaded && rows.length === 0
+  // Nothing written yet: a new chat from here would be the same as this one.
+  const fresh = loaded && !rows.some((r) => r.role === 'user')
 
   return (
     <View style={styles.screen}>
@@ -257,11 +260,13 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
         right={
           <View style={styles.headerActions}>
             <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
-            <Link href={`/chat/new?character=${character.id}`} asChild>
-              <Link.AppleZoom>
+            {fresh ? (
+              <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
+            ) : (
+              <Link href={`/chat/new?character=${character.id}`} asChild>
                 <GlassButton icon="create-outline" />
-              </Link.AppleZoom>
-            </Link>
+              </Link>
+            )}
           </View>
         }
       >

@@ -4,7 +4,7 @@ import * as LocalAuthentication from 'expo-local-authentication'
 import { StyleSheet, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
-import { ButtonCell, CheckCell, InputCell, LinkCell, ListFooter, ListSection, MenuCell, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
+import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
 import { loadModel } from '@/api/llm'
 import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
@@ -32,6 +32,7 @@ import { useServerForm } from '@/hooks/features/useServerForm'
 import { useStoredFlag } from '@/hooks/util/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { CONTEXT_STEPS, type ContextMode } from '@/lib/core/context'
+import { ChipRowCell } from '@/components/lists/PictureCells'
 import { BackupTreeSheet } from '@/components/overlays/BackupTreeSheet'
 import { exportBackup, importBackup, loadBackupTree, readBackup, wipeAllData, type OpenedBackup } from '@/lib/transfer/backup'
 import type { BackupTree, Selection } from '@/lib/transfer/backupSelection'
@@ -357,16 +358,15 @@ export default function SettingsScreen() {
   const continueRows = (
     <ListSection header={t('settings.homeScreen')} footer={t('settings.continueButtonNote')}>
       <SwitchCell label={t('settings.continueButton')} value={continueButton} onValueChange={toggleContinueButton} />
-      {continueButton
-        ? CONTINUE_OPTIONS.map((o) => (
-            <CheckCell
-              key={o.value}
-              label={o.label}
-              checked={(continueByVisit ? 'visit' : 'message') === o.value}
-              onPress={() => setContinueByVisitValue(o.value === 'visit')}
-            />
-          ))
-        : null}
+      {continueButton ? (
+        <ChipRowCell
+          actions={CONTINUE_OPTIONS.map((o) => ({
+            label: o.label,
+            active: (continueByVisit ? 'visit' : 'message') === o.value,
+            onPress: () => setContinueByVisitValue(o.value === 'visit'),
+          }))}
+        />
+      ) : null}
     </ListSection>
   )
 
@@ -463,12 +463,7 @@ export default function SettingsScreen() {
         />
         {/* Typed by hand until the server has listed its models, then picked from them. */}
         {models.length > 0 ? (
-          <MenuCell
-            label={t('settings.modelLabel')}
-            value={models.includes(cfg.model) ? cfg.model : ''}
-            placeholder={t('onboarding.pickModel')}
-            items={modelItems(models)}
-          />
+          <ChipChoiceCell label={t('settings.modelLabel')} options={models} value={cfg.model} onChange={(model) => update({ model })} />
         ) : (
           <InputCell
             label={t('settings.modelLabel')}
@@ -479,9 +474,10 @@ export default function SettingsScreen() {
             autoCorrect={false}
           />
         )}
-        <ButtonCell label={t('settings.testConnection')} onPress={onTest} loading={status.kind === 'testing'} />
+        <ButtonCell label={t('settings.testConnection')} icon={{ symbol: 'bolt.horizontal', fallback: 'pulse-outline' }} onPress={onTest} loading={status.kind === 'testing'} />
         <ButtonCell
           label={t('settings.loadModel')}
+          icon={{ symbol: 'cpu', fallback: 'hardware-chip-outline' }}
           onPress={onLoadModel}
           loading={loadingModel}
           disabled={!cfg.baseUrl.trim() || !cfg.model.trim()}
@@ -501,9 +497,9 @@ export default function SettingsScreen() {
           ) : null
         }
       >
-        {CONTEXT_OPTIONS.map((o) => (
-          <CheckCell key={o.value} label={o.label} checked={cfg.contextMode === o.value} onPress={() => update({ contextMode: o.value })} />
-        ))}
+        <ChipRowCell
+          actions={CONTEXT_OPTIONS.map((o) => ({ label: o.label, active: cfg.contextMode === o.value, onPress: () => update({ contextMode: o.value }) }))}
+        />
         {cfg.contextMode === 'messages' ? (
           <>
             <InputCell
@@ -551,25 +547,31 @@ export default function SettingsScreen() {
       />
       {cloudSync.enabled || cloudPreview ? (
         <>
-          <ButtonCell
-            label={t('settings.folderSyncPush')}
-            icon={{ fallback: 'arrow-up', slide: 'up' }}
-            onPress={() => runCloud('push', cloudSync.pushNow)}
-            loading={cloudAction === 'push'}
-            disabled={cloudBusy || cloudAction === 'pull'}
-          />
-          <ButtonCell
-            label={t('settings.folderSyncPull')}
-            icon={{ fallback: 'arrow-down', slide: 'down' }}
-            onPress={() => runCloud('pull', cloudSync.pullNow)}
-            loading={cloudAction === 'pull'}
-            disabled={cloudBusy || cloudAction === 'push'}
-          />
-          <ButtonCell
-            label={t('settings.folderSyncChangeFolder')}
-            icon={{ fallback: 'folder-outline' }}
-            onPress={() => cloudSync.changeFolder().catch((err) => reportError(t('sync.failedTitle'), err))}
-            disabled={cloudBusy || cloudAction !== null}
+          <ChipRowCell
+            actions={[
+              {
+                label: t('settings.folderSyncPush'),
+                icon: { symbol: 'arrow.up', fallback: 'arrow-up' },
+                slide: 'up',
+                onPress: () => runCloud('push', cloudSync.pushNow),
+                loading: cloudAction === 'push',
+                disabled: cloudBusy || cloudAction === 'pull',
+              },
+              {
+                label: t('settings.folderSyncPull'),
+                icon: { symbol: 'arrow.down', fallback: 'arrow-down' },
+                slide: 'down',
+                onPress: () => runCloud('pull', cloudSync.pullNow),
+                loading: cloudAction === 'pull',
+                disabled: cloudBusy || cloudAction === 'push',
+              },
+              {
+                label: t('settings.folderSyncChangeFolder'),
+                icon: { symbol: 'folder', fallback: 'folder-outline' },
+                onPress: () => cloudSync.changeFolder().catch((err) => reportError(t('sync.failedTitle'), err)),
+                disabled: cloudBusy || cloudAction !== null,
+              },
+            ]}
           />
         </>
       ) : null}
@@ -607,8 +609,26 @@ export default function SettingsScreen() {
   const backup = (
     <>
       <ListSection header={t('settings.backupTitle')} footer={t('settings.backupNote')}>
-        <ButtonCell label={t('settings.exportJson')} onPress={onExport} loading={exporting} disabled={cloudAction !== null} />
-        <ButtonCell label={t('settings.importJson')} onPress={onImport} loading={importing} disabled={cloudAction !== null} />
+        <ChipRowCell
+          actions={[
+            {
+              label: t('settings.exportJson'),
+              icon: { symbol: 'square.and.arrow.up', fallback: 'share-outline' },
+              labeled: true,
+              onPress: onExport,
+              loading: exporting,
+              disabled: cloudAction !== null || importing,
+            },
+            {
+              label: t('settings.importJson'),
+              icon: { symbol: 'square.and.arrow.down', fallback: 'download-outline' },
+              labeled: true,
+              onPress: onImport,
+              loading: importing,
+              disabled: cloudAction !== null || exporting,
+            },
+          ]}
+        />
       </ListSection>
       <BackupTreeSheet tree={exportTree} confirmLabel={t('settings.exportJson')} onConfirm={runExport} onClose={() => setExportTree(null)} />
       <BackupTreeSheet tree={opened?.tree ?? null} confirmLabel={t('settings.importJson')} onConfirm={runImport} onClose={() => setOpened(null)} />

@@ -88,9 +88,7 @@ export default function CharacterChatsScreen() {
               text={t('chatsList.emptyText')}
               action={
                 <Link href={`/chat/new?character=${characterId}`} asChild>
-                  <Link.AppleZoom>
-                    <Button variant="glass" label={t('chatsList.startChat')} style={emptyButtonStyle} />
-                  </Link.AppleZoom>
+                  <Button variant="glass" label={t('chatsList.startChat')} style={emptyButtonStyle} />
                 </Link>
               }
             />
@@ -122,9 +120,7 @@ export default function CharacterChatsScreen() {
                 accessibilityLabel={t('profile.title')}
               />
               <Link href={`/chat/new?character=${character.id}`} asChild>
-                <Link.AppleZoom>
-                  <IconButton name="add" size={26} />
-                </Link.AppleZoom>
+                <IconButton name="add" size={26} />
               </Link>
             </GlassGroup>
           ) : null

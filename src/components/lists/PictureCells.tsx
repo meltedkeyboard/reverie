@@ -18,18 +18,25 @@ import { ButtonCell, ListSection } from './GroupedList'
 
 type ChipAction = {
   label: string
-  icon: NonNullable<ComponentProps<typeof Chip>['icon']>
+  // Without one the chip shows its label.
+  icon?: ComponentProps<typeof Chip>['icon']
+  // The chosen one of a choice, tinted with the accent.
+  active?: boolean
   onPress: () => void
   ink?: string
+  labeled?: boolean
+  loading?: boolean
+  slide?: 'up' | 'down'
+  disabled?: boolean
 }
 
-// Icon chips that share the width of the row and melt into each other when pressed.
+// Chips (icons, labels or both) that share the width of the row and melt into each other when pressed.
 export function ChipRowCell({ actions }: { actions: ChipAction[] }) {
   const styles = useStyles(createStyles)
   return (
     <GlassMerge style={styles.chips}>
       {actions.map((action) => (
-        <Chip key={action.label} {...action} active={false} interactive style={styles.chip} />
+        <Chip key={action.label} active={false} {...action} interactive style={styles.chip} />
       ))}
     </GlassMerge>
   )
