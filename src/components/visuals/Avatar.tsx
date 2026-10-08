@@ -1,12 +1,11 @@
 import { Text, View } from 'react-native'
 
 import { avatarUri } from '@/lib/images/avatars'
+import { avatarInitial, avatarTint } from '@/lib/images/initial'
 import { fonts } from '@/theme'
 
 import { ImageLink } from './ImageLink'
 import { Picture } from './Picture'
-
-const TINTS = ['#3B2F5C', '#2F4A5C', '#5C3B47', '#365C48', '#5C4F2F', '#40406B']
 
 type Props = {
   name: string
@@ -39,11 +38,11 @@ export function Avatar({ name, file, uri, size, square = false, fill = false, vi
     )
   }
 
-  const tint = TINTS[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % TINTS.length]
+  const tint = avatarTint(name)
   return (
     <View style={[box, { backgroundColor: tint, alignItems: 'center', justifyContent: 'center' }]}>
       <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: fonts.prose, fontSize: size * 0.42 }}>
-        {name.trim().charAt(0).toUpperCase() || '?'}
+        {avatarInitial(name)}
       </Text>
     </View>
   )

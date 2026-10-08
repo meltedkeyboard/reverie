@@ -9,12 +9,44 @@ import { DEFAULT_SAMPLING, insertCharacter } from '@/db/characters'
 import { t } from '@/i18n'
 import { avatarUri, persistAvatar, persistOriginal, squareAvatar } from '@/lib/images/avatars'
 import { PLACEHOLDER_PNG_BASE64 } from '@/lib/images/cardPlaceholder'
+import { avatarInitial, avatarTint } from '@/lib/images/initial'
+import { isWeb } from '@/lib/core/platform'
 import { buildCard, embedCard, isPng, parseCard, readPngCard } from '@/lib/transfer/characterCard'
 import { saveFile, saveImageBytes } from '@/lib/transfer/download'
 
+import { dragModule } from '../../../modules/reverie-drag'
+
+const INITIAL_SIZE = 512
+
+// The initial on its tint as the app shows it, drawn natively on iOS and on a canvas on the
+// web and the desktop. Null on Android, which keeps the plain picture.
+async function initialPicture(name: string): Promise<Uint8Array | null> {
+  if (dragModule) {
+    const file = new File(dragModule.renderInitial(avatarInitial(name), avatarTint(name), INITIAL_SIZE))
+    try {
+      return await file.bytes()
+    } finally {
+      file.delete()
+    }
+  }
+  if (!isWeb) return null
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = INITIAL_SIZE
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = avatarTint(name)
+  ctx.fillRect(0, 0, INITIAL_SIZE, INITIAL_SIZE)
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'
+  ctx.font = `${INITIAL_SIZE * 0.42}px Georgia, serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(avatarInitial(name), INITIAL_SIZE / 2, INITIAL_SIZE / 2)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+  return blob ? new Uint8Array(await blob.arrayBuffer()) : null
+}
+
 // The avatar as PNG bytes, since a card lives in a PNG text chunk. Without an avatar (or one
-// that can't be drawn, like a video) a plain picture carries the card instead.
-async function cardPicture(avatar: string | null) {
+// that can't be drawn, like a video) the initial carries the card, or a plain picture.
+async function cardPicture(name: string, avatar: string | null) {
   const uri = avatar && avatarUri(avatar)
   if (uri) {
     try {
@@ -28,14 +60,14 @@ async function cardPicture(avatar: string | null) {
       }
     } catch {}
   }
-  return toByteArray(PLACEHOLDER_PNG_BASE64)
+  return (await initialPicture(name)) ?? toByteArray(PLACEHOLDER_PNG_BASE64)
 }
 
 // Saves the character as a card picture: the avatar with the V2 card inside, either through
 // the Files "Save as" sheet or to Photos. Null when the user cancelled.
 export type CardCharacter = { name: string; avatar: string | null; systemPrompt: string; greeting: string }
 
-export const buildCardPng = async (character: CardCharacter) => embedCard(await cardPicture(character.avatar), buildCard(character))
+export const buildCardPng = async (character: CardCharacter) => embedCard(await cardPicture(character.name, character.avatar), buildCard(character))
 
 export const cardFileName = (name: string, extension: string) => `${name.replace(/[\\/:*?"<>|]/g, '').trim() || 'character'}.${extension}`
 

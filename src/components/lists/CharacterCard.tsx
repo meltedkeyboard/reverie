@@ -11,7 +11,7 @@ import { Avatar } from '../visuals/Avatar'
 import { FeaturedBody } from '../cast/FeaturedBody'
 import { ListCard } from './ListCard'
 import type { MenuItem } from '../overlays/NativeMenu'
-import { DragCardView, type DragMenuEntry } from '../../../modules/reverie-drag'
+import { DragCardView, dragSession, type DragMenuEntry } from '../../../modules/reverie-drag'
 
 type Props = {
   character: CharacterPreview
@@ -81,7 +81,7 @@ const toEntries = (items: MenuItem[]): DragMenuEntry[] =>
 // On iOS a long press is the system's: the menu, and moving the finger lifts the card to
 // drop into Files, Photos or another app, with a tap on other cards adding them to the stack.
 export function CharacterCard(props: Props) {
-  const content = <CharacterCardContent {...props} />
+  const content = <CharacterCardContent {...props} onOpen={() => dragSession.active || props.onOpen()} />
   return (
     <AnimatedFill fillHeight={props.fillHeight}>
       {DragCardView ? (
@@ -96,6 +96,9 @@ export function CharacterCard(props: Props) {
             item?.onSelect?.()
           }}
           onProvide={({ nativeEvent }) => props.onProvide?.(nativeEvent.token, nativeEvent.kind)}
+          onDragState={({ nativeEvent }) => {
+            dragSession.active = nativeEvent.active
+          }}
         >
           {content}
         </DragCardView>

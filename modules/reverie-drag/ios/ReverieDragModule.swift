@@ -31,8 +31,27 @@ public class ReverieDragModule: Module {
       done(url, false, nil)
     }
 
+    // The picture of a card for a character without an avatar: the initial on its tint, as
+    // the app draws it. A file URL of a PNG in the caches.
+    Function("renderInitial") { (letter: String, tint: String, size: Double) -> String in
+      let side = CGSize(width: size, height: size)
+      let format = UIGraphicsImageRendererFormat()
+      format.scale = 1
+      let png = UIGraphicsImageRenderer(size: side, format: format).pngData { ctx in
+        UIColor(hex: tint).setFill()
+        ctx.fill(CGRect(origin: .zero, size: side))
+        let font = UIFont(name: "Georgia", size: size * 0.42) ?? .systemFont(ofSize: size * 0.42)
+        let text = NSAttributedString(string: letter, attributes: [.font: font, .foregroundColor: UIColor(white: 1, alpha: 0.85)])
+        let box = text.size()
+        text.draw(at: CGPoint(x: (size - box.width) / 2, y: (size - box.height) / 2))
+      }
+      let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).png")
+      try png.write(to: url)
+      return url.absoluteString
+    }
+
     View(DragCardView.self) {
-      Events("onMenuSelect", "onProvide")
+      Events("onMenuSelect", "onProvide", "onDragState")
       Prop("menu") { (view: DragCardView, menu: [[String: Any]]) in
         view.menuItems = menu
       }
@@ -59,6 +78,7 @@ public class ReverieDragModule: Module {
 class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractionDelegate {
   let onMenuSelect = EventDispatcher()
   let onProvide = EventDispatcher()
+  let onDragState = EventDispatcher()
   var menuItems: [[String: Any]] = []
   var name = "Character"
   var radius = 20.0
@@ -113,6 +133,16 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
     session.localContext = window
     return [dragItem()]
+  }
+
+  // While cards are in the air a tap on another one adds it to the stack, so JS must not
+  // open it as well.
+  func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
+    onDragState(["active": true])
+  }
+
+  func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
+    onDragState(["active": false])
   }
 
   // A tap on another card while one is in the air adds it to the stack.
@@ -205,5 +235,17 @@ class DropTargetView: ExpoView, UIDropInteractionDelegate {
     group.notify(queue: .main) { [weak self] in
       if !files.isEmpty { self?.onDropFiles(["files": files]) }
     }
+  }
+}
+
+private extension UIColor {
+  convenience init(hex: String) {
+    let value = UInt32(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) ?? 0
+    self.init(
+      red: CGFloat((value >> 16) & 0xFF) / 255,
+      green: CGFloat((value >> 8) & 0xFF) / 255,
+      blue: CGFloat(value & 0xFF) / 255,
+      alpha: 1
+    )
   }
 }
