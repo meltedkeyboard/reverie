@@ -26,6 +26,8 @@ type Props = {
   // Throws the content off screen before onDelete runs, for a delete that needs no
   // question. Otherwise the content springs back first, and onDelete asks.
   throwAway?: boolean
+  // Off while the list is being edited; kept mounted so the content can animate in place.
+  disabled?: boolean
   children: React.ReactNode
 }
 
@@ -40,7 +42,7 @@ const SPRING ={ damping: 24, stiffness: 240 }
 // Like a row in an iOS list: a swipe to the left uncovers a trash button, and a long
 // swipe deletes at once. The one place this gesture lives, for cards and the continue
 // button alike.
-export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, throwAway = false, children }: Props) {
+export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, throwAway = false, disabled = false, children }: Props) {
   const styles = useStyles(createStyles)
   const { width } = useWindowDimensions()
   const [open, setOpen] = useState(false)
@@ -77,6 +79,7 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
   }
 
   const pan = Gesture.Pan()
+    .enabled(!disabled)
     .activeOffsetX([-12, 12])
     .failOffsetY([-12, 12])
     // A touch that starts at the left edge is the system's swipe back, not ours.

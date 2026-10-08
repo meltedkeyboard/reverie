@@ -18,6 +18,9 @@ type LastChatContext = {
   // continue button floats above.
   bottom: number
   setBottom: (bottom: number) => void
+  // Set by a home tab in edit mode, whose own bar takes the bottom of the screen.
+  suspended: boolean
+  setSuspended: (suspended: boolean) => void
 }
 
 export const [Context, useLastChatContext] = createRequiredContext<LastChatContext>('useLastChat needs LastChatProvider')
@@ -29,6 +32,7 @@ export function LastChatProvider({ children }: { children: React.ReactNode }) {
   const db = useDatabase()
   const [chats, setChats] = useState<Chats>({ character: null, room: null })
   const [bottom, setBottom] = useState(0)
+  const [suspended, setSuspended] = useState(false)
 
   const reload = useCallback(
     async (kind: ContinueKind) => {
@@ -53,7 +57,7 @@ export function LastChatProvider({ children }: { children: React.ReactNode }) {
     reload('room')
   }, [reload])
 
-  const value = useMemo(() => ({ chats, reload, hide, bottom, setBottom }), [chats, reload, hide, bottom])
+  const value = useMemo(() => ({ chats, reload, hide, bottom, setBottom, suspended, setSuspended }), [chats, reload, hide, bottom, suspended])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 

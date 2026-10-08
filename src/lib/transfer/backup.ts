@@ -123,8 +123,19 @@ export async function loadBackupTree(db: SQLiteDatabase): Promise<BackupTree> {
   return buildTree({ characters, rooms, chats })
 }
 
+// One character with all its chats, for a card dragged out of the list.
+export async function characterSelection(db: SQLiteDatabase, id: number): Promise<Selection> {
+  const chats = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE character_id = ? AND room_id IS NULL', id)
+  return { characters: new Set([id]), rooms: new Set(), chats: new Set(chats.map((chat) => chat.id)) }
+}
+
 // Everything when `selection` is left out.
 export async function exportBackup(db: SQLiteDatabase, selection?: Selection) {
+  const zip = await buildBackupArchive(db, selection)
+  return saveFile(`reverie-backup-${new Date().toISOString().slice(0, 10)}.zip`, zip, 'application/zip')
+}
+
+export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selection) {
   const all = {
     characters: await db.getAllAsync<{
       id: number
@@ -179,7 +190,7 @@ export async function exportBackup(db: SQLiteDatabase, selection?: Selection) {
 
   // The API key is left out on purpose: the file usually ends up in a cloud drive.
   const manifest = { app: 'reverie', version: BACKUP_VERSION, exportedAt: new Date().toISOString(), settings: { baseUrl, model } }
-  const zip = packArchive({
+  return packArchive({
     manifest,
     characters: characters as (typeof characters[number] & { name: string })[],
     rooms: rooms as (typeof rooms[number] & { id: number; name: string })[],
@@ -188,7 +199,6 @@ export async function exportBackup(db: SQLiteDatabase, selection?: Selection) {
     messages: messages as unknown as { chatId: number }[],
     files,
   })
-  return saveFile(`reverie-backup-${new Date().toISOString().slice(0, 10)}.zip`, zip, 'application/zip')
 }
 
 // What a backup file holds, whichever form it came in: the zip, or the old single JSON file.
@@ -211,8 +221,11 @@ export type OpenedBackup = ReturnType<typeof openBackup> & { tree: BackupTree }
 // Picks a backup (a zip, or an older JSON file) and opens it; null when cancelled.
 export async function readBackup(): Promise<OpenedBackup | null> {
   const bytes = await pickBackupFile()
-  if (bytes === null) return null
+  return bytes === null ? null : openBackupBytes(bytes)
+}
 
+// A backup that came some other way: dropped on the list or opened from Files.
+export function openBackupBytes(bytes: Uint8Array): OpenedBackup {
   const opened = openBackup(bytes)
   const { dump } = opened
   if (dump.app !== 'reverie' || !Array.isArray(dump.characters)) {

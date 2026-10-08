@@ -34,7 +34,8 @@ import { useTranslation, type LocalePreference } from '@/i18n'
 import { CONTEXT_STEPS, type ContextMode } from '@/lib/core/context'
 import { ChipRowCell } from '@/components/lists/PictureCells'
 import { BackupTreeSheet } from '@/components/overlays/BackupTreeSheet'
-import { exportBackup, importBackup, loadBackupTree, readBackup, wipeAllData, type OpenedBackup } from '@/lib/transfer/backup'
+import { exportBackup, loadBackupTree, wipeAllData } from '@/lib/transfer/backup'
+import { useBackupImport } from '@/hooks/features/useBackupImport'
 import type { BackupTree, Selection } from '@/lib/transfer/backupSelection'
 import { alternateIconsAvailable, currentAppIcon } from '@/lib/settings/appIcons'
 import { confirm } from '@/lib/ui/dialogs'
@@ -132,7 +133,8 @@ export default function SettingsScreen() {
     else setAttachmentLimitMb(db, count)
   }
   const [exporting, setExporting] = useState(false)
-  const [importing, setImporting] = useState(false)
+  const backupImport = useBackupImport()
+  const importing = backupImport.importing
   const backingUp = exporting || importing
   const [wiping, setWiping] = useState(false)
   const [continueButton, toggleContinueButton] = useStoredFlag(isContinueEnabled, setContinueEnabled, true)
@@ -246,7 +248,6 @@ export default function SettingsScreen() {
 
   // The sheet with what to take or bring in: open while there is a tree.
   const [exportTree, setExportTree] = useState<BackupTree | null>(null)
-  const [opened, setOpened] = useState<OpenedBackup | null>(null)
 
   const onExport = async () => {
     setExporting(true)
@@ -275,36 +276,6 @@ export default function SettingsScreen() {
       reportError(t('settings.exportFailedTitle'), err)
     } finally {
       setExporting(false)
-    }
-  }
-
-  const onImport = async () => {
-    setImporting(true)
-    try {
-      setOpened(await readBackup())
-    } catch (err) {
-      reportError(t('settings.importFailedTitle'), err)
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  const runImport = async (selection: Selection) => {
-    const backup = opened
-    setOpened(null)
-    if (!backup) return
-    setImporting(true)
-    try {
-      const result = await importBackup(db, backup, selection)
-      showToast({
-        tone: 'success',
-        title: t('settings.importDoneTitle'),
-        message: t('settings.importDoneMessage', { characters: result.characters, rooms: result.rooms, chats: result.chats }),
-      })
-    } catch (err) {
-      reportError(t('settings.importFailedTitle'), err)
-    } finally {
-      setImporting(false)
     }
   }
 
@@ -623,7 +594,7 @@ export default function SettingsScreen() {
               label: t('settings.importJson'),
               icon: { symbol: 'square.and.arrow.down', fallback: 'download-outline' },
               labeled: true,
-              onPress: onImport,
+              onPress: backupImport.pick,
               loading: importing,
               disabled: cloudAction !== null || exporting,
             },
@@ -631,7 +602,7 @@ export default function SettingsScreen() {
         />
       </ListSection>
       <BackupTreeSheet tree={exportTree} confirmLabel={t('settings.exportJson')} onConfirm={runExport} onClose={() => setExportTree(null)} />
-      <BackupTreeSheet tree={opened?.tree ?? null} confirmLabel={t('settings.importJson')} onConfirm={runImport} onClose={() => setOpened(null)} />
+      {backupImport.sheet}
     </>
   )
 

@@ -43,9 +43,9 @@ const SHIFT = 8
 // Characters and Rooms is open, so switching between them changes only what it shows.
 export function HomeContinueButton({ kind }: { kind: ContinueKind | null }) {
   const router = useRouter()
-  const { chats, hide, bottom } = useLastChatContext()
+  const { chats, hide, bottom, suspended } = useLastChatContext()
   const chat = kind ? chats[kind] : null
-  if (!kind || !chat) return null
+  if (!kind || !chat || suspended) return null
   return (
     <ContinueButton
       kind={kind}

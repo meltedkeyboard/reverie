@@ -19,7 +19,19 @@
         },
         "NSLocalNetworkUsageDescription": "Reverie connects to your model server on your local network.",
         "UIFileSharingEnabled": true,
-        "LSSupportsOpeningDocumentsInPlace": true
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "app.reverie.character",
+            "UTTypeDescription": "Reverie Character",
+            "UTTypeConformsTo": ["public.zip-archive", "public.data"],
+            "UTTypeTagSpecification": { "public.filename-extension": ["reverie"] }
+          }
+        ],
+        "CFBundleDocumentTypes": [
+          { "CFBundleTypeName": "Reverie Character", "CFBundleTypeRole": "Viewer", "LSHandlerRank": "Owner", "LSItemContentTypes": ["app.reverie.character"] },
+          { "CFBundleTypeName": "Reverie Backup", "CFBundleTypeRole": "Viewer", "LSHandlerRank": "Alternate", "LSItemContentTypes": ["public.zip-archive"] }
+        ]
       },
       "icon": {
         "light": "./assets/images/icon.png",

@@ -35,9 +35,13 @@ async function cardPicture(avatar: string | null) {
 // the Files "Save as" sheet or to Photos. Null when the user cancelled.
 export type CardCharacter = { name: string; avatar: string | null; systemPrompt: string; greeting: string }
 
+export const buildCardPng = async (character: CardCharacter) => embedCard(await cardPicture(character.avatar), buildCard(character))
+
+export const cardFileName = (name: string, extension: string) => `${name.replace(/[\\/:*?"<>|]/g, '').trim() || 'character'}.${extension}`
+
 export async function exportCharacterCard(character: CardCharacter, target: 'files' | 'photos') {
-  const png = embedCard(await cardPicture(character.avatar), buildCard(character))
-  const fileName = `${character.name.replace(/[\\/:*?"<>|]/g, '').trim() || 'character'}.png`
+  const png = await buildCardPng(character)
+  const fileName = cardFileName(character.name, 'png')
   if (target === 'files') return saveFile(fileName, png, 'image/png')
   await saveImageBytes(png, 'png')
   return { name: fileName, folder: t('card.photos') }
@@ -61,13 +65,18 @@ async function pickCardUri(source: CardSource) {
 // when nothing was picked.
 export async function importCharacterCard(db: SQLiteDatabase, source: CardSource) {
   const uri = await pickCardUri(source)
-  if (!uri) return null
+  return uri ? importCardFile(db, uri, source === 'photos') : null
+}
+
+// A card that is already a file: picked, or dropped on the list from another app. Only a
+// picture can come from Photos.
+export async function importCardFile(db: SQLiteDatabase, uri: string, pictureOnly: boolean) {
   const file = new File(uri)
 
   const bytes = await file.bytes()
   const png = isPng(bytes)
   // A photo that isn't a PNG (a JPEG, a screenshot) can't carry a card at all.
-  if (source === 'photos' && !png) throw new Error(t('card.noCardInPng'))
+  if (pictureOnly && !png) throw new Error(t('card.noCardInPng'))
   let card: unknown
   try {
     card = png ? readPngCard(bytes) : JSON.parse(await file.text())

@@ -1,0 +1,89 @@
+diff --git a/node_modules/react-native-reorderable-list/lib/typescript/types/props.d.ts b/node_modules/react-native-reorderable-list/lib/typescript/types/props.d.ts
+index 3512a7a..5b26262 100644
+--- a/node_modules/react-native-reorderable-list/lib/typescript/types/props.d.ts
++++ b/node_modules/react-native-reorderable-list/lib/typescript/types/props.d.ts
+@@ -75,6 +75,10 @@ export interface ReorderableListProps<T> extends Omit<FlatListProps<T>, OmittedP
+      * Scales the autoscroll spreed at which the list scrolls when an item is dragged to the scroll areas. Default: `1`.
+      */
+     autoscrollSpeedScale?: number;
++    /**
++     * How strongly the autoscroll speeds up while the item stays in the scroll area. Default: `1`.
++     */
++    autoscrollAcceleration?: number;
+     /**
+      * Delay in between autoscroll triggers. Can be used to tune the autoscroll smoothness.
+      * Default Android: `0`.
+diff --git a/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx b/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
+index 81bdff2..d0a2e13 100644
+--- a/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
++++ b/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
+@@ -79,6 +79,7 @@ const ReorderableListCore = <T,>(
+     autoscrollThreshold = 0.1,
+     autoscrollThresholdOffset,
+     autoscrollSpeedScale = 1,
++    autoscrollAcceleration = 1,
+     autoscrollDelay = AUTOSCROLL_CONFIG.delay,
+     autoscrollActivationDelta = 5,
+     animationDuration = 200,
+@@ -145,6 +146,8 @@ const ReorderableListCore = <T,>(
+   const itemCount = useSharedValue(data.length);
+   const autoscrollTrigger = useSharedValue(-1);
+   const lastAutoscrollTrigger = useSharedValue(-1);
++  // When the item reached the scroll area, for the autoscroll to speed up the longer it stays there.
++  const autoscrollStartedAt = useSharedValue(0);
+   const dragXY = useSharedValue(0);
+   const currentIndex = useSharedValue(-1);
+   const draggedIndex = useSharedValue(-1);
+@@ -880,6 +883,7 @@ const ReorderableListCore = <T,>(
+           // we let it continue (no-op).
+           if (state.value !== ReorderableListState.AUTOSCROLL) {
+             state.value = ReorderableListState.AUTOSCROLL;
++            autoscrollStartedAt.value = Date.now();
+             lastAutoscrollTrigger.value = autoscrollTrigger.value;
+             autoscrollTrigger.value *= -1;
+           }
+@@ -897,10 +901,17 @@ const ReorderableListCore = <T,>(
+         autoscrollTrigger.value !== lastAutoscrollTrigger.value &&
+         state.value === ReorderableListState.AUTOSCROLL
+       ) {
++        // Up to 5 times as fast after 1.6 s in the area (at an acceleration of 1), so a long list is crossed quickly
++        // while a short move stays precise.
++        const acceleration =
++          1 +
++          Math.min((Date.now() - autoscrollStartedAt.value) / 400, 4) *
++            autoscrollAcceleration;
+         const autoscrollIncrement =
+           dragDirection.value *
+           AUTOSCROLL_CONFIG.increment *
+-          autoscrollSpeedScale;
++          autoscrollSpeedScale *
++          acceleration;
+ 
+         if (autoscrollIncrement !== 0) {
+           let scrollOffset = flatListScrollOffsetXY.value;
+@@ -924,7 +935,8 @@ const ReorderableListCore = <T,>(
+             listRef,
+             horizontalProp.value ? scrollToValue : 0,
+             horizontalProp.value ? 0 : scrollToValue,
+-            true,
++            // A short delay scrolls every frame, where an animated scroll would lag behind.
++            autoscrollDelay >= 50,
+           );
+         }
+       }
+diff --git a/node_modules/react-native-reorderable-list/src/types/props.ts b/node_modules/react-native-reorderable-list/src/types/props.ts
+index cc69dcb..a150762 100644
+--- a/node_modules/react-native-reorderable-list/src/types/props.ts
++++ b/node_modules/react-native-reorderable-list/src/types/props.ts
+@@ -112,6 +112,11 @@ export interface ReorderableListProps<T>
+    * Scales the autoscroll spreed at which the list scrolls when an item is dragged to the scroll areas. Default: `1`.
+    */
+   autoscrollSpeedScale?: number;
++  /**
++   * How strongly the autoscroll speeds up while the item stays in the scroll area: at 1 it
++   * reaches 5 times the speed after 1.6 s, at 0 it never speeds up. Default: `1`.
++   */
++  autoscrollAcceleration?: number;
+   /**
+    * Delay in between autoscroll triggers. Can be used to tune the autoscroll smoothness.
+    * Default Android: `0`.
