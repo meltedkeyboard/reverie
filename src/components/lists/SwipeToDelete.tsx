@@ -28,6 +28,9 @@ type Props = {
   throwAway?: boolean
   // Off while the list is being edited; kept mounted so the content can animate in place.
   disabled?: boolean
+  // A second action behind the left edge, uncovered by a swipe to the right, run at once
+  // with no question (a group taken apart).
+  leading?: { label: string; icon: React.ComponentProps<typeof Icon>['name']; color: string; onAction: () => void }
   children: React.ReactNode
 }
 
@@ -42,7 +45,7 @@ const SPRING ={ damping: 24, stiffness: 240 }
 // Like a row in an iOS list: a swipe to the left uncovers a trash button, and a long
 // swipe deletes at once. The one place this gesture lives, for cards and the continue
 // button alike.
-export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, throwAway = false, disabled = false, children }: Props) {
+export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, throwAway = false, disabled = false, leading, children }: Props) {
   const styles = useStyles(createStyles)
   const { width } = useWindowDimensions()
   const [open, setOpen] = useState(false)
@@ -59,6 +62,18 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
   }
 
   const tick = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+
+  const fireLeading = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    leading?.onAction()
+  }
+  const hasLeading = !!leading
+
+  const triggerLeading = () => {
+    'worklet'
+    close()
+    scheduleOnRN(fireLeading)
+  }
 
   const close = () => {
     'worklet'
@@ -91,9 +106,9 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
     })
     .onUpdate((e) => {
       const raw = start.value + e.translationX
-      // Nothing is behind the right edge, so a pull that way only gives a little.
-      offset.value = raw > 0 ? raw * 0.2 : raw
-      const past = -offset.value > full
+      // With nothing behind the left edge a pull to the right only gives a little.
+      offset.value = raw > 0 && !hasLeading ? raw * 0.2 : raw
+      const past = Math.abs(offset.value) > full
       if (past !== armed.value) {
         armed.value = past
         scheduleOnRN(tick)
@@ -102,7 +117,11 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
     .onEnd((e) => {
       if (armed.value) {
         armed.value = false
-        trigger()
+        if (offset.value > 0) triggerLeading()
+        else trigger()
+      } else if (hasLeading && (offset.value > REVEAL / 2 || (offset.value > 0 && e.velocityX > 400))) {
+        offset.value = withSpring(REVEAL, SPRING)
+        scheduleOnRN(setOpen, true)
       } else if (-offset.value > REVEAL / 2 || e.velocityX < -400) {
         offset.value = withSpring(-REVEAL, SPRING)
         scheduleOnRN(setOpen, true)
@@ -123,7 +142,7 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
     })
     .onEnd((_e, success) => {
       if (!success) return
-      if (offset.value < 0) close()
+      if (offset.value !== 0) close()
       else if (onPress) scheduleOnRN(onPress)
     })
 
@@ -145,8 +164,29 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
     }
   })
 
+  const leadingButton = useAnimatedStyle(() => {
+    const pulled = Math.max(0, offset.value)
+    return {
+      width: Math.max(TRASH, pulled - GAP),
+      opacity: interpolate(pulled, [0, REVEAL * 0.6], [0, 1], 'clamp'),
+      transform: [{ scale: interpolate(pulled, [0, REVEAL], [0.6, 1], 'clamp') }],
+    }
+  })
+
   return (
     <View>
+      {leading ? (
+        <Animated.View style={[styles.leadingSlot, leadingButton]}>
+          <Pressable
+            onPress={triggerLeading}
+            accessibilityRole="button"
+            accessibilityLabel={leading.label}
+            style={({ pressed: down }) => [styles.trash, { borderRadius: radius, backgroundColor: leading.color }, down && { opacity: 0.8 }]}
+          >
+            <Icon name={leading.icon} size={22} color={ON_ACCENT} />
+          </Pressable>
+        </Animated.View>
+      ) : null}
       <Animated.View style={[styles.trashSlot, trash]}>
         <Pressable
           onPress={trigger}
@@ -170,5 +210,6 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     trashSlot: { position: 'absolute', right: 0, top: 0, bottom: 0 },
+    leadingSlot: { position: 'absolute', left: 0, top: 0, bottom: 0 },
     trash: { flex: 1, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
   })

@@ -35,6 +35,10 @@ type Props = {
   // the ellipsis and is the only way to drag the card, and a tap ticks it in place of
   // opening it. Only for a solid card; it stays mounted so the change animates.
   editing?: { active: boolean; checked: boolean; onToggle: () => void }
+  // Drawn in place of the ellipsis, for a card whose menu is only the long press.
+  trailing?: React.ReactNode
+  // An action behind a swipe to the right (see SwipeToDelete).
+  leading?: React.ComponentProps<typeof SwipeToDelete>['leading']
   children: React.ReactNode
 }
 
@@ -47,7 +51,7 @@ type Props = {
 // solid fill turned into a grey haze in the dark scheme. The glass is a sibling of the
 // content rather than inside it: clipped, its rim and the swell of a touch would be cut
 // off at the corners.
-export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, solid, longPressDrag = true, editing, children }: Props) {
+export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, solid, longPressDrag = true, editing, trailing, leading, children }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -55,7 +59,9 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
   const openSheet = () => showSheet(menuTitle, menu)
   // In a vertical card the ellipsis floats over the picture, on a dark disc to stay readable.
   const iconColor = vertical ? ON_ACCENT : colors.textFaint
-  const menuButton = swiftUI ? (
+  const menuButton = trailing ? (
+    <View style={styles.menu}>{trailing}</View>
+  ) : swiftUI ? (
     // Claims the touch, so the card does not open under the menu.
     <View onStartShouldSetResponder={() => true} style={vertical && styles.floating}>
       <NativeMenu items={menu} style={styles.menu}>
@@ -111,7 +117,7 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
   }
 
   return (
-    <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete} throwAway={!isConfirmDeleteOn()} disabled={active}>
+    <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete} throwAway={!isConfirmDeleteOn()} disabled={active} leading={leading}>
       <Pressable
         onPress={active ? editing?.onToggle : onOpen}
         onLongPress={active ? undefined : onLongPress}
@@ -194,7 +200,7 @@ const createStyles = (colors: Colors) =>
     layer: LAYER,
     glassCard: { borderWidth: 0, backgroundColor: 'transparent' },
     // The same box as the IconButton it replaces.
-    menu: { width: 40, height: 40 },
+    menu: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
     vertical: { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingVertical: 0, paddingLeft: 0, paddingRight: 0 },
     ...(isDesktop
       ? {

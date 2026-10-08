@@ -225,6 +225,17 @@ const MIGRATIONS = [
   `
     SELECT 1;
   `,
+  // Groups of characters on the home list. A group and a character outside any group share
+  // one sort order there; members keep theirs for the order inside the group.
+  `
+    CREATE TABLE character_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    ALTER TABLE characters ADD COLUMN group_id INTEGER REFERENCES character_groups(id) ON DELETE SET NULL;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

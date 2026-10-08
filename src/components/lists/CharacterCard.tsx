@@ -11,7 +11,7 @@ import { Avatar } from '../visuals/Avatar'
 import { FeaturedBody } from '../cast/FeaturedBody'
 import { ListCard } from './ListCard'
 import type { MenuItem } from '../overlays/NativeMenu'
-import { DragCardView, dragSession, type DragMenuEntry } from '../../../modules/reverie-drag'
+import { DraggableCard, unlessDragging } from './DraggableCard'
 
 type Props = {
   character: CharacterPreview
@@ -22,8 +22,11 @@ type Props = {
   // on top and the text under it taking the rest.
   fillHeight?: number
   editing?: { active: boolean; checked: boolean; onToggle: () => void }
-  // A drop asked for the dragged character as a file: the whole archive, or the card PNG.
-  onProvide?: (token: string, kind: 'archive' | 'card') => void
+  onProvide?: (token: string, kind: 'archive' | 'card', id: number) => void
+  // Other cards dropped on this one, to make a group of them.
+  onDropCards?: (ids: number[]) => void
+  // A member of an open group: set in under it.
+  inGroup?: boolean
 }
 
 function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, editing }: Props) {
@@ -74,40 +77,29 @@ function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, e
 // stretches with the card when a larger text size makes the card taller.
 const AVATAR = 88
 
-const toEntries = (items: MenuItem[]): DragMenuEntry[] =>
-  items.map(({ label, systemImage, destructive, children }) => ({ label, systemImage, destructive, children: children && toEntries(children) }))
-
 // The card draws itself; the wrapper only animates the change between row and full screen.
-// On iOS a long press is the system's: the menu, and moving the finger lifts the card to
-// drop into Files, Photos or another app, with a tap on other cards adding them to the stack.
 export function CharacterCard(props: Props) {
-  const content = <CharacterCardContent {...props} onOpen={() => dragSession.active || props.onOpen()} />
+  const { character, menu, editing, onProvide, onDropCards, inGroup } = props
   return (
     <AnimatedFill fillHeight={props.fillHeight}>
-      {DragCardView ? (
-        <DragCardView
-          menu={toEntries(props.menu)}
-          dragEnabled={!props.editing?.active}
-          name={props.character.name}
-          cornerRadius={20}
-          onMenuSelect={({ nativeEvent }) => {
-            let item: MenuItem | undefined = { label: '', children: props.menu }
-            for (const index of nativeEvent.path) item = item?.children?.[index]
-            item?.onSelect?.()
-          }}
-          onProvide={({ nativeEvent }) => props.onProvide?.(nativeEvent.token, nativeEvent.kind)}
-          onDragState={({ nativeEvent }) => {
-            dragSession.active = nativeEvent.active
-          }}
+      {/* The inset sits outside the drag view, so the lifted card is the card alone. */}
+      <View style={inGroup && member}>
+        <DraggableCard
+          menu={menu}
+          items={[{ id: character.id, name: character.name }]}
+          dragEnabled={!editing?.active}
+          onProvide={onProvide}
+          onDropCards={onDropCards}
         >
-          {content}
-        </DragCardView>
-      ) : (
-        content
-      )}
+          <CharacterCardContent {...props} onOpen={unlessDragging(props.onOpen)} />
+        </DraggableCard>
+      </View>
     </AnimatedFill>
   )
 }
+
+// A member of an open group is set in under it.
+const member = { marginLeft: 16 }
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({

@@ -1,15 +1,16 @@
 import { File, Paths } from 'expo-file-system'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated'
+import Animated, { FadeIn, FadeInDown, FadeOut, FadeOutDown, LinearTransition } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import ReorderableList, { type ReorderableListReorderEvent } from 'react-native-reorderable-list'
+import ReorderableList, { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
 
 import { isDesktop } from '@/lib/core/platform'
 import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
+import { GroupCard } from '@/components/lists/GroupCard'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton } from '@/components/chrome/Glass'
@@ -17,7 +18,8 @@ import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/Gla
 import { Pattern } from '@/components/visuals/Pattern'
 import { MenuGlassButton } from '@/components/chrome/MenuGlassButton'
 import { SFIcon } from '@/components/visuals/SFIcon'
-import { deleteCharacter, listCharacters, mergeCharacters, sameCharacter, setCharacterOrder, type CharacterPreview } from '@/db/characters'
+import { deleteCharacter, listCharacters, mergeCharacters, sameCharacter, type CharacterPreview } from '@/db/characters'
+import { addToGroup, createGroup, deleteGroup, listGroups, pruneGroups, removeFromGroup, renameGroup, setHomeOrder, ungroup, type CharacterGroup } from '@/db/groups'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
@@ -30,8 +32,8 @@ import { useReorder } from '@/hooks/features/useReorder'
 import { useTranslation } from '@/i18n'
 import { removeCharacterImages } from '@/lib/images/avatars'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
-import { confirm } from '@/lib/ui/dialogs'
-import { buildBackupArchive, characterSelection, openBackupBytes } from '@/lib/transfer/backup'
+import { confirm, promptText } from '@/lib/ui/dialogs'
+import { buildBackupArchive, characterSelection, exportBackup, openBackupBytes } from '@/lib/transfer/backup'
 import { buildCardPng, cardFileName, importCardFile, importCharacterCard, type CardSource } from '@/lib/transfer/importCard'
 import { showToast } from '@/lib/ui/toast'
 import { reportError } from '@/lib/transfer/report'
@@ -42,6 +44,29 @@ import { dragModule, DropTargetView, type DropFile } from '../../../modules/reve
 // The server notice above the list: its height and the margin under it.
 const NOTICE_HEIGHT = 74
 
+// A row of the home list: a group, or a character standing alone or inside an open group.
+type Row =
+  | { kind: 'group'; key: string; group: CharacterGroup; members: CharacterPreview[] }
+  | { kind: 'character'; key: string; character: CharacterPreview; inGroup: boolean }
+
+// Groups and lone characters share one order, highest first; on a tie a group comes first,
+// so a character taken out of one lands right under it.
+function buildRows(characters: CharacterPreview[], groups: CharacterGroup[], open: Set<number>): Row[] {
+  const members = new Map<number, CharacterPreview[]>()
+  for (const c of characters) if (c.groupId !== null) members.set(c.groupId, [...(members.get(c.groupId) ?? []), c])
+  const top = [
+    ...groups.filter((g) => members.has(g.id)).map((g) => ({ order: g.sortOrder, tie: 1, id: g.id, group: g as CharacterGroup | undefined, character: undefined })),
+    ...characters.filter((c) => c.groupId === null).map((c) => ({ order: c.sortOrder, tie: 0, id: c.id, group: undefined, character: c as CharacterPreview | undefined })),
+  ].sort((a, b) => b.order - a.order || b.tie - a.tie || b.id - a.id)
+  return top.flatMap((entry): Row[] => {
+    if (entry.character) return [{ kind: 'character', key: `c${entry.id}`, character: entry.character, inGroup: false }]
+    const list = members.get(entry.id)!
+    const head: Row = { kind: 'group', key: `g${entry.id}`, group: entry.group!, members: list }
+    if (!open.has(entry.id)) return [head]
+    return [head, ...list.map((c): Row => ({ kind: 'character', key: `c${c.id}`, character: c, inGroup: true }))]
+  })
+}
+
 
 export default function CharactersScreen() {
   const db = useDatabase()
@@ -51,6 +76,8 @@ export default function CharactersScreen() {
   const colors = useColors()
   const { t } = useTranslation()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
+  const [groups, setGroups] = useState<CharacterGroup[]>([])
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [serverSet, setServerSet] = useState(true)
   const { lastChat, reload: reloadLastChat } = useLastChat('character')
   // The continue button itself is drawn by the tabs layout, over both home tabs.
@@ -60,6 +87,7 @@ export default function CharactersScreen() {
     await pruneUntouchedChats(db)
     const list = await listCharacters(db)
     const set = Boolean((await loadSettings(db)).baseUrl.trim())
+    setGroups(await listGroups(db))
     setCharacters(list)
     setServerSet(set)
     await reloadLastChat()
@@ -93,10 +121,15 @@ export default function CharactersScreen() {
     setChecked(new Set())
   }
 
-  const toggleChecked = (id: number) =>
+  // A group's check ticks or clears all its characters at once.
+  const toggleChecked = (ids: number[]) =>
     setChecked((prev) => {
       const next = new Set(prev)
-      if (!next.delete(id)) next.add(id)
+      const all = ids.every((id) => next.has(id))
+      for (const id of ids) {
+        if (all) next.delete(id)
+        else next.add(id)
+      }
       return next
     })
 
@@ -114,6 +147,7 @@ export default function CharactersScreen() {
           await deleteCharacter(db, character.id)
           removeCharacterImages(character)
         }
+        await pruneGroups(db)
         setEditing(false)
         setChecked(new Set())
         reload()
@@ -122,9 +156,11 @@ export default function CharactersScreen() {
   }
 
   // The file a drop outside the app asked for, written to the caches for the system to copy.
-  const provide = async (character: CharacterPreview, token: string, kind: 'archive' | 'card') => {
+  const provide = async (token: string, kind: 'archive' | 'card', id: number) => {
+    const character = characters?.find((c) => c.id === id)
     if (!dragModule) return
     try {
+      if (!character) throw new Error(`No character ${id}`)
       const bytes = kind === 'card' ? await buildCardPng(character) : await buildBackupArchive(db, await characterSelection(db, character.id))
       const file = new File(Paths.cache, cardFileName(character.name, kind === 'card' ? 'png' : 'reverie'))
       file.create({ overwrite: true })
@@ -159,18 +195,105 @@ export default function CharactersScreen() {
   }, [openedFile])
 
   const { menuItems, confirmDelete } = useCharacterActions(reload)
-  const reorder = useReorder(characters, setCharacters, (ids) => setCharacterOrder(db, ids))
+  // Only the haptics and the edge guard of the shared hook: the rows here are of two kinds.
+  const reorder = useReorder(null, () => {}, async () => {})
+
+  // Groups fold while editing: only whole rows are moved then.
+  const rows = useMemo(
+    () => buildRows(characters ?? [], groups, editing ? new Set() : expanded),
+    [characters, groups, editing, expanded]
+  )
+  const groupedIds = useMemo(() => (characters ?? []).filter((c) => c.groupId !== null).map((c) => c.id), [characters])
+
+  const toggleExpanded = (id: number) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
+
+  const run = (change: Promise<unknown>) =>
+    change.catch((err) => reportError(t('groups.failed'), err)).then(reload)
+
+  // Cards dropped on a character make a group in its place; on a member of a group or on the
+  // group itself they join that group.
+  const dropOnCharacter = (target: CharacterPreview, ids: number[]) =>
+    run(target.groupId !== null ? addToGroup(db, target.groupId, ids) : createGroup(db, target, ids))
+
+  const deleteWholeGroup = (group: CharacterGroup, members: CharacterPreview[]) =>
+    confirmDeletion({
+      title: t('groups.deleteTitle'),
+      message: t('groups.deleteMessage', { count: members.length }),
+      confirmLabel: t('characters.delete'),
+      destructive: true,
+      onConfirm: () =>
+        run(
+          (async () => {
+            for (const character of members) {
+              await deleteCharacter(db, character.id)
+              removeCharacterImages(character)
+            }
+            await deleteGroup(db, group.id)
+          })()
+        ),
+    })
+
+  const groupMenu = (group: CharacterGroup, members: CharacterPreview[]) => [
+    {
+      label: t('groups.rename'),
+      systemImage: 'pencil',
+      onSelect: () =>
+        promptText({
+          title: t('groups.rename'),
+          message: t('groups.renameMessage'),
+          initial: group.name ?? '',
+          confirmLabel: t('common.save'),
+          onSubmit: (name) => run(renameGroup(db, group.id, name)),
+        }),
+    },
+    { label: t('groups.ungroup'), systemImage: 'rectangle.stack.badge.minus', onSelect: () => run(ungroup(db, group.id)) },
+    {
+      label: t('card.export'),
+      systemImage: 'square.and.arrow.up',
+      onSelect: () =>
+        run(
+          (async () => {
+            const picked = await Promise.all(members.map((c) => characterSelection(db, c.id)))
+            await exportBackup(db, {
+              characters: new Set(picked.flatMap((p) => [...p.characters])),
+              rooms: new Set(),
+              chats: new Set(picked.flatMap((p) => [...p.chats])),
+            })
+          })()
+        ),
+    },
+    { label: t('groups.delete'), systemImage: 'trash', destructive: true, onSelect: () => deleteWholeGroup(group, members) },
+  ]
+
+  // Rows move as wholes; the new order is shown at once and saved for groups and lone
+  // characters alike.
+  const moveRow = ({ from, to }: ReorderableListReorderEvent) => {
+    const next = reorderItems(rows, from, to)
+    const order = new Map(next.map((row, index) => [row.key, next.length - index]))
+    setGroups((prev) => prev.map((g) => ({ ...g, sortOrder: order.get(`g${g.id}`) ?? g.sortOrder })))
+    setCharacters((prev) => prev && prev.map((c) => ({ ...c, sortOrder: order.get(`c${c.id}`) ?? c.sortOrder })))
+    setHomeOrder(
+      db,
+      next.map((row) => (row.kind === 'group' ? { kind: 'group', id: row.group.id } : { kind: 'character', id: row.character.id }))
+    )
+  }
 
   // A card dropped next to an identical one (the one it displaced first) offers to merge: the
   // other one stays, with its settings, and takes over the chats of the dropped one.
   const onReorder = (event: ReorderableListReorderEvent) => {
-    reorder.onReorder(event)
-    const list = characters
-    const dragged = list?.[event.from]
-    if (!list || !dragged) return
-    const target = [list[event.to], list[event.to + (event.to > event.from ? 1 : -1)]].find(
-      (other) => other && other.id !== dragged.id && sameCharacter(other, dragged)
-    )
+    moveRow(event)
+    const near = [rows[event.to], rows[event.to + (event.to > event.from ? 1 : -1)]]
+    const moved = rows[event.from]
+    if (moved?.kind !== 'character') return
+    const dragged = moved.character
+    const target = near
+      .map((row) => (row?.kind === 'character' ? row.character : undefined))
+      .find((other) => other && other.id !== dragged.id && sameCharacter(other, dragged))
     if (!target) return
     confirm({
       title: t('characters.mergeTitle'),
@@ -192,7 +315,7 @@ export default function CharactersScreen() {
   // A lone character is one card over the whole screen, and the list does not scroll. Not
   // while editing: the check and the handle sit on a row.
   const fill = useFeaturedFill(
-    characters?.length ?? 0,
+    rows.length === 1 && rows[0].kind === 'group' ? rows.length + 1 : rows.length,
     padding,
     (lastChat ? CONTINUE_BUTTON_SPACE : 0) + (serverSet ? 0 : NOTICE_HEIGHT)
   )
@@ -209,9 +332,10 @@ export default function CharactersScreen() {
     }}>
       <Pattern id="stars" />
       <ReorderableList
-        data={characters ?? []}
-        keyExtractor={(c) => String(c.id)}
+        data={rows}
+        keyExtractor={(row) => row.key}
         {...reorder}
+        itemLayoutAnimation={LinearTransition.springify().duration(350).dampingRatio(1)}
         onReorder={onReorder}
         // The list runs under the floating header and the tab bar, where the edge zones that
         // scroll it would hide: they start where the cards can be seen.
@@ -223,7 +347,7 @@ export default function CharactersScreen() {
         autoscrollSpeedScale={0.12}
         // About 20 characters fit a few screens, where the full speed-up overshoots: it grows
         // from two thirds there to all of it at 50.
-        autoscrollAcceleration={Math.min(Math.max(((characters?.length ?? 0) - 20) / 30, 0), 1) / 3 + 2 / 3}
+        autoscrollAcceleration={Math.min(Math.max((rows.length - 20) / 30, 0), 1) / 3 + 2 / 3}
         scrollEnabled={editing || fill.scroll}
         contentContainerStyle={[
           padding,
@@ -261,17 +385,47 @@ export default function CharactersScreen() {
             />
           ) : null
         }
-        renderItem={({ item: character }) => (
-          <CharacterCard
-            character={character}
-            onOpen={() => router.push(`/chats/${character.id}`)}
-            onDelete={() => confirmDelete(character)}
-            menu={menuItems(character)}
-            fillHeight={fillHeight}
-            editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked(character.id) }}
-            onProvide={(token, kind) => provide(character, token, kind)}
-          />
-        )}
+        renderItem={({ item: row }) => {
+          if (row.kind === 'group') {
+            const ids = row.members.map((m) => m.id)
+            return (
+              <GroupCard
+                group={row.group}
+                members={row.members}
+                expanded={expanded.has(row.group.id) && !editing}
+                onToggle={() => toggleExpanded(row.group.id)}
+                onDelete={() => deleteWholeGroup(row.group, row.members)}
+                onUngroup={() => run(ungroup(db, row.group.id))}
+                menu={groupMenu(row.group, row.members)}
+                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids) }}
+                onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
+                onProvide={provide}
+              />
+            )
+          }
+          const { character, inGroup } = row
+          const card = (
+            <CharacterCard
+              character={character}
+              onOpen={() => router.push(`/chats/${character.id}`)}
+              onDelete={() => confirmDelete(character)}
+              menu={menuItems(character)}
+              fillHeight={fillHeight}
+              editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]) }}
+              onProvide={provide}
+              onDropCards={(dropped) => dropOnCharacter(character, dropped)}
+              inGroup={inGroup}
+            />
+          )
+          // Members slide in under their group and fade out back into it.
+          return inGroup ? (
+            <Animated.View entering={FadeIn.duration(250)} exiting={FadeOut.duration(150)}>
+              {card}
+            </Animated.View>
+          ) : (
+            card
+          )
+        }}
       />
       {editing ? (
         <Animated.View
@@ -326,7 +480,12 @@ export default function CharactersScreen() {
   )
 
   return DropTargetView ? (
-    <DropTargetView style={styles.screen} onDropFiles={({ nativeEvent }) => importFiles(nativeEvent.files)}>
+    <DropTargetView
+      style={styles.screen}
+      groupedIds={groupedIds}
+      onDropFiles={({ nativeEvent }) => importFiles(nativeEvent.files)}
+      onDropCards={({ nativeEvent }) => run(removeFromGroup(db, nativeEvent.ids))}
+    >
       {screen}
     </DropTargetView>
   ) : (

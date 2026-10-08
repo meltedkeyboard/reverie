@@ -51,7 +51,7 @@ public class ReverieDragModule: Module {
     }
 
     View(DragCardView.self) {
-      Events("onMenuSelect", "onProvide", "onDragState")
+      Events("onMenuSelect", "onProvide", "onDragState", "onDropCards")
       Prop("menu") { (view: DragCardView, menu: [[String: Any]]) in
         view.menuItems = menu
       }
@@ -61,8 +61,20 @@ public class ReverieDragModule: Module {
         view.contextMenu = nil
         if enabled { view.addContextMenu() }
       }
-      Prop("name") { (view: DragCardView, name: String) in
-        view.name = name
+      // What the card carries when dragged: one character, or every member of a group.
+      Prop("items") { (view: DragCardView, items: [[String: Any]]) in
+        view.items = items.compactMap { entry in
+          guard let id = entry["id"] as? Int else { return nil }
+          return (id, entry["name"] as? String ?? "Character")
+        }
+      }
+      // Whether other cards dropped on this one are taken: onto a character they make a
+      // group, onto a group they join it.
+      Prop("acceptsCards") { (view: DragCardView, accepts: Bool) in
+        view.acceptsCards = accepts
+      }
+      Prop("accentColor") { (view: DragCardView, color: String) in
+        view.accent = UIColor(hex: color)
       }
       Prop("cornerRadius") { (view: DragCardView, radius: Double) in
         view.radius = radius
@@ -70,20 +82,47 @@ public class ReverieDragModule: Module {
     }
 
     View(DropTargetView.self) {
-      Events("onDropFiles")
+      Events("onDropFiles", "onDropCards")
+      // Characters in a group: dropped on the list off any card, they leave it.
+      Prop("groupedIds") { (view: DropTargetView, ids: [Int]) in
+        view.groupedIds = Set(ids)
+      }
     }
   }
 }
 
-class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractionDelegate {
+// One dragged character, and the card it was lifted from.
+final class DragPayload {
+  let id: Int
+  weak var card: DragCardView?
+
+  init(id: Int, card: DragCardView) {
+    self.id = id
+    self.card = card
+  }
+}
+
+// The ids of the characters in a session started in this app.
+func draggedIds(_ session: UIDropSession) -> [Int] {
+  session.localDragSession?.items.compactMap { ($0.localObject as? DragPayload)?.id } ?? []
+}
+
+class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractionDelegate, UIDropInteractionDelegate {
   let onMenuSelect = EventDispatcher()
   let onProvide = EventDispatcher()
   let onDragState = EventDispatcher()
+  let onDropCards = EventDispatcher()
   var menuItems: [[String: Any]] = []
-  var name = "Character"
+  var items: [(id: Int, name: String)] = []
+  var acceptsCards = false
+  var accent = UIColor.systemBlue
   var radius = 20.0
   lazy var drag = UIDragInteraction(delegate: self)
   var contextMenu: UIContextMenuInteraction?
+  private let ring = UIView()
+  // Lifted into a drag: dimmed where it stood until the drag ends.
+  private var picked = false
+  private var targeted = false
 
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -91,6 +130,35 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     drag.isEnabled = true
     addInteraction(drag)
     addContextMenu()
+    addInteraction(UIDropInteraction(delegate: self))
+    ring.isUserInteractionEnabled = false
+    ring.alpha = 0
+    ring.layer.borderWidth = 2.5
+    ring.layer.cornerCurve = .continuous
+    addSubview(ring)
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    ring.frame = bounds
+    ring.layer.cornerRadius = radius
+    bringSubviewToFront(ring)
+  }
+
+  // The target ring shows on a dimmed card too: the card lights up again under it.
+  private func restyle() {
+    ring.layer.borderColor = accent.cgColor
+    ring.backgroundColor = accent.withAlphaComponent(0.12)
+    UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
+      self.alpha = self.picked && !self.targeted ? 0.45 : 1
+      self.ring.alpha = self.targeted ? 1 : 0
+      self.transform = self.targeted ? CGAffineTransform(scaleX: 1.03, y: 1.03) : .identity
+    }
+  }
+
+  func setPicked(_ on: Bool) {
+    picked = on
+    restyle()
   }
 
   func addContextMenu() {
@@ -99,7 +167,11 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     contextMenu = menu
   }
 
-  private func dragItem() -> UIDragItem {
+  private func dragItems() -> [UIDragItem] {
+    items.map { dragItem(id: $0.id, name: $0.name) }
+  }
+
+  private func dragItem(id: Int, name: String) -> UIDragItem {
     let provider = NSItemProvider()
     provider.suggestedName = name
     // The archive first: Files keeps the first type it can, Photos only takes the picture.
@@ -114,13 +186,13 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
             takePending(token)?(nil, false, NSError(domain: "ReverieDrag", code: 2))
             return
           }
-          self.onProvide(["token": token, "kind": kind])
+          self.onProvide(["token": token, "kind": kind, "id": id])
         }
         return nil
       }
     }
     let item = UIDragItem(itemProvider: provider)
-    item.localObject = self
+    item.localObject = DragPayload(id: id, card: self)
     return item
   }
 
@@ -132,7 +204,11 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
 
   func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
     session.localContext = window
-    return [dragItem()]
+    return dragItems()
+  }
+
+  func dragInteraction(_ interaction: UIDragInteraction, willAdd items: [UIDragItem], for session: UIDragSession, withAnimator animator: UIDragAnimating) {
+    animator.addCompletion { _ in self.setPicked(true) }
   }
 
   // While cards are in the air a tap on another one adds it to the stack, so JS must not
@@ -141,14 +217,19 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     onDragState(["active": true])
   }
 
+  // Only the card the drag began on hears its end, so it lights up all the others.
   func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
+    for item in session.items {
+      (item.localObject as? DragPayload)?.card?.setPicked(false)
+    }
+    setPicked(false)
     onDragState(["active": false])
   }
 
   // A tap on another card while one is in the air adds it to the stack.
   func dragInteraction(_ interaction: UIDragInteraction, itemsForAddingTo session: UIDragSession, withTouchAt point: CGPoint) -> [UIDragItem] {
-    if session.items.contains(where: { $0.localObject as? DragCardView === self }) { return [] }
-    return [dragItem()]
+    if session.items.contains(where: { ($0.localObject as? DragPayload)?.card === self }) { return [] }
+    return dragItems()
   }
 
   func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
@@ -173,6 +254,40 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     roundedPreview()
   }
 
+  // Other cards of this window dropped on this one. A card is no target for itself alone.
+  private func takes(_ session: UIDropSession) -> Bool {
+    guard acceptsCards, let local = session.localDragSession, (local.localContext as? UIWindow) === window else { return false }
+    let own = Set(items.map { $0.id })
+    return draggedIds(session).contains { !own.contains($0) }
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
+    takes(session)
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnter session: UIDropSession) {
+    targeted = true
+    restyle()
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
+    UIDropProposal(operation: takes(session) ? .move : .cancel)
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: UIDropSession) {
+    targeted = false
+    restyle()
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: UIDropSession) {
+    targeted = false
+    restyle()
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
+    onDropCards(["ids": draggedIds(session)])
+  }
+
   private func buildMenu(_ items: [[String: Any]], path: [Int]) -> [UIMenuElement] {
     items.enumerated().map { index, entry in
       let title = entry["label"] as? String ?? ""
@@ -193,6 +308,8 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
 // app is copied into the caches and handed to JS, which shows the import sheet.
 class DropTargetView: ExpoView, UIDropInteractionDelegate {
   let onDropFiles = EventDispatcher()
+  let onDropCards = EventDispatcher()
+  var groupedIds = Set<Int>()
   private let accepted = [characterType, UTType.zip.identifier, UTType.png.identifier]
 
   required init(appContext: AppContext? = nil) {
@@ -205,15 +322,26 @@ class DropTargetView: ExpoView, UIDropInteractionDelegate {
     (session.localDragSession?.localContext as? UIWindow) === window && window != nil
   }
 
+  // From here only members of a group are taken, to leave it; anything else moved around
+  // is no import.
+  private func leavesGroup(_ session: UIDropSession) -> Bool {
+    draggedIds(session).contains { groupedIds.contains($0) }
+  }
+
   func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
-    !fromHere(session) && session.hasItemsConforming(toTypeIdentifiers: accepted)
+    fromHere(session) ? leavesGroup(session) : session.hasItemsConforming(toTypeIdentifiers: accepted)
   }
 
   func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
-    UIDropProposal(operation: fromHere(session) ? .cancel : .copy)
+    if fromHere(session) { return UIDropProposal(operation: leavesGroup(session) ? .move : .cancel) }
+    return UIDropProposal(operation: .copy)
   }
 
   func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
+    if fromHere(session) {
+      onDropCards(["ids": draggedIds(session).filter { groupedIds.contains($0) }])
+      return
+    }
     let group = DispatchGroup()
     var files: [[String: String]] = []
     let lock = NSLock()

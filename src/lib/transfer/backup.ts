@@ -420,7 +420,7 @@ export async function importBackup(
 // clearing by hand.
 export async function wipeAllData(db: SQLiteDatabase) {
   await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM rooms; DELETE FROM characters; DELETE FROM app_settings;')
+    await db.execAsync('DELETE FROM rooms; DELETE FROM characters; DELETE FROM character_groups; DELETE FROM app_settings;')
   })
   removeAllAvatars()
 }

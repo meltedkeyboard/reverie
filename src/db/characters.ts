@@ -43,6 +43,8 @@ export type CharacterPreview = Character & {
   lastMessage: string | null
   lastActivity: number
   chatCount: number
+  groupId: number | null
+  sortOrder: number
 }
 
 export const DEFAULT_SAMPLING = { temperature: 0.8, maxTokens: 800, topP: 0.95 } as const
@@ -68,7 +70,8 @@ export function listCharacters(db: SQLiteDatabase) {
           WHERE ch.character_id = c.id ORDER BY m.id DESC LIMIT 1),
         c.created_at
       ) AS lastActivity,
-      (SELECT COUNT(*) FROM chats ch WHERE ch.character_id = c.id) AS chatCount
+      (SELECT COUNT(*) FROM chats ch WHERE ch.character_id = c.id) AS chatCount,
+      c.group_id AS groupId, c.sort_order AS sortOrder
     FROM characters c
     ORDER BY c.sort_order DESC, c.id DESC
   `)
@@ -147,9 +150,10 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
   let characterId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      `INSERT INTO characters (${FIELD_COLUMNS}, created_at)
+      // The copy stays in the original's group.
+      `INSERT INTO characters (${FIELD_COLUMNS}, created_at, group_id)
        SELECT ?, ?, ?, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking,
-         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, ?
+         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, ?, group_id
        FROM characters WHERE id = ?`,
       [name, images.avatar, images.avatarOriginal, images.background, images.backgroundOriginal, Date.now(), id]
     )

@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router'
 
 import { deleteCharacter, duplicateCharacter, type CharacterPreview } from '@/db/characters'
 import { createChat } from '@/db/chats'
+import { pruneGroups, removeFromGroup } from '@/db/groups'
 import { useDatabase } from '@/db/provider'
 import { useCardExport } from '@/hooks/features/useCardExport'
 import { useTranslation } from '@/i18n'
@@ -30,6 +31,7 @@ export function useCharacterActions(reload: () => void) {
       destructive: true,
       onConfirm: async () => {
         await deleteCharacter(db, character.id)
+        await pruneGroups(db)
         removeCharacterImages(character)
         reload()
       },
@@ -51,6 +53,9 @@ export function useCharacterActions(reload: () => void) {
     { label: t('characters.edit'), systemImage: 'pencil', onSelect: () => router.push(`/character/${character.id}`) },
     { label: t('characters.duplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(character) },
     exportItem(async () => character),
+    ...(character.groupId !== null
+      ? [{ label: t('groups.removeFromGroup'), systemImage: 'rectangle.stack.badge.minus', onSelect: () => removeFromGroup(db, [character.id]).then(reload) }]
+      : []),
     { label: t('characters.delete'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(character) },
   ]
 

@@ -35,6 +35,7 @@ const UNITS = {
   word: { ru: ['слово', 'слова', 'слов'], en: ['word', 'words'] },
   paragraph: { ru: ['абзац', 'абзаца', 'абзацев'], en: ['paragraph', 'paragraphs'] },
   line: { ru: ['реплика', 'реплики', 'реплик'], en: ['line', 'lines'] },
+  character: { ru: ['персонаж', 'персонажа', 'персонажей'], en: ['character', 'characters'] },
 } as const satisfies Record<string, { ru: [string, string, string]; en: [string, string] }>
 
 export type CountUnit = keyof typeof UNITS

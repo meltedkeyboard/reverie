@@ -116,6 +116,7 @@ function LucideOrIonicon(props: Props) {
 const SF: Record<string, [string, string]> = {
   add: ['plus', 'plus'],
   alert: ['exclamationmark.triangle', 'exclamationmark.triangle.fill'],
+  albums: ['rectangle.stack', 'rectangle.stack.fill'],
   apps: ['square.grid.2x2', 'square.grid.2x2.fill'],
   archive: ['archivebox', 'archivebox.fill'],
   'arrow-down': ['arrow.down', 'arrow.down'],

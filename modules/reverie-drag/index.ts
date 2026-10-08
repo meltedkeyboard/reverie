@@ -13,14 +13,22 @@ type DragModule = {
 type DragCardProps = ViewProps & {
   menu: DragMenuEntry[]
   dragEnabled: boolean
-  name: string
+  // What the card carries when dragged: one character, or the members of a group.
+  items: { id: number; name: string }[]
+  acceptsCards: boolean
+  accentColor: string
   cornerRadius: number
   onMenuSelect: (e: { nativeEvent: { path: number[] } }) => void
-  onProvide: (e: { nativeEvent: { token: string; kind: 'archive' | 'card' } }) => void
+  onProvide: (e: { nativeEvent: { token: string; kind: 'archive' | 'card'; id: number } }) => void
   onDragState: (e: { nativeEvent: { active: boolean } }) => void
+  onDropCards: (e: { nativeEvent: { ids: number[] } }) => void
 }
 
-type DropTargetProps = ViewProps & { onDropFiles: (e: { nativeEvent: { files: DropFile[] } }) => void }
+type DropTargetProps = ViewProps & {
+  groupedIds: number[]
+  onDropFiles: (e: { nativeEvent: { files: DropFile[] } }) => void
+  onDropCards: (e: { nativeEvent: { ids: number[] } }) => void
+}
 
 // Missing in Expo Go, on Android and on the web: the cards then keep the plain menu.
 export const dragModule = requireOptionalNativeModule<DragModule>('ReverieDrag')
