@@ -25,8 +25,9 @@ type Props = {
   onProvide?: (token: string, kind: 'archive' | 'card', id: number) => void
   // Other cards dropped on this one, to make a group of them.
   onDropCards?: (ids: number[]) => void
-  // A member of an open group: set in under it.
+  // A member of an open group: set in under it. `groupIds` are all of that group's characters.
   inGroup?: boolean
+  groupIds?: number[]
 }
 
 function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, editing }: Props) {
@@ -79,7 +80,7 @@ const AVATAR = 88
 
 // The card draws itself; the wrapper only animates the change between row and full screen.
 export function CharacterCard(props: Props) {
-  const { character, menu, editing, onProvide, onDropCards, inGroup } = props
+  const { character, menu, editing, onProvide, onDropCards, inGroup, groupIds } = props
   return (
     <AnimatedFill fillHeight={props.fillHeight}>
       {/* The inset sits outside the drag view, so the lifted card is the card alone. */}
@@ -88,6 +89,7 @@ export function CharacterCard(props: Props) {
           menu={menu}
           items={[{ id: character.id, name: character.name }]}
           dragEnabled={!editing?.active}
+          groupIds={groupIds}
           onProvide={onProvide}
           onDropCards={onDropCards}
         >

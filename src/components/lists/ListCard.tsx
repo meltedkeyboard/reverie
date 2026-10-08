@@ -34,7 +34,8 @@ type Props = {
   // The edit mode of a list: a check slides in on the left, the handle takes the place of
   // the ellipsis and is the only way to drag the card, and a tap ticks it in place of
   // opening it. Only for a solid card; it stays mounted so the change animates.
-  editing?: { active: boolean; checked: boolean; onToggle: () => void }
+  // With `opens` a tap still opens the card (a group unfolds) and only the check ticks it.
+  editing?: { active: boolean; checked: boolean; onToggle: () => void; opens?: boolean }
   // Drawn in place of the ellipsis, for a card whose menu is only the long press.
   trailing?: React.ReactNode
   // An action behind a swipe to the right (see SwipeToDelete).
@@ -119,7 +120,7 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
   return (
     <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete} throwAway={!isConfirmDeleteOn()} disabled={active} leading={leading}>
       <Pressable
-        onPress={active ? editing?.onToggle : onOpen}
+        onPress={active && !editing?.opens ? editing?.onToggle : onOpen}
         onLongPress={active ? undefined : onLongPress}
         // On the desktop a flat list row: no outline, greyer under the pointer.
         style={(state) =>
@@ -130,17 +131,20 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
       >
         {editing ? (
           <>
-            <Animated.View style={[styles.check, checkStyle]}>
-              <SFIcon
-                name={editing.checked ? 'checkmark.circle.fill' : 'circle'}
-                fallback={editing.checked ? 'checkmark-circle' : 'ellipse-outline'}
-                size={22}
-                color={editing.checked ? colors.accent : colors.textFaint}
-                animateChange
-              />
-            </Animated.View>
             <Animated.View style={[styles.content, { gap }, insetStyle]}>
               <Animated.View style={[styles.content, { gap }, shiftStyle]}>{children}</Animated.View>
+            </Animated.View>
+            {/* Over the content, so the check takes its own tap where a tap opens the card. */}
+            <Animated.View style={[styles.check, checkStyle]} pointerEvents={active && editing.opens ? 'auto' : 'none'}>
+              <Pressable onPress={editing.onToggle} hitSlop={8} style={styles.checkTap}>
+                <SFIcon
+                  name={editing.checked ? 'checkmark.circle.fill' : 'circle'}
+                  fallback={editing.checked ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={22}
+                  color={editing.checked ? colors.accent : colors.textFaint}
+                  animateChange
+                />
+              </Pressable>
             </Animated.View>
           </>
         ) : (
@@ -219,6 +223,7 @@ const createStyles = (colors: Colors) =>
     check: { position: 'absolute', top: 0, bottom: 0, left: 0, width: CHECK_WIDTH, alignItems: 'center', justifyContent: 'center' },
     // Stands in for the card's own row, so the content keeps its layout inside.
     content: { flex: 1, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center' },
+    checkTap: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
     handleLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
     handle: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     hovered: { backgroundColor: colors.surfaceRaised },

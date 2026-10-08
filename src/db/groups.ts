@@ -68,6 +68,15 @@ export function deleteGroup(db: SQLiteDatabase, groupId: number) {
   return db.runAsync('DELETE FROM character_groups WHERE id = ?', groupId)
 }
 
+// The order of a group's members after one was moved among them, top down.
+export function setMemberOrder(db: SQLiteDatabase, ids: number[]) {
+  return db.withTransactionAsync(async () => {
+    for (const [index, id] of ids.entries()) {
+      await db.runAsync('UPDATE characters SET sort_order = ? WHERE id = ?', [ids.length - index, id])
+    }
+  })
+}
+
 // Members top down; sort_order runs downward like on the home list.
 async function placeMembers(db: SQLiteDatabase, groupId: number, ids: number[]) {
   for (const [index, id] of ids.entries()) {

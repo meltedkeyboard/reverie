@@ -76,6 +76,15 @@ public class ReverieDragModule: Module {
       Prop("accentColor") { (view: DragCardView, color: String) in
         view.accent = UIColor(hex: color)
       }
+      // The screen's background, laid over a card picked into a drag to dim it.
+      Prop("shadeColor") { (view: DragCardView, color: String) in
+        view.shade.backgroundColor = UIColor(hex: color)
+      }
+      // The characters of the group the card is in (or is): cards of the same group are no
+      // target for each other.
+      Prop("groupIds") { (view: DragCardView, ids: [Int]) in
+        view.groupIds = Set(ids)
+      }
       Prop("cornerRadius") { (view: DragCardView, radius: Double) in
         view.radius = radius
       }
@@ -115,6 +124,8 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   var menuItems: [[String: Any]] = []
   var items: [(id: Int, name: String)] = []
   var acceptsCards = false
+  var groupIds = Set<Int>()
+  let shade = UIView()
   var accent = UIColor.systemBlue
   var radius = 20.0
   lazy var drag = UIDragInteraction(delegate: self)
@@ -131,6 +142,11 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     addInteraction(drag)
     addContextMenu()
     addInteraction(UIDropInteraction(delegate: self))
+    // UIKit sets the alpha of the card itself around the lift, so the dimming is a layer of
+    // its own laid over it.
+    shade.isUserInteractionEnabled = false
+    shade.alpha = 0
+    addSubview(shade)
     ring.isUserInteractionEnabled = false
     ring.alpha = 0
     ring.layer.borderWidth = 2.5
@@ -140,9 +156,12 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    ring.frame = bounds
-    ring.layer.cornerRadius = radius
-    bringSubviewToFront(ring)
+    for overlay in [shade, ring] {
+      overlay.frame = bounds
+      overlay.layer.cornerRadius = radius
+      overlay.layer.cornerCurve = .continuous
+      bringSubviewToFront(overlay)
+    }
   }
 
   // The target ring shows on a dimmed card too: the card lights up again under it.
@@ -150,15 +169,29 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     ring.layer.borderColor = accent.cgColor
     ring.backgroundColor = accent.withAlphaComponent(0.12)
     UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
-      self.alpha = self.picked && !self.targeted ? 0.45 : 1
+      self.shade.alpha = self.picked && !self.targeted ? 0.55 : 0
       self.ring.alpha = self.targeted ? 1 : 0
       self.transform = self.targeted ? CGAffineTransform(scaleX: 1.03, y: 1.03) : .identity
     }
   }
 
   func setPicked(_ on: Bool) {
+    inDrag = on
     picked = on
     restyle()
+  }
+
+  // In a drag from the moment it is lifted; dimmed once the lift has played, since the
+  // lifted preview is drawn from the card as it is then.
+  private var inDrag = false
+
+  private func pickAfterLift() {
+    inDrag = true
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+      guard let self, self.inDrag else { return }
+      self.picked = true
+      self.restyle()
+    }
   }
 
   func addContextMenu() {
@@ -204,11 +237,8 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
 
   func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
     session.localContext = window
+    pickAfterLift()
     return dragItems()
-  }
-
-  func dragInteraction(_ interaction: UIDragInteraction, willAdd items: [UIDragItem], for session: UIDragSession, withAnimator animator: UIDragAnimating) {
-    animator.addCompletion { _ in self.setPicked(true) }
   }
 
   // While cards are in the air a tap on another one adds it to the stack, so JS must not
@@ -229,6 +259,7 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   // A tap on another card while one is in the air adds it to the stack.
   func dragInteraction(_ interaction: UIDragInteraction, itemsForAddingTo session: UIDragSession, withTouchAt point: CGPoint) -> [UIDragItem] {
     if session.items.contains(where: { ($0.localObject as? DragPayload)?.card === self }) { return [] }
+    pickAfterLift()
     return dragItems()
   }
 
@@ -257,7 +288,7 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   // Other cards of this window dropped on this one. A card is no target for itself alone.
   private func takes(_ session: UIDropSession) -> Bool {
     guard acceptsCards, let local = session.localDragSession, (local.localContext as? UIWindow) === window else { return false }
-    let own = Set(items.map { $0.id })
+    let own = Set(items.map { $0.id }).union(groupIds)
     return draggedIds(session).contains { !own.contains($0) }
   }
 

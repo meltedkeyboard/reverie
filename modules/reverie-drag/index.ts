@@ -17,6 +17,8 @@ type DragCardProps = ViewProps & {
   items: { id: number; name: string }[]
   acceptsCards: boolean
   accentColor: string
+  shadeColor: string
+  groupIds: number[]
   cornerRadius: number
   onMenuSelect: (e: { nativeEvent: { path: number[] } }) => void
   onProvide: (e: { nativeEvent: { token: string; kind: 'archive' | 'card'; id: number } }) => void

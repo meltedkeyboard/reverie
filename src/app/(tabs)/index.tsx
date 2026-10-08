@@ -19,7 +19,7 @@ import { Pattern } from '@/components/visuals/Pattern'
 import { MenuGlassButton } from '@/components/chrome/MenuGlassButton'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { deleteCharacter, listCharacters, mergeCharacters, sameCharacter, type CharacterPreview } from '@/db/characters'
-import { addToGroup, createGroup, deleteGroup, listGroups, pruneGroups, removeFromGroup, renameGroup, setHomeOrder, ungroup, type CharacterGroup } from '@/db/groups'
+import { addToGroup, createGroup, deleteGroup, listGroups, pruneGroups, removeFromGroup, renameGroup, setHomeOrder, setMemberOrder, ungroup, type CharacterGroup } from '@/db/groups'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
@@ -198,12 +198,13 @@ export default function CharactersScreen() {
   // Only the haptics and the edge guard of the shared hook: the rows here are of two kinds.
   const reorder = useReorder(null, () => {}, async () => {})
 
-  // Groups fold while editing: only whole rows are moved then.
-  const rows = useMemo(
-    () => buildRows(characters ?? [], groups, editing ? new Set() : expanded),
-    [characters, groups, editing, expanded]
-  )
+  const rows = useMemo(() => buildRows(characters ?? [], groups, expanded), [characters, groups, expanded])
   const groupedIds = useMemo(() => (characters ?? []).filter((c) => c.groupId !== null).map((c) => c.id), [characters])
+  const membersOf = useMemo(() => {
+    const byGroup = new Map<number, number[]>()
+    for (const c of characters ?? []) if (c.groupId !== null) byGroup.set(c.groupId, [...(byGroup.get(c.groupId) ?? []), c.id])
+    return byGroup
+  }, [characters])
 
   const toggleExpanded = (id: number) =>
     setExpanded((prev) => {
@@ -270,17 +271,26 @@ export default function CharactersScreen() {
     { label: t('groups.delete'), systemImage: 'trash', destructive: true, onSelect: () => deleteWholeGroup(group, members) },
   ]
 
-  // Rows move as wholes; the new order is shown at once and saved for groups and lone
-  // characters alike.
+  // The new order is shown at once and saved: groups and lone characters among themselves,
+  // and the members of each group among themselves. A member moved out of its group's rows
+  // stays in the group and goes back under it.
   const moveRow = ({ from, to }: ReorderableListReorderEvent) => {
     const next = reorderItems(rows, from, to)
-    const order = new Map(next.map((row, index) => [row.key, next.length - index]))
+    const top = next.filter((row) => row.kind === 'group' || !row.inGroup)
+    const order = new Map(top.map((row, index) => [row.key, top.length - index]))
+    const inside = new Map<number, number[]>()
+    for (const row of next) {
+      if (row.kind !== 'character' || !row.inGroup || row.character.groupId === null) continue
+      inside.set(row.character.groupId, [...(inside.get(row.character.groupId) ?? []), row.character.id])
+    }
+    for (const ids of inside.values()) ids.forEach((id, index) => order.set(`c${id}`, ids.length - index))
     setGroups((prev) => prev.map((g) => ({ ...g, sortOrder: order.get(`g${g.id}`) ?? g.sortOrder })))
     setCharacters((prev) => prev && prev.map((c) => ({ ...c, sortOrder: order.get(`c${c.id}`) ?? c.sortOrder })))
     setHomeOrder(
       db,
-      next.map((row) => (row.kind === 'group' ? { kind: 'group', id: row.group.id } : { kind: 'character', id: row.character.id }))
+      top.map((row) => (row.kind === 'group' ? { kind: 'group', id: row.group.id } : { kind: 'character', id: row.character.id }))
     )
+    for (const ids of inside.values()) setMemberOrder(db, ids)
   }
 
   // A card dropped next to an identical one (the one it displaced first) offers to merge: the
@@ -392,18 +402,19 @@ export default function CharactersScreen() {
               <GroupCard
                 group={row.group}
                 members={row.members}
-                expanded={expanded.has(row.group.id) && !editing}
+                expanded={expanded.has(row.group.id)}
                 onToggle={() => toggleExpanded(row.group.id)}
                 onDelete={() => deleteWholeGroup(row.group, row.members)}
                 onUngroup={() => run(ungroup(db, row.group.id))}
                 menu={groupMenu(row.group, row.members)}
-                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids) }}
+                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), opens: true }}
                 onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
                 onProvide={provide}
               />
             )
           }
           const { character, inGroup } = row
+          const groupIds = character.groupId !== null ? membersOf.get(character.groupId) : undefined
           const card = (
             <CharacterCard
               character={character}
@@ -415,6 +426,7 @@ export default function CharactersScreen() {
               onProvide={provide}
               onDropCards={(dropped) => dropOnCharacter(character, dropped)}
               inGroup={inGroup}
+              groupIds={groupIds}
             />
           )
           // Members slide in under their group and fade out back into it.

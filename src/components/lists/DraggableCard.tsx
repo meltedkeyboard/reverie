@@ -8,6 +8,8 @@ export type DragCardProps = {
   // What a drag carries: the character, or every member of a group.
   items: { id: number; name: string }[]
   dragEnabled: boolean
+  // The characters of the group the card is in or is: no target for each other.
+  groupIds?: number[]
   // Other cards dropped on this one: onto a character they make a group, onto a group they join it.
   onDropCards?: (ids: number[]) => void
   // A drop outside the app asked for a dragged character as a file: the archive or the card PNG.
@@ -21,7 +23,7 @@ const toEntries = (items: MenuItem[]): DragMenuEntry[] =>
 // On iOS a long press on a card is the system's: the menu, and moving the finger lifts the
 // card to drop into Files, Photos, another app or onto another card, with a tap on other
 // cards adding them to the stack. Elsewhere the card stays as it is.
-export function DraggableCard({ menu, items, dragEnabled, onDropCards, onProvide, children }: DragCardProps) {
+export function DraggableCard({ menu, items, dragEnabled, groupIds = [], onDropCards, onProvide, children }: DragCardProps) {
   const colors = useColors()
   if (!DragCardView) return children
   return (
@@ -31,6 +33,8 @@ export function DraggableCard({ menu, items, dragEnabled, onDropCards, onProvide
       dragEnabled={dragEnabled}
       acceptsCards={dragEnabled && !!onDropCards}
       accentColor={colors.accent}
+      shadeColor={colors.bg}
+      groupIds={groupIds}
       cornerRadius={20}
       onMenuSelect={({ nativeEvent }) => {
         let item: MenuItem | undefined = { label: '', children: menu }

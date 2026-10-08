@@ -24,7 +24,7 @@ type Props = {
   // A swipe to the right: the characters stay, the group goes.
   onUngroup: () => void
   menu: MenuItem[]
-  editing?: { active: boolean; checked: boolean; onToggle: () => void }
+  editing?: React.ComponentProps<typeof ListCard>['editing']
   onDropCards: (ids: number[]) => void
   onProvide?: (token: string, kind: 'archive' | 'card', id: number) => void
 }
@@ -47,6 +47,7 @@ export function GroupCard({ group, members, expanded, onToggle, onDelete, onUngr
       menu={menu}
       items={members.map((m) => ({ id: m.id, name: m.name }))}
       dragEnabled={!editing?.active}
+      groupIds={members.map((m) => m.id)}
       onDropCards={onDropCards}
       onProvide={onProvide}
     >
