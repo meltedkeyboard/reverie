@@ -116,6 +116,10 @@ func draggedIds(_ session: UIDropSession) -> [Int] {
   session.localDragSession?.items.compactMap { ($0.localObject as? DragPayload)?.id } ?? []
 }
 
+// How far the target's dashed outline stands off the card.
+private let RING_OUTSET: CGFloat = 4
+private let RING_WIDTH: CGFloat = 1.5
+
 class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractionDelegate, UIDropInteractionDelegate {
   let onMenuSelect = EventDispatcher()
   let onProvide = EventDispatcher()
@@ -132,7 +136,9 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   lazy var drag = UIDragInteraction(delegate: self)
   var contextMenu: UIContextMenuInteraction?
   var menuEnabled = true
+  // The target's mark: a dashed outline just outside the card.
   private let ring = UIView()
+  private let dashes = CAShapeLayer()
   // Lifted into a drag: dimmed where it stood until the drag ends.
   private var picked = false
   private var targeted = false
@@ -150,31 +156,41 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     shade.alpha = 0
     addSubview(shade)
     ring.isUserInteractionEnabled = false
-    ring.alpha = 0
-    ring.layer.borderWidth = 2.5
-    ring.layer.cornerCurve = .continuous
+    dashes.fillColor = nil
+    dashes.lineWidth = 0
+    dashes.lineDashPattern = [6, 4]
+    ring.layer.addSublayer(dashes)
     addSubview(ring)
   }
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    for overlay in [shade, ring] {
-      overlay.frame = bounds
-      overlay.layer.cornerRadius = radius
-      overlay.layer.cornerCurve = .continuous
-      bringSubviewToFront(overlay)
-    }
+    shade.frame = bounds
+    shade.layer.cornerRadius = radius
+    shade.layer.cornerCurve = .continuous
+    bringSubviewToFront(shade)
+    ring.frame = bounds
+    dashes.frame = ring.bounds
+    dashes.path = UIBezierPath(roundedRect: bounds.insetBy(dx: -RING_OUTSET, dy: -RING_OUTSET), cornerRadius: radius + RING_OUTSET).cgPath
+    bringSubviewToFront(ring)
   }
 
   // The target ring shows on a dimmed card too: the card lights up again under it.
   private func restyle() {
-    ring.layer.borderColor = accent.cgColor
-    ring.backgroundColor = accent.withAlphaComponent(0.12)
-    UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
+    dashes.strokeColor = accent.cgColor
+    UIView.animate(withDuration: 0.2, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
       self.shade.alpha = self.picked && !self.targeted ? 0.55 : 0
-      self.ring.alpha = self.targeted ? 1 : 0
-      self.transform = self.targeted ? CGAffineTransform(scaleX: 1.03, y: 1.03) : .identity
     }
+    // The outline grows out of nothing and thins back to nothing, from wherever it is.
+    let width: CGFloat = targeted ? RING_WIDTH : 0
+    guard dashes.lineWidth != width else { return }
+    let grow = CABasicAnimation(keyPath: "lineWidth")
+    grow.fromValue = dashes.presentation()?.lineWidth ?? dashes.lineWidth
+    grow.toValue = width
+    grow.duration = 0.2
+    grow.timingFunction = CAMediaTimingFunction(name: targeted ? .easeOut : .easeIn)
+    dashes.lineWidth = width
+    dashes.add(grow, forKey: "lineWidth")
   }
 
   func setPicked(_ on: Bool) {
