@@ -5,6 +5,7 @@ import { Animated, AppState, StyleSheet, Text, View } from 'react-native'
 
 import { PillButton } from '@/components/controls/PillButton'
 import { Star } from '@/components/visuals/motifs/Star'
+import { splashDone } from '@/components/startup/SplashOverlay'
 import { isAppLockEnabled, isAppLockEnabledCached } from '@/db/prefs/appLock'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
@@ -44,7 +45,8 @@ export function AppLock({ children }: { children: ReactNode }) {
     launchChecked.current = true
     isAppLockEnabled(db).then((enabled) => {
       setChecked(true)
-      if (enabled) unlock()
+      // The prompt waits for the launch splash to finish, not to cut it short.
+      if (enabled) splashDone.then(unlock)
       else setLocked(false)
     })
   }, [db, unlock])

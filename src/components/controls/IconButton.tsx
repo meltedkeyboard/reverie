@@ -9,6 +9,8 @@ type Props = {
   name: React.ComponentProps<typeof Icon>['name']
   // Optional because a Link with asChild injects its own onPress.
   onPress?: () => void
+  onPressIn?: () => void
+  onPressOut?: () => void
   size?: number
   color?: string
   style?: StyleProp<ViewStyle>
@@ -18,11 +20,13 @@ type Props = {
   children?: React.ReactNode
 }
 
-export function IconButton({ name, onPress, size = 22, color, style, disabled, accessibilityLabel, children }: Props) {
+export function IconButton({ name, onPress, onPressIn, onPressOut, size = 22, color, style, disabled, accessibilityLabel, children }: Props) {
   const colors = useColors()
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}

@@ -21,16 +21,6 @@ const tinted = dark
   .replace(/fill="#F0616D"/i, 'fill="#8E8E93"')
   .replace(/clip_dark/g, 'clip_tinted')
 
-// iOS rounds the corners of an app icon itself, but not of the splash picture, so
-// those are rounded here, at the same share of the side.
-const CORNER = 0.2237
-
-function rounded(svg, id) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-<defs><clipPath id="${id}"><rect width="1024" height="1024" rx="${1024 * CORNER}"/></clipPath></defs>
-<g clip-path="url(#${id})">${body(svg)}</g></svg>`
-}
-
 function png(svg, file, width = 1024) {
   const image = new Resvg(svg, { fitTo: { mode: 'width', value: width } }).render()
   writeFileSync(file, image.asPng())
@@ -53,8 +43,10 @@ png(dark, 'assets/images/icon-dark.png')
 png(tinted, 'assets/images/icon-tinted.png')
 png(glyphOnly(dark), 'assets/images/adaptive-icon.png')
 png(glyphOnly(dark, '#FFFFFF'), 'assets/images/adaptive-icon-mono.png')
-png(rounded(light, 'splash_light'), 'assets/images/splash-icon.png', 512)
-png(rounded(dark, 'splash_dark'), 'assets/images/splash-icon-dark.png', 512)
+// The splash is the whole square, unrounded: its background is the splash's own color, so
+// rounded corners only left a faint edge around it.
+png(light, 'assets/images/splash-icon.png', 512)
+png(dark, 'assets/images/splash-icon-dark.png', 512)
 
 // Alternate app icons, drawn in Penpot and kept in assets/brand/alt, each with a 'bg' and a
 // 'glyph' group (the letter and the spark). iOS takes the whole picture. A launcher cuts an

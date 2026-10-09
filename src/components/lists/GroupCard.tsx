@@ -36,9 +36,15 @@ export function GroupCard({ group, members, expanded, onToggle, onDelete, onUngr
   const colors = useColors()
   const { t, locale } = useTranslation()
   const turn = useSharedValue(expanded ? 1 : 0)
-  useEffect(() => {
-    turn.value = withSpring(expanded ? 1 : 0, { duration: 350, dampingRatio: 1 })
-  }, [expanded, turn])
+  const spin = (open: boolean) => {
+    turn.value = withSpring(open ? 1 : 0, { duration: 350, dampingRatio: 1 })
+  }
+  useEffect(() => spin(expanded), [expanded])
+  // The arrow turns at the tap, before the list has rendered the members.
+  const toggle = () => {
+    spin(!expanded)
+    onToggle()
+  }
   const arrow = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value * 90}deg` }] }))
   const names = members.map((m) => m.name).join(', ')
 
@@ -55,7 +61,7 @@ export function GroupCard({ group, members, expanded, onToggle, onDelete, onUngr
         solid
         longPressDrag={false}
         editing={editing}
-        onOpen={unlessDragging(onToggle)}
+        onOpen={unlessDragging(toggle)}
         onDelete={onDelete}
         leading={{ label: t('groups.ungroup'), icon: 'albums-outline', color: colors.accent, onAction: onUngroup }}
         menu={menu}

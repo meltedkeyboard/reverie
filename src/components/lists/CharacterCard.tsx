@@ -21,7 +21,7 @@ type Props = {
   // A single character: one card this tall, filling the screen: a full-width square picture
   // on top and the text under it taking the rest.
   fillHeight?: number
-  editing?: { active: boolean; checked: boolean; onToggle: () => void }
+  editing?: React.ComponentProps<typeof ListCard>['editing']
   onProvide?: (token: string, kind: 'archive' | 'card', id: number) => void
   // Other cards dropped on this one, to make a group of them.
   onDropCards?: (ids: number[]) => void

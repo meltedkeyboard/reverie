@@ -45,6 +45,9 @@ export function DraggableCard({ menu, items, dragEnabled, groupIds = [], onDropC
       onDragState={({ nativeEvent }) => {
         dragSession.active = nativeEvent.active
       }}
+      onMenuState={({ nativeEvent }) => {
+        dragSession.menuOpen = nativeEvent.open
+      }}
       onDropCards={({ nativeEvent }) => onDropCards?.(nativeEvent.ids)}
     >
       {children}
@@ -52,7 +55,8 @@ export function DraggableCard({ menu, items, dragEnabled, groupIds = [], onDropC
   )
 }
 
-// A tap on a card opens it, except while cards are in the air: then it adds it to the drag.
+// A tap on a card opens it, except while cards are in the air (then it adds it to the drag)
+// or while its menu is up.
 export const unlessDragging = (open: () => void) => () => {
-  if (!dragSession.active) open()
+  if (!dragSession.active && !dragSession.menuOpen) open()
 }

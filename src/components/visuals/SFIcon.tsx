@@ -21,6 +21,8 @@ type Props = {
   active?: boolean
   // Swapping `name` plays the system Replace transition instead of a hard cut.
   animateChange?: boolean
+  // How long the change takes, as the spring's response in seconds.
+  changeResponse?: number
   // Drawn on the accent fill. In the light scheme the symbol comes out dark even with an
   // explicit white color, so the hosted view is given the dark scheme instead.
   onAccent?: boolean
@@ -34,7 +36,7 @@ function FallbackIcon({ fallback, size, color }: Props) {
   return <Icon name={fallback} size={size} color={color} />
 }
 
-function NativeIcon({ name, size, color, effect, trigger, active, animateChange, onAccent = false }: Props) {
+function NativeIcon({ name, size, color, effect, trigger, active, animateChange, changeResponse = 0.35, onAccent = false }: Props) {
   const theme = useTheme()
   const scheme = onAccent ? 'dark' : theme.scheme
   const { Host, Image, useNativeState } = swiftUI!.ui
@@ -56,7 +58,7 @@ function NativeIcon({ name, size, color, effect, trigger, active, animateChange,
   const modifiers = effect
     ? [symbolEffect(effect, active === undefined ? { value: fired } : { isActive: running })]
     : []
-  if (animateChange) modifiers.push(animation(Animation.spring({ response: 0.35, dampingFraction: 0.7 }), swaps.current.count))
+  if (animateChange) modifiers.push(animation(Animation.spring({ response: changeResponse, dampingFraction: 0.7 }), swaps.current.count))
   // The box is a little wider than the glyph: some symbols overhang their nominal size.
   const box = Math.round(size * 1.3)
   return (

@@ -23,6 +23,7 @@ type DragCardProps = ViewProps & {
   onMenuSelect: (e: { nativeEvent: { path: number[] } }) => void
   onProvide: (e: { nativeEvent: { token: string; kind: 'archive' | 'card'; id: number } }) => void
   onDragState: (e: { nativeEvent: { active: boolean } }) => void
+  onMenuState: (e: { nativeEvent: { open: boolean } }) => void
   onDropCards: (e: { nativeEvent: { ids: number[] } }) => void
 }
 
@@ -39,4 +40,5 @@ export const DragCardView: ComponentType<DragCardProps> | null = dragModule ? re
 export const DropTargetView: ComponentType<DropTargetProps> | null = dragModule ? requireNativeView('ReverieDrag', 'DropTargetView') : null
 
 // Whether cards are in the air: a tap on a card then adds it to the drag, not opens it.
-export const dragSession = { active: false }
+// Whether a card's menu is up: the touch that opened it must not open the card too.
+export const dragSession = { active: false, menuOpen: false }

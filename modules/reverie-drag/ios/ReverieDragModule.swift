@@ -51,15 +51,15 @@ public class ReverieDragModule: Module {
     }
 
     View(DragCardView.self) {
-      Events("onMenuSelect", "onProvide", "onDragState", "onDropCards")
+      Events("onMenuSelect", "onProvide", "onDragState", "onMenuState", "onDropCards")
       Prop("menu") { (view: DragCardView, menu: [[String: Any]]) in
         view.menuItems = menu
       }
       Prop("dragEnabled") { (view: DragCardView, enabled: Bool) in
+        // Flags only: taking the menu interaction off every card and putting it back stalled
+        // the switch into and out of edit mode.
         view.drag.isEnabled = enabled
-        view.contextMenu.map { view.removeInteraction($0) }
-        view.contextMenu = nil
-        if enabled { view.addContextMenu() }
+        view.menuEnabled = enabled
       }
       // What the card carries when dragged: one character, or every member of a group.
       Prop("items") { (view: DragCardView, items: [[String: Any]]) in
@@ -120,6 +120,7 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   let onMenuSelect = EventDispatcher()
   let onProvide = EventDispatcher()
   let onDragState = EventDispatcher()
+  let onMenuState = EventDispatcher()
   let onDropCards = EventDispatcher()
   var menuItems: [[String: Any]] = []
   var items: [(id: Int, name: String)] = []
@@ -130,6 +131,7 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   var radius = 20.0
   lazy var drag = UIDragInteraction(delegate: self)
   var contextMenu: UIContextMenuInteraction?
+  var menuEnabled = true
   private let ring = UIView()
   // Lifted into a drag: dimmed where it stood until the drag ends.
   private var picked = false
@@ -237,13 +239,16 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
 
   func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
     session.localContext = window
-    pickAfterLift()
     return dragItems()
   }
 
   // While cards are in the air a tap on another one adds it to the stack, so JS must not
-  // open it as well.
+  // open it as well. The cards dim only now, once the finger moves: a lift alone may just
+  // open the menu, and by now the lifted preview has been drawn.
   func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
+    for item in session.items {
+      (item.localObject as? DragPayload)?.card?.setPicked(true)
+    }
     onDragState(["active": true])
   }
 
@@ -270,11 +275,31 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   }
 
   func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
-    if menuItems.isEmpty { return nil }
+    if !menuEnabled || menuItems.isEmpty { return nil }
     return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
       guard let self else { return nil }
       return UIMenu(children: self.buildMenu(self.menuItems, path: []))
     }
+  }
+
+  // The touch that opened the menu still ends as a tap in JS, which must not open the card
+  // under it: taking the card off screen with its menu up left the preview white and crashed.
+  func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willDisplayMenuFor configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionAnimating?) {
+    onMenuState(["open": true])
+  }
+
+  func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionAnimating?) {
+    if let animator {
+      animator.addCompletion { [weak self] in self?.onMenuState(["open": false]) }
+    } else {
+      onMenuState(["open": false])
+    }
+  }
+
+  // Should the card go anyway, its menu goes first.
+  override func willMove(toWindow newWindow: UIWindow?) {
+    super.willMove(toWindow: newWindow)
+    if newWindow == nil { contextMenu?.dismissMenu() }
   }
 
   func contextMenuInteraction(_ interaction: UIContextMenuInteraction, previewForHighlightingMenuWithConfiguration configuration: UIContextMenuConfiguration) -> UITargetedPreview? {

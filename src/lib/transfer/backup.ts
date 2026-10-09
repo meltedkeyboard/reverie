@@ -8,6 +8,7 @@ import { t } from '@/i18n'
 import { pickBackupFile } from '@/lib/transfer/pickBackup'
 import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/images/avatars'
 import { isArchive, packArchive, unpackArchive } from '@/lib/transfer/backupArchive'
+import { insertGroup } from '@/db/groups'
 import { applySelection, buildTree, type BackupTree, type Selection } from '@/lib/transfer/backupSelection'
 import { saveFile } from '@/lib/transfer/download'
 import { fromByteArray } from 'base64-js'
@@ -40,7 +41,12 @@ type BackupCharacter = {
   backgroundIntensity?: number
   backgroundBubbleTransparency?: number
   createdAt: number
+  // The group the character was in and its place there, top down. Backups from before
+  // groups leave it out.
+  group?: BackupGroupSlot
 }
+
+type BackupGroupSlot = { id: number; name: string | null; position: number }
 
 // Backups from before rooms have no roomId, and every chat has a character.
 type BackupChat = { id: number; characterId: number | null; roomId?: number | null; title: string | null; createdAt: number }
@@ -143,7 +149,9 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       avatarOriginal: string | null
       background: string | null
       backgroundOriginal: string | null
-    }>(`SELECT ${CHARACTER_COLUMNS} FROM characters ORDER BY sort_order, id`),
+      groupId: number | null
+      sortOrder: number
+    }>(`SELECT ${CHARACTER_COLUMNS}, group_id AS groupId, sort_order AS sortOrder FROM characters ORDER BY sort_order, id`),
     rooms: await db.getAllAsync<{ id: number; background: string | null; backgroundOriginal: string | null }>(
       `SELECT ${ROOM_COLUMNS} FROM rooms ORDER BY sort_order, id`
     ),
@@ -157,7 +165,12 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
     messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
   }
   const picked = selection ? applySelection(all, selection) : all
-  const { characters, rooms = [], roomMembers = [], chats } = picked
+  const { rooms = [], roomMembers = [], chats } = picked
+  const groupSlots = await loadGroupSlots(db)
+  const characters = picked.characters.map(({ groupId: _groupId, sortOrder: _sortOrder, ...character }) => {
+    const group = groupSlots.get(character.id)
+    return group ? { ...character, group } : character
+  })
   const messages = picked.messages.map((row) => (row.images ? { ...row, images: JSON.parse(row.images) } : row))
   const { baseUrl, model } = await loadSettings(db)
 
@@ -199,6 +212,22 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
     messages: messages as unknown as { chatId: number }[],
     files,
   })
+}
+
+// Each grouped character's group and place in it, the top member first.
+async function loadGroupSlots(db: SQLiteDatabase) {
+  const rows = await db.getAllAsync<{ id: number; groupId: number; name: string | null }>(
+    `SELECT c.id, c.group_id AS groupId, g.name FROM characters c JOIN character_groups g ON g.id = c.group_id
+     ORDER BY c.group_id, c.sort_order DESC, c.id DESC`
+  )
+  const slots = new Map<number, BackupGroupSlot>()
+  const counts = new Map<number, number>()
+  for (const row of rows) {
+    const position = counts.get(row.groupId) ?? 0
+    counts.set(row.groupId, position + 1)
+    slots.set(row.id, { id: row.groupId, name: row.name, position })
+  }
+  return slots
 }
 
 // What a backup file holds, whichever form it came in: the zip, or the old single JSON file.
@@ -307,6 +336,20 @@ export async function importBackup(
         character.createdAt
       )
       characterIds.set(character.id, id)
+    }
+
+    // The groups come back with whichever of their characters came along, if two or more did.
+    const groups = new Map<number, { name: string | null; members: { id: number; position: number }[] }>()
+    for (const character of dump.characters) {
+      const slot = character.group
+      if (!slot) continue
+      const group = groups.get(slot.id) ?? { name: slot.name, members: [] }
+      group.members.push({ id: characterIds.get(character.id)!, position: slot.position })
+      groups.set(slot.id, group)
+    }
+    for (const { name, members } of groups.values()) {
+      if (members.length < 2) continue
+      await insertGroup(db, name, members.sort((a, b) => a.position - b.position).map((m) => m.id))
     }
 
     for (const room of dump.rooms ?? []) {

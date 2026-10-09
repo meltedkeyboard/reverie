@@ -77,6 +77,17 @@ export function setMemberOrder(db: SQLiteDatabase, ids: number[]) {
   })
 }
 
+// A group brought in by a backup, its members top down, in the place of the highest of
+// them. Runs inside the import's transaction.
+export async function insertGroup(db: SQLiteDatabase, name: string | null, ids: number[]) {
+  const top = await db.getFirstAsync<{ sortOrder: number }>(
+    'SELECT MAX(sort_order) AS sortOrder FROM characters WHERE id IN (SELECT value FROM json_each(?))',
+    JSON.stringify(ids)
+  )
+  const res = await db.runAsync('INSERT INTO character_groups (name, sort_order, created_at) VALUES (?, ?, ?)', [name, top?.sortOrder ?? 0, Date.now()])
+  await placeMembers(db, res.lastInsertRowId, ids)
+}
+
 // Members top down; sort_order runs downward like on the home list.
 async function placeMembers(db: SQLiteDatabase, groupId: number, ids: number[]) {
   for (const [index, id] of ids.entries()) {

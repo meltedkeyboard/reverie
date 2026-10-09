@@ -1,8 +1,8 @@
 import { File, Paths } from 'expo-file-system'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, FadeInDown, FadeOut, FadeOutDown, LinearTransition } from 'react-native-reanimated'
+import Animated, { FadeInDown, FadeOutDown, LinearTransition, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import ReorderableList, { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
@@ -11,6 +11,8 @@ import { isDesktop } from '@/lib/core/platform'
 import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { GroupCard } from '@/components/lists/GroupCard'
+import { MemberSlat } from '@/components/lists/MemberSlat'
+import { setEditMotion } from '@/components/lists/ListCard'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton } from '@/components/chrome/Glass'
@@ -47,7 +49,8 @@ const NOTICE_HEIGHT = 74
 // A row of the home list: a group, or a character standing alone or inside an open group.
 type Row =
   | { kind: 'group'; key: string; group: CharacterGroup; members: CharacterPreview[] }
-  | { kind: 'character'; key: string; character: CharacterPreview; inGroup: boolean }
+  // A member is always a row, `open` or not, and `slot` is its place among its group's.
+  | { kind: 'character'; key: string; character: CharacterPreview; inGroup: boolean; open?: boolean; slot?: { index: number; count: number } }
 
 // Groups and lone characters share one order, highest first; on a tie a group comes first,
 // so a character taken out of one lands right under it.
@@ -62,8 +65,8 @@ function buildRows(characters: CharacterPreview[], groups: CharacterGroup[], ope
     if (entry.character) return [{ kind: 'character', key: `c${entry.id}`, character: entry.character, inGroup: false }]
     const list = members.get(entry.id)!
     const head: Row = { kind: 'group', key: `g${entry.id}`, group: entry.group!, members: list }
-    if (!open.has(entry.id)) return [head]
-    return [head, ...list.map((c): Row => ({ kind: 'character', key: `c${c.id}`, character: c, inGroup: true }))]
+    const shown = open.has(entry.id)
+    return [head, ...list.map((c, index): Row => ({ kind: 'character', key: `c${c.id}`, character: c, inGroup: true, open: shown, slot: { index, count: list.length } }))]
   })
 }
 
@@ -116,14 +119,35 @@ export default function CharactersScreen() {
     return () => setSuspended(false)
   }, [editing, setSuspended])
 
+  // Driven from here, so the cards start moving at the touch, not after the list renders.
+  const progress = useSharedValue(0)
+  const settled = useSharedValue(0)
+  const editMotion = useMemo(() => ({ progress, settled }), [progress, settled])
+  // The cards start moving at the touch, but the mode changes only when it ends on the
+  // button: a finger slid off it takes the motion back. onPressOut comes before onPress, so
+  // the take-back waits a turn for the press to claim it.
+  const editPress = useRef(false)
+  const previewEditing = () => {
+    editPress.current = true
+    setEditMotion(editMotion, !editing)
+  }
+  const cancelEditing = () =>
+    setTimeout(() => {
+      if (!editPress.current) return
+      editPress.current = false
+      setEditMotion(editMotion, editing)
+    })
   const toggleEditing = () => {
-    setEditing((on) => !on)
+    editPress.current = false
+    setEditMotion(editMotion, !editing)
+    setEditing(!editing)
     setChecked(new Set())
   }
 
-  // A group's check ticks or clears all its characters at once.
+  // A group's check ticks or clears all its characters at once. A transition, since it
+  // renders the whole list again: the card shows its tick by itself meanwhile.
   const toggleChecked = (ids: number[]) =>
-    setChecked((prev) => {
+    startTransition(() => setChecked((prev) => {
       const next = new Set(prev)
       const all = ids.every((id) => next.has(id))
       for (const id of ids) {
@@ -131,7 +155,7 @@ export default function CharactersScreen() {
         else next.add(id)
       }
       return next
-    })
+    }))
 
   const allChecked = !!characters?.length && checked.size === characters.length
 
@@ -148,6 +172,7 @@ export default function CharactersScreen() {
           removeCharacterImages(character)
         }
         await pruneGroups(db)
+        setEditMotion(editMotion, false)
         setEditing(false)
         setChecked(new Set())
         reload()
@@ -199,6 +224,8 @@ export default function CharactersScreen() {
   const reorder = useReorder(null, () => {}, async () => {})
 
   const rows = useMemo(() => buildRows(characters ?? [], groups, expanded), [characters, groups, expanded])
+  const isHidden = (row: Row | undefined) => row?.kind === 'character' && row.inGroup && !row.open
+  const visibleCount = rows.filter((row) => !isHidden(row)).length
   const groupedIds = useMemo(() => (characters ?? []).filter((c) => c.groupId !== null).map((c) => c.id), [characters])
   const membersOf = useMemo(() => {
     const byGroup = new Map<number, number[]>()
@@ -206,12 +233,16 @@ export default function CharactersScreen() {
     return byGroup
   }, [characters])
 
-  const toggleExpanded = (id: number) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(id)) next.add(id)
-      return next
-    })
+  // The members move at the tap from this shared value; the list's own state, which the
+  // touches and the order go by, follows in a transition.
+  const openGroups = useSharedValue<number[]>([])
+  const toggleExpanded = (id: number) => {
+    // From the shared value: a second tap may come before the state has caught up.
+    const next = new Set(openGroups.value)
+    if (!next.delete(id)) next.add(id)
+    openGroups.value = [...next]
+    startTransition(() => setExpanded(next))
+  }
 
   const run = (change: Promise<unknown>) =>
     change.catch((err) => reportError(t('groups.failed'), err)).then(reload)
@@ -297,7 +328,7 @@ export default function CharactersScreen() {
   // other one stays, with its settings, and takes over the chats of the dropped one.
   const onReorder = (event: ReorderableListReorderEvent) => {
     moveRow(event)
-    const near = [rows[event.to], rows[event.to + (event.to > event.from ? 1 : -1)]]
+    const near = [rows[event.to], rows[event.to + (event.to > event.from ? 1 : -1)]].filter((row) => !isHidden(row))
     const moved = rows[event.from]
     if (moved?.kind !== 'character') return
     const dragged = moved.character
@@ -325,7 +356,7 @@ export default function CharactersScreen() {
   // A lone character is one card over the whole screen, and the list does not scroll. Not
   // while editing: the check and the handle sit on a row.
   const fill = useFeaturedFill(
-    rows.length === 1 && rows[0].kind === 'group' ? rows.length + 1 : rows.length,
+    visibleCount === 1 && rows[0].kind === 'group' ? 2 : visibleCount,
     padding,
     (lastChat ? CONTINUE_BUTTON_SPACE : 0) + (serverSet ? 0 : NOTICE_HEIGHT)
   )
@@ -357,13 +388,13 @@ export default function CharactersScreen() {
         autoscrollSpeedScale={0.12}
         // About 20 characters fit a few screens, where the full speed-up overshoots: it grows
         // from two thirds there to all of it at 50.
-        autoscrollAcceleration={Math.min(Math.max((rows.length - 20) / 30, 0), 1) / 3 + 2 / 3}
+        autoscrollAcceleration={Math.min(Math.max((visibleCount - 20) / 30, 0), 1) / 3 + 2 / 3}
         scrollEnabled={editing || fill.scroll}
         contentContainerStyle={[
           padding,
           { paddingBottom: padding.paddingBottom + bottomSpace },
         ]}
-        ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}
+        ItemSeparatorComponent={featured ? FeaturedSeparator : RowSeparator}
         ListHeaderComponent={
           !serverSet && characters ? (
             // A row like the "finish setting up" one in iOS Settings: a glyph on a
@@ -407,7 +438,7 @@ export default function CharactersScreen() {
                 onDelete={() => deleteWholeGroup(row.group, row.members)}
                 onUngroup={() => run(ungroup(db, row.group.id))}
                 menu={groupMenu(row.group, row.members)}
-                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), opens: true }}
+                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), opens: true, motion: editMotion }}
                 onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
                 onProvide={provide}
               />
@@ -422,18 +453,24 @@ export default function CharactersScreen() {
               onDelete={() => confirmDelete(character)}
               menu={menuItems(character)}
               fillHeight={fillHeight}
-              editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]) }}
+              editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]), motion: editMotion }}
               onProvide={provide}
               onDropCards={(dropped) => dropOnCharacter(character, dropped)}
               inGroup={inGroup}
               groupIds={groupIds}
             />
           )
-          // Members slide in under their group and fade out back into it.
-          return inGroup ? (
-            <Animated.View entering={FadeIn.duration(250)} exiting={FadeOut.duration(150)}>
+          return inGroup && row.slot && character.groupId !== null ? (
+            <MemberSlat
+              groupId={character.groupId}
+              openGroups={openGroups}
+              open={!!row.open}
+              index={row.slot.index}
+              count={row.slot.count}
+              gap={MEMBER_GAP}
+            >
               {card}
-            </Animated.View>
+            </MemberSlat>
           ) : (
             card
           )
@@ -468,6 +505,8 @@ export default function CharactersScreen() {
               <GlassButton
                 icon={editing ? 'checkmark' : 'list'}
                 tint={editing ? colors.accent : undefined}
+                onPressIn={previewEditing}
+                onPressOut={cancelEditing}
                 onPress={toggleEditing}
                 accessibilityLabel={editing ? t('characters.doneEditing') : t('characters.editList')}
               />
@@ -503,6 +542,16 @@ export default function CharactersScreen() {
   ) : (
     screen
   )
+}
+
+// The members carry the gap above them themselves, so a closed group leaves none: no
+// separator after a group's card or between its members, only after the last.
+const MEMBER_GAP = 10
+
+function RowSeparator({ leadingItem }: { leadingItem?: Row }) {
+  if (leadingItem?.kind === 'group') return null
+  if (leadingItem?.inGroup && leadingItem.slot && leadingItem.slot.index < leadingItem.slot.count - 1) return null
+  return <ListSeparator />
 }
 
 // Room the list leaves under its last card for the edit bar.

@@ -54,6 +54,9 @@ type ButtonProps = {
   iconSize?: number
   // Optional because a Link with asChild injects its own onPress.
   onPress?: () => void
+  // For an action that answers the touch itself, not its end.
+  onPressIn?: () => void
+  onPressOut?: () => void
   disabled?: boolean
   accessibilityLabel?: string
   // Fills the button, for the one action a screen leads to (like saving). A disabled
@@ -66,7 +69,7 @@ type ButtonProps = {
 // A round Liquid Glass button of the same 44 pt as the other glass controls; outside
 // iOS 26 it is the plain icon button. The glass is interactive and springs under the
 // finger by itself, so a glass control adds no press scale of its own: the two fight.
-export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, accessibilityLabel, tint, children }: ButtonProps) {
+export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOut, disabled = false, accessibilityLabel, tint, children }: ButtonProps) {
   const { colors } = useTheme()
   const styles = useStyles(createStyles)
   const fill = disabled ? undefined : tint
@@ -76,6 +79,8 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
         name={icon}
         size={iconSize}
         onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         disabled={disabled}
         accessibilityLabel={accessibilityLabel}
         style={[floatingBars && !isDesktop && styles.circleSolid, fill ? { backgroundColor: fill } : undefined]}
@@ -87,6 +92,8 @@ export function GlassButton({ icon, iconSize = 22, onPress, disabled = false, ac
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}

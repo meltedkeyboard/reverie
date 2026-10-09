@@ -1,7 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
-import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
 import { useReorderableDrag } from 'react-native-reorderable-list'
 
 import { isDesktop } from '@/lib/core/platform'
@@ -35,7 +35,9 @@ type Props = {
   // the ellipsis and is the only way to drag the card, and a tap ticks it in place of
   // opening it. Only for a solid card; it stays mounted so the change animates.
   // With `opens` a tap still opens the card (a group unfolds) and only the check ticks it.
-  editing?: { active: boolean; checked: boolean; onToggle: () => void; opens?: boolean }
+  // `motion`, when the list drives the change itself, starts it at the touch, before this
+  // card has rendered again.
+  editing?: { active: boolean; checked: boolean; onToggle: () => void; opens?: boolean; motion?: EditMotion }
   // Drawn in place of the ellipsis, for a card whose menu is only the long press.
   trailing?: React.ReactNode
   // An action behind a swipe to the right (see SwipeToDelete).
@@ -78,28 +80,35 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
 
   const onLongPress = longPressDrag ? drag : undefined
   const active = editing?.active ?? false
+  // The tick shows at once on this card alone; the list takes it in after (see toggleChecked
+  // of the characters list), and its answer wins.
+  const checkedProp = editing?.checked ?? false
+  const [checked, setChecked] = useState(checkedProp)
+  useEffect(() => setChecked(checkedProp), [checkedProp])
+  const toggle = () => {
+    setChecked(!checked)
+    editing?.onToggle()
+  }
 
-  // The spring of a UITableView entering edit mode: critically damped, about a third of a second.
-  const progress = useSharedValue(active ? 1 : 0)
+  const ownProgress = useSharedValue(active ? 1 : 0)
+  const ownSettled = useSharedValue(active ? 1 : 0)
+  const motion = editing?.motion
+  const progress = motion?.progress ?? ownProgress
+  const settled = motion?.settled ?? ownSettled
   useEffect(() => {
-    progress.value = withSpring(active ? 1 : 0, { duration: 350, dampingRatio: 1 })
-  }, [active, progress])
+    if (!motion) setEditMotion({ progress: ownProgress, settled: ownSettled }, active)
+  }, [active, motion, ownProgress, ownSettled])
   // Only transforms move while the spring runs: animating a width relaid out every card on
-  // every frame on the UI thread, and the scroll stuttered along with it. The content's real
-  // inset changes once, as the spring starts, and a shift holds the content where it was, so
-  // the text is cut to its new width right away, under the fading ellipsis, not at the end.
-  const settled = useSharedValue(active ? 1 : 0)
-  useEffect(() => {
-    settled.value = active ? 1 : 0
-  }, [active, settled])
-  const gap = Number(StyleSheet.flatten(cardStyle).gap ?? 0)
-  const shift = CHECK_WIDTH + gap
+  // every frame on the UI thread, and the scroll stuttered along with it. The check sits on
+  // the right, before the handle, so nothing on the left moves: the content's real inset on
+  // the right changes once, as the spring starts, and the text is cut to its new width right
+  // away, under the check sliding in.
   const checkStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
-    transform: [{ translateX: (progress.value - 1) * CHECK_WIDTH }, { scale: interpolate(progress.value, [0, 1], [0.5, 1]) }],
+    transform: [{ translateX: (1 - progress.value) * CHECK_WIDTH }, { scale: interpolate(progress.value, [0, 1], [0.5, 1]) }],
   }))
-  const insetStyle = useAnimatedStyle(() => ({ paddingLeft: settled.value * shift }))
-  const shiftStyle = useAnimatedStyle(() => ({ transform: [{ translateX: (progress.value - settled.value) * shift }] }))
+  const gap = Number(StyleSheet.flatten(cardStyle).gap ?? 0)
+  const insetStyle = useAnimatedStyle(() => ({ paddingRight: settled.value * CHECK_WIDTH }))
   const menuStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value }))
   const handleStyle = useAnimatedStyle(() => ({ opacity: progress.value }))
 
@@ -120,7 +129,7 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
   return (
     <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete} throwAway={!isConfirmDeleteOn()} disabled={active} leading={leading}>
       <Pressable
-        onPress={active && !editing?.opens ? editing?.onToggle : onOpen}
+        onPress={active && !editing?.opens ? toggle : onOpen}
         onLongPress={active ? undefined : onLongPress}
         // On the desktop a flat list row: no outline, greyer under the pointer.
         style={(state) =>
@@ -130,23 +139,24 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
         }
       >
         {editing ? (
-          <>
-            <Animated.View style={[styles.content, { gap }, insetStyle]}>
-              <Animated.View style={[styles.content, { gap }, shiftStyle]}>{children}</Animated.View>
-            </Animated.View>
-            {/* Over the content, so the check takes its own tap where a tap opens the card. */}
+          <Animated.View style={[styles.content, { gap }, insetStyle]}>
+            {children}
+            {/* Over the content, in the room its inset leaves on the right, so the check
+                takes its own tap where a tap opens the card. */}
             <Animated.View style={[styles.check, checkStyle]} pointerEvents={active && editing.opens ? 'auto' : 'none'}>
-              <Pressable onPress={editing.onToggle} hitSlop={8} style={styles.checkTap}>
+              <Pressable onPress={toggle} hitSlop={8} style={styles.checkTap}>
                 <SFIcon
-                  name={editing.checked ? 'checkmark.circle.fill' : 'circle'}
-                  fallback={editing.checked ? 'checkmark-circle' : 'ellipse-outline'}
+                  name={checked ? 'checkmark.circle.fill' : 'circle'}
+                  fallback={checked ? 'checkmark-circle' : 'ellipse-outline'}
                   size={22}
-                  color={editing.checked ? colors.accent : colors.textFaint}
+                  color={checked ? colors.accent : colors.textFaint}
                   animateChange
+                  // A tick answers at once, like in Mail.
+                  changeResponse={0.18}
                 />
               </Pressable>
             </Animated.View>
-          </>
+          </Animated.View>
         ) : (
           children
         )}
@@ -168,6 +178,15 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
       </Pressable>
     </SwipeToDelete>
   )
+}
+
+export type EditMotion = { progress: SharedValue<number>; settled: SharedValue<number> }
+
+// The spring of a UITableView entering edit mode: critically damped, about a third of a
+// second. The inset is not animated (see ListCard) and changes at once.
+export function setEditMotion({ progress, settled }: EditMotion, on: boolean) {
+  progress.value = withSpring(on ? 1 : 0, { duration: 350, dampingRatio: 1 })
+  settled.value = on ? 1 : 0
 }
 
 const CHECK_WIDTH = 40
@@ -220,7 +239,7 @@ const createStyles = (colors: Colors) =>
           },
         }
       : {}),
-    check: { position: 'absolute', top: 0, bottom: 0, left: 0, width: CHECK_WIDTH, alignItems: 'center', justifyContent: 'center' },
+    check: { position: 'absolute', top: 0, bottom: 0, right: 0, width: CHECK_WIDTH, alignItems: 'center', justifyContent: 'center' },
     // Stands in for the card's own row, so the content keeps its layout inside.
     content: { flex: 1, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center' },
     checkTap: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
