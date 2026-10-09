@@ -1,11 +1,12 @@
 import { File, Paths } from 'expo-file-system'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
-import { startTransition, useCallback, useEffect, useMemo, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown, FadeOutDown, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import ReorderableList, { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
+import ReorderableList, { reorderItems, type ReorderableListDragEndEvent, type ReorderableListDragStartEvent, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import { isDesktop } from '@/lib/core/platform'
 import { Button } from '@/components/controls/Button'
@@ -13,14 +14,14 @@ import { CharacterCard } from '@/components/lists/CharacterCard'
 import { GroupCard } from '@/components/lists/GroupCard'
 import { MemberSlat } from '@/components/lists/MemberSlat'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
-import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
+import { EmptyState, FeaturedSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Pattern } from '@/components/visuals/Pattern'
 import { MenuGlassButton } from '@/components/chrome/MenuGlassButton'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { deleteCharacter, listCharacters, mergeCharacters, sameCharacter, type CharacterPreview } from '@/db/characters'
-import { addToGroup, createGroup, deleteGroup, listGroups, pruneGroups, removeFromGroup, renameGroup, setHomeOrder, setMemberOrder, ungroup, type CharacterGroup } from '@/db/groups'
+import { addToGroup, createGroup, deleteGroup, listGroups, pruneGroups, removeFromGroup, renameGroup, saveHomeOrder, ungroup, type CharacterGroup } from '@/db/groups'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
@@ -116,10 +117,12 @@ export default function CharactersScreen() {
   // The list has no layout transition of its own: it caught every frame of a member's
   // growing height and held the card shut.
   const openGroups = useSharedValue<number[]>([])
-  // In edit mode every group is open, so its characters can be moved among themselves.
-  const { editing, setEditing, motion: editMotion, button: editButton, checked, setChecked, toggleChecked } = useEditMode((on) => {
-    openGroups.value = on ? groups.map((g) => g.id) : [...expanded]
-  })
+  const showGroups = (ids: Set<number>) => {
+    openGroups.value = [...ids]
+    startTransition(() => setExpanded(ids))
+  }
+  // Groups stay as they were in edit mode; a tap there opens or closes one as usual.
+  const { editing, setEditing, motion: editMotion, button: editButton, checked, setChecked, toggleChecked } = useEditMode()
 
   const allChecked = !!characters?.length && checked.size === characters.length
 
@@ -185,8 +188,49 @@ export default function CharactersScreen() {
   // Only the haptics and the edge guard of the shared hook: the rows here are of two kinds.
   const reorder = useReorder(null, () => {}, async () => {})
 
-  const shownGroups = useMemo(() => (editing ? new Set(groups.map((g) => g.id)) : expanded), [editing, groups, expanded])
-  const rows = useMemo(() => buildRows(characters ?? [], groups, shownGroups), [characters, groups, shownGroups])
+  const rows = useMemo(() => buildRows(characters ?? [], groups, expanded), [characters, groups, expanded])
+  // A group lifted by its handle goes as one card: an open one shuts at once, with no motion,
+  // so the list measures the rows anew before the card is moved, and stays shut where it
+  // lands. Only shared values while the finger is down: the list must not render mid-drag.
+  const liftedGroup = useSharedValue(-1)
+  const lifted = useRef<number | null>(null)
+  const liftRow = (index: number) => {
+    const row = rows[index]
+    if (row?.kind !== 'group' || !openGroups.value.includes(row.group.id)) return
+    lifted.current = row.group.id
+    liftedGroup.value = row.group.id
+    openGroups.value = openGroups.value.filter((id) => id !== row.group.id)
+  }
+  // The group stays shut in React's state too, but in the same render as the new order
+  // (see moveRow): a render of its own at the release held up the reorder behind it.
+  const dropRow = (moved: boolean) => {
+    const id = lifted.current
+    if (id === null) return
+    liftedGroup.value = -1
+    if (moved) return
+    lifted.current = null
+    shutGroup(id)
+  }
+  const shutGroup = (id: number) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  // Only the functions go into the worklets: the pan gesture beside them cannot be copied there.
+  const { onDragStart: pickUp, onDragEnd: putDown } = reorder
+  const listDrag = {
+    onDragStart: (event: ReorderableListDragStartEvent) => {
+      'worklet'
+      pickUp()
+      scheduleOnRN(liftRow, event.index)
+    },
+    onDragEnd: (event: ReorderableListDragEndEvent) => {
+      'worklet'
+      putDown()
+      scheduleOnRN(dropRow, event.from !== event.to)
+    },
+  }
   const isHidden = (row: Row | undefined) => row?.kind === 'character' && row.inGroup && !row.open
   const visibleCount = rows.filter((row) => !isHidden(row)).length
   const groupedIds = useMemo(() => (characters ?? []).filter((c) => c.groupId !== null).map((c) => c.id), [characters])
@@ -200,8 +244,7 @@ export default function CharactersScreen() {
     // From the shared value: a second tap may come before the state has caught up.
     const next = new Set(openGroups.value)
     if (!next.delete(id)) next.add(id)
-    openGroups.value = [...next]
-    startTransition(() => setExpanded(next))
+    showGroups(next)
   }
 
   const run = (change: Promise<unknown>) =>
@@ -266,6 +309,10 @@ export default function CharactersScreen() {
   // and the members of each group among themselves. A member moved out of its group's rows
   // stays in the group and goes back under it.
   const moveRow = ({ from, to }: ReorderableListReorderEvent) => {
+    if (lifted.current !== null) {
+      shutGroup(lifted.current)
+      lifted.current = null
+    }
     const next = reorderItems(rows, from, to)
     const top = next.filter((row) => row.kind === 'group' || !row.inGroup)
     const order = new Map(top.map((row, index) => [row.key, top.length - index]))
@@ -277,11 +324,11 @@ export default function CharactersScreen() {
     for (const ids of inside.values()) ids.forEach((id, index) => order.set(`c${id}`, ids.length - index))
     setGroups((prev) => prev.map((g) => ({ ...g, sortOrder: order.get(`g${g.id}`) ?? g.sortOrder })))
     setCharacters((prev) => prev && prev.map((c) => ({ ...c, sortOrder: order.get(`c${c.id}`) ?? c.sortOrder })))
-    setHomeOrder(
+    saveHomeOrder(
       db,
-      top.map((row) => (row.kind === 'group' ? { kind: 'group', id: row.group.id } : { kind: 'character', id: row.character.id }))
-    )
-    for (const ids of inside.values()) setMemberOrder(db, ids)
+      top.map((row) => (row.kind === 'group' ? { kind: 'group', id: row.group.id } : { kind: 'character', id: row.character.id })),
+      [...inside.values()]
+    ).catch((err) => reportError(t('groups.failed'), err))
   }
 
   // A card dropped next to an identical one (the one it displaced first) offers to merge: the
@@ -322,6 +369,11 @@ export default function CharactersScreen() {
   )
   const fillHeight = editing ? undefined : fill.height
   const featured = fillHeight !== undefined
+  // Every row carries the gap under it, the last one too, so all rows are their card and the
+  // gap and a dragged one lands where the list then lays it out: a separator between rows
+  // only left the last row 10 pt short and a card dropped at the end landed off by that.
+  // A group's members carry theirs above them instead (see MemberSlat).
+  const withGap = (node: React.ReactElement) => (featured ? node : <View style={{ paddingBottom: MEMBER_GAP }}>{node}</View>)
   // The continue button is gone while editing; the edit bar takes its place.
   const barBottom = insets.bottom + 12
   const bottomSpace = editing ? EDIT_BAR_SPACE : lastChat ? CONTINUE_BUTTON_SPACE : 0
@@ -336,6 +388,7 @@ export default function CharactersScreen() {
         data={rows}
         keyExtractor={(row) => row.key}
         {...reorder}
+        {...listDrag}
         onReorder={onReorder}
         // The list runs under the floating header and the tab bar, where the edge zones that
         // scroll it would hide: they start where the cards can be seen.
@@ -351,9 +404,10 @@ export default function CharactersScreen() {
         scrollEnabled={editing || fill.scroll}
         contentContainerStyle={[
           padding,
-          { paddingBottom: padding.paddingBottom + bottomSpace },
+          // The last row's own gap stands in for part of the padding under it.
+          { paddingBottom: padding.paddingBottom + bottomSpace - (featured ? 0 : MEMBER_GAP) },
         ]}
-        ItemSeparatorComponent={featured ? FeaturedSeparator : RowSeparator}
+        ItemSeparatorComponent={featured ? FeaturedSeparator : undefined}
         ListHeaderComponent={
           !serverSet && characters ? (
             // A row like the "finish setting up" one in iOS Settings: a glyph on a
@@ -388,16 +442,16 @@ export default function CharactersScreen() {
         renderItem={({ item: row }) => {
           if (row.kind === 'group') {
             const ids = row.members.map((m) => m.id)
-            return (
+            return withGap(
               <GroupCard
                 group={row.group}
                 members={row.members}
-                expanded={shownGroups.has(row.group.id)}
+                expanded={expanded.has(row.group.id)}
                 onToggle={() => toggleExpanded(row.group.id)}
                 onDelete={() => deleteWholeGroup(row.group, row.members)}
                 onUngroup={() => run(ungroup(db, row.group.id))}
                 menu={groupMenu(row.group, row.members)}
-                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), motion: editMotion }}
+                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), opens: true, motion: editMotion }}
                 onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
                 onProvide={provide}
               />
@@ -423,6 +477,7 @@ export default function CharactersScreen() {
             <MemberSlat
               groupId={character.groupId}
               openGroups={openGroups}
+              liftedGroup={liftedGroup}
               open={!!row.open}
               index={row.slot.index}
               count={row.slot.count}
@@ -431,7 +486,7 @@ export default function CharactersScreen() {
               {card}
             </MemberSlat>
           ) : (
-            card
+            withGap(card)
           )
         }}
       />
@@ -501,15 +556,8 @@ export default function CharactersScreen() {
   )
 }
 
-// The members carry the gap above them themselves, so a closed group leaves none: no
-// separator after a group's card or between its members, only after the last.
+// The gap under every row (see withGap), which a group's members carry above them.
 const MEMBER_GAP = 10
-
-function RowSeparator({ leadingItem }: { leadingItem?: Row }) {
-  if (leadingItem?.kind === 'group') return null
-  if (leadingItem?.inGroup && leadingItem.slot && leadingItem.slot.index < leadingItem.slot.count - 1) return null
-  return <ListSeparator />
-}
 
 // Room the list leaves under its last card for the edit bar.
 const EDIT_BAR_SPACE = 64

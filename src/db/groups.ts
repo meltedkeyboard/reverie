@@ -9,13 +9,27 @@ export function listGroups(db: SQLiteDatabase) {
 // A group and a character outside any group by their place on the home list, top down.
 export type HomeEntry = { kind: 'group' | 'character'; id: number }
 
-export function setHomeOrder(db: SQLiteDatabase, entries: HomeEntry[]) {
-  return db.withTransactionAsync(async () => {
-    for (const [index, entry] of entries.entries()) {
-      const table = entry.kind === 'group' ? 'character_groups' : 'characters'
-      await db.runAsync(`UPDATE ${table} SET sort_order = ? WHERE id = ?`, [entries.length - index, entry.id])
-    }
-  })
+// The whole order of the home list in one transaction: the groups and the lone characters,
+// then the members of each group. Saves queue up behind one another, since two
+// transactions open at once on the one connection break each other ("cannot rollback").
+let saving: Promise<unknown> = Promise.resolve()
+
+export function saveHomeOrder(db: SQLiteDatabase, entries: HomeEntry[], members: number[][]) {
+  const save = () =>
+    db.withTransactionAsync(async () => {
+      for (const [index, entry] of entries.entries()) {
+        const table = entry.kind === 'group' ? 'character_groups' : 'characters'
+        await db.runAsync(`UPDATE ${table} SET sort_order = ? WHERE id = ?`, [entries.length - index, entry.id])
+      }
+      for (const ids of members) {
+        for (const [index, id] of ids.entries()) {
+          await db.runAsync('UPDATE characters SET sort_order = ? WHERE id = ?', [ids.length - index, id])
+        }
+      }
+    })
+  const next = saving.then(save, save)
+  saving = next
+  return next
 }
 
 // A group in the place of `target`, holding it first and then the dropped ones.
@@ -66,15 +80,6 @@ export function renameGroup(db: SQLiteDatabase, groupId: number, name: string) {
 
 export function deleteGroup(db: SQLiteDatabase, groupId: number) {
   return db.runAsync('DELETE FROM character_groups WHERE id = ?', groupId)
-}
-
-// The order of a group's members after one was moved among them, top down.
-export function setMemberOrder(db: SQLiteDatabase, ids: number[]) {
-  return db.withTransactionAsync(async () => {
-    for (const [index, id] of ids.entries()) {
-      await db.runAsync('UPDATE characters SET sort_order = ? WHERE id = ?', [ids.length - index, id])
-    }
-  })
 }
 
 // A group brought in by a backup, its members top down, in the place of the highest of

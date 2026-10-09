@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
+  cancelAnimation,
   runOnUI,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -16,11 +17,13 @@ type Props = {
   groupId: number
   // The groups open right now, set at the tap, before React renders anything.
   openGroups: SharedValue<number[]>
+  // The group lifted into a drag right now, whose members shut at once.
+  liftedGroup: SharedValue<number>
   // Whether React has the group open: touches and VoiceOver follow it.
   open: boolean
   index: number
   count: number
-  // The space above the card, in place of the list's separator.
+  // The space above the card, the same as the list's separator.
   gap: number
   children: ReactNode
 }
@@ -29,7 +32,7 @@ type Props = {
 // builds nothing: it only moves. The cards come down one after another, each a beat after
 // the one above, the rows below riding on the growing height; closing takes them back up
 // from the bottom.
-export function MemberSlat({ groupId, openGroups, open, index, count, gap, children }: Props) {
+export function MemberSlat({ groupId, openGroups, liftedGroup, open, index, count, gap, children }: Props) {
   const shown = useSharedValue(open ? 1 : 0)
   // Where the slat is headed, so the tap and React's state, whichever comes first, start it once.
   const target = useSharedValue(open ? 1 : 0)
@@ -46,6 +49,15 @@ export function MemberSlat({ groupId, openGroups, open, index, count, gap, child
     () => openGroups.value.includes(groupId),
     (now, before) => {
       if (before !== null && now !== before) move(now ? 1 : 0)
+    }
+  )
+  useAnimatedReaction(
+    () => liftedGroup.value === groupId,
+    (now, before) => {
+      if (!now || before === null || before) return
+      cancelAnimation(shown)
+      target.value = 0
+      shown.value = 0
     }
   )
   useEffect(() => {
@@ -65,9 +77,12 @@ export function MemberSlat({ groupId, openGroups, open, index, count, gap, child
     transform: [{ translateY: -(1 - shown.value) * (height.value + gap) }],
   }))
 
+  // The row above ends in a gap (the group's separator, or the gap left under the member
+  // before), so the slot is drawn moved up over it: the card still comes out from under the
+  // card above, and the gap is left under this one in its place.
   return (
     <Animated.View
-      style={[styles.slot, slot]}
+      style={[styles.slot, { transform: [{ translateY: -gap }] }, slot]}
       pointerEvents={open ? 'box-none' : 'none'}
       accessibilityElementsHidden={!open}
       importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
