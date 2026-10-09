@@ -119,7 +119,13 @@ type Backup = {
 
 // The tree the export sheet shows: characters and rooms with their chats, from the database.
 export async function loadBackupTree(db: SQLiteDatabase): Promise<BackupTree> {
-  const characters = await db.getAllAsync<{ id: number; name: string; avatar: string | null }>('SELECT id, name, avatar FROM characters ORDER BY sort_order, id')
+  // Top down like the home list, so a group stands where it does there.
+  const rows = await db.getAllAsync<{ id: number; name: string; avatar: string | null; groupId: number | null; groupName: string | null }>(
+    `SELECT c.id, c.name, c.avatar, c.group_id AS groupId, g.name AS groupName
+     FROM characters c LEFT JOIN character_groups g ON g.id = c.group_id
+     ORDER BY COALESCE(g.sort_order, c.sort_order) DESC, c.group_id IS NULL, c.sort_order DESC, c.id DESC`
+  )
+  const characters = rows.map(({ groupId, groupName, ...c }) => ({ ...c, group: groupId === null ? null : { id: groupId, name: groupName } }))
   const rooms = await db.getAllAsync<{ id: number; name: string }>('SELECT id, name FROM rooms ORDER BY sort_order, id')
   const chats = await db.getAllAsync<{ id: number; characterId: number | null; roomId: number | null; title: string | null; messageCount: number }>(
     `SELECT ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title,
@@ -166,7 +172,7 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
   }
   const picked = selection ? applySelection(all, selection) : all
   const { rooms = [], roomMembers = [], chats } = picked
-  const groupSlots = await loadGroupSlots(db)
+  const groupSlots = selection?.keepGroups === false ? new Map<number, BackupGroupSlot>() : await loadGroupSlots(db)
   const characters = picked.characters.map(({ groupId: _groupId, sortOrder: _sortOrder, ...character }) => {
     const group = groupSlots.get(character.id)
     return group ? { ...character, group } : character
@@ -341,7 +347,7 @@ export async function importBackup(
     // The groups come back with whichever of their characters came along, if two or more did.
     const groups = new Map<number, { name: string | null; members: { id: number; position: number }[] }>()
     for (const character of dump.characters) {
-      const slot = character.group
+      const slot = selection?.keepGroups === false ? undefined : character.group
       if (!slot) continue
       const group = groups.get(slot.id) ?? { name: slot.name, members: [] }
       group.members.push({ id: characterIds.get(character.id)!, position: slot.position })

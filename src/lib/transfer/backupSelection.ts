@@ -1,18 +1,22 @@
-// What goes into a backup or comes out of one: a tree of characters with their chats and
-// rooms with their scenes, and the set of ticked nodes. No UI and no database here.
+// What goes into a backup or comes out of one: a tree of groups with their characters,
+// characters with their chats and rooms with their scenes, and the set of ticked nodes. No
+// UI and no database here.
 
 export type TreeChat = { id: number; title: string | null; messageCount: number }
 // `avatar` is a stored file (the export), `avatarUri` a picture read out of the backup (the import).
 export type TreeNode = { id: number; name: string; avatar?: string | null; avatarUri?: string | null; chats: TreeChat[] }
-export type BackupTree = { characters: TreeNode[]; rooms: TreeNode[] }
+// `members` are among `characters` too; a group is only a way to tick several at once.
+export type TreeGroup = { id: number; name: string | null; members: TreeNode[] }
+export type BackupTree = { characters: TreeNode[]; groups: TreeGroup[]; rooms: TreeNode[] }
 
-export type Selection = { characters: Set<number>; rooms: Set<number>; chats: Set<number> }
+// `keepGroups: false` takes the characters alone, out of their groups; left out, they keep them.
+export type Selection = { characters: Set<number>; rooms: Set<number>; chats: Set<number>; keepGroups?: boolean }
 
 export type Branch = 'characters' | 'rooms'
 export type CheckState = 'all' | 'some' | 'none'
 
 type Source = {
-  characters: { id: number; name: string; avatar?: string | null }[]
+  characters: { id: number; name: string; avatar?: string | null; group?: { id: number; name: string | null } | null }[]
   rooms?: { id: number; name: string }[]
   // `messageCount` when the caller already has it (SQL), else it is counted from `messages`.
   chats?: { id: number; characterId: number | null; roomId?: number | null; title: string | null; messageCount?: number }[]
@@ -31,26 +35,54 @@ export function buildTree(source: Source): BackupTree {
     if (ownerId === null) continue
     owner.set(ownerId, [...(owner.get(ownerId) ?? []), entry])
   }
+  const characters = source.characters.map(({ id, name, avatar }) => ({ id, name, avatar, chats: byCharacter.get(id) ?? [] }))
+  // In the order of their characters; one that came with a single member is no group.
+  const groups = new Map<number, TreeGroup>()
+  source.characters.forEach(({ group }, index) => {
+    if (!group) return
+    const entry = groups.get(group.id) ?? { id: group.id, name: group.name, members: [] }
+    entry.members.push(characters[index])
+    groups.set(group.id, entry)
+  })
   return {
-    characters: source.characters.map(({ id, name, avatar }) => ({ id, name, avatar, chats: byCharacter.get(id) ?? [] })),
+    characters,
+    groups: [...groups.values()].filter((g) => g.members.length > 1),
     rooms: (source.rooms ?? []).map(({ id, name }) => ({ id, name, chats: byRoom.get(id) ?? [] })),
   }
+}
+
+// What the characters section shows top down: a group where its first member is, with all
+// its members in it, and the characters of no group as they come.
+export type CharacterEntry = { kind: 'group'; group: TreeGroup } | { kind: 'character'; node: TreeNode }
+
+export function characterEntries(tree: BackupTree): CharacterEntry[] {
+  const groupOf = new Map<number, TreeGroup>()
+  for (const group of tree.groups) for (const member of group.members) groupOf.set(member.id, group)
+  const placed = new Set<number>()
+  return tree.characters.flatMap((node): CharacterEntry[] => {
+    const group = groupOf.get(node.id)
+    if (!group) return [{ kind: 'character', node }]
+    if (placed.has(group.id)) return []
+    placed.add(group.id)
+    return [{ kind: 'group', group }]
+  })
 }
 
 export function selectAll(tree: BackupTree): Selection {
   const chats = new Set<number>()
   for (const node of [...tree.characters, ...tree.rooms]) for (const chat of node.chats) chats.add(chat.id)
-  return { characters: new Set(tree.characters.map((c) => c.id)), rooms: new Set(tree.rooms.map((r) => r.id)), chats }
+  return { characters: new Set(tree.characters.map((c) => c.id)), rooms: new Set(tree.rooms.map((r) => r.id)), chats, keepGroups: true }
 }
 
 export function selectNone(): Selection {
-  return { characters: new Set(), rooms: new Set(), chats: new Set() }
+  return { characters: new Set(), rooms: new Set(), chats: new Set(), keepGroups: true }
 }
 
 const copy = (selection: Selection): Selection => ({
   characters: new Set(selection.characters),
   rooms: new Set(selection.rooms),
   chats: new Set(selection.chats),
+  keepGroups: selection.keepGroups,
 })
 
 // Ticking a parent ticks all its chats, clearing it clears them (a chat cannot go without its owner).
@@ -64,6 +96,31 @@ export function toggleNode(selection: Selection, branch: Branch, node: TreeNode)
     for (const chat of node.chats) next.chats.add(chat.id)
   }
   return next
+}
+
+// A group ticks all its characters with their chats, or clears them all when every one was ticked.
+export function toggleGroup(selection: Selection, group: TreeGroup): Selection {
+  const next = copy(selection)
+  const on = groupState(selection, group) !== 'all'
+  for (const member of group.members) {
+    if (on) next.characters.add(member.id)
+    else next.characters.delete(member.id)
+    for (const chat of member.chats) {
+      if (on) next.chats.add(chat.id)
+      else next.chats.delete(chat.id)
+    }
+  }
+  return next
+}
+
+export function groupState(selection: Selection, group: TreeGroup): CheckState {
+  const states = group.members.map((member) => nodeState(selection, 'characters', member))
+  if (states.every((state) => state === 'all')) return 'all'
+  return states.every((state) => state === 'none') ? 'none' : 'some'
+}
+
+export function membersSelected(selection: Selection, group: TreeGroup) {
+  return group.members.filter((member) => selection.characters.has(member.id)).length
 }
 
 // Ticking a chat ticks its owner too.

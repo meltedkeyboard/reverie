@@ -1,6 +1,6 @@
 import { File, Paths } from 'expo-file-system'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown, FadeOutDown, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -12,7 +12,6 @@ import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { GroupCard } from '@/components/lists/GroupCard'
 import { MemberSlat } from '@/components/lists/MemberSlat'
-import { setEditMotion } from '@/components/lists/ListCard'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton } from '@/components/chrome/Glass'
@@ -28,8 +27,9 @@ import { loadSettings } from '@/db/prefs/settings'
 import { useBackupImport } from '@/hooks/features/useBackupImport'
 import { useCharacterActions } from '@/hooks/features/useCharacterActions'
 import { useFeaturedFill } from '@/hooks/features/useFeaturedFill'
-import { useContinueAnchor, useLastChat, useLastChatContext } from '@/hooks/chat/useLastChat'
+import { useContinueAnchor, useLastChat } from '@/hooks/chat/useLastChat'
 import { useReloadOnFocus } from '@/hooks/chat/useChatListActions'
+import { useEditMode } from '@/hooks/features/useEditMode'
 import { useReorder } from '@/hooks/features/useReorder'
 import { useTranslation } from '@/i18n'
 import { removeCharacterImages } from '@/lib/images/avatars'
@@ -110,52 +110,16 @@ export default function CharactersScreen() {
   }
 
   const backupImport = useBackupImport(reload)
-  const [editing, setEditing] = useState(false)
-  const [checked, setChecked] = useState<Set<number>>(new Set())
   const insets = useSafeAreaInsets()
-  const { setSuspended } = useLastChatContext()
-  useEffect(() => {
-    setSuspended(editing)
-    return () => setSuspended(false)
-  }, [editing, setSuspended])
-
-  // Driven from here, so the cards start moving at the touch, not after the list renders.
-  const progress = useSharedValue(0)
-  const settled = useSharedValue(0)
-  const editMotion = useMemo(() => ({ progress, settled }), [progress, settled])
-  // The cards start moving at the touch, but the mode changes only when it ends on the
-  // button: a finger slid off it takes the motion back. onPressOut comes before onPress, so
-  // the take-back waits a turn for the press to claim it.
-  const editPress = useRef(false)
-  const previewEditing = () => {
-    editPress.current = true
-    setEditMotion(editMotion, !editing)
-  }
-  const cancelEditing = () =>
-    setTimeout(() => {
-      if (!editPress.current) return
-      editPress.current = false
-      setEditMotion(editMotion, editing)
-    })
-  const toggleEditing = () => {
-    editPress.current = false
-    setEditMotion(editMotion, !editing)
-    setEditing(!editing)
-    setChecked(new Set())
-  }
-
-  // A group's check ticks or clears all its characters at once. A transition, since it
-  // renders the whole list again: the card shows its tick by itself meanwhile.
-  const toggleChecked = (ids: number[]) =>
-    startTransition(() => setChecked((prev) => {
-      const next = new Set(prev)
-      const all = ids.every((id) => next.has(id))
-      for (const id of ids) {
-        if (all) next.delete(id)
-        else next.add(id)
-      }
-      return next
-    }))
+  // The members move at the tap from this shared value; the list's own state, which the
+  // touches and the order go by, follows in a transition.
+  // The list has no layout transition of its own: it caught every frame of a member's
+  // growing height and held the card shut.
+  const openGroups = useSharedValue<number[]>([])
+  // In edit mode every group is open, so its characters can be moved among themselves.
+  const { editing, setEditing, motion: editMotion, button: editButton, checked, setChecked, toggleChecked } = useEditMode((on) => {
+    openGroups.value = on ? groups.map((g) => g.id) : [...expanded]
+  })
 
   const allChecked = !!characters?.length && checked.size === characters.length
 
@@ -172,9 +136,7 @@ export default function CharactersScreen() {
           removeCharacterImages(character)
         }
         await pruneGroups(db)
-        setEditMotion(editMotion, false)
         setEditing(false)
-        setChecked(new Set())
         reload()
       },
     })
@@ -223,7 +185,8 @@ export default function CharactersScreen() {
   // Only the haptics and the edge guard of the shared hook: the rows here are of two kinds.
   const reorder = useReorder(null, () => {}, async () => {})
 
-  const rows = useMemo(() => buildRows(characters ?? [], groups, expanded), [characters, groups, expanded])
+  const shownGroups = useMemo(() => (editing ? new Set(groups.map((g) => g.id)) : expanded), [editing, groups, expanded])
+  const rows = useMemo(() => buildRows(characters ?? [], groups, shownGroups), [characters, groups, shownGroups])
   const isHidden = (row: Row | undefined) => row?.kind === 'character' && row.inGroup && !row.open
   const visibleCount = rows.filter((row) => !isHidden(row)).length
   const groupedIds = useMemo(() => (characters ?? []).filter((c) => c.groupId !== null).map((c) => c.id), [characters])
@@ -233,11 +196,6 @@ export default function CharactersScreen() {
     return byGroup
   }, [characters])
 
-  // The members move at the tap from this shared value; the list's own state, which the
-  // touches and the order go by, follows in a transition.
-  // The list has no layout transition of its own: it caught every frame of a member's
-  // growing height and held the card shut.
-  const openGroups = useSharedValue<number[]>([])
   const toggleExpanded = (id: number) => {
     // From the shared value: a second tap may come before the state has caught up.
     const next = new Set(openGroups.value)
@@ -434,12 +392,12 @@ export default function CharactersScreen() {
               <GroupCard
                 group={row.group}
                 members={row.members}
-                expanded={expanded.has(row.group.id)}
+                expanded={shownGroups.has(row.group.id)}
                 onToggle={() => toggleExpanded(row.group.id)}
                 onDelete={() => deleteWholeGroup(row.group, row.members)}
                 onUngroup={() => run(ungroup(db, row.group.id))}
                 menu={groupMenu(row.group, row.members)}
-                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), opens: true, motion: editMotion }}
+                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), motion: editMotion }}
                 onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
                 onProvide={provide}
               />
@@ -506,9 +464,7 @@ export default function CharactersScreen() {
               <GlassButton
                 icon={editing ? 'checkmark' : 'list'}
                 tint={editing ? colors.accent : undefined}
-                onPressIn={previewEditing}
-                onPressOut={cancelEditing}
-                onPress={toggleEditing}
+                {...editButton}
                 accessibilityLabel={editing ? t('characters.doneEditing') : t('characters.editList')}
               />
             ) : null}

@@ -21,11 +21,12 @@ type Props = {
   // A single room: one card this tall, filling the screen: the cast on top as a grid of
   // whole squares and the text under it taking the rest.
   fillHeight?: number
+  editing?: React.ComponentProps<typeof ListCard>['editing']
 }
 
 const HERO_FACES = 4
 
-function RoomCardContent({ room, onOpen, onDelete, menu, fillHeight }: Props) {
+function RoomCardContent({ room, onOpen, onDelete, menu, fillHeight, editing }: Props) {
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const last = plainPreview(room.lastMessage ?? '')
@@ -76,7 +77,8 @@ function RoomCardContent({ room, onOpen, onDelete, menu, fillHeight }: Props) {
     )
   }
   return (
-    <ListCard onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={room.name} style={styles.card}>
+    // Solid like a character's card; reordered by the handle of the edit mode only.
+    <ListCard solid longPressDrag={false} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={room.name} style={styles.card}>
       <View style={styles.faces}>
         <AvatarStack cast={room.cast} size={40} max={3} />
       </View>

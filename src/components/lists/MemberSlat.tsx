@@ -26,9 +26,9 @@ type Props = {
 }
 
 // A member's card stays mounted under its group, closed to no height, so opening the group
-// builds nothing: it only moves. The cards unfold like the slats of a blind, each turning
-// down on its top edge a beat after the one above, the rows below riding on the growing
-// height; closing folds them back up from the bottom.
+// builds nothing: it only moves. The cards come down one after another, each a beat after
+// the one above, the rows below riding on the growing height; closing takes them back up
+// from the bottom.
 export function MemberSlat({ groupId, openGroups, open, index, count, gap, children }: Props) {
   const shown = useSharedValue(open ? 1 : 0)
   // Where the slat is headed, so the tap and React's state, whichever comes first, start it once.
@@ -54,13 +54,15 @@ export function MemberSlat({ groupId, openGroups, open, index, count, gap, child
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Until the card has been measured an open one keeps its own height.
+  // Until the card has been measured an open one keeps its own height. Said outright: a
+  // key left out of an animated style keeps its last value, and a closed 0 stayed for good.
   const slot = useAnimatedStyle(() =>
-    height.value === 0 ? (shown.value > 0 ? {} : { height: 0 }) : { height: (height.value + gap) * shown.value }
+    height.value === 0 ? { height: shown.value > 0 ? 'auto' : 0 } : { height: (height.value + gap) * shown.value }
   )
+  // The card hangs from the bottom of its growing slot, so it comes down out of the one above.
   const slat = useAnimatedStyle(() => ({
     opacity: Math.min(1, shown.value * 3),
-    transform: [{ perspective: PERSPECTIVE }, { rotateX: `${(1 - shown.value) * -90}deg` }],
+    transform: [{ translateY: -(1 - shown.value) * (height.value + gap) }],
   }))
 
   return (
@@ -76,18 +78,16 @@ export function MemberSlat({ groupId, openGroups, open, index, count, gap, child
           height.value = e.nativeEvent.layout.height - gap
         }}
       >
-        <Animated.View style={[styles.slat, slat]}>{children}</Animated.View>
+        <Animated.View style={slat}>{children}</Animated.View>
       </View>
     </Animated.View>
   )
 }
 
-const STEP = 35
-const SPRING = { duration: 350, dampingRatio: 1 }
-const CLOSE = { duration: 220, easing: Easing.in(Easing.quad) }
-const PERSPECTIVE = 900
+const STEP = 20
+const SPRING = { duration: 220, dampingRatio: 1 }
+const CLOSE = { duration: 140, easing: Easing.in(Easing.quad) }
 
 const styles = StyleSheet.create({
   slot: { overflow: 'hidden' },
-  slat: { transformOrigin: 'top' },
 })

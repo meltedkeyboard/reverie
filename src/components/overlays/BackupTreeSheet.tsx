@@ -1,6 +1,6 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useEffect, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 
 import { Avatar } from '@/components/visuals/Avatar'
 import { GlassSurface } from '@/components/chrome/Glass'
@@ -22,17 +22,22 @@ import Animated, {
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/ui/haptics'
 import {
+  characterEntries,
   chatsSelected,
+  groupState,
   isEmpty,
+  membersSelected,
   nodeState,
   selectAll,
   selectNone,
   toggleChat,
+  toggleGroup,
   toggleNode,
   type BackupTree,
   type Branch,
   type CheckState,
   type Selection,
+  type TreeGroup,
   type TreeNode,
 } from '@/lib/transfer/backupSelection'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
@@ -153,86 +158,156 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
       return next
     })
 
-  const section = (branch: Branch, title: string, nodes: TreeNode[]) =>
+  // A character or a room, the chats under it when open.
+  const nodeBlock = (branch: Branch, node: TreeNode) => {
+    const key = `${branch}:${node.id}`
+    const expanded = open.has(key)
+    return (
+      <Animated.View key={key} layout={LinearTransition.duration(200)}>
+        <View style={styles.nodeRow}>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync()
+              setSelection((s) => toggleNode(s, branch, node))
+            }}
+            style={styles.ringHit}
+            accessibilityRole="checkbox"
+            accessibilityLabel={node.name}
+          >
+            <Ring state={nodeState(selection, branch, node)}>
+              {branch === 'characters' ? (
+                <Avatar name={node.name} file={node.avatar} uri={node.avatarUri} size={40} viewable={false} />
+              ) : (
+                <View style={styles.roomIcon}>
+                  <Icon name="people" size={20} color={colors.accent} />
+                </View>
+              )}
+            </Ring>
+          </Pressable>
+          <Pressable
+            style={styles.rowMain}
+            onPress={() => (node.chats.length ? toggleOpen(key) : setSelection((s) => toggleNode(s, branch, node)))}
+          >
+            <Text style={styles.name} numberOfLines={1}>
+              {node.name}
+            </Text>
+            {node.chats.length ? (
+              <Text style={styles.count}>
+                {t('backup.selected', { selected: chatsSelected(selection, node), total: node.chats.length })}
+              </Text>
+            ) : null}
+            {node.chats.length ? (
+              <Chevron open={expanded} />
+            ) : null}
+          </Pressable>
+        </View>
+        {expanded
+          ? node.chats.map((chat, index) => (
+              <Animated.View key={chat.id} entering={FadeInUp.duration(220)} exiting={FadeOutUp.duration(120)}>
+                {/* The trunk runs on past each chat and a rounded branch peels off into it. The pieces are
+                    solid and the group is faded as a whole, so where they overlap there is no darker spot. */}
+                <View pointerEvents="none" needsOffscreenAlphaCompositing style={styles.branch}>
+                  {index === 0 ? <View style={styles.stem} /> : null}
+                  {/* The last one stops at the elbow, but still joins the trunk of the row above. */}
+                  <View style={index === node.chats.length - 1 ? [styles.trunk, styles.trunkEnd] : styles.trunk} />
+                  <View style={styles.elbow} />
+                </View>
+              <Pressable
+                style={[styles.row, styles.child]}
+                onPress={() => {
+                  Haptics.selectionAsync()
+                  setSelection((s) => toggleChat(s, branch, node, chat.id))
+                }}
+              >
+                <CheckMark state={selection.chats.has(chat.id) ? 'all' : 'none'} />
+                <Text style={styles.chatTitle} numberOfLines={1}>
+                  {chat.title || t('backup.untitled')}
+                </Text>
+                <Text style={styles.count}>{chat.messageCount}</Text>
+              </Pressable>
+              </Animated.View>
+            ))
+          : null}
+      </Animated.View>
+    )
+  }
+
+  // A group: its characters under it when open, on branches of their own like the chats.
+  const groupBlock = (group: TreeGroup) => {
+    const key = `groups:${group.id}`
+    const expanded = open.has(key)
+    const name = group.name ?? group.members.map((m) => m.name).join(', ')
+    return (
+      <Animated.View key={key} layout={LinearTransition.duration(200)}>
+        <View style={styles.nodeRow}>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync()
+              setSelection((s) => toggleGroup(s, group))
+            }}
+            style={styles.ringHit}
+            accessibilityRole="checkbox"
+            accessibilityLabel={name}
+          >
+            <Ring state={groupState(selection, group)}>
+              <View style={styles.roomIcon}>
+                <Icon name="albums" size={20} color={colors.accent} />
+              </View>
+            </Ring>
+          </Pressable>
+          <Pressable style={styles.rowMain} onPress={() => toggleOpen(key)}>
+            <Text style={styles.name} numberOfLines={1}>
+              {name}
+            </Text>
+            <Text style={styles.count}>{t('backup.selected', { selected: membersSelected(selection, group), total: group.members.length })}</Text>
+            <Chevron open={expanded} />
+          </Pressable>
+        </View>
+        {expanded
+          ? group.members.map((member, index) => (
+              <Animated.View key={member.id} entering={FadeInUp.duration(220)} exiting={FadeOutUp.duration(120)}>
+                {/* The trunk runs on past a member's open chats to the next member. */}
+                <View pointerEvents="none" needsOffscreenAlphaCompositing style={styles.branch}>
+                  {index === 0 ? <View style={styles.stem} /> : null}
+                  <View style={index === group.members.length - 1 ? [styles.trunk, styles.trunkEnd] : styles.trunk} />
+                  <View style={[styles.elbow, styles.memberElbow]} />
+                </View>
+                <View style={styles.member}>{nodeBlock('characters', member)}</View>
+              </Animated.View>
+            ))
+          : null}
+      </Animated.View>
+    )
+  }
+
+  const section = (branch: Branch, title: string, nodes: TreeNode[], extra?: React.ReactNode) =>
     nodes.length ? (
       <View key={branch}>
         <Animated.Text layout={LinearTransition.duration(200)} style={styles.section}>
           {title}
         </Animated.Text>
-        {nodes.map((node) => {
-          const key = `${branch}:${node.id}`
-          const expanded = open.has(key)
-          return (
-            <Animated.View key={key} layout={LinearTransition.duration(200)}>
-              <View style={styles.nodeRow}>
-                <Pressable
-                  onPress={() => {
-                    Haptics.selectionAsync()
-                    setSelection((s) => toggleNode(s, branch, node))
-                  }}
-                  style={styles.ringHit}
-                  accessibilityRole="checkbox"
-                  accessibilityLabel={node.name}
-                >
-                  <Ring state={nodeState(selection, branch, node)}>
-                    {branch === 'characters' ? (
-                      <Avatar name={node.name} file={node.avatar} uri={node.avatarUri} size={40} viewable={false} />
-                    ) : (
-                      <View style={styles.roomIcon}>
-                        <Icon name="people" size={20} color={colors.accent} />
-                      </View>
-                    )}
-                  </Ring>
-                </Pressable>
-                <Pressable
-                  style={styles.rowMain}
-                  onPress={() => (node.chats.length ? toggleOpen(key) : setSelection((s) => toggleNode(s, branch, node)))}
-                >
-                  <Text style={styles.name} numberOfLines={1}>
-                    {node.name}
-                  </Text>
-                  {node.chats.length ? (
-                    <Text style={styles.count}>
-                      {t('backup.selected', { selected: chatsSelected(selection, node), total: node.chats.length })}
-                    </Text>
-                  ) : null}
-                  {node.chats.length ? (
-                    <Chevron open={expanded} />
-                  ) : null}
-                </Pressable>
-              </View>
-              {expanded
-                ? node.chats.map((chat, index) => (
-                    <Animated.View key={chat.id} entering={FadeInUp.duration(220)} exiting={FadeOutUp.duration(120)}>
-                      {/* The trunk runs on past each chat and a rounded branch peels off into it. The pieces are
-                          solid and the group is faded as a whole, so where they overlap there is no darker spot. */}
-                      <View pointerEvents="none" needsOffscreenAlphaCompositing style={styles.branch}>
-                        {index === 0 ? <View style={styles.stem} /> : null}
-                        {/* The last one stops at the elbow, but still joins the trunk of the row above. */}
-                        <View style={index === node.chats.length - 1 ? [styles.trunk, styles.trunkEnd] : styles.trunk} />
-                        <View style={styles.elbow} />
-                      </View>
-                    <Pressable
-                      style={[styles.row, styles.child]}
-                      onPress={() => {
-                        Haptics.selectionAsync()
-                        setSelection((s) => toggleChat(s, branch, node, chat.id))
-                      }}
-                    >
-                      <CheckMark state={selection.chats.has(chat.id) ? 'all' : 'none'} />
-                      <Text style={styles.chatTitle} numberOfLines={1}>
-                        {chat.title || t('backup.untitled')}
-                      </Text>
-                      <Text style={styles.count}>{chat.messageCount}</Text>
-                    </Pressable>
-                    </Animated.View>
-                  ))
-                : null}
-            </Animated.View>
-          )
-        })}
+        {extra}
+        {/* Without the groups the tree shows the characters as they will come: one by one. */}
+        {branch === 'characters' && tree && selection.keepGroups !== false
+          ? characterEntries(tree).map((entry) => (entry.kind === 'group' ? groupBlock(entry.group) : nodeBlock('characters', entry.node)))
+          : nodes.map((node) => nodeBlock(branch, node))}
       </View>
     ) : null
+
+  // Whether the groups come along, or the characters alone.
+  const keepGroups = tree?.groups.length ? (
+    <Animated.View layout={LinearTransition.duration(200)} style={styles.toggleRow}>
+      <View style={styles.toggleText}>
+        <Text style={styles.name}>{t('backup.keepGroups')}</Text>
+        <Text style={styles.toggleNote}>{t('backup.keepGroupsNote')}</Text>
+      </View>
+      <Switch
+        value={selection.keepGroups !== false}
+        onValueChange={(on) => setSelection((s) => ({ ...s, keepGroups: on }))}
+        trackColor={{ true: colors.accent }}
+      />
+    </Animated.View>
+  ) : null
 
   return (
     <PageSheet
@@ -259,7 +334,7 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
             <Pressable
               onPress={() => {
                 Haptics.selectionAsync()
-                setSelection(allOn ? selectNone() : everything)
+                setSelection((s) => ({ ...(allOn ? selectNone() : everything), keepGroups: s.keepGroups }))
               }}
               hitSlop={8}
               style={{ height: 24 }}
@@ -273,7 +348,7 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
                 {allOn ? t('backup.clearAll') : t('backup.selectAll')}
               </Animated.Text>
             </Pressable>
-            {section('characters', t('backup.characters'), tree.characters)}
+            {section('characters', t('backup.characters'), tree.characters, keepGroups)}
             {section('rooms', t('backup.rooms'), tree.rooms)}
             {tree.rooms.length ? (
               <Animated.Text layout={LinearTransition.duration(200)} style={styles.note}>
@@ -297,6 +372,13 @@ const createStyles = (colors: Colors) =>
     ringHit: { justifyContent: 'center', paddingVertical: 12, paddingLeft: 4, paddingRight: 14 },
     rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
     child: { paddingLeft: 52 },
+    // A group's character sits in as far as a chat does, and so do its own branches.
+    member: { paddingLeft: 52 },
+    // From the trunk to the member's ring (52 in, 4 of padding), down to the middle of its row.
+    memberElbow: { width: 52 + 4 - TRUNK_X, height: 12 + 24 },
+    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+    toggleText: { flex: 1, gap: 2 },
+    toggleNote: { color: colors.textFaint, fontSize: 13 },
     // From the foot of the picture down to the first chat, then a rounded elbow into every chat
     // and the trunk on to the next one.
     branch: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, opacity: 0.22 },

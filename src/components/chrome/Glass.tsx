@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type View
 
 import { floatingBars, glassEffect, liquidGlass } from '@/lib/ui/nativeUI'
 import { isDesktop } from '@/lib/core/platform'
-import { useStyles, useTheme, type Colors } from '@/theme'
+import { ON_ACCENT, useStyles, useTheme, type Colors } from '@/theme'
 
 import { IconButton } from '../controls/IconButton'
 
@@ -78,6 +78,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOu
       <IconButton
         name={icon}
         size={iconSize}
+        color={fill ? ON_ACCENT : undefined}
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
@@ -102,7 +103,8 @@ export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOu
       <GlassSurface interactive={!disabled} tintColor={fill} style={styles.circle}>
         {/* Like a disabled bar button: the glass stays, only the glyph greys out. */}
         <View style={disabled && styles.disabled}>
-          {children ?? <Icon name={icon} size={iconSize - 2} color={colors.text} />}
+          {/* White on the accent fill, like the prominent bar buttons. */}
+          {children ?? <Icon name={icon} size={iconSize - 2} color={fill ? ON_ACCENT : colors.text} />}
         </View>
       </GlassSurface>
     </Pressable>
