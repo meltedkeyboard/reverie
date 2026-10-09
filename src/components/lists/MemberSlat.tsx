@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
+  runOnUI,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
@@ -30,16 +31,28 @@ type Props = {
 // height; closing folds them back up from the bottom.
 export function MemberSlat({ groupId, openGroups, open, index, count, gap, children }: Props) {
   const shown = useSharedValue(open ? 1 : 0)
+  // Where the slat is headed, so the tap and React's state, whichever comes first, start it once.
+  const target = useSharedValue(open ? 1 : 0)
   const height = useSharedValue(0)
 
+  const move = (to: number) => {
+    'worklet'
+    if (target.value === to) return
+    target.value = to
+    const delay = (to ? index : count - 1 - index) * STEP
+    shown.value = withDelay(delay, to ? withSpring(1, SPRING) : withTiming(0, CLOSE))
+  }
   useAnimatedReaction(
     () => openGroups.value.includes(groupId),
     (now, before) => {
-      if (before === null || now === before) return
-      const delay = (now ? index : count - 1 - index) * STEP
-      shown.value = withDelay(delay, now ? withSpring(1, SPRING) : withTiming(0, CLOSE))
+      if (before !== null && now !== before) move(now ? 1 : 0)
     }
   )
+  useEffect(() => {
+    // On the UI thread, where the tap may have started it already.
+    runOnUI(move)(open ? 1 : 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   // Until the card has been measured an open one keeps its own height.
   const slot = useAnimatedStyle(() =>

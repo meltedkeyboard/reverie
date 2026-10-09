@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeInDown, FadeOutDown, LinearTransition, useSharedValue } from 'react-native-reanimated'
+import Animated, { FadeInDown, FadeOutDown, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import ReorderableList, { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
@@ -235,6 +235,8 @@ export default function CharactersScreen() {
 
   // The members move at the tap from this shared value; the list's own state, which the
   // touches and the order go by, follows in a transition.
+  // The list has no layout transition of its own: it caught every frame of a member's
+  // growing height and held the card shut.
   const openGroups = useSharedValue<number[]>([])
   const toggleExpanded = (id: number) => {
     // From the shared value: a second tap may come before the state has caught up.
@@ -376,7 +378,6 @@ export default function CharactersScreen() {
         data={rows}
         keyExtractor={(row) => row.key}
         {...reorder}
-        itemLayoutAnimation={LinearTransition.springify().duration(350).dampingRatio(1)}
         onReorder={onReorder}
         // The list runs under the floating header and the tab bar, where the edge zones that
         // scroll it would hide: they start where the cards can be seen.
