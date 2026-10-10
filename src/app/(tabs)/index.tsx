@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeInDown, FadeOutDown, useSharedValue } from 'react-native-reanimated'
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import ReorderableList, { reorderItems, type ReorderableListDragEndEvent, type ReorderableListDragStartEvent, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
@@ -12,7 +12,7 @@ import { isDesktop } from '@/lib/core/platform'
 import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { GroupCard } from '@/components/lists/GroupCard'
-import { MemberSlat } from '@/components/lists/MemberSlat'
+import { MemberSlat, RidingRow, useGroupMotion } from '@/components/lists/MemberSlat'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton } from '@/components/chrome/Glass'
@@ -112,15 +112,11 @@ export default function CharactersScreen() {
 
   const backupImport = useBackupImport(reload)
   const insets = useSafeAreaInsets()
-  // The members move at the tap from this shared value; the list's own state, which the
-  // touches and the order go by, follows in a transition.
-  // The list has no layout transition of its own: it caught every frame of a member's
-  // growing height and held the card shut.
-  const openGroups = useSharedValue<number[]>([])
-  const showGroups = (ids: Set<number>) => {
-    openGroups.value = [...ids]
-    startTransition(() => setExpanded(ids))
-  }
+  // The groups headed open. The members move at the tap (see useGroupMotion); the list's own
+  // state, which the touches and the order go by, follows in a transition.
+  // The list has no layout transition of its own: it would move the rows a second time,
+  // over the transforms that already carry them.
+  const openGroups = useRef(new Set<number>())
   // Groups stay as they were in edit mode; a tap there opens or closes one as usual.
   const { editing, setEditing, motion: editMotion, button: editButton, checked, setChecked, toggleChecked } = useEditMode()
 
@@ -189,25 +185,29 @@ export default function CharactersScreen() {
   const reorder = useReorder(null, () => {}, async () => {})
 
   const rows = useMemo(() => buildRows(characters ?? [], groups, expanded), [characters, groups, expanded])
-  // A group lifted by its handle goes as one card: an open one shuts at once, with no motion,
-  // so the list measures the rows anew before the card is moved, and stays shut where it
+  const groupMotion = useGroupMotion(
+    rows.map((row) => ({
+      key: row.key,
+      member: row.kind === 'character' && row.slot && row.character.groupId !== null ? { id: row.character.id, group: row.character.groupId, ...row.slot } : undefined,
+    }))
+  )
+  // A group lifted by its handle goes as one card: it shuts at once, with no motion, so the
+  // list measures the rows anew before the card is moved, and an open one stays shut where it
   // lands. Only shared values while the finger is down: the list must not render mid-drag.
-  const liftedGroup = useSharedValue(-1)
   const lifted = useRef<number | null>(null)
   const liftRow = (index: number) => {
     const row = rows[index]
-    if (row?.kind !== 'group' || !openGroups.value.includes(row.group.id)) return
+    if (row?.kind !== 'group') return
+    groupMotion.shut(row.group.id)
+    if (!openGroups.current.has(row.group.id)) return
     lifted.current = row.group.id
-    liftedGroup.value = row.group.id
-    openGroups.value = openGroups.value.filter((id) => id !== row.group.id)
+    openGroups.current = new Set([...openGroups.current].filter((id) => id !== row.group.id))
   }
   // The group stays shut in React's state too, but in the same render as the new order
   // (see moveRow): a render of its own at the release held up the reorder behind it.
   const dropRow = (moved: boolean) => {
     const id = lifted.current
-    if (id === null) return
-    liftedGroup.value = -1
-    if (moved) return
+    if (id === null || moved) return
     lifted.current = null
     shutGroup(id)
   }
@@ -241,10 +241,13 @@ export default function CharactersScreen() {
   }, [characters])
 
   const toggleExpanded = (id: number) => {
-    // From the shared value: a second tap may come before the state has caught up.
-    const next = new Set(openGroups.value)
-    if (!next.delete(id)) next.add(id)
-    showGroups(next)
+    // From the ref: a second tap may come before the state has caught up.
+    const next = new Set(openGroups.current)
+    const open = !next.delete(id)
+    if (open) next.add(id)
+    openGroups.current = next
+    groupMotion.unfold(id, open)
+    startTransition(() => setExpanded(next))
   }
 
   const run = (change: Promise<unknown>) =>
@@ -373,7 +376,14 @@ export default function CharactersScreen() {
   // gap and a dragged one lands where the list then lays it out: a separator between rows
   // only left the last row 10 pt short and a card dropped at the end landed off by that.
   // A group's members carry theirs above them instead (see MemberSlat).
-  const withGap = (node: React.ReactElement) => (featured ? node : <View style={{ paddingBottom: MEMBER_GAP }}>{node}</View>)
+  const withGap = (key: string, node: React.ReactElement) =>
+    featured ? (
+      node
+    ) : (
+      <RidingRow motion={groupMotion} rowKey={key} gap={MEMBER_GAP}>
+        {node}
+      </RidingRow>
+    )
   // The continue button is gone while editing; the edit bar takes its place.
   const barBottom = insets.bottom + 12
   const bottomSpace = editing ? EDIT_BAR_SPACE : lastChat ? CONTINUE_BUTTON_SPACE : 0
@@ -443,6 +453,7 @@ export default function CharactersScreen() {
           if (row.kind === 'group') {
             const ids = row.members.map((m) => m.id)
             return withGap(
+              row.key,
               <GroupCard
                 group={row.group}
                 members={row.members}
@@ -475,9 +486,10 @@ export default function CharactersScreen() {
           )
           return inGroup && row.slot && character.groupId !== null ? (
             <MemberSlat
-              groupId={character.groupId}
-              openGroups={openGroups}
-              liftedGroup={liftedGroup}
+              motion={groupMotion}
+              rowKey={row.key}
+              id={character.id}
+              group={character.groupId}
               open={!!row.open}
               index={row.slot.index}
               count={row.slot.count}
@@ -486,7 +498,7 @@ export default function CharactersScreen() {
               {card}
             </MemberSlat>
           ) : (
-            withGap(card)
+            withGap(row.key, card)
           )
         }}
       />

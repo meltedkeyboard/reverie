@@ -104,10 +104,13 @@ public class ReverieDragModule: Module {
 final class DragPayload {
   let id: Int
   weak var card: DragCardView?
+  // Lifted with its whole group, on the group's card: it stays in the group wherever it lands.
+  let withGroup: Bool
 
-  init(id: Int, card: DragCardView) {
+  init(id: Int, card: DragCardView, withGroup: Bool) {
     self.id = id
     self.card = card
+    self.withGroup = withGroup
   }
 }
 
@@ -243,7 +246,8 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
       }
     }
     let item = UIDragItem(itemProvider: provider)
-    item.localObject = DragPayload(id: id, card: self)
+    // Only a group's card carries more than one character.
+    item.localObject = DragPayload(id: id, card: self, withGroup: items.count > 1)
     return item
   }
 
@@ -394,10 +398,18 @@ class DropTargetView: ExpoView, UIDropInteractionDelegate {
     (session.localDragSession?.localContext as? UIWindow) === window && window != nil
   }
 
-  // From here only members of a group are taken, to leave it; anything else moved around
-  // is no import.
+  // From here only members of a group are taken, to leave it, and only on their own cards:
+  // a group lifted and let go off the cards stays as it was. Anything else moved around is
+  // no import.
+  private func leavingIds(_ session: UIDropSession) -> [Int] {
+    session.localDragSession?.items.compactMap { item in
+      guard let payload = item.localObject as? DragPayload, !payload.withGroup, groupedIds.contains(payload.id) else { return nil }
+      return payload.id
+    } ?? []
+  }
+
   private func leavesGroup(_ session: UIDropSession) -> Bool {
-    draggedIds(session).contains { groupedIds.contains($0) }
+    !leavingIds(session).isEmpty
   }
 
   func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
@@ -411,7 +423,7 @@ class DropTargetView: ExpoView, UIDropInteractionDelegate {
 
   func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
     if fromHere(session) {
-      onDropCards(["ids": draggedIds(session).filter { groupedIds.contains($0) }])
+      onDropCards(["ids": leavingIds(session)])
       return
     }
     let group = DispatchGroup()

@@ -69,16 +69,17 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
   }
   const hasLeading = !!leading
 
-  const triggerLeading = () => {
-    'worklet'
-    close()
-    scheduleOnRN(fireLeading)
-  }
-
+  // Before the worklets that call it: a worklet takes in what it uses as it is made.
   const close = () => {
     'worklet'
     offset.value = withSpring(0, SPRING)
     scheduleOnRN(setOpen, false)
+  }
+
+  const triggerLeading = () => {
+    'worklet'
+    close()
+    scheduleOnRN(fireLeading)
   }
 
   const trigger = () => {
