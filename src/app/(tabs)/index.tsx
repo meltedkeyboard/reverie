@@ -1,20 +1,18 @@
 import { File, Paths } from 'expo-file-system'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import ReorderableList, { reorderItems, type ReorderableListDragEndEvent, type ReorderableListDragStartEvent, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
-import { scheduleOnRN } from 'react-native-worklets'
+import ReorderableList, { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
 
 import { isDesktop } from '@/lib/core/platform'
 import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { GroupCard } from '@/components/lists/GroupCard'
-import { MemberSlat, RidingRow, useGroupMotion } from '@/components/lists/MemberSlat'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
-import { EmptyState, FeaturedSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
+import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Pattern } from '@/components/visuals/Pattern'
@@ -47,27 +45,23 @@ import { dragModule, DropTargetView, type DropFile } from '../../../modules/reve
 // The server notice above the list: its height and the margin under it.
 const NOTICE_HEIGHT = 74
 
-// A row of the home list: a group, or a character standing alone or inside an open group.
+// A row of the home list: a group, or a character standing alone.
 type Row =
   | { kind: 'group'; key: string; group: CharacterGroup; members: CharacterPreview[] }
-  // A member is always a row, `open` or not, and `slot` is its place among its group's.
-  | { kind: 'character'; key: string; character: CharacterPreview; inGroup: boolean; open?: boolean; slot?: { index: number; count: number } }
+  | { kind: 'character'; key: string; character: CharacterPreview }
 
-// Groups and lone characters share one order, highest first; on a tie a group comes first,
-// so a character taken out of one lands right under it.
-function buildRows(characters: CharacterPreview[], groups: CharacterGroup[], open: Set<number>): Row[] {
+// Groups and lone characters share one order, highest first; on a tie a group comes first.
+function buildRows(characters: CharacterPreview[], groups: CharacterGroup[]): Row[] {
   const members = new Map<number, CharacterPreview[]>()
   for (const c of characters) if (c.groupId !== null) members.set(c.groupId, [...(members.get(c.groupId) ?? []), c])
   const top = [
     ...groups.filter((g) => members.has(g.id)).map((g) => ({ order: g.sortOrder, tie: 1, id: g.id, group: g as CharacterGroup | undefined, character: undefined })),
     ...characters.filter((c) => c.groupId === null).map((c) => ({ order: c.sortOrder, tie: 0, id: c.id, group: undefined, character: c as CharacterPreview | undefined })),
   ].sort((a, b) => b.order - a.order || b.tie - a.tie || b.id - a.id)
-  return top.flatMap((entry): Row[] => {
-    if (entry.character) return [{ kind: 'character', key: `c${entry.id}`, character: entry.character, inGroup: false }]
+  return top.map((entry): Row => {
+    if (entry.character) return { kind: 'character', key: `c${entry.id}`, character: entry.character }
     const list = members.get(entry.id)!
-    const head: Row = { kind: 'group', key: `g${entry.id}`, group: entry.group!, members: list }
-    const shown = open.has(entry.id)
-    return [head, ...list.map((c, index): Row => ({ kind: 'character', key: `c${c.id}`, character: c, inGroup: true, open: shown, slot: { index, count: list.length } }))]
+    return { kind: 'group', key: `g${entry.id}`, group: entry.group!, members: list }
   })
 }
 
@@ -81,7 +75,6 @@ export default function CharactersScreen() {
   const { t } = useTranslation()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
   const [groups, setGroups] = useState<CharacterGroup[]>([])
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [serverSet, setServerSet] = useState(true)
   const { lastChat, reload: reloadLastChat } = useLastChat('character')
   // The continue button itself is drawn by the tabs layout, over both home tabs.
@@ -112,12 +105,6 @@ export default function CharactersScreen() {
 
   const backupImport = useBackupImport(reload)
   const insets = useSafeAreaInsets()
-  // The groups headed open. The members move at the tap (see useGroupMotion); the list's own
-  // state, which the touches and the order go by, follows in a transition.
-  // The list has no layout transition of its own: it would move the rows a second time,
-  // over the transforms that already carry them.
-  const openGroups = useRef(new Set<number>())
-  // Groups stay as they were in edit mode; a tap there opens or closes one as usual.
   const { editing, setEditing, motion: editMotion, button: editButton, checked, setChecked, toggleChecked } = useEditMode()
 
   const allChecked = !!characters?.length && checked.size === characters.length
@@ -184,71 +171,9 @@ export default function CharactersScreen() {
   // Only the haptics and the edge guard of the shared hook: the rows here are of two kinds.
   const reorder = useReorder(null, () => {}, async () => {})
 
-  const rows = useMemo(() => buildRows(characters ?? [], groups, expanded), [characters, groups, expanded])
-  const groupMotion = useGroupMotion(
-    rows.map((row) => ({
-      key: row.key,
-      member: row.kind === 'character' && row.slot && row.character.groupId !== null ? { id: row.character.id, group: row.character.groupId, ...row.slot } : undefined,
-    }))
-  )
-  // A group lifted by its handle goes as one card: it shuts at once, with no motion, so the
-  // list measures the rows anew before the card is moved, and an open one stays shut where it
-  // lands. Only shared values while the finger is down: the list must not render mid-drag.
-  const lifted = useRef<number | null>(null)
-  const liftRow = (index: number) => {
-    const row = rows[index]
-    if (row?.kind !== 'group') return
-    groupMotion.shut(row.group.id)
-    if (!openGroups.current.has(row.group.id)) return
-    lifted.current = row.group.id
-    openGroups.current = new Set([...openGroups.current].filter((id) => id !== row.group.id))
-  }
-  // The group stays shut in React's state too, but in the same render as the new order
-  // (see moveRow): a render of its own at the release held up the reorder behind it.
-  const dropRow = (moved: boolean) => {
-    const id = lifted.current
-    if (id === null || moved) return
-    lifted.current = null
-    shutGroup(id)
-  }
-  const shutGroup = (id: number) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      next.delete(id)
-      return next
-    })
-  // Only the functions go into the worklets: the pan gesture beside them cannot be copied there.
-  const { onDragStart: pickUp, onDragEnd: putDown } = reorder
-  const listDrag = {
-    onDragStart: (event: ReorderableListDragStartEvent) => {
-      'worklet'
-      pickUp()
-      scheduleOnRN(liftRow, event.index)
-    },
-    onDragEnd: (event: ReorderableListDragEndEvent) => {
-      'worklet'
-      putDown()
-      scheduleOnRN(dropRow, event.from !== event.to)
-    },
-  }
-  const isHidden = (row: Row | undefined) => row?.kind === 'character' && row.inGroup && !row.open
-  const visibleCount = rows.filter((row) => !isHidden(row)).length
+  const rows = useMemo(() => buildRows(characters ?? [], groups), [characters, groups])
+  const visibleCount = rows.length
   const groupedIds = useMemo(() => (characters ?? []).filter((c) => c.groupId !== null).map((c) => c.id), [characters])
-  const membersOf = useMemo(() => {
-    const byGroup = new Map<number, number[]>()
-    for (const c of characters ?? []) if (c.groupId !== null) byGroup.set(c.groupId, [...(byGroup.get(c.groupId) ?? []), c.id])
-    return byGroup
-  }, [characters])
-
-  const toggleExpanded = (id: number) => {
-    // From the ref: a second tap may come before the state has caught up.
-    const next = new Set(openGroups.current)
-    const open = !next.delete(id)
-    if (open) next.add(id)
-    openGroups.current = next
-    groupMotion.unfold(id, open)
-    startTransition(() => setExpanded(next))
-  }
 
   const run = (change: Promise<unknown>) =>
     change.catch((err) => reportError(t('groups.failed'), err)).then(reload)
@@ -308,29 +233,16 @@ export default function CharactersScreen() {
     { label: t('groups.delete'), systemImage: 'trash', destructive: true, onSelect: () => deleteWholeGroup(group, members) },
   ]
 
-  // The new order is shown at once and saved: groups and lone characters among themselves,
-  // and the members of each group among themselves. A member moved out of its group's rows
-  // stays in the group and goes back under it.
+  // The new order is shown at once and saved: groups and lone characters among themselves.
   const moveRow = ({ from, to }: ReorderableListReorderEvent) => {
-    if (lifted.current !== null) {
-      shutGroup(lifted.current)
-      lifted.current = null
-    }
     const next = reorderItems(rows, from, to)
-    const top = next.filter((row) => row.kind === 'group' || !row.inGroup)
-    const order = new Map(top.map((row, index) => [row.key, top.length - index]))
-    const inside = new Map<number, number[]>()
-    for (const row of next) {
-      if (row.kind !== 'character' || !row.inGroup || row.character.groupId === null) continue
-      inside.set(row.character.groupId, [...(inside.get(row.character.groupId) ?? []), row.character.id])
-    }
-    for (const ids of inside.values()) ids.forEach((id, index) => order.set(`c${id}`, ids.length - index))
+    const order = new Map(next.map((row, index) => [row.key, next.length - index]))
     setGroups((prev) => prev.map((g) => ({ ...g, sortOrder: order.get(`g${g.id}`) ?? g.sortOrder })))
     setCharacters((prev) => prev && prev.map((c) => ({ ...c, sortOrder: order.get(`c${c.id}`) ?? c.sortOrder })))
     saveHomeOrder(
       db,
-      top.map((row) => (row.kind === 'group' ? { kind: 'group', id: row.group.id } : { kind: 'character', id: row.character.id })),
-      [...inside.values()]
+      next.map((row) => (row.kind === 'group' ? { kind: 'group', id: row.group.id } : { kind: 'character', id: row.character.id })),
+      []
     ).catch((err) => reportError(t('groups.failed'), err))
   }
 
@@ -338,7 +250,7 @@ export default function CharactersScreen() {
   // other one stays, with its settings, and takes over the chats of the dropped one.
   const onReorder = (event: ReorderableListReorderEvent) => {
     moveRow(event)
-    const near = [rows[event.to], rows[event.to + (event.to > event.from ? 1 : -1)]].filter((row) => !isHidden(row))
+    const near = [rows[event.to], rows[event.to + (event.to > event.from ? 1 : -1)]]
     const moved = rows[event.from]
     if (moved?.kind !== 'character') return
     const dragged = moved.character
@@ -372,18 +284,6 @@ export default function CharactersScreen() {
   )
   const fillHeight = editing ? undefined : fill.height
   const featured = fillHeight !== undefined
-  // Every row carries the gap under it, the last one too, so all rows are their card and the
-  // gap and a dragged one lands where the list then lays it out: a separator between rows
-  // only left the last row 10 pt short and a card dropped at the end landed off by that.
-  // A group's members carry theirs above them instead (see MemberSlat).
-  const withGap = (key: string, node: React.ReactElement) =>
-    featured ? (
-      node
-    ) : (
-      <RidingRow motion={groupMotion} rowKey={key} gap={MEMBER_GAP}>
-        {node}
-      </RidingRow>
-    )
   // The continue button is gone while editing; the edit bar takes its place.
   const barBottom = insets.bottom + 12
   const bottomSpace = editing ? EDIT_BAR_SPACE : lastChat ? CONTINUE_BUTTON_SPACE : 0
@@ -398,7 +298,6 @@ export default function CharactersScreen() {
         data={rows}
         keyExtractor={(row) => row.key}
         {...reorder}
-        {...listDrag}
         onReorder={onReorder}
         // The list runs under the floating header and the tab bar, where the edge zones that
         // scroll it would hide: they start where the cards can be seen.
@@ -414,10 +313,9 @@ export default function CharactersScreen() {
         scrollEnabled={editing || fill.scroll}
         contentContainerStyle={[
           padding,
-          // The last row's own gap stands in for part of the padding under it.
-          { paddingBottom: padding.paddingBottom + bottomSpace - (featured ? 0 : MEMBER_GAP) },
+          { paddingBottom: padding.paddingBottom + bottomSpace },
         ]}
-        ItemSeparatorComponent={featured ? FeaturedSeparator : undefined}
+        ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}
         ListHeaderComponent={
           !serverSet && characters ? (
             // A row like the "finish setting up" one in iOS Settings: a glyph on a
@@ -452,25 +350,22 @@ export default function CharactersScreen() {
         renderItem={({ item: row }) => {
           if (row.kind === 'group') {
             const ids = row.members.map((m) => m.id)
-            return withGap(
-              row.key,
+            return (
               <GroupCard
                 group={row.group}
                 members={row.members}
-                expanded={expanded.has(row.group.id)}
-                onToggle={() => toggleExpanded(row.group.id)}
+                onOpen={() => router.push(`/groups/${row.group.id}`)}
                 onDelete={() => deleteWholeGroup(row.group, row.members)}
                 onUngroup={() => run(ungroup(db, row.group.id))}
                 menu={groupMenu(row.group, row.members)}
-                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), opens: true, motion: editMotion }}
+                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), motion: editMotion }}
                 onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
                 onProvide={provide}
               />
             )
           }
-          const { character, inGroup } = row
-          const groupIds = character.groupId !== null ? membersOf.get(character.groupId) : undefined
-          const card = (
+          const { character } = row
+          return (
             <CharacterCard
               character={character}
               onOpen={() => router.push(`/chats/${character.id}`)}
@@ -480,25 +375,7 @@ export default function CharactersScreen() {
               editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]), motion: editMotion }}
               onProvide={provide}
               onDropCards={(dropped) => dropOnCharacter(character, dropped)}
-              inGroup={inGroup}
-              groupIds={groupIds}
             />
-          )
-          return inGroup && row.slot && character.groupId !== null ? (
-            <MemberSlat
-              motion={groupMotion}
-              rowKey={row.key}
-              id={character.id}
-              group={character.groupId}
-              open={!!row.open}
-              index={row.slot.index}
-              count={row.slot.count}
-              gap={MEMBER_GAP}
-            >
-              {card}
-            </MemberSlat>
-          ) : (
-            withGap(row.key, card)
           )
         }}
       />
@@ -567,9 +444,6 @@ export default function CharactersScreen() {
     screen
   )
 }
-
-// The gap under every row (see withGap), which a group's members carry above them.
-const MEMBER_GAP = 10
 
 // Room the list leaves under its last card for the edit bar.
 const EDIT_BAR_SPACE = 64

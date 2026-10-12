@@ -6,6 +6,10 @@ export function listGroups(db: SQLiteDatabase) {
   return db.getAllAsync<CharacterGroup>('SELECT id, name, sort_order AS sortOrder FROM character_groups ORDER BY sort_order DESC, id DESC')
 }
 
+export function getGroup(db: SQLiteDatabase, id: number) {
+  return db.getFirstAsync<CharacterGroup>('SELECT id, name, sort_order AS sortOrder FROM character_groups WHERE id = ?', id)
+}
+
 // A group and a character outside any group by their place on the home list, top down.
 export type HomeEntry = { kind: 'group' | 'character'; id: number }
 

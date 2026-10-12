@@ -77,6 +77,24 @@ export function listCharacters(db: SQLiteDatabase) {
   `)
 }
 
+export function listGroupCharacters(db: SQLiteDatabase, groupId: number) {
+  return db.getAllAsync<CharacterPreview>(`
+    SELECT ${CHARACTER_COLUMNS},
+      (SELECT ${PREVIEW} FROM messages m JOIN chats ch ON ch.id = m.chat_id
+        WHERE ch.character_id = c.id ORDER BY m.id DESC LIMIT 1) AS lastMessage,
+      COALESCE(
+        (SELECT m.created_at FROM messages m JOIN chats ch ON ch.id = m.chat_id
+          WHERE ch.character_id = c.id ORDER BY m.id DESC LIMIT 1),
+        c.created_at
+      ) AS lastActivity,
+      (SELECT COUNT(*) FROM chats ch WHERE ch.character_id = c.id) AS chatCount,
+      c.group_id AS groupId, c.sort_order AS sortOrder
+    FROM characters c
+    WHERE c.group_id = ?
+    ORDER BY c.sort_order DESC, c.id DESC
+  `, groupId)
+}
+
 // Saves the order the user dragged the characters into; ids run from the top down.
 export function setCharacterOrder(db: SQLiteDatabase, ids: number[]) {
   return db.withTransactionAsync(async () => {

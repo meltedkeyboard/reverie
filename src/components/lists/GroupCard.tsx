@@ -1,6 +1,4 @@
-import { useEffect } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 
 import type { CharacterPreview } from '@/db/characters'
 import type { CharacterGroup } from '@/db/groups'
@@ -17,8 +15,7 @@ import type { MenuItem } from '../overlays/NativeMenu'
 type Props = {
   group: CharacterGroup
   members: CharacterPreview[]
-  expanded: boolean
-  onToggle: () => void
+  onOpen: () => void
   // A swipe to the left: the group with all its characters, after asking.
   onDelete: () => void
   // A swipe to the right: the characters stay, the group goes.
@@ -30,22 +27,11 @@ type Props = {
 }
 
 // As tall as a character's card: up to three faces in circles as on a room's card, the
-// group's own name or else its members' names, and an arrow that turns as it opens.
-export function GroupCard({ group, members, expanded, onToggle, onDelete, onUngroup, menu, editing, onDropCards, onProvide }: Props) {
+// group's own name or else its members' names, and a chevron pointing right to open the group.
+export function GroupCard({ group, members, onOpen, onDelete, onUngroup, menu, editing, onDropCards, onProvide }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t, locale } = useTranslation()
-  const turn = useSharedValue(expanded ? 1 : 0)
-  const spin = (open: boolean) => {
-    turn.value = withSpring(open ? 1 : 0, { duration: 350, dampingRatio: 1 })
-  }
-  useEffect(() => spin(expanded), [expanded])
-  // The arrow turns at the tap, before the list has rendered the members.
-  const toggle = () => {
-    spin(!expanded)
-    onToggle()
-  }
-  const arrow = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value * 90}deg` }] }))
   const names = members.map((m) => m.name).join(', ')
 
   return (
@@ -61,17 +47,13 @@ export function GroupCard({ group, members, expanded, onToggle, onDelete, onUngr
         solid
         longPressDrag={false}
         editing={editing}
-        onOpen={unlessDragging(toggle)}
+        onOpen={unlessDragging(onOpen)}
         onDelete={onDelete}
         leading={{ label: t('groups.ungroup'), icon: 'albums-outline', color: colors.accent, onAction: onUngroup }}
         menu={menu}
         menuTitle={group.name ?? names}
         style={styles.card}
-        trailing={
-          <Animated.View style={arrow} accessibilityLabel={expanded ? t('groups.collapse') : t('groups.expand')}>
-            <SFIcon name="chevron.right" fallback="chevron-forward" size={16} color={colors.textFaint} />
-          </Animated.View>
-        }
+        trailing={<SFIcon name="chevron.right" fallback="chevron-forward" size={16} color={colors.textFaint} />}
       >
         <View style={styles.faces}>
           <AvatarStack cast={members} size={40} max={3} viewable={false} />
