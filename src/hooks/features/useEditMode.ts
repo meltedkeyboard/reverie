@@ -1,19 +1,19 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSharedValue } from 'react-native-reanimated'
 
 import { setEditMotion } from '@/components/lists/ListCard'
-import { useLastChatContext } from '@/hooks/chat/useLastChat'
+import { Context as LastChatContext } from '@/hooks/chat/useLastChat'
 
-// The edit mode of a home list: the cards' motion, the ticked ids, and the props of the
-// button that switches it. The continue button is away meanwhile.
+// The edit mode of a list: the cards' motion, the ticked ids, and the props of the
+// button that switches it. The continue button is away meanwhile if present.
 export function useEditMode(onChange?: (on: boolean) => void) {
   const [editing, setEditing] = useState(false)
   const [checked, setChecked] = useState<Set<number>>(new Set())
-  const { setSuspended } = useLastChatContext()
+  const lastChat = useContext(LastChatContext)
   useEffect(() => {
-    setSuspended(editing)
-    return () => setSuspended(false)
-  }, [editing, setSuspended])
+    lastChat?.setSuspended(editing)
+    return () => lastChat?.setSuspended(false)
+  }, [editing, lastChat])
 
   // Driven from here, so the cards start moving at the touch, not after the list renders.
   const progress = useSharedValue(0)
