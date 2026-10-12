@@ -40,6 +40,7 @@ export function useServerForm(onChange?: () => void) {
   const onTest = async () => {
     const found = await test(cfg)
     if (found.length === 1 && !found.includes(cfg.model)) update({ model: found[0] })
+    return found
   }
 
   return { cfg, setCfg, loaded, update, status, models, modelItems, onTest }

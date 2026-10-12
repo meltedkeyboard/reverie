@@ -121,7 +121,8 @@ type ReasoningOption = 'off' | 'on' | 'low' | 'medium' | 'high'
 type NativeModel = {
   type: string
   key: string
-  loaded_instances?: { id: string }[]
+  max_context_length?: number
+  loaded_instances?: { id: string; config?: { context_length?: number } }[]
   capabilities?: { reasoning?: { allowed_options: ReasoningOption[]; default: ReasoningOption } }
 }
 
@@ -152,6 +153,68 @@ async function detectServer(cfg: ServerSettings, base: string) {
   return server
 }
 
+export type LoadedModelInfo = {
+  isLoaded: boolean
+  loadedContextLength?: number
+  maxContextLength?: number
+  modelName?: string
+}
+
+export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Promise<LoadedModelInfo> {
+  const base = normalizeBaseUrl(cfg.baseUrl)
+  const modelName = cfg.model.trim()
+  if (!base || !modelName) return { isLoaded: false }
+
+  if (fresh) {
+    serverKinds.delete(base)
+  }
+  const server = await detectServer(cfg, base)
+
+  if (server.kind === 'lmstudio') {
+    const llms = server.models.filter((m) => m.type === 'llm')
+    const match =
+      llms.find(
+        (m) =>
+          m.key === modelName ||
+          m.key.toLowerCase() === modelName.toLowerCase() ||
+          m.loaded_instances?.some((i) => i.id === modelName || i.id.toLowerCase() === modelName.toLowerCase()),
+      ) ??
+      llms.find(
+        (m) =>
+          m.key.toLowerCase().startsWith(modelName.toLowerCase()) ||
+          modelName.toLowerCase().startsWith(m.key.toLowerCase()),
+      ) ??
+      llms.find((m) => m.loaded_instances && m.loaded_instances.length > 0)
+
+    if (match && match.loaded_instances && match.loaded_instances.length > 0) {
+      const instance = match.loaded_instances[0]
+      const loadedContext = instance.config?.context_length
+      return {
+        isLoaded: true,
+        loadedContextLength: typeof loadedContext === 'number' ? loadedContext : undefined,
+        maxContextLength: typeof match.max_context_length === 'number' ? match.max_context_length : undefined,
+        modelName: instance.id || match.key,
+      }
+    }
+
+    return {
+      isLoaded: false,
+      maxContextLength: typeof match?.max_context_length === 'number' ? match.max_context_length : undefined,
+    }
+  }
+
+  if (server.kind === 'ollama') {
+    const ps = await probeJson(cfg, `${base}/api/ps`)
+    const models = Array.isArray(ps?.models) ? ps.models : []
+    const isLoaded = models.some(
+      (m: { name?: string; model?: string }) => m.name === modelName || m.model === modelName,
+    )
+    return { isLoaded }
+  }
+
+  return { isLoaded: false }
+}
+
 // llama.cpp and vLLM switch thinking with chat_template_kwargs. LM Studio and Ollama
 // ignore it and take reasoning_effort instead, where "none" is off and any other
 // effort is on. LM Studio rejects a setting the model doesn't allow, so it is checked
@@ -180,7 +243,7 @@ async function reasoningFields(cfg: ServerSettings, base: string, mode: Thinking
 // Loads the model into memory, which on a big one takes a while, so there is no deadline.
 // LM Studio and Ollama have a call for it; llama.cpp and vLLM serve the model they were
 // started with, so there is nothing to load and the connection is all that is checked.
-export async function loadModel(cfg: ServerSettings) {
+export async function loadModel(cfg: ServerSettings): Promise<{ loadedContextLength?: number }> {
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) throw new Error(t('llm.baseUrlMissing'))
   const model = cfg.model.trim()
@@ -191,11 +254,15 @@ export async function loadModel(cfg: ServerSettings) {
   const server = await detectServer(cfg, base)
   if (server.kind === 'other') {
     await testConnection(cfg)
-    return
+    return {}
   }
 
+  const contextLength = cfg.contextTokens
+
   const [path, body] =
-    server.kind === 'lmstudio' ? ['/api/v1/models/load', { model }] : ['/api/generate', { model, prompt: '', stream: false }]
+    server.kind === 'lmstudio'
+      ? ['/api/v1/models/load', { model, context_length: contextLength, echo_load_config: true }]
+      : ['/api/generate', { model, prompt: '', stream: false, options: { num_ctx: contextLength } }]
   let res
   try {
     res = await fetch(`${base}${path}`, { method: 'POST', headers: requestHeaders(cfg), body: JSON.stringify(body) })
@@ -203,7 +270,22 @@ export async function loadModel(cfg: ServerSettings) {
     throw unreachable(err)
   }
   if (!res.ok) throw await readServerError(res)
-  await res.text().catch(() => '')
+
+  let loadedContextLength: number | undefined
+  try {
+    const text = await res.text()
+    if (text) {
+      const data = JSON.parse(text)
+      if (typeof data?.load_config?.context_length === 'number') {
+        loadedContextLength = data.load_config.context_length
+      }
+    }
+  } catch {
+    // Non-JSON or parsing error
+  }
+
+  serverKinds.delete(base)
+  return { loadedContextLength: loadedContextLength ?? contextLength }
 }
 
 async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: boolean, signal?: AbortSignal) {

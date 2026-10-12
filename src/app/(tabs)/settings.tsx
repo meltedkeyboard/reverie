@@ -1,11 +1,11 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
-import { loadModel } from '@/api/llm'
+import { inspectLoadedModel, loadModel, type LoadedModelInfo } from '@/api/llm'
 import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/prefs/appLock'
@@ -31,7 +31,8 @@ import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useServerForm } from '@/hooks/features/useServerForm'
 import { useStoredFlag } from '@/hooks/util/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
-import { CONTEXT_STEPS, type ContextMode } from '@/lib/core/context'
+import { CONTEXT_STEPS, formatContextTokens, formatTokensLabel, type ContextMode } from '@/lib/core/context'
+import { SFIcon } from '@/components/visuals/SFIcon'
 import { ChipRowCell } from '@/components/lists/PictureCells'
 import { BackupTreeSheet } from '@/components/overlays/BackupTreeSheet'
 import { exportBackup, loadBackupTree, wipeAllData } from '@/lib/transfer/backup'
@@ -47,12 +48,13 @@ import type { SettingsSection } from '@/lib/core/searchScope'
 import { isShownInFiles } from '@/lib/core/storage'
 import { reportError } from '@/lib/transfer/report'
 import { isAndroid } from '@/lib/core/platform'
-import { type Colors, useStyles } from '@/theme'
+import { type Colors, useColors, useStyles } from '@/theme'
 
 
 export default function SettingsScreen() {
   const db = useDatabase()
   const router = useRouter()
+  const colors = useColors()
   const padding = useScreenPadding('form')
   const styles = useStyles(createStyles)
   const { t, locale, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
@@ -110,7 +112,40 @@ export default function SettingsScreen() {
   // The context slider shows once the model is loaded; another server or model starts over.
   const [loadingModel, setLoadingModel] = useState(false)
   const [modelLoaded, setModelLoaded] = useState(false)
-  const { cfg, setCfg, loaded, update, status, models, modelItems, onTest } = useServerForm(() => setModelLoaded(false))
+  const [loadedModelInfo, setLoadedModelInfo] = useState<LoadedModelInfo | null>(null)
+  const { cfg, setCfg, loaded, update, status, models, modelItems, onTest: runTest } = useServerForm(() => {
+    setModelLoaded(false)
+    setLoadedModelInfo(null)
+  })
+
+  const checkModelStatus = useCallback(async (currentCfg: typeof cfg, fresh = false) => {
+    if (!currentCfg.baseUrl.trim() || !currentCfg.model.trim()) {
+      setLoadedModelInfo(null)
+      return
+    }
+    try {
+      const info = await inspectLoadedModel(currentCfg, fresh)
+      setLoadedModelInfo(info)
+      if (info.isLoaded) setModelLoaded(true)
+    } catch {
+      // Ignore background probe errors
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!loaded) return
+    checkModelStatus(cfg)
+  }, [loaded, cfg.baseUrl, cfg.model, checkModelStatus])
+
+  const onTest = async () => {
+    const found = await runTest()
+    if (found.length === 1 && !found.includes(cfg.model)) {
+      update({ model: found[0] })
+      checkModelStatus({ ...cfg, model: found[0] }, true)
+    } else if (cfg.model.trim()) {
+      checkModelStatus(cfg, true)
+    }
+  }
   // What is typed in the message-count fields: it may be empty on the way to a new number.
   const [messageDrafts, setMessageDrafts] = useState<{ chatMessages?: string; roomMessages?: string }>({})
   const setMessages = (field: 'chatMessages' | 'roomMessages', text: string) => {
@@ -235,8 +270,12 @@ export default function SettingsScreen() {
   const onLoadModel = async () => {
     setLoadingModel(true)
     try {
-      await loadModel(cfg)
+      const result = await loadModel(cfg)
       setModelLoaded(true)
+      setLoadedModelInfo({
+        isLoaded: true,
+        loadedContextLength: result?.loadedContextLength ?? cfg.contextTokens,
+      })
       notificationAsync(NotificationFeedbackType.Success)
     } catch (err) {
       notificationAsync(NotificationFeedbackType.Error)
@@ -403,6 +442,61 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
+  const isLoaded = modelLoaded || Boolean(loadedModelInfo?.isLoaded)
+  const loadedCtx = loadedModelInfo?.loadedContextLength
+
+  const contextBanner = isLoaded ? (
+    loadedCtx ? (
+      cfg.contextMode === 'tokens' && cfg.contextTokens !== loadedCtx ? (
+        <Pressable
+          onPress={onLoadModel}
+          disabled={loadingModel || !cfg.baseUrl.trim() || !cfg.model.trim()}
+          style={({ pressed }) => [
+            styles.contextBanner,
+            styles.contextBannerMismatch,
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <SFIcon name="exclamationmark.triangle.fill" fallback="warning" size={16} color={colors.accent} />
+          <Text style={styles.contextBannerText}>
+            {t('settings.contextLoadedMismatch', {
+              loaded: formatContextTokens(loadedCtx),
+              chosen: formatTokensLabel(cfg.contextTokens),
+            })}
+          </Text>
+        </Pressable>
+      ) : (
+        <View style={styles.contextBanner}>
+          <SFIcon name="checkmark.circle.fill" fallback="checkmark-circle" size={16} color={colors.success} />
+          <Text style={styles.contextBannerText}>
+            {t('settings.contextLoadedWindow', {
+              window: formatContextTokens(loadedCtx),
+            })}
+          </Text>
+        </View>
+      )
+    ) : (
+      <View style={styles.contextBanner}>
+        <SFIcon name="info.circle.fill" fallback="information-circle" size={16} color={colors.textMuted} />
+        <Text style={styles.contextBannerText}>{t('settings.contextModelLoadedNoTokens')}</Text>
+      </View>
+    )
+  ) : null
+
+  const contextFooter = (
+    <>
+      {contextBanner}
+      {cfg.contextMode === 'messages' ? (
+        <>
+          <ListFooter>{t('settings.contextMessagesHint')}</ListFooter>
+          {cfg.chatMessages > 1000 || cfg.roomMessages > 1000 ? <ListFooter danger>{t('settings.contextMessagesWarning')}</ListFooter> : null}
+        </>
+      ) : (
+        <ListFooter>{t('settings.contextHint')}</ListFooter>
+      )}
+    </>
+  )
+
   const server = (
     <>
       <ListSection
@@ -434,7 +528,15 @@ export default function SettingsScreen() {
         />
         {/* Typed by hand until the server has listed its models, then picked from them. */}
         {models.length > 0 ? (
-          <ChipChoiceCell label={t('settings.modelLabel')} options={models} value={cfg.model} onChange={(model) => update({ model })} />
+          <ChipChoiceCell
+            label={t('settings.modelLabel')}
+            options={models}
+            value={cfg.model}
+            onChange={(model) => {
+              update({ model })
+              checkModelStatus({ ...cfg, model }, true)
+            }}
+          />
         ) : (
           <InputCell
             label={t('settings.modelLabel')}
@@ -457,16 +559,7 @@ export default function SettingsScreen() {
 
       <ListSection
         header={t('settings.contextLabel')}
-        footer={
-          cfg.contextMode === 'messages' ? (
-            <>
-              <ListFooter>{t('settings.contextMessagesHint')}</ListFooter>
-              {cfg.chatMessages > 1000 || cfg.roomMessages > 1000 ? <ListFooter danger>{t('settings.contextMessagesWarning')}</ListFooter> : null}
-            </>
-          ) : modelLoaded ? (
-            t('settings.contextHint')
-          ) : null
-        }
+        footer={contextFooter}
       >
         <ChipRowCell
           actions={CONTEXT_OPTIONS.map((o) => ({ label: o.label, active: cfg.contextMode === o.value, onPress: () => update({ contextMode: o.value }) }))}
@@ -486,8 +579,7 @@ export default function SettingsScreen() {
               keyboardType="number-pad"
             />
           </>
-        ) : null}
-        {cfg.contextMode === 'tokens' && modelLoaded ? (
+        ) : (
           // A step of the slider, not a token count: the sizes models come in are doublings.
           <SliderCell
             label={t('settings.contextTokensLabel')}
@@ -498,7 +590,7 @@ export default function SettingsScreen() {
             formatValue={(i) => `${CONTEXT_STEPS[i] / 1024}K`}
             onChange={(i) => update({ contextTokens: CONTEXT_STEPS[i] })}
           />
-        ) : null}
+        )}
       </ListSection>
     </>
   )
@@ -658,4 +750,26 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     // Reaches a little past the block, so the tint frames it instead of hugging the text.
     flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 30 },
+    contextBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      marginTop: 8,
+      marginBottom: 6,
+      borderRadius: 14,
+      backgroundColor: colors.surfaceRaised,
+    },
+    contextBannerMismatch: {
+      backgroundColor: colors.accentSoft,
+      borderWidth: 1,
+      borderColor: colors.accentBorder,
+    },
+    contextBannerText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.text,
+    },
   })

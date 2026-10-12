@@ -58,3 +58,19 @@ export function selectHistory<T>(
   if (cfg.contextMode === 'messages') return items.slice(-messages)
   return fitHistory(items, cost, { contextTokens: cfg.contextTokens, system, maxTokens })
 }
+
+export function formatTokensLabel(tokens: number): string {
+  if (tokens >= 1024 && tokens % 1024 === 0) {
+    return `${tokens / 1024}K`
+  }
+  if (tokens >= 1024) {
+    return `${(tokens / 1024).toFixed(1)}K`
+  }
+  return String(tokens)
+}
+
+export function formatContextTokens(tokens: number): string {
+  const short = formatTokensLabel(tokens)
+  const formattedCount = tokens >= 1000 ? String(tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : String(tokens)
+  return `${short} (${formattedCount})`
+}
