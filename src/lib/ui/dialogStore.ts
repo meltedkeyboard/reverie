@@ -6,9 +6,11 @@ export type AppDialog =
   | {
       kind: 'sheet'
       title?: string
+      message?: string
       actions: (Pick<SheetAction, 'label' | 'destructive'> & { onSelect: () => void })[]
       // Web: where the click was, so the menu opens there instead of at the bottom.
       anchor?: { x: number; y: number } | null
+      onCancel?: () => void
     }
   // Web: a question with a confirm button and, if cancelable, a cancel one; a notice has none.
   | {

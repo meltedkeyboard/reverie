@@ -1,6 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
+import { SFIcon } from '@/components/visuals/SFIcon'
 import { useState } from 'react'
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   interpolate,
@@ -12,7 +13,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets'
 
 import * as Haptics from '@/lib/ui/haptics'
-import { type Colors, ON_ACCENT, useStyles } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 type Props = {
   onDelete: () => void
@@ -20,6 +21,10 @@ type Props = {
   radius: number
   // Accessibility label of the trash button.
   label: string
+  actionLabel?: string
+  actionIcon?: React.ComponentProps<typeof Icon>['name']
+  actionIconSF?: React.ComponentProps<typeof SFIcon>['name']
+  actionColor?: string
   // Makes the content itself tappable, with a small press effect.
   onPress?: () => void
   contentLabel?: string
@@ -40,12 +45,27 @@ const GAP = 8
 const REVEAL = TRASH + GAP
 // Width of the strip along the left edge that is left to the system's swipe back.
 const EDGE = 24
-const SPRING ={ damping: 24, stiffness: 240 }
+const SPRING = { damping: 24, stiffness: 240 }
 
 // Like a row in an iOS list: a swipe to the left uncovers a trash button, and a long
 // swipe deletes at once. The one place this gesture lives, for cards and the continue
 // button alike.
-export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, throwAway = false, disabled = false, leading, children }: Props) {
+export function SwipeToDelete({
+  onDelete,
+  radius,
+  label,
+  actionLabel,
+  actionIcon,
+  actionIconSF,
+  actionColor,
+  onPress,
+  contentLabel,
+  throwAway = false,
+  disabled = false,
+  leading,
+  children,
+}: Props) {
+  const colors = useColors()
   const styles = useStyles(createStyles)
   const { width } = useWindowDimensions()
   const [open, setOpen] = useState(false)
@@ -55,6 +75,8 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
   const pressed = useSharedValue(false)
   // Past this pull letting go deletes without a tap on the trash.
   const full = width * 0.5
+  const buttonWidth = actionLabel ? 76 : TRASH
+  const revealWidth = actionLabel ? buttonWidth + GAP : REVEAL
 
   const fire = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -89,7 +111,7 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
       scheduleOnRN(fire)
       return
     }
-    offset.value = withTiming(-width - REVEAL, { duration: 220 }, (finished) => {
+    offset.value = withTiming(-width - revealWidth, { duration: 220 }, (finished) => {
       if (finished) scheduleOnRN(fire)
     })
   }
@@ -98,7 +120,7 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
     .enabled(!disabled)
     .activeOffsetX([-12, 12])
     .failOffsetY([-12, 12])
-    // A touch that starts at the left edge is the system's swipe back, not ours.
+    // A touch that starts at the left edge belongs to the system swipe back gesture.
     .onTouchesDown((e, manager) => {
       if (e.allTouches[0] && e.allTouches[0].x < EDGE) manager.fail()
     })
@@ -123,8 +145,8 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
       } else if (hasLeading && (offset.value > REVEAL / 2 || (offset.value > 0 && e.velocityX > 400))) {
         offset.value = withSpring(REVEAL, SPRING)
         scheduleOnRN(setOpen, true)
-      } else if (-offset.value > REVEAL / 2 || e.velocityX < -400) {
-        offset.value = withSpring(-REVEAL, SPRING)
+      } else if (-offset.value > revealWidth / 2 || e.velocityX < -400) {
+        offset.value = withSpring(-revealWidth, SPRING)
         scheduleOnRN(setOpen, true)
       } else {
         close()
@@ -159,9 +181,9 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
   const trash = useAnimatedStyle(() => {
     const pulled = Math.max(0, -offset.value)
     return {
-      width: Math.max(TRASH, pulled - GAP),
-      opacity: interpolate(pulled, [0, REVEAL * 0.6], [0, 1], 'clamp'),
-      transform: [{ scale: interpolate(pulled, [0, REVEAL], [0.6, 1], 'clamp') }],
+      width: Math.max(buttonWidth, pulled - GAP),
+      opacity: interpolate(pulled, [0, revealWidth * 0.6], [0, 1], 'clamp'),
+      transform: [{ scale: interpolate(pulled, [0, revealWidth], [0.6, 1], 'clamp') }],
     }
   })
 
@@ -193,9 +215,18 @@ export function SwipeToDelete({ onDelete, radius, label, onPress, contentLabel, 
           onPress={trigger}
           accessibilityRole="button"
           accessibilityLabel={label}
-          style={({ pressed: down }) => [styles.trash, { borderRadius: radius }, down && { opacity: 0.8 }]}
+          style={({ pressed: down }) => [
+            styles.trash,
+            { borderRadius: radius, backgroundColor: actionColor ?? colors.danger },
+            down && { opacity: 0.8 },
+          ]}
         >
-          <Icon name="trash" size={22} color={ON_ACCENT} />
+          {actionIconSF || actionIcon ? (
+            <SFIcon name={actionIconSF ?? 'trash'} fallback={actionIcon ?? 'trash'} size={20} color={ON_ACCENT} />
+          ) : (
+            <Icon name="trash" size={22} color={ON_ACCENT} />
+          )}
+          {actionLabel ? <Text style={styles.actionLabelText}>{actionLabel}</Text> : null}
         </Pressable>
       </Animated.View>
       <GestureDetector gesture={Gesture.Exclusive(pan, tap)}>
@@ -213,4 +244,5 @@ const createStyles = (colors: Colors) =>
     trashSlot: { position: 'absolute', right: 0, top: 0, bottom: 0 },
     leadingSlot: { position: 'absolute', left: 0, top: 0, bottom: 0 },
     trash: { flex: 1, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
+    actionLabelText: { color: ON_ACCENT, fontSize: 11, fontWeight: '600', marginTop: 3 },
   })

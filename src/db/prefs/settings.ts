@@ -5,6 +5,8 @@ import {
   CONTEXT_MODES,
   CONTEXT_STEPS,
   DEFAULT_CONTEXT_TOKENS,
+  MAX_CONTEXT_TOKENS,
+  MIN_CONTEXT_TOKENS,
   ROOM_MESSAGES,
   type ContextMode,
 } from '@/lib/core/context'
@@ -16,8 +18,9 @@ export type ServerSettings = {
   model: string
   // The model's context window, as set by hand: it changes with the model, so it is not per character.
   contextTokens: number
-  contextMode: ContextMode
-  // How many of the latest messages the 'messages' mode sends, in chats and in rooms separately.
+  // Whether to limit history by message count in addition to the token window.
+  limitMessages: boolean
+  // How many of the latest messages to send when limitMessages is on, in chats and in rooms separately.
   chatMessages: number
   roomMessages: number
 }
@@ -27,7 +30,7 @@ export const DEFAULT_SETTINGS: ServerSettings = {
   apiKey: '',
   model: '',
   contextTokens: DEFAULT_CONTEXT_TOKENS,
-  contextMode: 'messages',
+  limitMessages: false,
   chatMessages: CHAT_MESSAGES,
   roomMessages: ROOM_MESSAGES,
 }
@@ -37,7 +40,7 @@ const KEYS = {
   apiKey: 'api_key',
   model: 'model',
   contextTokens: 'context_tokens',
-  contextMode: 'context_mode',
+  limitMessages: 'context_limit_messages',
   chatMessages: 'context_chat_messages',
   roomMessages: 'context_room_messages',
 } as const
@@ -106,18 +109,26 @@ export function defineChoice<T extends string>(key: string, allowed: readonly T[
 
 function storedContext(value: string | undefined) {
   const n = Number(value)
-  return (CONTEXT_STEPS as readonly number[]).includes(n) ? n : DEFAULT_SETTINGS.contextTokens
+  return Number.isSafeInteger(n) && n >= MIN_CONTEXT_TOKENS && n <= MAX_CONTEXT_TOKENS
+    ? n
+    : DEFAULT_SETTINGS.contextTokens
 }
 
 export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> {
   const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM app_settings')
   const stored = new Map(rows.map((r) => [r.key, r.value]))
+  const rawLimit = stored.get(KEYS.limitMessages)
+  const limitMessages =
+    rawLimit !== undefined
+      ? rawLimit === '1' || rawLimit === 'true'
+      : stored.get('context_mode') === 'messages'
+
   return {
     baseUrl: stored.get(KEYS.baseUrl) ?? DEFAULT_SETTINGS.baseUrl,
     apiKey: stored.get(KEYS.apiKey) ?? DEFAULT_SETTINGS.apiKey,
     model: stored.get(KEYS.model) ?? DEFAULT_SETTINGS.model,
     contextTokens: storedContext(stored.get(KEYS.contextTokens)),
-    contextMode: CONTEXT_MODES.find((m) => m === stored.get(KEYS.contextMode)) ?? DEFAULT_SETTINGS.contextMode,
+    limitMessages,
     chatMessages: positiveInt(stored.get(KEYS.chatMessages), DEFAULT_SETTINGS.chatMessages),
     roomMessages: positiveInt(stored.get(KEYS.roomMessages), DEFAULT_SETTINGS.roomMessages),
   }
@@ -132,8 +143,10 @@ export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
   const next = saveQueue.then(() =>
     db.withTransactionAsync(async () => {
       for (const field of Object.keys(KEYS) as (keyof typeof KEYS)[]) {
-        await setSetting(db, KEYS[field], String(settings[field]))
+        const val = field === 'limitMessages' ? (settings.limitMessages ? '1' : '0') : String(settings[field])
+        await setSetting(db, KEYS[field], val)
       }
+      await setSetting(db, 'context_mode', settings.limitMessages ? 'messages' : 'tokens')
     })
   )
   saveQueue = next.catch(() => {})

@@ -1,6 +1,9 @@
 import type { ChatTurn } from '@/api/llm'
 
-// The slider in Settings moves between these; the stored value is the token count.
+// The context slider in Settings steps by 1,000 tokens (1K).
+export const MIN_CONTEXT_TOKENS = 1000
+export const MAX_CONTEXT_TOKENS = 256000
+export const CONTEXT_STEP_TOKENS = 1000
 export const CONTEXT_STEPS = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144] as const
 export const DEFAULT_CONTEXT_TOKENS = 8192
 
@@ -45,26 +48,32 @@ export function fitHistory<T>(
   return items.slice(from)
 }
 
-type Window = { contextMode: ContextMode; contextTokens: number }
+// Window settings for history selection: contextTokens is the fundamental budget,
+// and limitMessages optionally caps the candidate history to the latest messages.
+type Window = { contextTokens: number; limitMessages?: boolean; contextMode?: ContextMode }
 
-// The history a request carries, by the mode chosen in Settings; `messages` is how many
-// the first mode keeps.
+// The history a request carries: fits within the token budget `contextTokens`.
+// If `limitMessages` is on and `messages` is given, only the latest `messages` items are considered.
 export function selectHistory<T>(
   items: T[],
   cost: (item: T) => number,
   cfg: Window,
-  { messages, system, maxTokens }: { messages: number; system: string; maxTokens: number }
+  { messages, system, maxTokens }: { messages?: number; system: string; maxTokens: number }
 ) {
-  if (cfg.contextMode === 'messages') return items.slice(-messages)
-  return fitHistory(items, cost, { contextTokens: cfg.contextTokens, system, maxTokens })
+  const shouldLimit = cfg.limitMessages ?? (cfg.contextMode === 'messages')
+  const capped = shouldLimit && typeof messages === 'number' && messages > 0 ? items.slice(-messages) : items
+  return fitHistory(capped, cost, { contextTokens: cfg.contextTokens, system, maxTokens })
 }
 
 export function formatTokensLabel(tokens: number): string {
+  if (tokens >= 1000 && tokens % 1000 === 0) {
+    return `${tokens / 1000}K`
+  }
   if (tokens >= 1024 && tokens % 1024 === 0) {
     return `${tokens / 1024}K`
   }
-  if (tokens >= 1024) {
-    return `${(tokens / 1024).toFixed(1)}K`
+  if (tokens >= 1000) {
+    return `${Number((tokens / 1000).toFixed(1))}K`
   }
   return String(tokens)
 }

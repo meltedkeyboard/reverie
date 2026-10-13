@@ -32,23 +32,49 @@ export type TextPrompt = {
   onSubmit: (text: string) => void
 }
 
-export function showSheet(title: string | undefined, items: SheetAction[]) {
+export type SheetOptions = {
+  message?: string
+  onCancel?: () => void
+}
+
+export function showSheet(
+  title: string | undefined,
+  items: SheetAction[],
+  optionsOrCancel?: SheetOptions | (() => void)
+) {
+  const options = typeof optionsOrCancel === 'function' ? { onCancel: optionsOrCancel } : optionsOrCancel
   const actions = items.map(({ label, destructive, onSelect, children }) => ({
     label,
     destructive,
-    onSelect: children ? () => showSheet(label, children) : (onSelect ?? (() => {})),
+    onSelect: children ? () => showSheet(label, children, options) : (onSelect ?? (() => {})),
   }))
   // Everywhere but iOS the sheet is drawn by the app; on the web it opens where the click was.
-  if (!isIOS) return openDialog({ kind: 'sheet', title, actions, anchor: isWeb ? lastPointer() : undefined })
+  if (!isIOS) {
+    return openDialog({
+      kind: 'sheet',
+      title,
+      message: options?.message,
+      actions,
+      anchor: isWeb ? lastPointer() : undefined,
+      onCancel: options?.onCancel,
+    })
+  }
   const destructive = actions.findIndex((action) => action.destructive)
   ActionSheetIOS.showActionSheetWithOptions(
     {
       title,
+      message: options?.message,
       options: [...actions.map((action) => action.label), t('common.cancel')],
       destructiveButtonIndex: destructive >= 0 ? destructive : undefined,
       cancelButtonIndex: actions.length,
     },
-    (index) => actions[index]?.onSelect()
+    (index) => {
+      if (index === actions.length) {
+        options?.onCancel?.()
+      } else {
+        actions[index]?.onSelect()
+      }
+    }
   )
 }
 

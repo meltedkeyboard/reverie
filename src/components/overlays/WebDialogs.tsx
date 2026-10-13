@@ -50,7 +50,14 @@ export function WebDialogHost() {
 
   const dimStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, pop.value) }))
 
-  useWindowKey(isKey('Escape'), closeDialog, !!live)
+  useWindowKey(
+    isKey('Escape'),
+    () => {
+      if (dialog?.kind === 'confirm' || dialog?.kind === 'sheet') dialog.onCancel?.()
+      closeDialog()
+    },
+    !!live,
+  )
 
   if (!dialog) return null
   const menu = dialog.kind === 'sheet'
@@ -59,7 +66,7 @@ export function WebDialogHost() {
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={() => {
-          if (dialog.kind === 'confirm') dialog.onCancel?.()
+          if (dialog.kind === 'confirm' || dialog.kind === 'sheet') dialog.onCancel?.()
           closeDialog()
         }}
       />
@@ -107,8 +114,13 @@ function Menu({ dialog, pop }: { dialog: Sheet; pop: SharedValue<number> }) {
   return (
     <Animated.View style={[styles.menu, position, { transformOrigin: origin }, popStyle]} onLayout={onLayout}>
       {dialog.title ? (
-        <Text style={styles.menuTitle} numberOfLines={1}>
+        <Text style={styles.menuTitle} numberOfLines={2}>
           {dialog.title}
+        </Text>
+      ) : null}
+      {dialog.message ? (
+        <Text style={styles.menuMessage}>
+          {dialog.message}
         </Text>
       ) : null}
       {dialog.actions.map((action, index) => (
@@ -222,7 +234,8 @@ const createStyles = (colors: Colors) =>
       borderColor: colors.borderStrong,
       boxShadow: '0 8px 28px rgba(0, 0, 0, 0.35)',
     },
-    menuTitle: { color: colors.textFaint, fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 },
+    menuTitle: { color: colors.text, fontSize: 13, fontWeight: '600', paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2 },
+    menuMessage: { color: colors.textMuted, fontSize: 12, lineHeight: 16, paddingHorizontal: 10, paddingBottom: 6 },
     menuRow: { paddingHorizontal: 10, paddingVertical: isDesktop ? 6 : 8, borderRadius: isDesktop ? 5 : 8 },
     menuLabel: { color: colors.text, fontSize: 14 },
     window: {

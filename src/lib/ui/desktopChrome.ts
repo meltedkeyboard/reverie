@@ -41,6 +41,14 @@ export function usePageZoom() {
 // keyboard, no zoom of the whole window, and the system buttons tinted to the title bar.
 export function applyDesktopChrome(colors: Colors) {
   if (typeof document === 'undefined') return
+  let fontLink = document.getElementById('reverie-font-instrument-serif') as HTMLLinkElement | null
+  if (!fontLink) {
+    fontLink = document.createElement('link')
+    fontLink.id = 'reverie-font-instrument-serif'
+    fontLink.rel = 'stylesheet'
+    fontLink.href = 'https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap'
+    document.head.appendChild(fontLink)
+  }
   let el = document.getElementById('reverie-desktop') as HTMLStyleElement | null
   if (!el) {
     el = document.createElement('style')
@@ -48,6 +56,7 @@ export function applyDesktopChrome(colors: Colors) {
     document.head.appendChild(el)
   }
   el.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
     html, body { overscroll-behavior: none; background: ${colors.bg}; }
     body {
       user-select: none;

@@ -1,11 +1,20 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
-import { inspectLoadedModel, loadModel, resetSkippedModelMismatch, type LoadedModelInfo } from '@/api/llm'
+import {
+  inspectLoadedModel,
+  listLoadedModels,
+  loadModel,
+  resetSkippedModelMismatch,
+  unloadAllModels,
+  unloadSingleModel,
+  type LoadedModelEntry,
+  type LoadedModelInfo,
+} from '@/api/llm'
 import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/prefs/appLock'
@@ -25,29 +34,36 @@ import {
 } from '@/db/recentAttachments'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/prefs/privateChat'
 import { useDatabase, useShowInFiles } from '@/db/provider'
-import { DEFAULT_SETTINGS, saveSettings, typedCount } from '@/db/prefs/settings'
+import { DEFAULT_SETTINGS, saveSettings, typedCount, type ServerSettings } from '@/db/prefs/settings'
 import { isSuggestionsEnabled, setSuggestionsEnabled } from '@/db/prefs/suggestions'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useServerForm } from '@/hooks/features/useServerForm'
 import { useStoredFlag } from '@/hooks/util/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
-import { CONTEXT_STEPS, formatContextTokens, formatTokensLabel, type ContextMode } from '@/lib/core/context'
+import {
+  CONTEXT_STEP_TOKENS,
+  MAX_CONTEXT_TOKENS,
+  MIN_CONTEXT_TOKENS,
+  formatContextTokens,
+  formatTokensLabel,
+} from '@/lib/core/context'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { ChipRowCell } from '@/components/lists/PictureCells'
+import { SwipeToDelete } from '@/components/lists/SwipeToDelete'
 import { BackupTreeSheet } from '@/components/overlays/BackupTreeSheet'
 import { exportBackup, loadBackupTree, wipeAllData } from '@/lib/transfer/backup'
 import { useBackupImport } from '@/hooks/features/useBackupImport'
 import type { BackupTree, Selection } from '@/lib/transfer/backupSelection'
 import { alternateIconsAvailable, currentAppIcon } from '@/lib/settings/appIcons'
-import { confirm } from '@/lib/ui/dialogs'
+import { confirm, showSheet } from '@/lib/ui/dialogs'
 import { showToast } from '@/lib/ui/toast'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import { formatWhen } from '@/lib/core/format'
-import { notificationAsync, NotificationFeedbackType } from '@/lib/ui/haptics'
+import { notificationAsync, NotificationFeedbackType, selectionAsync } from '@/lib/ui/haptics'
 import type { SettingsSection } from '@/lib/core/searchScope'
 import { isShownInFiles } from '@/lib/core/storage'
 import { reportError } from '@/lib/transfer/report'
-import { isAndroid } from '@/lib/core/platform'
+import { isAndroid, isDesktop } from '@/lib/core/platform'
 import { type Colors, useColors, useStyles } from '@/theme'
 
 
@@ -95,10 +111,6 @@ export default function SettingsScreen() {
     </View>
   )
 
-  const CONTEXT_OPTIONS: { value: ContextMode; label: string }[] = [
-    { value: 'messages', label: t('settings.contextMessages') },
-    { value: 'tokens', label: t('settings.contextTokens') },
-  ]
   const CONTINUE_OPTIONS: { value: 'visit' | 'message'; label: string }[] = [
     { value: 'visit', label: t('settings.continueByVisit') },
     { value: 'message', label: t('settings.continueByMessage') },
@@ -111,23 +123,38 @@ export default function SettingsScreen() {
 
   // The context slider shows once the model is loaded; another server or model starts over.
   const [loadingModel, setLoadingModel] = useState(false)
+  const loadingModelRef = useRef(false)
   const [modelLoaded, setModelLoaded] = useState(false)
   const [loadedModelInfo, setLoadedModelInfo] = useState<LoadedModelInfo | null>(null)
+  const [loadedModels, setLoadedModels] = useState<LoadedModelEntry[]>([])
+  const [selectedModelIndex, setSelectedModelIndex] = useState<number | null>(null)
+  const [unloadingModelIds, setUnloadingModelIds] = useState<Set<string>>(new Set())
+  const [unloadingAll, setUnloadingAll] = useState(false)
   const { cfg, setCfg, loaded, update, status, models, modelItems, onTest: runTest } = useServerForm(() => {
     setModelLoaded(false)
     setLoadedModelInfo(null)
   })
 
+  const cfgRef = useRef(cfg)
+  cfgRef.current = cfg
+
   const checkModelStatus = useCallback(async (currentCfg: typeof cfg, fresh = false) => {
-    if (!currentCfg.baseUrl.trim() || !currentCfg.model.trim()) {
+    if (loadingModelRef.current) return
+    if (!currentCfg.baseUrl.trim()) {
       setLoadedModelInfo(null)
       setModelLoaded(false)
+      setLoadedModels([])
       return
     }
     try {
-      const info = await inspectLoadedModel(currentCfg, fresh)
+      const [info, list] = await Promise.all([
+        inspectLoadedModel(currentCfg, fresh),
+        listLoadedModels(currentCfg, fresh),
+      ])
+      if (loadingModelRef.current) return
       setLoadedModelInfo(info)
-      setModelLoaded(info.isLoaded)
+      setModelLoaded(info.isLoaded || list.length > 0)
+      setLoadedModels(list)
     } catch {
       // Ignore background probe errors
     }
@@ -140,8 +167,13 @@ export default function SettingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (loaded) checkModelStatus(cfg, true)
-    }, [loaded, cfg, checkModelStatus]),
+      if (!loaded) return
+      checkModelStatus(cfgRef.current, true)
+      const interval = setInterval(() => {
+        checkModelStatus(cfgRef.current, true)
+      }, 3000)
+      return () => clearInterval(interval)
+    }, [loaded, checkModelStatus]),
   )
 
   const onTest = async () => {
@@ -277,22 +309,274 @@ export default function SettingsScreen() {
     }
   }, [db, cfg, loaded])
 
-  const onLoadModel = async () => {
+  const executeLoadModel = async (replace: boolean, targetModel?: string) => {
+    const modelToLoad = targetModel ?? cfg.model
+    const configToLoad = targetModel ? { ...cfg, model: targetModel } : cfg
     setLoadingModel(true)
+    loadingModelRef.current = true
     try {
-      const result = await loadModel(cfg)
+      const result = await loadModel(configToLoad, { replace })
+      setSelectedModelIndex(null)
       setModelLoaded(true)
       setLoadedModelInfo({
         isLoaded: true,
-        loadedContextLength: result?.loadedContextLength ?? cfg.contextTokens,
+        loadedContextLength: result?.loadedContextLength ?? configToLoad.contextTokens,
+        modelName: modelToLoad,
       })
+      const patch: Partial<ServerSettings> = {}
+      if (targetModel && targetModel !== cfg.model) {
+        patch.model = targetModel
+      }
+      if (result?.loadedContextLength && result.loadedContextLength > 0) {
+        patch.contextTokens = result.loadedContextLength
+      }
+      if (Object.keys(patch).length > 0) {
+        update(patch)
+      }
       notificationAsync(NotificationFeedbackType.Success)
+      await checkModelStatus(configToLoad, true)
     } catch (err) {
       notificationAsync(NotificationFeedbackType.Error)
       reportError(t('settings.loadModelFailed'), err)
     } finally {
+      loadingModelRef.current = false
       setLoadingModel(false)
     }
+  }
+
+  const isNameMatch = (first: string, second: string) => {
+    if (!first.trim() || !second.trim()) return false
+    const normFirst = first.trim().toLowerCase()
+    const normSecond = second.trim().toLowerCase()
+    if (normFirst === normSecond) return true
+    const baseFirst = normFirst.split('/').pop()?.replace(/\.gguf$/i, '') ?? normFirst
+    const baseSecond = normSecond.split('/').pop()?.replace(/\.gguf$/i, '') ?? normSecond
+    if (baseFirst === baseSecond) return true
+    const tagFirst = baseFirst.split(':')[0]
+    const tagSecond = baseSecond.split(':')[0]
+    return tagFirst === tagSecond
+  }
+
+  // At most one model can ever be the active chat model in the UI.
+  const computedActiveIndex = (() => {
+    if (!cfg.model.trim() || loadedModels.length === 0) return -1
+    const target = cfg.model.trim().toLowerCase()
+
+    // 1. Match both model name/id AND context length (distinguishes instances of same model)
+    const exactContextIndex = loadedModels.findIndex(
+      (entry) =>
+        (entry.key.toLowerCase() === target || entry.id.toLowerCase() === target) &&
+        entry.contextLength === cfg.contextTokens
+    )
+    if (exactContextIndex !== -1) return exactContextIndex
+
+    // 2. Exact match by id
+    const exactIdIndex = loadedModels.findIndex((entry) => entry.id.toLowerCase() === target)
+    if (exactIdIndex !== -1) return exactIdIndex
+
+    // 3. Exact match by key
+    const exactKeyIndex = loadedModels.findIndex((entry) => entry.key.toLowerCase() === target)
+    if (exactKeyIndex !== -1) return exactKeyIndex
+
+    // 4. Exact match ignoring path prefix or .gguf extension
+    const normalizeModelName = (name: string) =>
+      name.split('/').pop()?.replace(/\.gguf$/i, '').toLowerCase() ?? name.toLowerCase()
+    const targetNormalized = normalizeModelName(target)
+    const baseIndex = loadedModels.findIndex(
+      (entry) => normalizeModelName(entry.key) === targetNormalized || normalizeModelName(entry.id) === targetNormalized
+    )
+    if (baseIndex !== -1) return baseIndex
+
+    // 5. Exact match ignoring tag (e.g. "llama3:latest" vs "llama3")
+    const stripModelTag = (name: string) => name.split(':')[0].toLowerCase()
+    const targetWithoutTag = stripModelTag(target)
+    const tagIndex = loadedModels.findIndex(
+      (entry) => stripModelTag(entry.key) === targetWithoutTag || stripModelTag(entry.id) === targetWithoutTag
+    )
+    if (tagIndex !== -1) return tagIndex
+
+    // 6. Single unambiguous prefix match
+    const prefixIndices: number[] = []
+    loadedModels.forEach((entry, idx) => {
+      const key = entry.key.toLowerCase()
+      const id = entry.id.toLowerCase()
+      if (key.startsWith(target) || id.startsWith(target) || target.startsWith(key) || target.startsWith(id)) {
+        prefixIndices.push(idx)
+      }
+    })
+    if (prefixIndices.length === 1) {
+      return prefixIndices[0]
+    }
+
+    return -1
+  })()
+
+  const activeLoadedModelIndex =
+    selectedModelIndex !== null && selectedModelIndex >= 0 && selectedModelIndex < loadedModels.length
+      ? selectedModelIndex
+      : computedActiveIndex
+
+  const onSelectActiveModel = (entry: LoadedModelEntry, index: number) => {
+    if (unloadingModelIds.has(entry.id)) return
+    selectionAsync()
+    setSelectedModelIndex(index)
+    const modelName = entry.key || entry.id
+    const patch: Partial<ServerSettings> = { model: modelName }
+    if (typeof entry.contextLength === 'number' && entry.contextLength > 0) {
+      patch.contextTokens = entry.contextLength
+    }
+    update(patch)
+  }
+
+  const isSelectedModelLoaded = Boolean(
+    cfg.model.trim() &&
+      (activeLoadedModelIndex !== -1 ||
+        (modelLoaded &&
+          loadedModelInfo?.modelName &&
+          isNameMatch(loadedModelInfo.modelName, cfg.model)))
+  )
+
+  const onUnloadSingle = async (entry: LoadedModelEntry) => {
+    setUnloadingModelIds((prev) => new Set(prev).add(entry.id))
+    try {
+      await unloadSingleModel(cfg, entry)
+      setSelectedModelIndex(null)
+      notificationAsync(NotificationFeedbackType.Success)
+      const remaining = loadedModels.filter((m) => m.id !== entry.id)
+      if (isNameMatch(entry.key, cfg.model) || isNameMatch(entry.id, cfg.model)) {
+        if (remaining.length > 0) {
+          const nextModel = remaining[0]
+          const patch: Partial<ServerSettings> = { model: nextModel.key || nextModel.id }
+          if (typeof nextModel.contextLength === 'number' && nextModel.contextLength > 0) {
+            patch.contextTokens = nextModel.contextLength
+          }
+          update(patch)
+        }
+      }
+      await checkModelStatus(cfg, true)
+    } catch (err) {
+      notificationAsync(NotificationFeedbackType.Error)
+      reportError(t('settings.loadModelFailed'), err)
+    } finally {
+      setUnloadingModelIds((prev) => {
+        const next = new Set(prev)
+        next.delete(entry.id)
+        return next
+      })
+    }
+  }
+
+  const onUnloadAll = async () => {
+    setUnloadingAll(true)
+    try {
+      await unloadAllModels(cfg)
+      setSelectedModelIndex(null)
+      notificationAsync(NotificationFeedbackType.Success)
+      setLoadedModels([])
+      setModelLoaded(false)
+      setLoadedModelInfo(null)
+      await checkModelStatus(cfg, true)
+    } catch (err) {
+      notificationAsync(NotificationFeedbackType.Error)
+      reportError(t('settings.loadModelFailed'), err)
+    } finally {
+      setUnloadingAll(false)
+    }
+  }
+
+  const onLoadModel = async () => {
+    if (loadingModel || !cfg.baseUrl.trim() || !cfg.model.trim()) return
+
+    const probe = await inspectLoadedModel(cfg, true).catch(() => null)
+    const isCurrentlyLoaded = modelLoaded || Boolean(probe?.isLoaded || loadedModelInfo?.isLoaded)
+
+    if (isCurrentlyLoaded) {
+      showSheet(
+        t('settings.loadModelConflictTitle'),
+        [
+          {
+            label: t('settings.loadModelReplace'),
+            destructive: true,
+            onSelect: () => executeLoadModel(true),
+          },
+          {
+            label: t('settings.loadModelAlongside'),
+            onSelect: () => executeLoadModel(false),
+          },
+        ],
+        { message: t('settings.loadModelConflictMessage') },
+      )
+      return
+    }
+
+    executeLoadModel(false)
+  }
+
+  const onSelectModel = async (newModel: string) => {
+    if (loadingModel || newModel === cfg.model) return
+    if (!cfg.baseUrl.trim() || !newModel.trim()) {
+      update({ model: newModel })
+      return
+    }
+
+    const alreadyLoaded = loadedModels.find(
+      (m) => isNameMatch(m.key, newModel) || isNameMatch(m.id, newModel)
+    )
+    if (alreadyLoaded) {
+      const patch: Partial<ServerSettings> = { model: newModel }
+      if (typeof alreadyLoaded.contextLength === 'number' && alreadyLoaded.contextLength > 0) {
+        patch.contextTokens = alreadyLoaded.contextLength
+      }
+      update(patch)
+      setModelLoaded(true)
+      return
+    }
+
+    const probe = await inspectLoadedModel(cfg, true).catch(() => null)
+    const isCurrentlyLoaded = modelLoaded || Boolean(probe?.isLoaded || loadedModelInfo?.isLoaded)
+
+    const isSameModelAndContext =
+      probe?.isLoaded &&
+      probe?.modelName &&
+      (probe.modelName.toLowerCase() === newModel.toLowerCase() ||
+        probe.modelName.toLowerCase().startsWith(newModel.toLowerCase()) ||
+        newModel.toLowerCase().startsWith(probe.modelName.toLowerCase())) &&
+      probe.loadedContextLength === cfg.contextTokens
+
+    if (isSameModelAndContext) {
+      update({ model: newModel })
+      setModelLoaded(true)
+      setLoadedModelInfo(probe)
+      return
+    }
+
+    if (isCurrentlyLoaded) {
+      showSheet(
+        t('settings.loadModelConflictTitle'),
+        [
+          {
+            label: t('settings.loadModelReplace'),
+            destructive: true,
+            onSelect: () => {
+              update({ model: newModel })
+              executeLoadModel(true, newModel)
+            },
+          },
+          {
+            label: t('settings.loadModelAlongside'),
+            onSelect: () => {
+              update({ model: newModel })
+              executeLoadModel(false, newModel)
+            },
+          },
+        ],
+        { message: t('settings.loadModelConflictMessage') },
+      )
+      return
+    }
+
+    update({ model: newModel })
+    checkModelStatus({ ...cfg, model: newModel }, true)
   }
 
   // The sheet with what to take or bring in: open while there is a tree.
@@ -453,57 +737,16 @@ export default function SettingsScreen() {
   )
 
   const isLoaded = modelLoaded || Boolean(loadedModelInfo?.isLoaded)
-  const loadedCtx = loadedModelInfo?.loadedContextLength
-
-  const contextBanner = isLoaded ? (
-    loadedCtx ? (
-      cfg.contextMode === 'tokens' && cfg.contextTokens !== loadedCtx ? (
-        <Pressable
-          onPress={onLoadModel}
-          disabled={loadingModel || !cfg.baseUrl.trim() || !cfg.model.trim()}
-          style={({ pressed }) => [
-            styles.contextBanner,
-            styles.contextBannerMismatch,
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <SFIcon name="exclamationmark.triangle.fill" fallback="warning" size={16} color={colors.accent} />
-          <Text style={styles.contextBannerText}>
-            {t('settings.contextLoadedMismatch', {
-              loaded: formatContextTokens(loadedCtx),
-              chosen: formatTokensLabel(cfg.contextTokens),
-            })}
-          </Text>
-        </Pressable>
-      ) : (
-        <View style={styles.contextBanner}>
-          <SFIcon name="checkmark.circle.fill" fallback="checkmark-circle" size={16} color={colors.success} />
-          <Text style={styles.contextBannerText}>
-            {t('settings.contextLoadedWindow', {
-              window: formatContextTokens(loadedCtx),
-            })}
-          </Text>
-        </View>
-      )
-    ) : (
-      <View style={styles.contextBanner}>
-        <SFIcon name="info.circle.fill" fallback="information-circle" size={16} color={colors.textMuted} />
-        <Text style={styles.contextBannerText}>{t('settings.contextModelLoadedNoTokens')}</Text>
-      </View>
-    )
-  ) : null
 
   const contextFooter = (
     <>
-      {contextBanner}
-      {cfg.contextMode === 'messages' ? (
+      <ListFooter>{t('settings.contextHint')}</ListFooter>
+      {cfg.limitMessages ? (
         <>
           <ListFooter>{t('settings.contextMessagesHint')}</ListFooter>
           {cfg.chatMessages > 1000 || cfg.roomMessages > 1000 ? <ListFooter danger>{t('settings.contextMessagesWarning')}</ListFooter> : null}
         </>
-      ) : (
-        <ListFooter>{t('settings.contextHint')}</ListFooter>
-      )}
+      ) : null}
     </>
   )
 
@@ -542,10 +785,7 @@ export default function SettingsScreen() {
             label={t('settings.modelLabel')}
             options={models}
             value={cfg.model}
-            onChange={(model) => {
-              update({ model })
-              checkModelStatus({ ...cfg, model }, true)
-            }}
+            onChange={onSelectModel}
           />
         ) : (
           <InputCell
@@ -559,49 +799,134 @@ export default function SettingsScreen() {
         )}
         <ButtonCell label={t('settings.testConnection')} icon={{ symbol: 'bolt.horizontal', fallback: 'pulse-outline' }} onPress={onTest} loading={status.kind === 'testing'} />
         <ButtonCell
-          label={t('settings.loadModel')}
-          icon={{ symbol: 'cpu', fallback: 'hardware-chip-outline' }}
+          label={isSelectedModelLoaded ? t('settings.reloadModel') : t('settings.loadModel')}
+          icon={
+            isSelectedModelLoaded
+              ? { symbol: 'arrow.clockwise', fallback: 'refresh-outline' }
+              : { symbol: 'cpu', fallback: 'hardware-chip-outline' }
+          }
           onPress={onLoadModel}
           loading={loadingModel}
           disabled={!cfg.baseUrl.trim() || !cfg.model.trim()}
         />
       </ListSection>
 
+      {loadedModels.length > 0 ? (
+        <ListSection
+          header={t('settings.loadedModelsHeader')}
+          footer={t('settings.loadedModelsHint')}
+        >
+          {loadedModels.map((entry, index) => {
+            const isCurrent = index === activeLoadedModelIndex
+            const isUnloading = unloadingModelIds.has(entry.id)
+            return (
+              <SwipeToDelete
+                key={entry.id}
+                label={t('settings.unloadModel')}
+                actionLabel={t('settings.unload')}
+                actionIcon="close-circle-outline"
+                actionIconSF="eject.fill"
+                radius={0}
+                throwAway
+                onDelete={() => onUnloadSingle(entry)}
+                onPress={() => onSelectActiveModel(entry, index)}
+              >
+                <Pressable
+                  onPress={() => onSelectActiveModel(entry, index)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: isCurrent }}
+                  style={({ pressed }) => [
+                    styles.loadedModelRow,
+                    pressed && styles.pressedRow,
+                    isUnloading && styles.disabled,
+                  ]}
+                >
+                  <View style={styles.checkWrap}>
+                    {isCurrent ? (
+                      <SFIcon
+                        name="checkmark"
+                        fallback="checkmark"
+                        size={20}
+                        color={colors.accent}
+                      />
+                    ) : null}
+                  </View>
+                  <View style={styles.loadedModelMain}>
+                    <Text style={[styles.loadedModelName, isCurrent && { fontWeight: '600' }]} numberOfLines={1}>
+                      {entry.key || entry.id}
+                    </Text>
+                    {isCurrent ? (
+                      <View style={styles.currentBadge}>
+                        <Text style={styles.currentBadgeText}>{t('settings.loadedModelCurrent')}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {entry.contextLength ? (
+                    <Text style={styles.loadedModelTokens}>{formatContextTokens(entry.contextLength)}</Text>
+                  ) : null}
+                  {isUnloading ? (
+                    <ActivityIndicator size="small" color={colors.accent} style={{ marginLeft: 6 }} />
+                  ) : isDesktop ? (
+                    <Pressable
+                      onPress={(e) => {
+                        e?.stopPropagation?.()
+                        onUnloadSingle(entry)
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('settings.unload')}
+                      hitSlop={8}
+                      style={({ pressed }) => [styles.desktopUnloadBtn, pressed && { opacity: 0.7 }]}
+                    >
+                      <SFIcon name="eject" fallback="close-circle-outline" size={14} color={colors.textMuted} />
+                    </Pressable>
+                  ) : null}
+                </Pressable>
+              </SwipeToDelete>
+            )
+          })}
+          <ButtonCell
+            label={t('settings.unloadAllModels')}
+            icon={{ symbol: 'xmark.circle', fallback: 'close-circle-outline' }}
+            danger
+            onPress={onUnloadAll}
+            loading={unloadingAll}
+          />
+        </ListSection>
+      ) : null}
+
       <ListSection
         header={t('settings.contextLabel')}
         footer={contextFooter}
       >
-        <ChipRowCell
-          actions={CONTEXT_OPTIONS.map((o) => ({ label: o.label, active: cfg.contextMode === o.value, onPress: () => update({ contextMode: o.value }) }))}
+        <SliderCell
+          label={t('settings.contextTokensLabel')}
+          value={cfg.contextTokens}
+          min={MIN_CONTEXT_TOKENS}
+          max={MAX_CONTEXT_TOKENS}
+          step={CONTEXT_STEP_TOKENS}
+          formatValue={(tokens) => formatTokensLabel(tokens)}
+          onChange={(tokens) => update({ contextTokens: tokens })}
+          tintColor={isLoaded ? colors.accent : '#8E8E93'}
         />
-        {cfg.contextMode === 'messages' ? (
-          <>
-            <InputCell
-              label={t('settings.contextChatMessages')}
-              value={messageDrafts.chatMessages ?? String(cfg.chatMessages)}
-              onChangeText={(text) => setMessages('chatMessages', text)}
-              keyboardType="number-pad"
-            />
-            <InputCell
-              label={t('settings.contextRoomMessages')}
-              value={messageDrafts.roomMessages ?? String(cfg.roomMessages)}
-              onChangeText={(text) => setMessages('roomMessages', text)}
-              keyboardType="number-pad"
-            />
-          </>
-        ) : (
-          // A step of the slider, not a token count: the sizes models come in are doublings.
-          <SliderCell
-            label={t('settings.contextTokensLabel')}
-            value={Math.max(0, CONTEXT_STEPS.indexOf(cfg.contextTokens as (typeof CONTEXT_STEPS)[number]))}
-            min={0}
-            max={CONTEXT_STEPS.length - 1}
-            step={1}
-            formatValue={(i) => `${CONTEXT_STEPS[i] / 1024}K`}
-            onChange={(i) => update({ contextTokens: CONTEXT_STEPS[i] })}
-            tintColor={isLoaded ? colors.accent : '#8E8E93'}
-          />
-        )}
+        <SwitchCell
+          label={t('settings.contextMessages')}
+          value={cfg.limitMessages}
+          onValueChange={(limitMessages) => update({ limitMessages })}
+        />
+        <InputCell
+          label={t('settings.contextChatMessages')}
+          value={messageDrafts.chatMessages ?? String(cfg.chatMessages)}
+          onChangeText={(text) => setMessages('chatMessages', text)}
+          keyboardType="number-pad"
+          disabled={!cfg.limitMessages}
+        />
+        <InputCell
+          label={t('settings.contextRoomMessages')}
+          value={messageDrafts.roomMessages ?? String(cfg.roomMessages)}
+          onChangeText={(text) => setMessages('roomMessages', text)}
+          keyboardType="number-pad"
+          disabled={!cfg.limitMessages}
+        />
       </ListSection>
     </>
   )
@@ -761,26 +1086,56 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     // Reaches a little past the block, so the tint frames it instead of hugging the text.
     flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 30 },
-    contextBanner: {
+    loadedModelRow: {
+      minHeight: 52,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
       paddingHorizontal: 16,
       paddingVertical: 10,
-      marginTop: 8,
-      marginBottom: 6,
-      borderRadius: 14,
+      backgroundColor: colors.surface,
+    },
+    disabled: { opacity: 0.5 },
+    pressedRow: {
       backgroundColor: colors.surfaceRaised,
     },
-    contextBannerMismatch: {
-      backgroundColor: colors.accentSoft,
-      borderWidth: 1,
-      borderColor: colors.accentBorder,
+    checkWrap: {
+      width: 24,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    contextBannerText: {
+    loadedModelMain: {
       flex: 1,
-      fontSize: 13,
-      lineHeight: 18,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginRight: 6,
+    },
+    loadedModelName: {
       color: colors.text,
+      fontSize: 16,
+      flexShrink: 1,
+    },
+    currentBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      backgroundColor: colors.accentSoft,
+    },
+    currentBadgeText: {
+      color: colors.accent,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    loadedModelTokens: {
+      color: colors.textMuted,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    desktopUnloadBtn: {
+      padding: 6,
+      borderRadius: 6,
+      marginLeft: 4,
     },
   })

@@ -15,24 +15,39 @@ export function DialogHost() {
 function SheetDialogHost() {
   const dialog = useSyncExternalStore(subscribeDialog, getDialog)
   const styles = useStyles(createStyles)
+  const handleCancel = () => {
+    if (dialog?.kind === 'sheet') dialog.onCancel?.()
+    closeDialog()
+  }
   return (
-    <Modal visible={dialog !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={closeDialog}>
+    <Modal visible={dialog !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={handleCancel}>
       <View style={[styles.backdrop, dialog?.kind === 'prompt' && styles.top]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={closeDialog} />
-        {dialog?.kind === 'sheet' ? <Sheet title={dialog.title} actions={dialog.actions} /> : null}
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleCancel} />
+        {dialog?.kind === 'sheet' ? <Sheet title={dialog.title} message={dialog.message} actions={dialog.actions} onCancel={handleCancel} /> : null}
         {dialog?.kind === 'prompt' ? <Prompt key={dialog.prompt.title} {...dialog.prompt} /> : null}
       </View>
     </Modal>
   )
 }
 
-function Sheet({ title, actions }: { title?: string; actions: { label: string; destructive?: boolean; onSelect: () => void }[] }) {
+function Sheet({
+  title,
+  message,
+  actions,
+  onCancel,
+}: {
+  title?: string
+  message?: string
+  actions: { label: string; destructive?: boolean; onSelect: () => void }[]
+  onCancel?: () => void
+}) {
   const styles = useStyles(createStyles)
   const { colors } = useTheme()
   const { t } = useTranslation()
   return (
     <View style={styles.sheet}>
       {title ? <Text style={styles.title}>{title}</Text> : null}
+      {message ? <Text style={styles.sheetMessage}>{message}</Text> : null}
       {actions.map((action, index) => (
         <Pressable
           key={index}
@@ -45,7 +60,13 @@ function Sheet({ title, actions }: { title?: string; actions: { label: string; d
           <Text style={[styles.label, action.destructive && { color: colors.danger }]}>{action.label}</Text>
         </Pressable>
       ))}
-      <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceRaised }]} onPress={closeDialog}>
+      <Pressable
+        style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceRaised }]}
+        onPress={() => {
+          onCancel?.()
+          closeDialog()
+        }}
+      >
         <Text style={[styles.label, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
       </Pressable>
     </View>
@@ -92,6 +113,7 @@ const createStyles = (colors: Colors) =>
     sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8, paddingBottom: 24 },
     card: { backgroundColor: colors.surface, borderRadius: 24, marginHorizontal: 24, padding: 20, gap: 12 },
     title: { color: colors.text, fontSize: 18, fontWeight: '600', paddingHorizontal: 20, paddingVertical: 12 },
+    sheetMessage: { color: colors.textMuted, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingBottom: 10 },
     promptTitle: { color: colors.text, fontSize: 18, fontWeight: '600' },
     message: { color: colors.textMuted, fontSize: 15 },
     row: { paddingHorizontal: 24, paddingVertical: 16 },

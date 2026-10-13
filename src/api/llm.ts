@@ -35,7 +35,7 @@ function requestHeaders(cfg: ServerSettings) {
 }
 
 // Marks errors that already describe a server-side failure, so callers don't wrap
-// them again as "unreachable" — independent of the message's language.
+// them again as "unreachable" -- independent of the message's language.
 class ServerError extends Error {}
 
 // The server answered, but with an error, as opposed to not answering at all.
@@ -162,6 +162,114 @@ export type LoadedModelInfo = {
   modelName?: string
 }
 
+export type LoadedModelEntry = {
+  id: string
+  key: string
+  contextLength?: number
+  sizeVram?: number
+  paramSize?: string
+}
+
+export async function listLoadedModels(cfg: ServerSettings, fresh = false): Promise<LoadedModelEntry[]> {
+  const base = normalizeBaseUrl(cfg.baseUrl)
+  if (!base) return []
+
+  if (fresh) {
+    serverKinds.delete(base)
+  }
+  const server = await detectServer(cfg, base)
+
+  if (server.kind === 'lmstudio') {
+    const list: LoadedModelEntry[] = []
+    const llms = server.models.filter((m) => m.type === 'llm')
+    for (const m of llms) {
+      if (m.loaded_instances && m.loaded_instances.length > 0) {
+        for (let i = 0; i < m.loaded_instances.length; i++) {
+          const inst = m.loaded_instances[i]
+          list.push({
+            id: inst.id || (m.loaded_instances.length > 1 ? `${m.key}:${i}` : m.key),
+            key: m.key,
+            contextLength: typeof inst.config?.context_length === 'number' ? inst.config.context_length : undefined,
+          })
+        }
+      }
+    }
+    return list
+  }
+
+  if (server.kind === 'ollama') {
+    const ps = await probeJson(cfg, `${base}/api/ps`)
+    const models = Array.isArray(ps?.models) ? ps.models : []
+    return models.map((m: { name?: string; model?: string; size_vram?: number; details?: { parameter_size?: string } }) => ({
+      id: m.name || m.model || '',
+      key: m.model || m.name || '',
+      sizeVram: typeof m.size_vram === 'number' ? m.size_vram : undefined,
+      paramSize: m.details?.parameter_size,
+    }))
+  }
+
+  return []
+}
+
+export async function unloadSingleModel(
+  cfg: ServerSettings,
+  target: string | { id?: string; key?: string },
+): Promise<void> {
+  const base = normalizeBaseUrl(cfg.baseUrl)
+  if (!base) return
+  serverKinds.delete(base)
+  const server = await detectServer(cfg, base)
+
+  const instanceId = typeof target === 'string' ? target : target.id
+  const modelKey = typeof target === 'string' ? target : target.key
+
+  if (server.kind === 'lmstudio') {
+    let unloaded = false
+    if (instanceId) {
+      try {
+        const res = await fetch(`${base}/api/v1/models/unload`, {
+          method: 'POST',
+          headers: requestHeaders(cfg),
+          body: JSON.stringify({ instance_id: instanceId }),
+        })
+        if (res.ok) unloaded = true
+      } catch {
+        // Ignore
+      }
+    }
+    if (!unloaded && modelKey) {
+      try {
+        await fetch(`${base}/api/v1/models/unload`, {
+          method: 'POST',
+          headers: requestHeaders(cfg),
+          body: JSON.stringify({ model: modelKey }),
+        })
+      } catch {
+        // Ignore
+      }
+    }
+    serverKinds.delete(base)
+    return
+  }
+
+  if (server.kind === 'ollama') {
+    const model = modelKey || instanceId
+    if (model) {
+      try {
+        await fetch(`${base}/api/generate`, {
+          method: 'POST',
+          headers: requestHeaders(cfg),
+          body: JSON.stringify({ model, keep_alive: 0 }),
+        })
+      } catch {
+        // Ignore
+      }
+    }
+    serverKinds.delete(base)
+    return
+  }
+}
+
 export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Promise<LoadedModelInfo> {
   const base = normalizeBaseUrl(cfg.baseUrl)
   const modelName = cfg.model.trim()
@@ -223,17 +331,19 @@ export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Pr
   if (server.kind === 'ollama') {
     const ps = await probeJson(cfg, `${base}/api/ps`)
     const models = Array.isArray(ps?.models) ? ps.models : []
-    const isLoaded =
-      (Boolean(modelName) &&
-        models.some(
-          (m: { name?: string; model?: string }) =>
-            m.name === modelName ||
-            m.model === modelName ||
-            m.name?.toLowerCase() === modelName.toLowerCase() ||
-            m.model?.toLowerCase() === modelName.toLowerCase(),
-        )) ||
-      models.length > 0
-    return { isLoaded }
+    const matching = models.find(
+      (m: { name?: string; model?: string }) =>
+        m.name === modelName ||
+        m.model === modelName ||
+        m.name?.toLowerCase() === modelName.toLowerCase() ||
+        m.model?.toLowerCase() === modelName.toLowerCase(),
+    )
+    const active = matching ?? models[0]
+    const isLoaded = models.length > 0
+    return {
+      isLoaded,
+      modelName: active ? (active.model || active.name) : undefined,
+    }
   }
 
   if (server.kind === 'other') {
@@ -301,7 +411,6 @@ export async function ensureModelLoaded(
   if (info.isLoaded) {
     const modelName = cfg.model.trim()
     const isContextMismatch =
-      cfg.contextMode === 'tokens' &&
       typeof info.loadedContextLength === 'number' &&
       info.loadedContextLength !== cfg.contextTokens
 
@@ -320,10 +429,7 @@ export async function ensureModelLoaded(
               ? formatContextTokens(info.loadedContextLength)
               : '—'
           const settingsModel = modelName || '—'
-          const settingsContext =
-            cfg.contextMode === 'tokens'
-              ? formatContextTokens(cfg.contextTokens)
-              : `${cfg.chatMessages}`
+          const settingsContext = formatContextTokens(cfg.contextTokens)
 
           const shouldReload = await confirmAsync({
             title: t('chat.reloadModalTitle'),
@@ -339,7 +445,7 @@ export async function ensureModelLoaded(
 
           if (shouldReload) {
             skippedMismatchKey = null
-            return await loadModel(cfg)
+            return await loadModel(cfg, { replace: true })
           } else {
             // User chose to keep the old model
             skippedMismatchKey = mismatchKey
@@ -369,15 +475,119 @@ export async function ensureModelLoaded(
   return await activeLoadPromise
 }
 
+export type LoadModelOptions = {
+  // Clears server memory before loading so models do not stack up.
+  replace?: boolean
+}
+
+// Unloads active models from server memory (LM Studio and Ollama).
+export async function unloadModel(cfg: ServerSettings): Promise<void> {
+  const base = normalizeBaseUrl(cfg.baseUrl)
+  if (!base) return
+  serverKinds.delete(base)
+  const server = await detectServer(cfg, base)
+
+  if (server.kind === 'lmstudio') {
+    const instances: string[] = []
+    const modelKeys: string[] = []
+    for (const m of server.models) {
+      if (m.loaded_instances && m.loaded_instances.length > 0) {
+        modelKeys.push(m.key)
+        for (const inst of m.loaded_instances) {
+          if (inst.id) instances.push(inst.id)
+        }
+      }
+    }
+
+    for (const instanceId of instances) {
+      try {
+        await fetch(`${base}/api/v1/models/unload`, {
+          method: 'POST',
+          headers: requestHeaders(cfg),
+          body: JSON.stringify({ instance_id: instanceId }),
+        })
+      } catch {
+        // Failure on one instance does not block unloading remaining instances.
+      }
+    }
+
+    for (const model of modelKeys) {
+      try {
+        await fetch(`${base}/api/v1/models/unload`, {
+          method: 'POST',
+          headers: requestHeaders(cfg),
+          body: JSON.stringify({ model }),
+        })
+      } catch {
+        // Ignore
+      }
+    }
+
+    const fallbackModel = cfg.model.trim()
+    if (fallbackModel && !modelKeys.includes(fallbackModel)) {
+      try {
+        await fetch(`${base}/api/v1/models/unload`, {
+          method: 'POST',
+          headers: requestHeaders(cfg),
+          body: JSON.stringify({ model: fallbackModel }),
+        })
+      } catch {
+        // Ignore
+      }
+    }
+
+    serverKinds.delete(base)
+    return
+  }
+
+  if (server.kind === 'ollama') {
+    try {
+      const ps = await probeJson(cfg, `${base}/api/ps`)
+      const running = Array.isArray(ps?.models) ? ps.models : []
+      for (const m of running) {
+        const model = m.model || m.name
+        if (model) {
+          await fetch(`${base}/api/generate`, {
+            method: 'POST',
+            headers: requestHeaders(cfg),
+            body: JSON.stringify({ model, keep_alive: 0 }),
+          }).catch(() => null)
+        }
+      }
+      const model = cfg.model.trim()
+      if (model) {
+        await fetch(`${base}/api/generate`, {
+          method: 'POST',
+          headers: requestHeaders(cfg),
+          body: JSON.stringify({ model, keep_alive: 0 }),
+        }).catch(() => null)
+      }
+    } catch {
+      // Ignore
+    }
+    serverKinds.delete(base)
+    return
+  }
+}
+
+export const unloadAllModels = unloadModel
+
 // Loads the model into memory, which on a big one takes a while, so there is no deadline.
 // LM Studio and Ollama have a call for it; llama.cpp and vLLM serve the model they were
 // started with, so there is nothing to load and the connection is all that is checked.
-export async function loadModel(cfg: ServerSettings): Promise<{ loadedContextLength?: number }> {
+export async function loadModel(
+  cfg: ServerSettings,
+  options?: LoadModelOptions,
+): Promise<{ loadedContextLength?: number }> {
   skippedMismatchKey = null
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) throw new Error(t('llm.baseUrlMissing'))
   const model = cfg.model.trim()
   if (!model) throw new Error(t('llm.setModel'))
+
+  if (options?.replace) {
+    await unloadModel(cfg).catch(() => {})
+  }
 
   await askLocalNetworkAccess(`${base}/v1/models`)
   serverKinds.delete(base)
