@@ -29,7 +29,7 @@ const TILE_HEIGHT = (TILE_INNER * 852) / 393 + TILE_BORDER * 2
 const FALLBACK_FAMILIES =
   isAndroid
     ? ['serif', 'sans-serif', 'sans-serif-light', 'sans-serif-condensed', 'serif-monospace', 'monospace', 'casual', 'cursive']
-    : ['Instrument Serif', 'Georgia', 'Palatino', 'Iowan Old Style', 'Charter', 'Avenir Next', 'Times New Roman', 'Helvetica Neue', 'Menlo']
+    : ['Georgia', 'Palatino', 'Iowan Old Style', 'Charter', 'Avenir Next', 'Times New Roman', 'Helvetica Neue', 'Menlo']
 
 // Rounded to a percent, and caught by the regular size when the slider passes near it.
 function snap(value: number) {

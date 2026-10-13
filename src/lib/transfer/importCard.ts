@@ -36,7 +36,7 @@ async function initialPicture(name: string): Promise<Uint8Array | null> {
   ctx.fillStyle = avatarTint(name)
   ctx.fillRect(0, 0, INITIAL_SIZE, INITIAL_SIZE)
   ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.font = `${INITIAL_SIZE * 0.42}px "Instrument Serif", Georgia, serif`
+  ctx.font = `${INITIAL_SIZE * 0.42}px Georgia, serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(avatarInitial(name), INITIAL_SIZE / 2, INITIAL_SIZE / 2)

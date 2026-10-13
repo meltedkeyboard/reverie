@@ -40,7 +40,7 @@ public class ReverieDragModule: Module {
       let png = UIGraphicsImageRenderer(size: side, format: format).pngData { ctx in
         UIColor(hex: tint).setFill()
         ctx.fill(CGRect(origin: .zero, size: side))
-        let font = UIFont(name: "Instrument Serif", size: size * 0.42) ?? UIFont(name: "Georgia", size: size * 0.42) ?? .systemFont(ofSize: size * 0.42)
+        let font = UIFont(name: "Georgia", size: size * 0.42) ?? .systemFont(ofSize: size * 0.42)
         let text = NSAttributedString(string: letter, attributes: [.font: font, .foregroundColor: UIColor(white: 1, alpha: 0.85)])
         let box = text.size()
         text.draw(at: CGPoint(x: (size - box.width) / 2, y: (size - box.height) / 2))

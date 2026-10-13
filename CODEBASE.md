@@ -264,7 +264,7 @@ The same code base, with the iOS-only parts replaced or left out.
 - Tabs: `NativeTabs` has Material icons (`md`) next to the SF Symbols and, unlike iOS, insets the content by the tab bar itself.
 - Storage: no `Library` folder and no Files app. The data sits in `files/Reverie` and the "show in Files" toggle is hidden (`settings.tsx`, search entries).
 - No blur on Android (it costs a copy of the screen per frame): `BlurBar` is a nearly opaque tint, the app lock shield a solid color.
-- `reverie-save-as`, `reverie-fonts`, `reverie-drag` and `reverie-splash` are Swift only (on Android the cards keep the plain menu and no drag), while `reverie-cloud-folder` has a Kotlin side too, so folder sync works on Android. Missing there, so: saving a backup uses the folder picker, and the font menu lists the Android system families (`serif`, `monospace`, ...). The default chat font is `serif` instead of Instrument Serif / Georgia.
+- `reverie-save-as`, `reverie-fonts`, `reverie-drag` and `reverie-splash` are Swift only (on Android the cards keep the plain menu and no drag), while `reverie-cloud-folder` has a Kotlin side too, so folder sync works on Android. Missing there, so: saving a backup uses the folder picker, and the font menu lists the Android system families (`serif`, `monospace`, ...). The default chat font is `serif` instead of Georgia.
 - The lock row says "screen lock" (`settings.requireBiometrics`) instead of Face ID.
 - The search screen has a solid header on Android: `contentInsetAdjustmentBehavior` is iOS only.
 - Icons: `tools/build-icons.mjs` also renders the adaptive and monochrome Android icons.
