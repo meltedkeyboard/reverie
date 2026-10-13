@@ -47,6 +47,8 @@ png(glyphOnly(dark, '#FFFFFF'), 'assets/images/adaptive-icon-mono.png')
 // rounded corners only left a faint edge around it.
 png(light, 'assets/images/splash-icon.png', 512)
 png(dark, 'assets/images/splash-icon-dark.png', 512)
+const wordmark = readFileSync(`${BRAND}/wordmark.svg`, 'utf8')
+png(wordmark, 'assets/images/wordmark.png', 552)
 
 // Alternate app icons, drawn in Penpot and kept in assets/brand/alt, each with a 'bg' and a
 // 'glyph' group (the letter and the spark). iOS takes the whole picture. A launcher cuts an

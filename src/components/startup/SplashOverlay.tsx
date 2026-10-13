@@ -7,10 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { FILL } from '@/theme'
 
+import { dismissNativeSplash, isNativeSplashAvailable } from '../../../modules/reverie-splash'
 import { Wordmark } from '../visuals/Wordmark'
 
 // Kept up until the overlay below has taken its place, so there is no blank frame between.
 SplashScreen.preventAutoHideAsync().catch(() => {})
+SplashScreen.setOptions({ duration: 350, fade: true })
 
 // Settles once the overlay is gone, for what must not interrupt it, like the Face ID prompt.
 let splashGone: () => void
@@ -48,6 +50,15 @@ export function SplashOverlay() {
     return () => clearTimeout(fallback)
   }, [])
   useEffect(() => {
+    if (isNativeSplashAvailable()) {
+      dismissNativeSplash().then(() => {
+        setDone(true)
+        splashGone()
+      })
+      SplashScreen.hideAsync().catch(() => {})
+      return
+    }
+
     if (!shown) return
     const frame = requestAnimationFrame(() => SplashScreen.hideAsync().catch(() => {}))
     const ease = { duration: 200, easing: Easing.out(Easing.cubic) }
@@ -72,7 +83,7 @@ export function SplashOverlay() {
     if (done) splashGone()
   }, [done])
 
-  if (done) return null
+  if (done || isNativeSplashAvailable()) return null
   return (
     <Animated.View pointerEvents="none" style={[styles.screen, { backgroundColor: BACKGROUNDS[scheme] }, screen]}>
       <Animated.View style={icon}>
