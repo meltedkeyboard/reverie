@@ -1,20 +1,23 @@
-require 'json'
-
-package = JSON.parse(File.read(File.join(__dir__, '..', '..', '..', 'package.json')))
-
 Pod::Spec.new do |s|
   s.name           = 'ReverieSplash'
-  s.version        = package['version']
+  s.version        = '1.0.0'
   s.summary        = 'Reverie native animated splash screen'
-  s.author         = package['author']
-  s.homepage       = 'https://reverie.app'
-  s.platforms      = { :ios => '15.1' }
-  s.swift_version  = '5.4'
-  s.source         = { :git => '' }
+  s.description    = 'Reverie native animated splash screen'
+  s.author         = ''
+  s.homepage       = 'https://docs.expo.dev/modules/'
+  s.license        = 'MIT'
+  s.platforms      = { :ios => '16.4' }
+  s.swift_version  = '5.9'
+  s.source         = { git: '' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
 
+  s.pod_target_xcconfig = {
+    'DEFINES_MODULE' => 'YES'
+  }
+
   s.source_files = "**/*.{h,m,swift}"
   s.resources = "Resources/**/*"
 end
+
