@@ -56,7 +56,13 @@ export function WebDialogHost() {
   const menu = dialog.kind === 'sheet'
   return (
     <View style={styles.layer} pointerEvents={live ? 'auto' : 'none'}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={closeDialog} />
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={() => {
+          if (dialog.kind === 'confirm') dialog.onCancel?.()
+          closeDialog()
+        }}
+      />
       {menu ? null : <Animated.View style={[StyleSheet.absoluteFill, styles.dim, dimStyle]} pointerEvents="none" />}
       {dialog.kind === 'sheet' ? <Menu key={dialog.title} dialog={dialog} pop={pop} /> : null}
       {dialog.kind === 'confirm' ? <Question dialog={dialog} pop={pop} /> : null}
@@ -141,6 +147,11 @@ function Question({ dialog, pop }: { dialog: Confirm; pop: SharedValue<number> }
     closeDialog()
     dialog.onConfirm()
   }
+  const cancel = () => {
+    if (getDialog() !== dialog) return
+    closeDialog()
+    dialog.onCancel?.()
+  }
   useWindowKey(isKey('Enter'), accept)
   return (
     <Animated.View style={[styles.window, popStyle]}>
@@ -148,8 +159,8 @@ function Question({ dialog, pop }: { dialog: Confirm; pop: SharedValue<number> }
       {dialog.message ? <Text style={styles.windowMessage}>{dialog.message}</Text> : null}
       <View style={styles.buttons}>
         {dialog.cancelable ? (
-          <Pressable style={[styles.button, styles.buttonPlain]} onPress={closeDialog}>
-            <Text style={[styles.buttonLabel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
+          <Pressable style={[styles.button, styles.buttonPlain]} onPress={cancel}>
+            <Text style={[styles.buttonLabel, { color: colors.textMuted }]}>{dialog.cancelLabel ?? t('common.cancel')}</Text>
           </Pressable>
         ) : null}
         <Pressable

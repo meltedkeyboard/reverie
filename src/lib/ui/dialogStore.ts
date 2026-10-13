@@ -11,7 +11,17 @@ export type AppDialog =
       anchor?: { x: number; y: number } | null
     }
   // Web: a question with a confirm button and, if cancelable, a cancel one; a notice has none.
-  | { kind: 'confirm'; title: string; message?: string; confirmLabel: string; destructive?: boolean; cancelable: boolean; onConfirm: () => void }
+  | {
+      kind: 'confirm'
+      title: string
+      message?: string
+      confirmLabel: string
+      cancelLabel?: string
+      destructive?: boolean
+      cancelable: boolean
+      onConfirm: () => void
+      onCancel?: () => void
+    }
   | { kind: 'prompt'; prompt: TextPrompt }
 
 let current: AppDialog | null = null

@@ -42,7 +42,13 @@ export async function suggestReply(
     // A guess needs no thinking, and a model that thinks anyway would burn the short budget.
     thinking: 'off' as const,
   }
-  const streamed = await runReplyStream(cfg, req, signal, { onFrame: (frame) => onText(clean(frame.text)) })
+  const streamed = await runReplyStream(
+    cfg,
+    req,
+    signal,
+    { onFrame: (frame) => onText(clean(frame.text)) },
+    { interactive: false },
+  )
   if (streamed.error) throw streamed.error
   return clean(streamed.text) || null
 }

@@ -13,16 +13,19 @@ type Props = {
   // Overrides the plain number display, e.g. to spell out a sentinel value like "off".
   formatValue?: (value: number) => string
   onChange: (value: number) => void
+  tintColor?: string
 }
 
-export function ParamSlider({ label, value, min, max, step, digits = 0, formatValue, onChange }: Props) {
+export function ParamSlider({ label, value, min, max, step, digits = 0, formatValue, onChange, tintColor }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
         <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>{formatValue ? formatValue(value) : value.toFixed(digits)}</Text>
+        <Text style={[styles.value, tintColor ? { color: tintColor } : null]}>
+          {formatValue ? formatValue(value) : value.toFixed(digits)}
+        </Text>
       </View>
       <Slider
         value={value}
@@ -30,7 +33,7 @@ export function ParamSlider({ label, value, min, max, step, digits = 0, formatVa
         maximumValue={max}
         step={step}
         onValueChange={onChange}
-        minimumTrackTintColor={colors.accent}
+        minimumTrackTintColor={tintColor ?? colors.accent}
         maximumTrackTintColor={colors.borderStrong}
         thumbTintColor={ON_ACCENT}
         style={styles.slider}

@@ -18,8 +18,10 @@ export type Confirmation = {
   title: string
   message?: string
   confirmLabel: string
+  cancelLabel?: string
   destructive?: boolean
   onConfirm: () => void
+  onCancel?: () => void
 }
 
 export type TextPrompt = {
@@ -50,15 +52,31 @@ export function showSheet(title: string | undefined, items: SheetAction[]) {
   )
 }
 
-export function confirm({ title, message, confirmLabel, destructive, onConfirm }: Confirmation) {
+export function confirm({ title, message, confirmLabel, cancelLabel, destructive, onConfirm, onCancel }: Confirmation) {
   // Alert.alert does nothing on the web, so the question is a sheet with one answer.
   if (isWeb) {
-    return openDialog({ kind: 'confirm', title, message, confirmLabel, destructive, cancelable: true, onConfirm })
+    return openDialog({ kind: 'confirm', title, message, confirmLabel, cancelLabel, destructive, cancelable: true, onConfirm, onCancel })
   }
   Alert.alert(title, message, [
-    { text: t('common.cancel'), style: 'cancel' },
+    { text: cancelLabel ?? t('common.cancel'), style: 'cancel', onPress: onCancel },
     { text: confirmLabel, style: destructive ? 'destructive' : 'default', onPress: onConfirm },
   ])
+}
+
+export function confirmAsync(options: {
+  title: string
+  message?: string
+  confirmLabel: string
+  cancelLabel?: string
+  destructive?: boolean
+}): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    confirm({
+      ...options,
+      onConfirm: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
 }
 
 export function promptText(prompt: TextPrompt) {

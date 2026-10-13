@@ -21,7 +21,13 @@ type Callbacks = {
 // Streams one reply and hands out what arrived so far once per frame, since chunks come
 // faster than the screen refreshes. What was streamed is returned even when the stream
 // fails midway; the error is rethrown afterwards through `error`.
-export async function runReplyStream(cfg: ServerSettings, req: ChatRequest, signal: AbortSignal, cb: Callbacks) {
+export async function runReplyStream(
+  cfg: ServerSettings,
+  req: ChatRequest,
+  signal: AbortSignal,
+  cb: Callbacks,
+  options?: { interactive?: boolean },
+) {
   let text = ''
   let thought = ''
   let thinkingSince = 0
@@ -35,7 +41,7 @@ export async function runReplyStream(cfg: ServerSettings, req: ChatRequest, sign
   }
 
   try {
-    for await (const part of streamChat(cfg, await withInlinedImages(req), signal)) {
+    for await (const part of streamChat(cfg, await withInlinedImages(req), signal, { interactive: options?.interactive ?? true })) {
       if (part.kind === 'cutoff') {
         cutoff = true
         continue

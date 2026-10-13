@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
-import { inspectLoadedModel, loadModel, type LoadedModelInfo } from '@/api/llm'
+import { inspectLoadedModel, loadModel, resetSkippedModelMismatch, type LoadedModelInfo } from '@/api/llm'
 import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { isAppLockEnabled, setAppLockEnabled } from '@/db/prefs/appLock'
@@ -121,12 +121,13 @@ export default function SettingsScreen() {
   const checkModelStatus = useCallback(async (currentCfg: typeof cfg, fresh = false) => {
     if (!currentCfg.baseUrl.trim() || !currentCfg.model.trim()) {
       setLoadedModelInfo(null)
+      setModelLoaded(false)
       return
     }
     try {
       const info = await inspectLoadedModel(currentCfg, fresh)
       setLoadedModelInfo(info)
-      if (info.isLoaded) setModelLoaded(true)
+      setModelLoaded(info.isLoaded)
     } catch {
       // Ignore background probe errors
     }
@@ -136,6 +137,12 @@ export default function SettingsScreen() {
     if (!loaded) return
     checkModelStatus(cfg)
   }, [loaded, cfg.baseUrl, cfg.model, checkModelStatus])
+
+  useFocusEffect(
+    useCallback(() => {
+      if (loaded) checkModelStatus(cfg, true)
+    }, [loaded, cfg, checkModelStatus]),
+  )
 
   const onTest = async () => {
     const found = await runTest()
@@ -264,7 +271,10 @@ export default function SettingsScreen() {
   }
 
   useEffect(() => {
-    if (loaded) saveSettings(db, cfg)
+    if (loaded) {
+      saveSettings(db, cfg)
+      resetSkippedModelMismatch()
+    }
   }, [db, cfg, loaded])
 
   const onLoadModel = async () => {
@@ -589,6 +599,7 @@ export default function SettingsScreen() {
             step={1}
             formatValue={(i) => `${CONTEXT_STEPS[i] / 1024}K`}
             onChange={(i) => update({ contextTokens: CONTEXT_STEPS[i] })}
+            tintColor={isLoaded ? colors.accent : '#8E8E93'}
           />
         )}
       </ListSection>

@@ -4,7 +4,9 @@ import { AppState } from 'react-native'
 import type { ThinkingMode } from '@/db/characters'
 import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/prefs/settings'
 import { t } from '@/i18n'
+import { formatContextTokens } from '@/lib/core/context'
 import { errorMessage } from '@/lib/core/errors'
+import { confirmAsync } from '@/lib/ui/dialogs'
 
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 
@@ -163,7 +165,7 @@ export type LoadedModelInfo = {
 export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Promise<LoadedModelInfo> {
   const base = normalizeBaseUrl(cfg.baseUrl)
   const modelName = cfg.model.trim()
-  if (!base || !modelName) return { isLoaded: false }
+  if (!base) return { isLoaded: false }
 
   if (fresh) {
     serverKinds.delete(base)
@@ -172,28 +174,43 @@ export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Pr
 
   if (server.kind === 'lmstudio') {
     const llms = server.models.filter((m) => m.type === 'llm')
-    const match =
-      llms.find(
-        (m) =>
-          m.key === modelName ||
-          m.key.toLowerCase() === modelName.toLowerCase() ||
-          m.loaded_instances?.some((i) => i.id === modelName || i.id.toLowerCase() === modelName.toLowerCase()),
-      ) ??
-      llms.find(
-        (m) =>
-          m.key.toLowerCase().startsWith(modelName.toLowerCase()) ||
-          modelName.toLowerCase().startsWith(m.key.toLowerCase()),
-      ) ??
-      llms.find((m) => m.loaded_instances && m.loaded_instances.length > 0)
+    const directLoaded = modelName
+      ? llms.find(
+          (m) =>
+            m.loaded_instances &&
+            m.loaded_instances.length > 0 &&
+            (m.key === modelName ||
+              m.key.toLowerCase() === modelName.toLowerCase() ||
+              m.loaded_instances.some((i) => i.id === modelName || i.id.toLowerCase() === modelName.toLowerCase()) ||
+              m.key.toLowerCase().startsWith(modelName.toLowerCase()) ||
+              modelName.toLowerCase().startsWith(m.key.toLowerCase())),
+        )
+      : undefined
 
-    if (match && match.loaded_instances && match.loaded_instances.length > 0) {
-      const instance = match.loaded_instances[0]
+    const anyLoaded = llms.find((m) => m.loaded_instances && m.loaded_instances.length > 0)
+
+    const match =
+      directLoaded ??
+      (modelName
+        ? llms.find(
+            (m) =>
+              m.key === modelName ||
+              m.key.toLowerCase() === modelName.toLowerCase() ||
+              m.key.toLowerCase().startsWith(modelName.toLowerCase()) ||
+              modelName.toLowerCase().startsWith(m.key.toLowerCase()),
+          )
+        : undefined)
+
+    const active = directLoaded ?? anyLoaded
+
+    if (active && active.loaded_instances && active.loaded_instances.length > 0) {
+      const instance = active.loaded_instances[0]
       const loadedContext = instance.config?.context_length
       return {
         isLoaded: true,
         loadedContextLength: typeof loadedContext === 'number' ? loadedContext : undefined,
-        maxContextLength: typeof match.max_context_length === 'number' ? match.max_context_length : undefined,
-        modelName: instance.id || match.key,
+        maxContextLength: typeof active.max_context_length === 'number' ? active.max_context_length : undefined,
+        modelName: instance.id || active.key,
       }
     }
 
@@ -206,10 +223,25 @@ export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Pr
   if (server.kind === 'ollama') {
     const ps = await probeJson(cfg, `${base}/api/ps`)
     const models = Array.isArray(ps?.models) ? ps.models : []
-    const isLoaded = models.some(
-      (m: { name?: string; model?: string }) => m.name === modelName || m.model === modelName,
-    )
+    const isLoaded =
+      (Boolean(modelName) &&
+        models.some(
+          (m: { name?: string; model?: string }) =>
+            m.name === modelName ||
+            m.model === modelName ||
+            m.name?.toLowerCase() === modelName.toLowerCase() ||
+            m.model?.toLowerCase() === modelName.toLowerCase(),
+        )) ||
+      models.length > 0
     return { isLoaded }
+  }
+
+  if (server.kind === 'other') {
+    const models = await probeJson(cfg, `${base}/v1/models`)
+    if (Array.isArray(models?.data) && models.data.length > 0) {
+      return { isLoaded: true }
+    }
+    return { isLoaded: false }
   }
 
   return { isLoaded: false }
@@ -240,10 +272,108 @@ async function reasoningFields(cfg: ServerSettings, base: string, mode: Thinking
   return {}
 }
 
+let activeLoadPromise: Promise<{ loadedContextLength?: number } | null> | null = null
+
+export type EnsureLoadedOptions = {
+  // If true, prompts the user with a modal dialog when an active model
+  // on the server has a different context window or model name than in settings.
+  interactive?: boolean
+}
+
+let skippedMismatchKey: string | null = null
+
+export function resetSkippedModelMismatch() {
+  skippedMismatchKey = null
+}
+
+// Ensures the model is loaded on the server before a request is made.
+// If the server already has an active model with matching configuration, it does NOT reload it.
+// If there is a mismatch and options.interactive is true, it prompts the user with a modal dialog.
+export async function ensureModelLoaded(
+  cfg: ServerSettings,
+  options?: EnsureLoadedOptions,
+): Promise<{ loadedContextLength?: number } | null> {
+  const base = normalizeBaseUrl(cfg.baseUrl)
+  if (!base) return null
+
+  // Fast check: is any model already active on the server?
+  const info = await inspectLoadedModel(cfg, true)
+  if (info.isLoaded) {
+    const modelName = cfg.model.trim()
+    const isContextMismatch =
+      cfg.contextMode === 'tokens' &&
+      typeof info.loadedContextLength === 'number' &&
+      info.loadedContextLength !== cfg.contextTokens
+
+    const isModelMismatch =
+      Boolean(modelName) &&
+      Boolean(info.modelName) &&
+      modelName.toLowerCase() !== info.modelName?.toLowerCase()
+
+    if (isContextMismatch || isModelMismatch) {
+      if (options?.interactive) {
+        const mismatchKey = `${info.modelName ?? ''}:${info.loadedContextLength ?? ''}->${modelName}:${cfg.contextTokens}`
+        if (skippedMismatchKey !== mismatchKey) {
+          const serverModel = info.modelName || modelName || '—'
+          const serverContext =
+            typeof info.loadedContextLength === 'number'
+              ? formatContextTokens(info.loadedContextLength)
+              : '—'
+          const settingsModel = modelName || '—'
+          const settingsContext =
+            cfg.contextMode === 'tokens'
+              ? formatContextTokens(cfg.contextTokens)
+              : `${cfg.chatMessages}`
+
+          const shouldReload = await confirmAsync({
+            title: t('chat.reloadModalTitle'),
+            message: t('chat.reloadModalMessage', {
+              serverModel,
+              serverContext,
+              settingsModel,
+              settingsContext,
+            }),
+            confirmLabel: t('chat.reloadModalConfirm'),
+            cancelLabel: t('chat.reloadModalKeep'),
+          })
+
+          if (shouldReload) {
+            skippedMismatchKey = null
+            return await loadModel(cfg)
+          } else {
+            // User chose to keep the old model
+            skippedMismatchKey = mismatchKey
+            return { loadedContextLength: info.loadedContextLength }
+          }
+        }
+      }
+    }
+
+    // Model is already active on the server: do not reload!
+    return { loadedContextLength: info.loadedContextLength }
+  }
+
+  // Model is not loaded on the server: load it
+  if (activeLoadPromise) {
+    return await activeLoadPromise
+  }
+
+  activeLoadPromise = (async () => {
+    try {
+      return await loadModel(cfg)
+    } finally {
+      activeLoadPromise = null
+    }
+  })()
+
+  return await activeLoadPromise
+}
+
 // Loads the model into memory, which on a big one takes a while, so there is no deadline.
 // LM Studio and Ollama have a call for it; llama.cpp and vLLM serve the model they were
 // started with, so there is nothing to load and the connection is all that is checked.
 export async function loadModel(cfg: ServerSettings): Promise<{ loadedContextLength?: number }> {
+  skippedMismatchKey = null
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) throw new Error(t('llm.baseUrlMissing'))
   const model = cfg.model.trim()
@@ -288,9 +418,25 @@ export async function loadModel(cfg: ServerSettings): Promise<{ loadedContextLen
   return { loadedContextLength: loadedContextLength ?? contextLength }
 }
 
-async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: boolean, signal?: AbortSignal) {
+async function requestCompletion(
+  cfg: ServerSettings,
+  req: ChatRequest,
+  stream: boolean,
+  signal?: AbortSignal,
+  options?: EnsureLoadedOptions,
+) {
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) throw new Error(t('llm.baseUrlMissing'))
+
+  // Auto-load model if not active on the server
+  try {
+    await ensureModelLoaded(cfg, options)
+  } catch (err) {
+    if (signal?.aborted) throw err
+    // If auto-load fails, proceed to /v1/chat/completions so the server can report the error
+  }
+
+  if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
 
   const reasoning = await reasoningFields(cfg, base, req.thinking)
   let res
@@ -313,12 +459,50 @@ async function requestCompletion(cfg: ServerSettings, req: ChatRequest, stream: 
     if (signal?.aborted) throw err
     throw unreachable(err)
   }
-  if (!res.ok) throw await readServerError(res)
+  if (!res.ok) {
+    const err = await readServerError(res)
+    const isNotLoaded = /not\s+loaded|no\s+model|load\s+a\s+model|load\s+model/i.test(err.message)
+    if (isNotLoaded && !signal?.aborted) {
+      const info = await inspectLoadedModel(cfg, true).catch(() => null)
+      if (!info?.isLoaded) {
+        await loadModel(cfg)
+        if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
+        let retryRes
+        try {
+          retryRes = await fetch(`${base}/v1/chat/completions`, {
+            method: 'POST',
+            headers: requestHeaders(cfg),
+            signal,
+            body: JSON.stringify({
+              model: cfg.model.trim() || DEFAULT_SETTINGS.model,
+              messages: req.messages,
+              stream,
+              temperature: req.temperature,
+              max_tokens: req.maxTokens,
+              top_p: req.topP,
+              ...reasoning,
+            }),
+          })
+        } catch (retryErr) {
+          if (signal?.aborted) throw retryErr
+          throw unreachable(retryErr)
+        }
+        if (!retryRes.ok) throw await readServerError(retryRes)
+        return retryRes
+      }
+    }
+    throw err
+  }
   return res
 }
 
-export async function completeChat(cfg: ServerSettings, req: ChatRequest, signal?: AbortSignal) {
-  const body = await (await requestCompletion(cfg, req, false, signal)).json()
+export async function completeChat(
+  cfg: ServerSettings,
+  req: ChatRequest,
+  signal?: AbortSignal,
+  options?: EnsureLoadedOptions,
+) {
+  const body = await (await requestCompletion(cfg, req, false, signal, options)).json()
   const content = body?.choices?.[0]?.message?.content
   return typeof content === 'string' ? content : ''
 }
@@ -373,8 +557,13 @@ class ThinkSplitter {
   }
 }
 
-export async function* streamChat(cfg: ServerSettings, req: ChatRequest, signal: AbortSignal) {
-  const res = await requestCompletion(cfg, req, true, signal)
+export async function* streamChat(
+  cfg: ServerSettings,
+  req: ChatRequest,
+  signal: AbortSignal,
+  options?: EnsureLoadedOptions,
+) {
+  const res = await requestCompletion(cfg, req, true, signal, options)
   if (!res.body) throw new Error(t('llm.noStreaming'))
 
   const reader = res.body.getReader()
