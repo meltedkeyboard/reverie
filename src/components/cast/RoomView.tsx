@@ -1,6 +1,6 @@
 import { Icon } from '@/components/visuals/Icon'
 import * as Clipboard from 'expo-clipboard'
-import { Link, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
@@ -16,6 +16,7 @@ import { Composer, ComposerFloat, ComposerSwap } from '@/components/chat/Compose
 import { ConversationList, ErrorCard, JumpButton } from '@/components/chat/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/chrome/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/chrome/GlassHeader'
+import { useChatDrawer } from '@/components/chat/ChatSlideDrawer'
 import { useOpenViewer } from '@/components/visuals/ImageLink'
 import { MessageRow, type RowMessage, type RowScene } from '@/components/chat/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
@@ -37,7 +38,6 @@ import { roomScene } from '@/lib/chat/aside'
 import { promptRenameChat } from '@/lib/chat/chatDialogs'
 import { showSheet } from '@/lib/ui/dialogs'
 import { countLabel } from '@/lib/core/format'
-import { showToastOnce } from '@/lib/ui/toast'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { USER } from '@/lib/chat/room/audience'
@@ -61,6 +61,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const wide = useLayoutMode() === 'wide'
+  const drawer = useChatDrawer()
 
   // Muting someone or switching the floor from here is saved at once and shown without
   // waiting for the screen to reload the room.
@@ -108,8 +109,12 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const scene = useMemo(() => roomScene(room, members), [room, members])
   const aside = useAside(scene, messages)
   // The eye in the header opens a private thread with the model about the scene; while it
-  // is open the field talks to the model, so who is addressed does not matter.
   const { listRef, composerHeight, composerTop, asideOpen, toggleAside, sceneDraft, emptyStyle, scrollToNewest } = useChatShell(aside, () => setEditingRow(null))
+
+  useEffect(() => {
+    setEditingRow(null)
+    scrollToNewest()
+  }, [chatId, scrollToNewest])
 
   // Someone removed from the room, or out of the scene, can't stay picked.
   useEffect(() => {
@@ -323,8 +328,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
   const cast = useMemo(() => members.map((m) => ({ name: m.character.name, avatar: m.character.avatar })), [members])
   const empty = loaded && rows.length === 0
-  // Nothing written yet: a new chat from here would be the same as this one.
-  const fresh = loaded && !rows.some((r) => r.role === 'user')
 
   const asidePanel = asideOpen ? (
     <AsidePanel
@@ -368,17 +371,14 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
       <GlassHeader
         floating
-        left={wide ? undefined : <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
+        left={
+          wide ? undefined : (
+            <GlassButton icon="menu-outline" iconSize={22} onPress={drawer?.toggleDrawer} accessibilityLabel={t('sidebar.expand')} />
+          )
+        }
         right={
           <View style={styles.headerActions}>
             <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
-            {fresh ? (
-              <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
-            ) : (
-              <Link href={`/chat/new?room=${room.id}`} asChild>
-                <GlassButton icon="create-outline" />
-              </Link>
-            )}
           </View>
         }
       >

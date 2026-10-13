@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { setChatTitle, type Chat } from '@/db/chats'
 import {
@@ -63,6 +63,10 @@ export function useConversation(chat: Chat, speakerOf: (message: Message) => str
   const task = useAbortable()
   const discarded = useRef(new WeakSet<AbortController>())
   const titleRef = useRef(chat.title)
+  useEffect(() => {
+    titleRef.current = chat.title
+    setTitleState(chat.title)
+  }, [chat.id, chat.title])
   const namingRef = useRef(false)
   const speakerRef = useRef(speakerOf)
   speakerRef.current = speakerOf

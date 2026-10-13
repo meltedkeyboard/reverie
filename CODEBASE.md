@@ -61,7 +61,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 | `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder |
 | `/settings` | `(tabs)/settings.tsx` | Settings tab: server, the Appearance row, language, Continue capsule and where it leads, lock, haptics, private question button, recent pictures, size limits, folder sync, backup. `?section=` scrolls to a block and flashes it |
 | `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26) |
-| `/chats/:characterId` | `chats/[characterId].tsx` | Chats of one character; the info button opens the character's profile |
+| `/chats/:characterId` | `chats/[characterId].tsx` | Redirects to `/chat/new?character=:characterId` (characters open directly into a new chat; all existing chats are switched via the slide-out drawer) |
 | `/groups/:groupId` | `groups/[groupId].tsx` | Characters of one group; actions (rename, ungroup, export, delete), add character, reorder, edit mode |
 | `/chat/:id` | `chat/[id].tsx` | The conversation (largest screen); a room's scene renders `RoomView` instead. `?message=ID` opens it scrolled to that message |
 | `/rooms/:roomId` | `rooms/[roomId].tsx` | Scenes of one room, import of a member's chat |

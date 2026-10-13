@@ -1,7 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import * as Clipboard from 'expo-clipboard'
-import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -13,6 +13,7 @@ import { Composer, ComposerFloat, ComposerSwap } from '@/components/chat/Compose
 import { ConversationList, ErrorCard, JumpButton } from '@/components/chat/ConversationList'
 import { GlassButton, GlassSurface } from '@/components/chrome/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/chrome/GlassHeader'
+import { ChatSlideDrawer, useChatDrawer } from '@/components/chat/ChatSlideDrawer'
 import { MessageRow, type RowMessage } from '@/components/chat/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
 import { RoomView } from '@/components/cast/RoomView'
@@ -34,7 +35,6 @@ import { useTranslation } from '@/i18n'
 import { characterScene } from '@/lib/chat/aside'
 import { formatWhen } from '@/lib/core/format'
 import * as Haptics from '@/lib/ui/haptics'
-import { showToastOnce } from '@/lib/ui/toast'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
@@ -59,50 +59,115 @@ export default function ChatScreen() {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   // Kept across focus changes, so coming back from the character editor does not
   // start yet another chat.
-  const created = useRef<Promise<number> | null>(null)
+  const created = useRef<{ key: string; promise: Promise<number> } | null>(null)
 
-  useFocusEffect(
-    useCallback(() => {
-      ;(async () => {
-        let chatId = Number(id)
-        if (id === 'new' && roomParam) {
-          const room = await getRoom(db, Number(roomParam))
-          if (!room) return router.back()
-          created.current ??= createRoomChat(db, room)
-          chatId = await created.current
-        } else if (id === 'new') {
-          const owner = await getCharacter(db, Number(characterParam))
-          if (!owner) return router.back()
-          created.current ??= createChat(db, owner)
-          chatId = await created.current
+  const load = useCallback(() => {
+    let active = true
+    ;(async () => {
+      let chatId = Number(id)
+      if (id === 'new' && roomParam) {
+        const room = await getRoom(db, Number(roomParam))
+        if (!room) return router.back()
+        const key = `room:${roomParam}`
+        if (!created.current || created.current.key !== key) {
+          created.current = { key, promise: createRoomChat(db, room) }
         }
-        const chat = await getChat(db, chatId)
-        if (chat?.roomId) {
-          // Re-read on every focus: the room or its cast may have been edited meanwhile.
-          const room = await getRoom(db, chat.roomId)
-          if (!room) return router.back()
-          setLoaded({ kind: 'room', chat, room, members: await listRoomMembers(db, room.id) })
-          setContinueHidden(db, 'room', false)
-          setLastOpened(db, 'room', chat.id)
-          return
+        chatId = await created.current.promise
+        if (!active) return
+        router.setParams({ id: String(chatId) })
+      } else if (id === 'new') {
+        const owner = await getCharacter(db, Number(characterParam))
+        if (!owner) return router.back()
+        const key = `char:${characterParam}`
+        if (!created.current || created.current.key !== key) {
+          created.current = { key, promise: createChat(db, owner) }
         }
-        const character = chat?.characterId ? await getCharacter(db, chat.characterId) : null
-        if (chat && character) {
-          setLoaded({ kind: 'character', chat, character })
-          // A continue button swiped away on the home screen comes back once a chat opens.
-          setContinueHidden(db, 'character', false)
-          setLastOpened(db, 'character', chat.id)
-        } else router.back()
-      })()
-    }, [db, id, characterParam, roomParam, router])
-  )
+        chatId = await created.current.promise
+        if (!active) return
+        router.setParams({ id: String(chatId) })
+      } else {
+        created.current = null
+      }
+      const chat = await getChat(db, chatId)
+      if (!active) return
+      if (chat?.roomId) {
+        // Re-read on every focus: the room or its cast may have been edited meanwhile.
+        const room = await getRoom(db, chat.roomId)
+        if (!room || !active) return router.back()
+        setLoaded({ kind: 'room', chat, room, members: await listRoomMembers(db, room.id) })
+        setContinueHidden(db, 'room', false)
+        setLastOpened(db, 'room', chat.id)
+        return
+      }
+      const character = chat?.characterId ? await getCharacter(db, chat.characterId) : null
+      if (!active) return
+      if (chat && character) {
+        setLoaded({ kind: 'character', chat, character })
+        // A continue button swiped away on the home screen comes back once a chat opens.
+        setContinueHidden(db, 'character', false)
+        setLastOpened(db, 'character', chat.id)
+      } else router.back()
+    })()
+    return () => {
+      active = false
+    }
+  }, [db, id, characterParam, roomParam, router])
+
+  useFocusEffect(load)
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const switchChat = useCallback(async (chatId: number) => {
+    const chat = await getChat(db, chatId)
+    if (!chat) return
+    setLoaded((prev) => {
+      if (!prev) return prev
+      if (prev.kind === 'character') return { kind: 'character', chat, character: prev.character }
+      if (prev.kind === 'room') return { kind: 'room', chat, room: prev.room, members: prev.members }
+      return prev
+    })
+    router.setParams({ id: String(chatId), character: undefined, room: undefined, message: undefined })
+  }, [db, router])
+
+  const newChat = useCallback(async () => {
+    if (!loaded) return
+    if (loaded.kind === 'character') {
+      const nextId = await createChat(db, loaded.character)
+      const chat = await getChat(db, nextId)
+      if (chat) {
+        setLoaded({ kind: 'character', chat, character: loaded.character })
+        router.setParams({ id: String(nextId), character: undefined, room: undefined, message: undefined })
+      }
+    } else if (loaded?.kind === 'room') {
+      const nextId = await createRoomChat(db, loaded.room)
+      const chat = await getChat(db, nextId)
+      if (chat) {
+        setLoaded({ kind: 'room', chat, room: loaded.room, members: loaded.members })
+        router.setParams({ id: String(nextId), character: undefined, room: undefined, message: undefined })
+      }
+    }
+  }, [db, loaded, router])
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: colors.bg }} />
   const focusMessageId = messageParam ? Number(messageParam) : null
-  if (loaded.kind === 'room') {
-    return <RoomView chat={loaded.chat} room={loaded.room} members={loaded.members} focusMessageId={focusMessageId} />
-  }
-  return <ChatView chat={loaded.chat} character={loaded.character} focusMessageId={focusMessageId} />
+  const content =
+    loaded.kind === 'room' ? (
+      <RoomView chat={loaded.chat} room={loaded.room} members={loaded.members} focusMessageId={focusMessageId} />
+    ) : (
+      <ChatView chat={loaded.chat} character={loaded.character} focusMessageId={focusMessageId} />
+    )
+
+  return (
+    <ChatSlideDrawer
+      character={loaded.kind === 'character' ? loaded.character : undefined}
+      room={loaded.kind === 'room' ? loaded.room : undefined}
+      onSwitchChat={switchChat}
+      onNewChat={newChat}
+    >
+      {content}
+    </ChatSlideDrawer>
+  )
 }
 
 type ChatViewProps = {
@@ -116,6 +181,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const db = useDatabase()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const drawer = useChatDrawer()
   const headerHeight = useHeaderHeight()
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -151,8 +217,12 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
 
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [awayFromEnd, setAwayFromEnd] = useState(false)
-  // The eye in the header opens a private thread with the model about this chat.
   const { listRef, composerHeight, composerTop, asideOpen, toggleAside, sceneDraft, emptyStyle, scrollToNewest } = useChatShell(aside, () => setEditingRow(null))
+
+  useEffect(() => {
+    setEditingRow(null)
+    scrollToNewest()
+  }, [chatId, scrollToNewest])
 
   const idle = phase === 'idle'
   const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(scene, messages, suggestEnabled && idle && !asideOpen && !editingRow)
@@ -228,8 +298,6 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const errorCard = error ? <ErrorCard message={error} onRetry={retry} /> : null
 
   const empty = loaded && rows.length === 0
-  // Nothing written yet: a new chat from here would be the same as this one.
-  const fresh = loaded && !rows.some((r) => r.role === 'user')
 
   return (
     <View style={styles.screen}>
@@ -256,17 +324,14 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
 
       <GlassHeader
         floating
-        left={wide ? undefined : <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
+        left={
+          wide ? undefined : (
+            <GlassButton icon="menu-outline" iconSize={22} onPress={drawer?.toggleDrawer} accessibilityLabel={t('sidebar.expand')} />
+          )
+        }
         right={
           <View style={styles.headerActions}>
             <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
-            {fresh ? (
-              <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
-            ) : (
-              <Link href={`/chat/new?character=${character.id}`} asChild>
-                <GlassButton icon="create-outline" />
-              </Link>
-            )}
           </View>
         }
       >

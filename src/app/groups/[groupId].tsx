@@ -224,7 +224,7 @@ export default function GroupScreen() {
         renderItem={({ item: character }) => (
           <CharacterCard
             character={character}
-            onOpen={() => router.push(`/chats/${character.id}`)}
+            onOpen={() => router.push(`/chat/new?character=${character.id}`)}
             onDelete={() => confirmDelete(character)}
             menu={menuItems(character)}
             // All member ids: no card in the group becomes a drop target for another member.

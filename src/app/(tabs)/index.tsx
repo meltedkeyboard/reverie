@@ -368,7 +368,7 @@ export default function CharactersScreen() {
           return (
             <CharacterCard
               character={character}
-              onOpen={() => router.push(`/chats/${character.id}`)}
+              onOpen={() => router.push(`/chat/new?character=${character.id}`)}
               onDelete={() => confirmDelete(character)}
               menu={menuItems(character)}
               fillHeight={fillHeight}

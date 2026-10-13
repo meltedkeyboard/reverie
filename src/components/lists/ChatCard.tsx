@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import type { ChatPreview } from '@/db/chats'
 import { useTranslation } from '@/i18n'
 import { countLabel, formatWhen } from '@/lib/core/format'
-import { plainPreview } from '@/lib/chat/roleplay'
+import { InlineMarkdown } from '@/components/chat/Markdown'
 import { useStyles, type Colors } from '@/theme'
 
 import { ListCard } from './ListCard'
@@ -19,7 +19,7 @@ type Props = {
 export function ChatCard({ chat, onOpen, onDelete, menu }: Props) {
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
-  const preview = plainPreview(chat.lastMessage ?? '') || t('chatCard.emptyChat')
+  const hasMessage = Boolean(chat.lastMessage?.trim())
   const count = chat.messageCount
   const when = formatWhen(chat.lastActivity, locale)
   const messages = countLabel(count, 'message', locale)
@@ -30,9 +30,13 @@ export function ChatCard({ chat, onOpen, onDelete, menu }: Props) {
           {chat.title ?? when}
         </Text>
         <Text style={styles.meta}>{chat.title ? `${when}, ${messages}` : messages}</Text>
-        <Text style={styles.preview} numberOfLines={2}>
-          {preview}
-        </Text>
+        {hasMessage ? (
+          <InlineMarkdown text={chat.lastMessage!} style={styles.preview} numberOfLines={2} />
+        ) : (
+          <Text style={styles.preview} numberOfLines={2}>
+            {t('chatCard.emptyChat')}
+          </Text>
+        )}
       </View>
     </ListCard>
   )

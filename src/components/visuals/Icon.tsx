@@ -16,7 +16,9 @@ import { isDesktop } from '@/lib/core/platform'
 import { swiftUI } from '@/lib/ui/nativeUI'
 import { useTheme } from '@/theme'
 
-type Props = ComponentProps<typeof Ionicons>
+type Props = ComponentProps<typeof Ionicons> & {
+  strokeWidth?: number
+}
 
 // The desktop app draws Lucide; phones and the plain web page keep Ionicons.
 // The names stay Ionicons' (the outline and filled forms share one Lucide glyph), so a call
@@ -104,11 +106,11 @@ const LUCIDE: Record<string, LucideIcon> = {
 }
 
 function LucideOrIonicon(props: Props) {
-  const { name, size = 24, color, style } = props
+  const { name, size = 24, color, style, strokeWidth = 1.75 } = props
   const Glyph = LUCIDE[String(name).replace(/-(outline|sharp)$/, '')]
   if (!Glyph) return <Ionicons {...props} />
   // A light stroke: 1.75 at its usual 18 px, kept the same width at every size.
-  return <Glyph size={size} color={color as string | undefined} strokeWidth={1.75} absoluteStrokeWidth style={style} />
+  return <Glyph size={size} color={color as string | undefined} strokeWidth={strokeWidth} absoluteStrokeWidth style={style} />
 }
 
 // On iOS the same names are SF Symbols: [outline form, filled form]. The Ionicons name

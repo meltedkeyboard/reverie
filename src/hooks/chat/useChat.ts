@@ -87,8 +87,6 @@ export function useChat(chat: Chat, character: Character) {
       // screen already belongs to the other one.
       task.reset()
       lastRequest.current = null
-      setMessages([])
-      setLoaded(false)
       setDraft(null)
       setReasoning(null)
       setReasoningMs(null)

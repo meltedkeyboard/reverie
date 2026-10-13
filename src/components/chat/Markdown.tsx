@@ -226,6 +226,209 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
 
 export const Markdown = memo(MarkdownView)
 
+export type InlineMarkdownProps = {
+  text: string
+  style?: StyleProp<TextStyle>
+  emStyle?: StyleProp<TextStyle>
+  strongStyle?: StyleProp<TextStyle>
+  numberOfLines?: number
+}
+
+function flattenInlineTokens(tokens: Token[]): Token[] {
+  const result: Token[] = []
+
+  function appendSpace() {
+    if (result.length === 0) return
+    const last = result[result.length - 1]
+    if (last.type === 'text') {
+      if (!last.text.endsWith(' ')) {
+        last.text += ' '
+      }
+    } else {
+      result.push({ type: 'text', raw: ' ', text: ' ', escaped: false } as Tokens.Text)
+    }
+  }
+
+  function appendText(str: string) {
+    if (!str) return
+    const normalized = str.replace(/\s+/g, ' ')
+    if (!normalized) return
+    if (result.length > 0) {
+      const last = result[result.length - 1]
+      if (last.type === 'text') {
+        if (last.text.endsWith(' ') && normalized.startsWith(' ')) {
+          last.text += normalized.slice(1)
+        } else {
+          last.text += normalized
+        }
+        return
+      }
+    }
+    result.push({ type: 'text', raw: normalized, text: normalized, escaped: false } as Tokens.Text)
+  }
+
+  function walk(list: Token[]) {
+    for (const token of list) {
+      switch (token.type) {
+        case 'paragraph':
+        case 'heading':
+        case 'blockquote': {
+          appendSpace()
+          if ('tokens' in token && token.tokens) walk(token.tokens)
+          appendSpace()
+          break
+        }
+        case 'list': {
+          appendSpace()
+          const listToken = token as Tokens.List
+          listToken.items.forEach((item, idx) => {
+            if (idx > 0) appendSpace()
+            if (item.tokens) walk(item.tokens)
+          })
+          appendSpace()
+          break
+        }
+        case 'code': {
+          appendSpace()
+          result.push({
+            type: 'codespan',
+            raw: token.raw,
+            text: (token as Tokens.Code).text.replace(/\s+/g, ' '),
+          } as Tokens.Codespan)
+          appendSpace()
+          break
+        }
+        case 'hr':
+        case 'space':
+        case 'br': {
+          appendSpace()
+          break
+        }
+        case 'strong':
+        case 'em':
+        case 'del': {
+          if ('tokens' in token && token.tokens) {
+            result.push({ ...token, tokens: flattenInlineTokens(token.tokens) })
+          } else {
+            result.push(token)
+          }
+          break
+        }
+        case 'codespan':
+        case 'link': {
+          result.push(token)
+          break
+        }
+        case 'image': {
+          const imageToken = token as Tokens.Image
+          appendText(imageToken.text ? `[${imageToken.text}]` : '[Фото]')
+          break
+        }
+        case 'html': {
+          break
+        }
+        case 'text': {
+          const textToken = token as Tokens.Text
+          if (textToken.tokens && textToken.tokens.length) {
+            walk(textToken.tokens)
+          } else {
+            appendText(textToken.text)
+          }
+          break
+        }
+        default: {
+          if ('tokens' in token && Array.isArray((token as any).tokens)) {
+            walk((token as any).tokens)
+          } else if ('text' in token && typeof (token as any).text === 'string') {
+            appendText((token as any).text)
+          }
+          break
+        }
+      }
+    }
+  }
+
+  walk(tokens)
+
+  const first = result[0]
+  if (first && first.type === 'text') {
+    first.text = first.text.trimStart()
+    if (!first.text) result.shift()
+  }
+  const last = result[result.length - 1]
+  if (last && last.type === 'text') {
+    last.text = last.text.trimEnd()
+    if (!last.text) result.pop()
+  }
+
+  return result
+}
+
+function InlineMarkdownView({ text, style, emStyle, strongStyle, numberOfLines }: InlineMarkdownProps) {
+  const styles = useStyles(createStyles)
+  const tokens = useMemo(() => {
+    if (!text || !text.trim()) return []
+    const parsed = Lexer.lex(closeOpenEmphasis(text), { gfm: true })
+    return flattenInlineTokens(parsed)
+  }, [text])
+
+  const renderTokens = (list: Token[]): ReactNode[] =>
+    list.map((token, i) => {
+      switch (token.type) {
+        case 'strong':
+          return (
+            <Text key={i} style={[styles.strong, strongStyle]}>
+              {'tokens' in token && token.tokens ? renderTokens(token.tokens) : token.text}
+            </Text>
+          )
+        case 'em':
+          return (
+            <Text key={i} style={[styles.em, emStyle]}>
+              {'tokens' in token && token.tokens ? renderTokens(token.tokens) : token.text}
+            </Text>
+          )
+        case 'del':
+          return (
+            <Text key={i} style={styles.del}>
+              {'tokens' in token && token.tokens ? renderTokens(token.tokens) : token.text}
+            </Text>
+          )
+        case 'codespan':
+          return (
+            <Text key={i} style={styles.codespanInline}>
+              {(token as Tokens.Codespan).text}
+            </Text>
+          )
+        case 'link':
+          return (
+            <Text key={i} style={styles.link}>
+              {'tokens' in token && token.tokens ? renderTokens(token.tokens) : (token as Tokens.Link).text}
+            </Text>
+          )
+        case 'text':
+          return token.text
+        default:
+          return 'text' in token ? (token as any).text : token.raw
+      }
+    })
+
+  if (!tokens.length) {
+    return (
+      <Text style={style} numberOfLines={numberOfLines}>
+        {''}
+      </Text>
+    )
+  }
+
+  return (
+    <Text style={style} numberOfLines={numberOfLines} ellipsizeMode="tail">
+      {renderTokens(tokens)}
+    </Text>
+  )
+}
+
+export const InlineMarkdown = memo(InlineMarkdownView)
+
 // While a reply streams, an action the model has opened but not yet closed would show
 // its asterisk and then jump into italics. Closing it early keeps the text steady.
 function closeOpenEmphasis(text: string) {
@@ -247,6 +450,7 @@ const createStyles = (colors: Colors) =>
     del: { textDecorationLine: 'line-through' },
     link: { color: colors.accent, textDecorationLine: 'underline' },
     codespan: { fontFamily: CODE_FONT, backgroundColor: colors.surface, color: colors.text },
+    codespanInline: { fontFamily: CODE_FONT },
     heading: { fontWeight: '700' },
     codeBlock: {
       borderRadius: 12,
