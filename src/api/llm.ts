@@ -369,16 +369,31 @@ async function reasoningFields(cfg: ServerSettings, base: string, mode: Thinking
   if (server.kind === 'ollama') return mode === 'off' ? { ...kwargs, reasoning_effort: 'none' } : kwargs
   if (server.kind === 'other') return kwargs
 
-  const name = cfg.model.trim()
+  const name = cfg.model.trim().toLowerCase()
   const llms = server.models.filter((m) => m.type === 'llm')
   // With no exact match LM Studio answers with whatever model is loaded.
   const model =
-    llms.find((m) => m.key === name || m.loaded_instances?.some((i) => i.id === name)) ??
-    llms.find((m) => m.loaded_instances?.length)
+    (name
+      ? llms.find(
+          (m) =>
+            m.key.toLowerCase() === name ||
+            m.loaded_instances?.some((i) => i.id.toLowerCase() === name) ||
+            m.key.toLowerCase().startsWith(name) ||
+            name.startsWith(m.key.toLowerCase()),
+        )
+      : undefined) ??
+    llms.find((m) => m.loaded_instances?.length) ??
+    llms[0]
   const allowed = model?.capabilities?.reasoning?.allowed_options ?? []
 
-  if (mode === 'off') return allowed.includes('off') ? { reasoning_effort: 'none' } : {}
-  if (allowed.includes('on') || allowed.includes('medium')) return { reasoning_effort: 'medium' }
+  if (mode === 'off') {
+    if (allowed.includes('off')) return { reasoning_effort: 'off' }
+    return {}
+  }
+  if (allowed.includes('medium')) return { reasoning_effort: 'medium' }
+  if (allowed.includes('on')) return { reasoning_effort: 'on' }
+  if (allowed.includes('high')) return { reasoning_effort: 'high' }
+  if (allowed.includes('low')) return { reasoning_effort: 'low' }
   return {}
 }
 
@@ -649,9 +664,8 @@ async function requestCompletion(
   if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
 
   const reasoning = await reasoningFields(cfg, base, req.thinking)
-  let res
-  try {
-    res = await fetch(`${base}/v1/chat/completions`, {
+  const postChat = (includeReasoning: boolean) =>
+    fetch(`${base}/v1/chat/completions`, {
       method: 'POST',
       headers: requestHeaders(cfg),
       signal,
@@ -662,9 +676,13 @@ async function requestCompletion(
         temperature: req.temperature,
         max_tokens: req.maxTokens,
         top_p: req.topP,
-        ...reasoning,
+        ...(includeReasoning ? reasoning : {}),
       }),
     })
+
+  let res
+  try {
+    res = await postChat(true)
   } catch (err) {
     if (signal?.aborted) throw err
     throw unreachable(err)
@@ -679,27 +697,35 @@ async function requestCompletion(
         if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
         let retryRes
         try {
-          retryRes = await fetch(`${base}/v1/chat/completions`, {
-            method: 'POST',
-            headers: requestHeaders(cfg),
-            signal,
-            body: JSON.stringify({
-              model: cfg.model.trim() || DEFAULT_SETTINGS.model,
-              messages: req.messages,
-              stream,
-              temperature: req.temperature,
-              max_tokens: req.maxTokens,
-              top_p: req.topP,
-              ...reasoning,
-            }),
-          })
+          retryRes = await postChat(true)
         } catch (retryErr) {
           if (signal?.aborted) throw retryErr
           throw unreachable(retryErr)
         }
-        if (!retryRes.ok) throw await readServerError(retryRes)
-        return retryRes
+        if (retryRes.ok) return retryRes
+        if (Object.keys(reasoning).length > 0 && (retryRes.status === 400 || retryRes.status === 422)) {
+          let fallbackRes
+          try {
+            fallbackRes = await postChat(false)
+          } catch (fallbackErr) {
+            if (signal?.aborted) throw fallbackErr
+            throw unreachable(fallbackErr)
+          }
+          if (fallbackRes.ok) return fallbackRes
+        }
+        throw await readServerError(retryRes)
       }
+    }
+    // If the server rejected thinking / reasoning kwargs (400 or 422), retry once without them
+    if (Object.keys(reasoning).length > 0 && (res.status === 400 || res.status === 422) && !signal?.aborted) {
+      let fallbackRes
+      try {
+        fallbackRes = await postChat(false)
+      } catch (retryErr) {
+        if (signal?.aborted) throw retryErr
+        throw unreachable(retryErr)
+      }
+      if (fallbackRes.ok) return fallbackRes
     }
     throw err
   }

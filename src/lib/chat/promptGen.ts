@@ -133,14 +133,16 @@ export function streamGeneration(
   signal: AbortSignal,
   options: { thinking: boolean; edit: boolean }
 ): AsyncGenerator<StreamPart> {
+  const budget = cfg.contextTokens ? Math.max(cfg.contextTokens - 1500, 3000) : 8192
+  const maxTokens = options.thinking ? Math.min(budget, 8192) : 3000
   return streamChat(
     cfg,
     // The token budget is generous because reasoning models spend part of it thinking
     // before the prompt itself starts.
     {
       messages,
-      temperature: options.edit ? 0.4 : 0.9,
-      maxTokens: 3000,
+      temperature: options.thinking ? (options.edit ? 0.7 : 0.8) : (options.edit ? 0.4 : 0.9),
+      maxTokens,
       topP: 0.95,
       thinking: options.thinking ? 'on' : 'off',
     },
@@ -152,6 +154,11 @@ export function streamGeneration(
 // "System prompt:" line in front.
 export function cleanGenerated(text: string) {
   let out = text.trim()
+  out = out.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+  if (out.includes('</think>')) {
+    out = out.slice(out.lastIndexOf('</think>') + '</think>'.length).trim()
+  }
+  out = out.replace(/^<think>[\s\S]*/gi, '').trim()
   const fence = out.match(/^```[\w-]*\n([\s\S]*?)\n```$/)
   if (fence) out = fence[1].trim()
   out = out.replace(/^(system prompt|системный промпт|промпт|prompt)\s*:\s*\n?/i, '')

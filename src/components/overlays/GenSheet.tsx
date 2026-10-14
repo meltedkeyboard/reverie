@@ -105,14 +105,28 @@ export function GenSheet({
     try {
       const cfg = await loadSettings(db)
       setActivity({ thinking: true, since: Date.now() })
+      let hadCutoff = false
+      let hadReasoning = false
       for await (const part of streamGeneration(cfg, build(revision), ctrl.signal, { thinking, edit: edits || !!revision })) {
-        if (part.kind === 'reasoning') continue
+        if (part.kind === 'reasoning') {
+          hadReasoning = true
+          continue
+        }
+        if (part.kind === 'cutoff') {
+          hadCutoff = true
+          continue
+        }
         if (!text) setActivity({ thinking: false, since: Date.now() })
         text += part.text
         setLive(text)
       }
       const done = cleanGenerated(text)
-      if (!done) throw new Error(t('promptGen.empty'))
+      if (!done) {
+        if (hadCutoff && (hadReasoning || thinking)) {
+          throw new Error(t('chat.thinkingOutOfTokens'))
+        }
+        throw new Error(t('promptGen.empty'))
+      }
       pushVersion(done)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     } catch (err) {
