@@ -81,6 +81,8 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     replacingId,
     queue,
     auto,
+    thinking,
+    toggleThinking,
     send,
     stop,
     proceed,
@@ -416,6 +418,8 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
           suggestion={suggestion}
           onSuggestionTaken={clearSuggestion}
           onSuggestionDismissed={dismissSuggestion}
+          thinking={asideOpen ? undefined : thinking}
+          onToggleThinking={asideOpen ? undefined : toggleThinking}
           hushed={asideOpen || (whisper && addressees.length > 0 && !narration)}
           toolbar={
             members.length && !asideOpen ? (

@@ -293,10 +293,11 @@ export async function importChatToRoom(db: SQLiteDatabase, chatId: number, roomI
        VALUES (?, ?, ?, ?, ?, ?, 0)`,
       [targetRoom, characterId, position?.next ?? 0, DEFAULT_MEMBER.talkativeness, DEFAULT_MEMBER.perception, '']
     )
-    const res = await db.runAsync('INSERT INTO chats (room_id, title, created_at) VALUES (?, ?, ?)', [
+    const res = await db.runAsync('INSERT INTO chats (room_id, title, created_at, thinking) VALUES (?, ?, ?, ?)', [
       targetRoom,
       source.title,
       source.createdAt,
+      source.thinking ?? null,
     ])
     sceneId = res.lastInsertRowId
     const columns = MESSAGE_COPY_COLUMNS.replace('speaker_id', "CASE role WHEN 'assistant' THEN ? END")

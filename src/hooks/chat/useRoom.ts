@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { type Chat } from '@/db/chats'
+import type { ThinkingMode } from '@/db/characters'
+import { setChatThinking, type Chat } from '@/db/chats'
 import { addMessage, addVariant, listMessages, type Message, type MessageImage, type MessageKind, type Thought } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { setMemberPresent, type Room, type RoomMember } from '@/db/rooms'
@@ -94,6 +95,27 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   const castRef = useRef(onMembersChange)
   castRef.current = onMembersChange
   const failure = useRef<Failure | null>(null)
+
+  const [chatThinking, setChatThinkingState] = useState<ThinkingMode | null>(chat.thinking ?? null)
+  const chatThinkingRef = useRef(chatThinking)
+  chatThinkingRef.current = chatThinking
+
+  useEffect(() => {
+    setChatThinkingState(chat.thinking ?? null)
+  }, [chat.id, chat.thinking])
+
+  const modes = new Set(members.map((m) => m.character.thinking))
+  const defaultMode: ThinkingMode = modes.size === 1 ? [...modes][0] : 'auto'
+  const thinking = chatThinking !== null ? chatThinking === 'on' : defaultMode === 'on'
+
+  const toggleThinking = useCallback(
+    async (on: boolean) => {
+      const mode: ThinkingMode = on ? 'on' : 'off'
+      setChatThinkingState(mode)
+      await setChatThinking(db, chat.id, mode)
+    },
+    [db, chat.id]
+  )
 
   useEffect(() => {
     let alive = true
@@ -201,6 +223,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           planned,
           guidance,
           window: cfg,
+          thinking: chatThinkingRef.current ?? speaker.character.thinking,
         })
         const streamed = await runReplyStream(cfg, req, ctrl.signal, {
           onStart: () => setPhase('streaming'),
@@ -476,6 +499,8 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     replacingId,
     queue,
     auto,
+    thinking,
+    toggleThinking,
     send,
     stop,
     proceed,

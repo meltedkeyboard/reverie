@@ -1,4 +1,5 @@
 import type { ChatRequest, ChatTurn, ContentPart } from '@/api/llm'
+import type { ThinkingMode } from '@/db/characters'
 import type { Message } from '@/db/messages'
 import type { Room, RoomMember } from '@/db/rooms'
 import { selectHistory, turnTokens } from '@/lib/core/context'
@@ -27,11 +28,12 @@ type Context = {
   planned: Planned
   guidance?: string
   window: Window
+  thinking?: ThinkingMode
 }
 
 // The scene as this one character lived it: their own lines as the assistant, everyone
 // else's as the user with a name in front, and nothing they could not have heard.
-export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window }: Context): ChatRequest {
+export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking }: Context): ChatRequest {
   const me = speaker.characterId
   const name = speaker.character.name
   const userName = userNameOf(room)
@@ -125,7 +127,7 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
     // reasoning model spends most of the budget thinking before it writes a word.
     maxTokens: character.maxTokens,
     topP: character.topP,
-    thinking: character.thinking,
+    thinking: thinking ?? character.thinking,
   }
 }
 

@@ -134,6 +134,8 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
     replacingId,
     reasoning,
     reasoningMs,
+    thinking,
+    toggleThinking,
     send,
     stop,
     regenerate,
@@ -317,6 +319,8 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
           suggestion={suggestion}
           onSuggestionTaken={clearSuggestion}
           onSuggestionDismissed={dismissSuggestion}
+          thinking={asideOpen ? undefined : thinking}
+          onToggleThinking={asideOpen ? undefined : toggleThinking}
           onSend={(text, image) => {
             if (asideOpen) return void aside.ask(text, image)
             send(text, image)

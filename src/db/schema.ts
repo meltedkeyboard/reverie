@@ -236,6 +236,10 @@ const MIGRATIONS = [
     );
     ALTER TABLE characters ADD COLUMN group_id INTEGER REFERENCES character_groups(id) ON DELETE SET NULL;
   `,
+  // Thinking mode per chat: on/off overrides the character's setting for this conversation.
+  `
+    ALTER TABLE chats ADD COLUMN thinking TEXT;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

@@ -179,7 +179,7 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
     const chats = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE character_id = ? ORDER BY id', id)
     for (const chat of chats) {
       const copy = await db.runAsync(
-        'INSERT INTO chats (character_id, title, created_at) SELECT ?, title, created_at FROM chats WHERE id = ?',
+        'INSERT INTO chats (character_id, title, created_at, thinking) SELECT ?, title, created_at, thinking FROM chats WHERE id = ?',
         [characterId, chat.id]
       )
       await db.runAsync(

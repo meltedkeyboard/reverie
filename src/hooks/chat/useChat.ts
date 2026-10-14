@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { ChatTurn } from '@/api/llm'
-import type { Character } from '@/db/characters'
-import { type Chat } from '@/db/chats'
+import type { Character, ThinkingMode } from '@/db/characters'
+import { setChatThinking, type Chat } from '@/db/chats'
 import { addVariant, type Message, type MessageImage, type Thought } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
@@ -70,6 +70,25 @@ export function useChat(chat: Chat, character: Character) {
   const [reasoning, setReasoning] = useState<string | null>(null)
   const [reasoningMs, setReasoningMs] = useState<number | null>(null)
 
+  const [chatThinking, setChatThinkingState] = useState<ThinkingMode | null>(chat.thinking ?? null)
+  const chatThinkingRef = useRef(chatThinking)
+  chatThinkingRef.current = chatThinking
+
+  useEffect(() => {
+    setChatThinkingState(chat.thinking ?? null)
+  }, [chat.id, chat.thinking])
+
+  const thinking = chatThinking !== null ? chatThinking === 'on' : character.thinking === 'on'
+
+  const toggleThinking = useCallback(
+    async (on: boolean) => {
+      const mode: ThinkingMode = on ? 'on' : 'off'
+      setChatThinkingState(mode)
+      await setChatThinking(db, chat.id, mode)
+    },
+    [db, chat.id]
+  )
+
   // The latest request, so a retry repeats exactly that one.
   const lastRequest = useRef<{ id: number; guidance?: string } | 'continue' | null>(null)
 
@@ -128,7 +147,7 @@ export function useChat(chat: Chat, character: Character) {
             temperature: target.temperature,
             maxTokens: target.maxTokens,
             topP: target.topP,
-            thinking: target.thinking,
+            thinking: chatThinkingRef.current ?? target.thinking,
           },
           ctrl.signal,
           {
@@ -237,6 +256,8 @@ export function useChat(chat: Chat, character: Character) {
     replacingId,
     reasoning,
     reasoningMs,
+    thinking,
+    toggleThinking,
     send,
     stop,
     regenerate,

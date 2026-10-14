@@ -1,11 +1,18 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import type { Character } from '@/db/characters'
+import type { Character, ThinkingMode } from '@/db/characters'
 import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
 import { notifyChatsChanged } from '@/lib/chat/chatEvents'
 
 // Exactly one of characterId and roomId is set: a chat is either one-on-one or a scene.
-export type Chat = { id: number; characterId: number | null; roomId: number | null; title: string | null; createdAt: number }
+export type Chat = {
+  id: number
+  characterId: number | null
+  roomId: number | null
+  title: string | null
+  createdAt: number
+  thinking?: ThinkingMode | null
+}
 
 export type ChatPreview = Chat & {
   lastMessage: string | null
@@ -16,7 +23,7 @@ export type ChatPreview = Chat & {
 // A message that is only a picture has empty text, so the list shows a label instead.
 export const PREVIEW = "CASE WHEN m.content = '' AND m.images IS NOT NULL THEN 'Фото' ELSE m.content END"
 
-export const CHAT_COLUMNS = 'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt'
+export const CHAT_COLUMNS = 'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking'
 
 export function listChats(db: SQLiteDatabase, characterId: number) {
   return db.getAllAsync<ChatPreview>(
@@ -69,12 +76,17 @@ export async function setChatTitle(db: SQLiteDatabase, id: number, title: string
   return value
 }
 
+export async function setChatThinking(db: SQLiteDatabase, id: number, thinking: ThinkingMode | null) {
+  await db.runAsync('UPDATE chats SET thinking = ? WHERE id = ?', [thinking, id])
+  notifyChatsChanged()
+}
+
 // Copies the chat with all its messages, variants and thoughts; timestamps are kept.
 export async function duplicateChat(db: SQLiteDatabase, id: number, title: string | null) {
   let chatId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      'INSERT INTO chats (character_id, room_id, title, created_at) SELECT character_id, room_id, ?, created_at FROM chats WHERE id = ?',
+      'INSERT INTO chats (character_id, room_id, title, created_at, thinking) SELECT character_id, room_id, ?, created_at, thinking FROM chats WHERE id = ?',
       [title, id]
     )
     chatId = res.lastInsertRowId

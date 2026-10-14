@@ -3,7 +3,7 @@ import NativeMaskedView from '@react-native-masked-view/masked-view'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native'
+import { FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native'
 
 // The isWeb has no native mask: the package paints the mask element itself, a black slab
 // over the field. There the field is shown as it is, without the fade at its edges.
@@ -41,7 +41,7 @@ import type { ImageSource } from '@/lib/images/images'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { alertError } from '@/lib/transfer/report'
-import { isDesktop, isWeb } from '@/lib/core/platform'
+import { isDesktop, isIOS, isWeb } from '@/lib/core/platform'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 type Props = {
@@ -78,6 +78,9 @@ type Props = {
   onSuggestionTaken?: () => void
   // A swipe to the left turns the suggestion down.
   onSuggestionDismissed?: () => void
+  // Whether reasoning / thinking is active for this chat.
+  thinking?: boolean
+  onToggleThinking?: (thinking: boolean) => void
 }
 
 export function Composer({
@@ -101,6 +104,8 @@ export function Composer({
   suggestion,
   onSuggestionTaken,
   onSuggestionDismissed,
+  thinking,
+  onToggleThinking,
 }: Props) {
   const insets = useSafeAreaInsets()
   const { width: windowWidth } = useWindowDimensions()
@@ -725,6 +730,39 @@ export function Composer({
                   ))}
                 </View>
               </GestureDetector>
+              {onToggleThinking ? (
+                <>
+                  <View style={styles.menuRule} />
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync()
+                      onToggleThinking(!thinking)
+                    }}
+                    accessible
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: !!thinking }}
+                    accessibilityLabel={t('chat.thinking')}
+                    style={({ pressed }) => [
+                      styles.menuItem,
+                      styles.thinkingItem,
+                      pressed && { backgroundColor: withAlpha(colors.text, 0.1) },
+                    ]}
+                  >
+                    <View style={styles.thinkingLeft}>
+                      <SFIcon name="brain" fallback="sparkles-outline" size={20} color={colors.text} />
+                      <Text style={styles.menuLabel}>{t('chat.thinking')}</Text>
+                    </View>
+                    <View pointerEvents="none">
+                      <Switch
+                        value={!!thinking}
+                        trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
+                        {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
+                        style={liquidGlass ? switchNudge : undefined}
+                      />
+                    </View>
+                  </Pressable>
+                </>
+              ) : null}
             </GlassSurface>
           </Animated.View>
         </>
@@ -833,6 +871,8 @@ const ICONS = {
   continue: { sf: 'forward.fill', fallback: 'play-forward' },
 } as const
 
+const switchNudge = { transform: [{ translateY: 1.5 }] }
+
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, justifyContent: 'flex-end' },
@@ -840,6 +880,9 @@ const createStyles = (colors: Colors) =>
   menu: { position: 'absolute', transformOrigin: 'left bottom' },
   menuBody: { borderRadius: 24, padding: 6, width: MENU_WIDTH },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 18 },
+  menuRule: { height: 1, marginHorizontal: 8, marginVertical: 4, backgroundColor: colors.border },
+  thinkingItem: { justifyContent: 'space-between' },
+  thinkingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   recents: { flexGrow: 0, height: THUMB + 12 },
   recentsContent: { gap: THUMB_GAP, padding: 6 },
   thumbCellImage: { width: THUMB, height: THUMB, borderRadius: 12, borderCurve: 'continuous', backgroundColor: colors.surface },

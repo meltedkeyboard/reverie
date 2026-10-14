@@ -49,7 +49,7 @@ type BackupCharacter = {
 type BackupGroupSlot = { id: number; name: string | null; position: number }
 
 // Backups from before rooms have no roomId, and every chat has a character.
-type BackupChat = { id: number; characterId: number | null; roomId?: number | null; title: string | null; createdAt: number }
+type BackupChat = { id: number; characterId: number | null; roomId?: number | null; title: string | null; createdAt: number; thinking?: ThinkingMode | null }
 
 type BackupRoom = {
   id: number
@@ -165,8 +165,8 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       `SELECT room_id AS roomId, character_id AS characterId, position, talkativeness, perception, triggers, muted, present
        FROM room_members ORDER BY room_id, position`
     ),
-    chats: await db.getAllAsync<{ id: number; characterId: number | null; roomId: number | null; title: string | null }>(
-      'SELECT id, character_id AS characterId, room_id AS roomId, title, created_at AS createdAt FROM chats ORDER BY sort_order, id'
+    chats: await db.getAllAsync<{ id: number; characterId: number | null; roomId: number | null; title: string | null; thinking?: ThinkingMode | null }>(
+      'SELECT id, character_id AS characterId, room_id AS roomId, title, created_at AS createdAt, thinking FROM chats ORDER BY sort_order, id'
     ),
     messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
   }
@@ -398,11 +398,12 @@ export async function importBackup(
       const roomId = chat.roomId ? roomIds.get(chat.roomId) : undefined
       const characterId = chat.characterId ? characterIds.get(chat.characterId) : undefined
       if (!roomId && !characterId) continue
-      const res = await db.runAsync('INSERT INTO chats (character_id, room_id, title, created_at) VALUES (?, ?, ?, ?)', [
+      const res = await db.runAsync('INSERT INTO chats (character_id, room_id, title, created_at, thinking) VALUES (?, ?, ?, ?, ?)', [
         roomId ? null : characterId!,
         roomId ?? null,
         chat.title,
         chat.createdAt,
+        chat.thinking ?? null,
       ])
       chatIds.set(chat.id, res.lastInsertRowId)
     }
