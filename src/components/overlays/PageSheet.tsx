@@ -18,7 +18,15 @@ type Props = {
 export function PageSheet({ visible, onClose, title, left, right, background, children }: Props) {
   const styles = useStyles(createStyles)
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      statusBarTranslucent
+      navigationBarTranslucent
+      allowSwipeDismissal
+      onRequestClose={onClose}
+    >
       <View style={[styles.root, background !== undefined && { backgroundColor: background }]}>
         <View style={styles.header}>
           {left !== undefined ? <View style={styles.side}>{left}</View> : null}

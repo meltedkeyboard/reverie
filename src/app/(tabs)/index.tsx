@@ -2,22 +2,26 @@ import { File, Paths } from 'expo-file-system'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated'
+import Animated, { Easing, FadeInDown, FadeOutDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import ReorderableList, { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list'
 
 import { isDesktop } from '@/lib/core/platform'
 import { Button } from '@/components/controls/Button'
+import { IconButton } from '@/components/controls/IconButton'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { GroupCard } from '@/components/lists/GroupCard'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassButton } from '@/components/chrome/Glass'
+import { GlassButton, GlassGroup, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Pattern } from '@/components/visuals/Pattern'
-import { MenuGlassButton } from '@/components/chrome/MenuGlassButton'
+import { Icon } from '@/components/visuals/Icon'
 import { SFIcon } from '@/components/visuals/SFIcon'
+import { withAlpha } from '@/lib/core/color'
+import * as Haptics from '@/lib/ui/haptics'
 import { deleteCharacter, listCharacters, mergeCharacters, sameCharacter, type CharacterPreview } from '@/db/characters'
 import { addToGroup, createGroup, deleteGroup, listGroups, pruneGroups, removeFromGroup, renameGroup, saveHomeOrder, ungroup, type CharacterGroup } from '@/db/groups'
 import { pruneUntouchedChats } from '@/db/chats'
@@ -77,7 +81,28 @@ export default function CharactersScreen() {
   const [groups, setGroups] = useState<CharacterGroup[]>([])
   const [serverSet, setServerSet] = useState(true)
   const { lastChat, reload: reloadLastChat } = useLastChat('character')
-  // The continue button itself is drawn by the tabs layout, over both home tabs.
+  const glass = useGlassStyles()
+  const [menuShown, setMenuShown] = useState(false)
+  const [menuMounted, setMenuMounted] = useState(false)
+  const pop = useSharedValue(0)
+
+  const openMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setMenuMounted(true)
+    setMenuShown(true)
+    pop.value = withSpring(1, { damping: 20, stiffness: 300, mass: 0.7 })
+  }
+
+  const closeMenu = () => {
+    if (!menuShown) return
+    setMenuShown(false)
+    pop.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
+      if (finished) scheduleOnRN(setMenuMounted, false)
+    })
+  }
+
+  const menuStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
+
   const anchor = useContinueAnchor()
 
   const reload = useCallback(async () => {
@@ -403,30 +428,67 @@ export default function CharactersScreen() {
       <GlassHeader
         floating
         right={
-          <View style={styles.headerButtons}>
+          <GlassGroup interactive={false}>
             {characters?.length ? (
-              <GlassButton
-                icon={editing ? 'checkmark' : 'list'}
-                tint={editing ? colors.accent : undefined}
+              <IconButton
+                name={editing ? 'checkmark' : 'list'}
+                color={editing ? colors.accent : undefined}
                 {...editButton}
                 accessibilityLabel={editing ? t('characters.doneEditing') : t('characters.editList')}
               />
             ) : null}
             {editing ? null : (
-              <MenuGlassButton
-                icon="add"
-                items={[
-                  { label: t('characters.createCharacter'), systemImage: 'person.crop.circle.badge.plus', onSelect: () => router.push('/character/new') },
-                  { label: t('card.importFromFiles'), systemImage: 'folder', onSelect: () => onImportCard('files') },
-                  { label: t('card.importFromPhotos'), systemImage: 'photo.on.rectangle', onSelect: () => onImportCard('photos') },
-                ]}
+              <IconButton
+                name="add"
+                size={26}
+                onPress={() => (menuShown ? closeMenu() : openMenu())}
+                accessibilityLabel={t('characters.createCharacter')}
               />
             )}
-          </View>
+          </GlassGroup>
         }
       >
         <TabTitle>{t('characters.title')}</TabTitle>
       </GlassHeader>
+      {menuMounted ? (
+        <>
+          <Pressable style={styles.menuBackdrop} onPress={closeMenu} accessibilityLabel={t('common.close')} />
+          <Animated.View style={[styles.createMenu, { top: insets.top + 4, right: 8 }, menuStyle]}>
+            <GlassSurface style={styles.createMenuBody} fallbackStyle={glass.solid}>
+              <Pressable
+                onPress={() => {
+                  closeMenu()
+                  router.push('/character/new')
+                }}
+                style={({ pressed }) => [styles.createMenuItem, pressed && { backgroundColor: withAlpha(colors.text, 0.1) }]}
+              >
+                <Icon name="person-add-outline" size={20} color={colors.text} />
+                <Text style={styles.createMenuLabel}>{t('characters.createCharacter')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  closeMenu()
+                  onImportCard('files')
+                }}
+                style={({ pressed }) => [styles.createMenuItem, pressed && { backgroundColor: withAlpha(colors.text, 0.1) }]}
+              >
+                <Icon name="folder-outline" size={20} color={colors.text} />
+                <Text style={styles.createMenuLabel}>{t('card.importFromFiles')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  closeMenu()
+                  onImportCard('photos')
+                }}
+                style={({ pressed }) => [styles.createMenuItem, pressed && { backgroundColor: withAlpha(colors.text, 0.1) }]}
+              >
+                <Icon name="images-outline" size={20} color={colors.text} />
+                <Text style={styles.createMenuLabel}>{t('card.importFromPhotos')}</Text>
+              </Pressable>
+            </GlassSurface>
+          </Animated.View>
+        </>
+      ) : null}
       {backupImport.sheet}
     </View>
   )
@@ -486,4 +548,9 @@ const createStyles = (colors: Colors) =>
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 },
+  createMenu: { position: 'absolute', zIndex: 100, transformOrigin: 'right top' },
+  createMenuBody: { borderRadius: 22, borderCurve: 'continuous', padding: 6, minWidth: 220 },
+  createMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 16, borderCurve: 'continuous' },
+  createMenuLabel: { color: colors.text, fontSize: 16, fontWeight: '500' },
 })

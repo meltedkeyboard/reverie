@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import Animated, { FadeIn, FadeInDown, FadeOut, FadeOutDown, SlideInDown, SlideOutDown } from 'react-native-reanimated'
 
 import { WebDialogHost } from '@/components/overlays/WebDialogs'
 import { usePromptState } from '@/hooks/chat/usePromptState'
@@ -20,12 +21,31 @@ function SheetDialogHost() {
     closeDialog()
   }
   return (
-    <Modal visible={dialog !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={handleCancel}>
-      <View style={[styles.backdrop, dialog?.kind === 'prompt' && styles.top]}>
+    <Modal
+      visible={dialog !== null}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={handleCancel}
+    >
+      <Animated.View
+        entering={FadeIn.duration(150)}
+        exiting={FadeOut.duration(120)}
+        style={[styles.backdrop, dialog?.kind === 'prompt' && styles.top]}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={handleCancel} />
-        {dialog?.kind === 'sheet' ? <Sheet title={dialog.title} message={dialog.message} actions={dialog.actions} onCancel={handleCancel} /> : null}
+        {dialog?.kind === 'sheet' ? (
+          <Sheet
+            key={dialog.title ?? 'sheet'}
+            title={dialog.title}
+            message={dialog.message}
+            actions={dialog.actions}
+            onCancel={handleCancel}
+          />
+        ) : null}
         {dialog?.kind === 'prompt' ? <Prompt key={dialog.prompt.title} {...dialog.prompt} /> : null}
-      </View>
+      </Animated.View>
     </Modal>
   )
 }
@@ -45,7 +65,11 @@ function Sheet({
   const { colors } = useTheme()
   const { t } = useTranslation()
   return (
-    <View style={styles.sheet}>
+    <Animated.View
+      entering={SlideInDown.springify().damping(28).stiffness(300).mass(0.8)}
+      exiting={SlideOutDown.duration(180)}
+      style={styles.sheet}
+    >
       {title ? <Text style={styles.title}>{title}</Text> : null}
       {message ? <Text style={styles.sheetMessage}>{message}</Text> : null}
       {actions.map((action, index) => (
@@ -69,7 +93,7 @@ function Sheet({
       >
         <Text style={[styles.label, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
       </Pressable>
-    </View>
+    </Animated.View>
   )
 }
 
@@ -79,7 +103,7 @@ function Prompt({ title, message, initial, confirmLabel, onSubmit }: { title: st
   const { t } = useTranslation()
   const { text, setText, submit } = usePromptState(initial, onSubmit)
   return (
-    <View style={styles.card}>
+    <Animated.View entering={FadeInDown.duration(200)} exiting={FadeOutDown.duration(150)} style={styles.card}>
       <Text style={styles.promptTitle}>{title}</Text>
       {message ? <Text style={styles.message}>{message}</Text> : null}
       <TextInput
@@ -101,7 +125,7 @@ function Prompt({ title, message, initial, confirmLabel, onSubmit }: { title: st
           <Text style={[styles.label, { color: colors.accent }]}>{confirmLabel}</Text>
         </Pressable>
       </View>
-    </View>
+    </Animated.View>
   )
 }
 

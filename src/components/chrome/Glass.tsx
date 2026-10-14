@@ -64,12 +64,13 @@ type ButtonProps = {
   tint?: string
   // Replaces the Ionicons glyph, e.g. with an animated SF Symbol.
   children?: React.ReactNode
+  interactive?: boolean
 }
 
 // A round Liquid Glass button of the same 44 pt as the other glass controls; outside
 // iOS 26 it is the plain icon button. The glass is interactive and springs under the
 // finger by itself, so a glass control adds no press scale of its own: the two fight.
-export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOut, disabled = false, accessibilityLabel, tint, children }: ButtonProps) {
+export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOut, disabled = false, accessibilityLabel, tint, interactive = true, children }: ButtonProps) {
   const { colors } = useTheme()
   const styles = useStyles(createStyles)
   const fill = disabled ? undefined : tint
@@ -100,7 +101,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOu
       accessibilityLabel={accessibilityLabel}
       hitSlop={6}
     >
-      <GlassSurface interactive={!disabled} tintColor={fill} style={styles.circle}>
+      <GlassSurface interactive={!disabled && interactive} tintColor={fill} style={styles.circle}>
         {/* Like a disabled bar button: the glass stays, only the glyph greys out. */}
         <View style={disabled && styles.disabled}>
           {/* White on the accent fill, like the prominent bar buttons. */}
@@ -113,12 +114,12 @@ export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOu
 
 // Several icon buttons in one Liquid Glass capsule, the way iOS 26 groups bar items;
 // outside iOS 26 they are just the plain icon buttons side by side.
-export function GlassGroup({ children }: { children: React.ReactNode }) {
+export function GlassGroup({ children, interactive = true }: { children: React.ReactNode; interactive?: boolean }) {
   const styles = useStyles(createStyles)
   // On the desktop the buttons stand loose, flat, as in a toolbar.
   if (isDesktop) return <View style={styles.desktopGroup}>{children}</View>
   return (
-    <GlassSurface interactive style={styles.group} fallbackStyle={floatingBars && styles.solid}>
+    <GlassSurface interactive={interactive} style={styles.group} fallbackStyle={floatingBars && styles.solid}>
       {children}
     </GlassSurface>
   )

@@ -8,7 +8,7 @@ import { Avatar } from '@/components/visuals/Avatar'
 import { Button } from '@/components/controls/Button'
 import { ChatCard } from '@/components/lists/ChatCard'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassGroup } from '@/components/chrome/Glass'
+import { GlassGroup, GlassSurface } from '@/components/chrome/Glass'
 import { IconButton } from '@/components/controls/IconButton'
 import { BackButton, GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
@@ -105,11 +105,16 @@ export default function CharacterChatsScreen() {
       />
       <GlassHeader
         floating
+        centerTitle
         left={
-          <GlassGroup>
+          <View style={styles.headerLeft}>
             <BackButton />
-            {character ? <Avatar name={character.name} file={character.avatar} size={34} /> : null}
-          </GlassGroup>
+            {character ? (
+              <GlassSurface interactive style={styles.avatarButton}>
+                <Avatar name={character.name} file={character.avatar} size={36} />
+              </GlassSurface>
+            ) : null}
+          </View>
         }
         right={
           character ? (
@@ -138,6 +143,14 @@ export default function CharacterChatsScreen() {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
-})
+    screen: { flex: 1, backgroundColor: colors.bg },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    avatarButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  })

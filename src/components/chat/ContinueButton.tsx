@@ -2,7 +2,7 @@ import { Icon } from '@/components/visuals/Icon'
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated'
+import Animated, { Easing, FadeInDown, FadeOutDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import type { LastChat } from '@/db/chats'
@@ -115,7 +115,12 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
   }))
 
   return (
-    <View style={[styles.slot, { bottom: bottom + 8 }]} pointerEvents="box-none">
+    <Animated.View
+      entering={FadeInDown.springify().duration(350).dampingRatio(1)}
+      exiting={FadeOutDown.duration(200)}
+      style={[styles.slot, { bottom: bottom + 8 }]}
+      pointerEvents="box-none"
+    >
       <SwipeToDelete
         throwAway
         radius={HEIGHT / 2}
@@ -139,7 +144,7 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
           <Icon name="chevron-forward" size={18} color={ON_ACCENT_FAINT} />
         </GlassSurface>
       </SwipeToDelete>
-    </View>
+    </Animated.View>
   )
 }
 

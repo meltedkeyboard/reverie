@@ -1,4 +1,4 @@
-import { startTransition, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useContext, useEffect, useMemo, useState } from 'react'
 import { useSharedValue } from 'react-native-reanimated'
 
 import { setEditMotion } from '@/components/lists/ListCard'
@@ -10,12 +10,13 @@ export function useEditMode(onChange?: (on: boolean) => void) {
   const [editing, setEditing] = useState(false)
   const [checked, setChecked] = useState<Set<number>>(new Set())
   const lastChat = useContext(LastChatContext)
+  const setSuspended = lastChat?.setSuspended
   useEffect(() => {
-    lastChat?.setSuspended(editing)
-    return () => lastChat?.setSuspended(false)
-  }, [editing, lastChat])
+    if (!editing) return
+    setSuspended?.(true)
+    return () => setSuspended?.(false)
+  }, [editing, setSuspended])
 
-  // Driven from here, so the cards start moving at the touch, not after the list renders.
   const progress = useSharedValue(0)
   const settled = useSharedValue(0)
   const motion = useMemo(() => ({ progress, settled }), [progress, settled])
@@ -27,23 +28,8 @@ export function useEditMode(onChange?: (on: boolean) => void) {
     onChange?.(on)
   }
 
-  // The cards start moving at the touch, but the mode changes only when it ends on the
-  // button: a finger slid off it takes the motion back. onPressOut comes before onPress, so
-  // the take-back waits a turn for the press to claim it.
-  const pressing = useRef(false)
   const button = {
-    onPressIn: () => {
-      pressing.current = true
-      setEditMotion(motion, !editing)
-    },
-    onPressOut: () =>
-      setTimeout(() => {
-        if (!pressing.current) return
-        pressing.current = false
-        setEditMotion(motion, editing)
-      }),
     onPress: () => {
-      pressing.current = false
       set(!editing)
     },
   }

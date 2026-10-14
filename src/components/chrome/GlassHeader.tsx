@@ -19,6 +19,7 @@ type Props = {
   // With Liquid Glass the bar itself disappears: the controls float over the content
   // and a fade stands in for the scroll edge effect of iOS 26.
   floating?: boolean
+  centerTitle?: boolean
 }
 
 const FADE_OVERHANG = 28
@@ -80,15 +81,24 @@ export function BackButton({ close }: { close?: boolean }) {
   return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
 }
 
-export function GlassHeader({ left, right, children, floating }: Props) {
+export function GlassHeader({ left, right, children, floating, centerTitle }: Props) {
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const row = (
     <View style={styles.row} pointerEvents="box-none">
+      {centerTitle ? (
+        <View style={styles.centered} pointerEvents="box-none">
+          {children}
+        </View>
+      ) : null}
       {left}
-      <View style={[styles.center, !left && { paddingLeft: 12 }]} pointerEvents="box-none">
-        {children}
-      </View>
+      {!centerTitle ? (
+        <View style={[styles.center, !left && { paddingLeft: 12 }]} pointerEvents="box-none">
+          {children}
+        </View>
+      ) : (
+        <View style={styles.center} pointerEvents="none" />
+      )}
       {right}
     </View>
   )
@@ -131,6 +141,16 @@ const createStyles = (colors: Colors) =>
     paddingHorizontal: 8,
   },
   center: { flex: 1, justifyContent: 'center', paddingHorizontal: 4 },
+  centered: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 88,
+  },
   // The prose face stays, it is the app's own; on the desktop the titles are just smaller,
   // in proportion to the compact chrome.
   ...(isDesktop

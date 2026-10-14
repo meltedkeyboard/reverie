@@ -9,7 +9,7 @@ import { ImageLink } from '../visuals/ImageLink'
 type Props = {
   cast: { name: string; avatar: string | null }[]
   size: number
-  // How many faces are drawn before the rest collapse into "+N".
+  // Maximum total circles (faces and "+N") drawn in the stack.
   max?: number
   // A tap opens every member's photo in the viewer, to swipe through. Off where the stack
   // sits inside a control that owns the tap itself.
@@ -20,7 +20,9 @@ type Props = {
 // edges stay apart.
 export function AvatarStack({ cast, size, max = 3, viewable = true }: Props) {
   const styles = useStyles(createStyles)
-  const shown = cast.slice(0, max)
+  const hasMore = cast.length > max
+  const count = hasMore ? Math.max(1, max - 1) : cast.length
+  const shown = cast.slice(0, count)
   const rest = cast.length - shown.length
   const ring = Math.max(1.5, size / 18)
   const overlap = size * 0.34
