@@ -1,7 +1,8 @@
 import { Icon } from '@/components/visuals/Icon'
+import { ShimmerText } from '@/components/visuals/ShimmerText'
 import { useNavigation, useRouter } from 'expo-router'
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -15,6 +16,7 @@ import { errorMessage } from '@/lib/core/errors'
 import { countLabel } from '@/lib/core/format'
 import * as Haptics from '@/lib/ui/haptics'
 import { isIOS } from '@/lib/core/platform'
+import { computeDiff } from '@/lib/chat/diff'
 import { cleanGenerated, countWords, streamGeneration } from '@/lib/chat/promptGen'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
@@ -80,7 +82,8 @@ export function GenSheet({
   const [activity, setActivity] = useState<{ thinking: boolean; since: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  const [showBefore, setShowBefore] = useState(false)
+  const [viewMode, setViewMode] = useState<'text' | 'diff'>('text')
+  const [liveThought, setLiveThought] = useState<string | null>(null)
   const task = useAbortable()
   const versionCount = useRef(0)
 
@@ -88,6 +91,10 @@ export function GenSheet({
   const thinkingSecs = useElapsedSeconds(Boolean(activity?.thinking), activity?.since)
   const result = live ?? versions[index] ?? null
   const hasBefore = before.trim().length > 0
+  const diffParts = useMemo(
+    () => (hasBefore && result ? computeDiff(before, result) : []),
+    [hasBefore, before, result]
+  )
 
   const pushVersion = (version: string) => {
     setIndex(versionCount.current)
@@ -99,24 +106,31 @@ export function GenSheet({
     const ctrl = task.start()
     setPhase('result')
     setError(null)
-    setShowBefore(false)
     setLive('')
+    setLiveThought(null)
     let text = ''
     try {
       const cfg = await loadSettings(db)
-      setActivity({ thinking: true, since: Date.now() })
+      setActivity({ thinking: Boolean(thinking), since: Date.now() })
       let hadCutoff = false
       let hadReasoning = false
+      let thoughts = ''
       for await (const part of streamGeneration(cfg, build(revision), ctrl.signal, { thinking, edit: edits || !!revision })) {
         if (part.kind === 'reasoning') {
           hadReasoning = true
+          setActivity((prev) => (prev?.thinking ? prev : { thinking: true, since: Date.now() }))
+          thoughts += part.text
+          setLiveThought(thoughts)
           continue
         }
         if (part.kind === 'cutoff') {
           hadCutoff = true
           continue
         }
-        if (!text) setActivity({ thinking: false, since: Date.now() })
+        if (!text) {
+          setActivity({ thinking: false, since: Date.now() })
+          setLiveThought(null)
+        }
         text += part.text
         setLive(text)
       }
@@ -140,6 +154,7 @@ export function GenSheet({
       if (task.finish(ctrl)) {
         setActivity(null)
         setLive(null)
+        setLiveThought(null)
       }
     }
   }
@@ -162,6 +177,8 @@ export function GenSheet({
   const backToCompose = () => {
     task.stop()
     setError(null)
+    setLiveThought(null)
+    setViewMode('text')
     setPhase('compose')
   }
 
@@ -175,7 +192,6 @@ export function GenSheet({
 
   const composeView = compose(<SwitchCell label={t('gen.thinking')} value={thinking} onValueChange={setThinking} />)
 
-  const comparing = hasBefore && showBefore && !busy
   const resultView = (
     <>
       <ListSection
@@ -194,11 +210,11 @@ export function GenSheet({
               {hasBefore ? (
                 <Segmented
                   options={[
-                    { value: 'before', label: t('promptGen.before') },
-                    { value: 'after', label: t('promptGen.after') },
+                    { value: 'text', label: t('promptGen.text') },
+                    { value: 'diff', label: t('promptGen.diff') },
                   ]}
-                  value={showBefore ? 'before' : 'after'}
-                  onChange={(v) => setShowBefore(v === 'before')}
+                  value={viewMode}
+                  onChange={(v) => setViewMode(v as 'text' | 'diff')}
                 />
               ) : null}
             </View>
@@ -215,12 +231,53 @@ export function GenSheet({
         {result !== null || busy ? (
           <View style={styles.resultRow}>
             {busy ? (
-              <Text style={[styles.resultText, !result && styles.placeholder]}>
-                {result || t('promptGen.thinkingShort')}
-                {result ? <Text style={{ color: colors.accent }}>{' ' + String.fromCharCode(0x258d)}</Text> : null}
+              !result ? (
+                <View style={styles.thinkingContainer}>
+                  <ShimmerText
+                    text={activity?.thinking ? t('promptGen.thinkingShort') : t('gen.writing')}
+                    style={styles.resultText}
+                    from={colors.textFaint}
+                    to={colors.text}
+                  />
+                  {liveThought ? (
+                    <Text style={styles.liveThoughtText} numberOfLines={5}>
+                      {liveThought.trim().slice(-400)}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : (
+                <Text style={styles.resultText}>
+                  {result}
+                  <Text style={{ color: colors.accent }}>{' ' + String.fromCharCode(0x258d)}</Text>
+                </Text>
+              )
+            ) : hasBefore && viewMode === 'diff' ? (
+              <Text style={styles.resultText} selectable>
+                {diffParts.map((part, i) => {
+                  const next = diffParts[i + 1]
+                  const needsSpace =
+                    part.type === 'removed' &&
+                    next?.type === 'added' &&
+                    !/\s$/.test(part.value) &&
+                    !/^\s/.test(next.value)
+                  return (
+                    <Text key={i}>
+                      <Text
+                        style={
+                          part.type === 'added'
+                            ? styles.diffAdded
+                            : part.type === 'removed'
+                              ? styles.diffRemoved
+                              : undefined
+                        }
+                      >
+                        {part.value}
+                      </Text>
+                      {needsSpace ? ' ' : null}
+                    </Text>
+                  )
+                })}
               </Text>
-            ) : comparing ? (
-              <Text style={[styles.resultText, styles.beforeText]}>{before}</Text>
             ) : (
               <TextInput
                 value={result ?? ''}
@@ -231,7 +288,6 @@ export function GenSheet({
                 style={[styles.resultText, styles.resultInput]}
               />
             )}
-            {busy ? <ActivityIndicator style={styles.spinner} size="small" color={colors.accent} /> : null}
           </View>
         ) : null}
       </ListSection>
@@ -384,9 +440,23 @@ const createStyles = (colors: Colors) =>
     resultRow: { paddingHorizontal: 16, paddingVertical: 14 },
     resultText: { color: colors.text, fontSize: 17, lineHeight: 24 },
     resultInput: { padding: 0, textAlignVertical: 'top' },
-    beforeText: { color: colors.textMuted },
     placeholder: { color: colors.textFaint },
-    spinner: { position: 'absolute', top: 12, right: 12 },
+    thinkingContainer: { gap: 8 },
+    liveThoughtText: {
+      color: colors.textFaint,
+      fontSize: 14,
+      lineHeight: 20,
+      fontStyle: 'italic',
+    },
+    diffAdded: {
+      color: colors.success,
+      backgroundColor: colors.success + '26',
+    },
+    diffRemoved: {
+      color: colors.danger,
+      textDecorationLine: 'line-through',
+      backgroundColor: colors.danger + '26',
+    },
     tweaks: { paddingVertical: 12 },
     presets: { paddingVertical: 12 },
     noteRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingLeft: 16, paddingRight: 8, paddingVertical: 8 },

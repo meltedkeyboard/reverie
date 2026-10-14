@@ -346,6 +346,8 @@
   "promptGen.version": "Вариант {{n}} из {{total}}",
   "promptGen.before": "Было",
   "promptGen.after": "Стало",
+  "promptGen.text": "Текст",
+  "promptGen.diff": "Diff",
   "promptGen.retry": "Попробовать ещё раз",
   "promptGen.reviseLabel": "Доработать",
   "promptGen.revisePlaceholder": "Что поменять в этом варианте?",

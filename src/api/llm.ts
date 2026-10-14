@@ -387,14 +387,20 @@ async function reasoningFields(cfg: ServerSettings, base: string, mode: Thinking
   const allowed = model?.capabilities?.reasoning?.allowed_options ?? []
 
   if (mode === 'off') {
-    if (allowed.includes('off')) return { reasoning_effort: 'off' }
-    return {}
+    return {
+      ...kwargs,
+      ...(allowed.includes('off') ? { reasoning_effort: 'off' } : {}),
+    }
   }
-  if (allowed.includes('medium')) return { reasoning_effort: 'medium' }
-  if (allowed.includes('on')) return { reasoning_effort: 'on' }
-  if (allowed.includes('high')) return { reasoning_effort: 'high' }
-  if (allowed.includes('low')) return { reasoning_effort: 'low' }
-  return {}
+  const effort =
+    allowed.includes('medium') ? 'medium' :
+    allowed.includes('on') ? 'on' :
+    allowed.includes('high') ? 'high' :
+    allowed.includes('low') ? 'low' : undefined
+  return {
+    ...kwargs,
+    ...(effort ? { reasoning_effort: effort } : {}),
+  }
 }
 
 let activeLoadPromise: Promise<{ loadedContextLength?: number } | null> | null = null

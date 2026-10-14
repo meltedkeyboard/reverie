@@ -1,4 +1,4 @@
-import { StyleSheet, View, type TextStyle } from 'react-native'
+import { StyleSheet, View, type StyleProp, type TextStyle } from 'react-native'
 import Animated, {
   Easing,
   interpolateColor,
@@ -20,10 +20,23 @@ const PAUSE_MS = 500
 
 // A glint that runs along the text in waves. Without a native mask each letter is its own
 // Text, brightened by how close the glint is to it; the one shared value drives them all.
-export function ShimmerText({ text, style, maxFontSizeMultiplier }: { text: string; style: TextStyle; maxFontSizeMultiplier?: number }) {
+export function ShimmerText({
+  text,
+  style,
+  from,
+  to,
+  maxFontSizeMultiplier,
+}: {
+  text: string
+  style?: StyleProp<TextStyle>
+  from?: string
+  to?: string
+  maxFontSizeMultiplier?: number
+}) {
   const colors = useColors()
   const glint = useSharedValue(0)
   const letters = Array.from(text)
+  const flatStyle = StyleSheet.flatten(style) ?? {}
 
   useEffect(() => {
     glint.value = withRepeat(
@@ -45,9 +58,9 @@ export function ShimmerText({ text, style, maxFontSizeMultiplier }: { text: stri
           index={index}
           count={letters.length}
           glint={glint}
-          from={colors.textMuted}
-          to={colors.text}
-          style={style}
+          from={from ?? colors.textMuted}
+          to={to ?? colors.text}
+          style={flatStyle}
           maxFontSizeMultiplier={maxFontSizeMultiplier}
         />
       ))}

@@ -133,8 +133,8 @@ export function streamGeneration(
   signal: AbortSignal,
   options: { thinking: boolean; edit: boolean }
 ): AsyncGenerator<StreamPart> {
-  const budget = cfg.contextTokens ? Math.max(cfg.contextTokens - 1500, 3000) : 8192
-  const maxTokens = options.thinking ? Math.min(budget, 8192) : 3000
+  const budget = cfg.contextTokens ? Math.max(cfg.contextTokens - 1500, 4000) : 8192
+  const maxTokens = Math.min(budget, 8192)
   return streamChat(
     cfg,
     // The token budget is generous because reasoning models spend part of it thinking

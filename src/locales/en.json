@@ -346,6 +346,8 @@
   "promptGen.version": "Version {{n}} of {{total}}",
   "promptGen.before": "Before",
   "promptGen.after": "After",
+  "promptGen.text": "Text",
+  "promptGen.diff": "Diff",
   "promptGen.retry": "Try again",
   "promptGen.reviseLabel": "Refine",
   "promptGen.revisePlaceholder": "What should change in this version?",
