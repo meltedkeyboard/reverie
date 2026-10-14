@@ -10,10 +10,10 @@ import ReorderableList from 'react-native-reorderable-list'
 import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassButton } from '@/components/chrome/Glass'
-import { MenuGlassButton } from '@/components/chrome/MenuGlassButton'
+import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
-import type { MenuItem } from '@/components/overlays/NativeMenu'
+import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
+import { Icon } from '@/components/visuals/Icon'
 import { Pattern } from '@/components/visuals/Pattern'
 import { deleteCharacter, listCharacters, listGroupCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
 import { addToGroup, deleteGroup, getGroup, removeFromGroup, renameGroup, ungroup, type CharacterGroup } from '@/db/groups'
@@ -37,12 +37,15 @@ import { dragModule, DropTargetView } from '../../../modules/reverie-drag'
 // Room the list leaves under its last card for the edit bar.
 const EDIT_BAR_SPACE = 64
 
+const PillSurface = nativeMenuGlass ? View : GlassSurface
+
 export default function GroupScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>()
   const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
+  const glass = useGlassStyles()
   const colors = useColors()
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
@@ -268,29 +271,30 @@ export default function GroupScreen() {
       ) : null}
       <GlassHeader
         floating
+        centerTitle
         left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
         right={
-          group ? (
-            <View style={styles.headerButtons}>
-              {members?.length ? (
-                <GlassButton
-                  icon={editing ? 'checkmark' : 'list'}
-                  tint={editing ? colors.accent : undefined}
-                  {...editButton}
-                  accessibilityLabel={editing ? t('characters.doneEditing') : t('characters.editList')}
-                />
-              ) : null}
-              {editing ? null : (
-                <MenuGlassButton icon="ellipsis-horizontal" items={groupMenuItems} />
-              )}
-            </View>
+          group && members?.length ? (
+            <GlassButton
+              icon={editing ? 'checkmark' : 'list'}
+              tint={editing ? colors.accent : undefined}
+              {...editButton}
+              accessibilityLabel={editing ? t('characters.doneEditing') : t('characters.editList')}
+            />
           ) : null
         }
       >
         {group ? (
-          <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
-            {title}
-          </Text>
+          <NativeMenu items={groupMenuItems} disabled={editing} style={styles.whoPress} glassRadius={22}>
+            <PillSurface interactive={!editing} style={styles.whoPill} fallbackStyle={glass.solid}>
+              <View style={styles.nameRow}>
+                <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
+                  {title}
+                </Text>
+                <Icon name="chevron-down" size={14} color={colors.textMuted} />
+              </View>
+            </PillSurface>
+          </NativeMenu>
         ) : null}
       </GlassHeader>
       <AddCharactersSheet
@@ -326,6 +330,18 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    whoPress: { maxWidth: '100%' },
+    whoPill: {
+      height: 44,
+      borderRadius: 22,
+      borderCurve: 'continuous',
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      maxWidth: '100%',
+    },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
     name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
     editBar: {
       position: 'absolute',
