@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import ReorderableList from 'react-native-reorderable-list'
 
+import { Avatar } from '@/components/visuals/Avatar'
 import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
@@ -286,7 +287,14 @@ export default function GroupScreen() {
       >
         {group ? (
           <NativeMenu items={groupMenuItems} disabled={editing} style={styles.whoPress} glassRadius={22}>
-            <PillSurface interactive={!editing} style={styles.whoPill} fallbackStyle={glass.solid}>
+            <PillSurface
+              interactive={!editing}
+              style={[styles.whoPill, members?.length === 1 && styles.whoPillWithAvatar]}
+              fallbackStyle={glass.solid}
+            >
+              {members?.length === 1 ? (
+                <Avatar name={members[0].name} file={members[0].avatar} size={32} viewable={false} />
+              ) : null}
               <View style={styles.nameRow}>
                 <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
                   {title}
@@ -340,6 +348,11 @@ const createStyles = (colors: Colors) =>
       alignItems: 'center',
       justifyContent: 'center',
       maxWidth: '100%',
+    },
+    whoPillWithAvatar: {
+      paddingLeft: 6,
+      paddingRight: 16,
+      gap: 10,
     },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
     name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },

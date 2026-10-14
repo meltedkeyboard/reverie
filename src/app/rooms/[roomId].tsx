@@ -5,13 +5,14 @@ import { StyleSheet, Text, View } from 'react-native'
 import ReorderableList from 'react-native-reorderable-list'
 
 import { AvatarStack } from '@/components/cast/AvatarStack'
+import { Avatar } from '@/components/visuals/Avatar'
 import { Button } from '@/components/controls/Button'
 import { ChatCard } from '@/components/lists/ChatCard'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassGroup } from '@/components/chrome/Glass'
-import { IconButton } from '@/components/controls/IconButton'
-import { BackButton, GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
-import type { MenuItem } from '@/components/overlays/NativeMenu'
+import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
+import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
+import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
+import { Icon } from '@/components/visuals/Icon'
 import { listChats, pruneUntouchedChats, setChatOrder } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { getRoom, importChatToRoom, listRoomChats, listRoomMembers, type Room, type RoomChatPreview, type RoomMember } from '@/db/rooms'
@@ -20,7 +21,7 @@ import { useReorder } from '@/hooks/features/useReorder'
 import { useTranslation } from '@/i18n'
 import { showMessage, showSheet } from '@/lib/ui/dialogs'
 import { formatWhen } from '@/lib/core/format'
-import { fonts, HEADER_FONT_SCALE, useStyles, type Colors } from '@/theme'
+import { fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
 const IMPORT_CHOICES = 12
 
@@ -30,6 +31,8 @@ export default function RoomScenesScreen() {
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
+  const glass = useGlassStyles()
+  const colors = useColors()
   const { t, locale } = useTranslation()
   const [room, setRoom] = useState<Room | null>(null)
   const [members, setMembers] = useState<RoomMember[]>([])
@@ -82,6 +85,21 @@ export default function RoomScenesScreen() {
 
   const cast = members.map((m) => ({ name: m.character.name, avatar: m.character.avatar }))
 
+  const roomMenuItems: MenuItem[] = room
+    ? [
+        {
+          label: t('rooms.importTitle'),
+          systemImage: 'square.and.arrow.down',
+          onSelect: chooseImport,
+        },
+        {
+          label: t('settings.title'),
+          systemImage: 'slider.horizontal.3',
+          onSelect: () => router.push(`/room/${room.id}`),
+        },
+      ]
+    : []
+
   return (
     <View style={styles.screen}>
       <ReorderableList
@@ -115,28 +133,55 @@ export default function RoomScenesScreen() {
       />
       <GlassHeader
         floating
+        centerTitle
         left={
-          <GlassGroup>
-            <BackButton />
-            {cast.length ? <AvatarStack cast={cast} size={28} /> : null}
-          </GlassGroup>
+          <GlassButton
+            icon="chevron-back"
+            iconSize={26}
+            onPress={() => router.back()}
+            accessibilityLabel={t('common.back')}
+          />
         }
         right={
           room ? (
-            <GlassGroup>
-              <IconButton name="download-outline" onPress={chooseImport} />
-              <IconButton name="options-outline" onPress={() => router.push(`/room/${room.id}`)} />
-              <Link href={`/chat/new?room=${room.id}`} asChild>
-                <IconButton name="add" size={26} />
-              </Link>
-            </GlassGroup>
+            <Link href={`/chat/new?room=${room.id}`} asChild>
+              <GlassButton icon="add" iconSize={26} accessibilityLabel={t('rooms.startScene')} />
+            </Link>
           ) : null
         }
       >
         {room ? (
-          <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
-            {room.name}
-          </Text>
+          <NativeMenu items={roomMenuItems} style={styles.whoPress}>
+            {cast.length > 1 ? (
+              <View style={styles.imessageHeader}>
+                <View style={styles.avatarRow}>
+                  <AvatarStack cast={cast} size={34} max={3} viewable={false} />
+                </View>
+                <GlassSurface interactive style={styles.namePill} fallbackStyle={glass.solid}>
+                  <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.imessageName} numberOfLines={1}>
+                    {room.name}
+                  </Text>
+                  <Icon name="chevron-forward" size={11} color={colors.textMuted} />
+                </GlassSurface>
+              </View>
+            ) : (
+              <GlassSurface
+                interactive
+                style={[styles.whoPill, !cast.length && styles.whoPillNoAvatar]}
+                fallbackStyle={glass.solid}
+              >
+                {cast.length === 1 ? (
+                  <Avatar name={cast[0].name} file={cast[0].avatar} size={32} viewable={false} />
+                ) : null}
+                <View style={styles.nameRow}>
+                  <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
+                    {room.name}
+                  </Text>
+                  <Icon name="chevron-down" size={14} color={colors.textMuted} />
+                </View>
+              </GlassSurface>
+            )}
+          </NativeMenu>
         ) : null}
       </GlassHeader>
     </View>
@@ -146,5 +191,51 @@ export default function RoomScenesScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
+    whoPress: { maxWidth: '100%', alignItems: 'center' },
+    whoPill: {
+      height: 44,
+      borderRadius: 22,
+      borderCurve: 'continuous',
+      paddingLeft: 6,
+      paddingRight: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      maxWidth: '100%',
+    },
+    whoPillNoAvatar: {
+      paddingHorizontal: 16,
+    },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+    name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
+    imessageHeader: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      maxWidth: '100%',
+    },
+    avatarRow: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1,
+    },
+    namePill: {
+      height: 22,
+      borderRadius: 11,
+      borderCurve: 'continuous',
+      paddingHorizontal: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 3,
+      marginTop: -7,
+      zIndex: 2,
+      maxWidth: '100%',
+    },
+    imessageName: {
+      flexShrink: 1,
+      color: colors.text,
+      fontFamily: fonts.prose,
+      fontSize: 13,
+      fontWeight: '600',
+    },
   })
