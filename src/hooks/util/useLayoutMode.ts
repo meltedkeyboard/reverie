@@ -18,3 +18,13 @@ export function useLayoutMode(): 'compact' | 'wide' {
 export function columnInset(width: number, column: number, min: number) {
   return Math.max(min, (width - column) / 2)
 }
+
+// Side insets that center content of at most `column` points while guaranteeing safe area margins.
+export function columnInsets(width: number, column: number, minLeft: number, minRight: number = minLeft) {
+  const base = Math.max(0, (width - column) / 2)
+  return {
+    paddingLeft: Math.max(minLeft, base),
+    paddingRight: Math.max(minRight, base),
+    paddingHorizontal: Math.max(minLeft, minRight, base),
+  }
+}

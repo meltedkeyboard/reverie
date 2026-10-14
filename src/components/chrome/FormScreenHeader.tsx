@@ -67,7 +67,16 @@ export function DrawnFormScreenHeader({
         <EdgeFade edge="top" style={StyleSheet.absoluteFill} />
       </Animated.View>
       <View style={[styles.bar, { paddingTop: insets.top }]} pointerEvents="box-none">
-        <View style={styles.row} pointerEvents="box-none">
+        <View
+          style={[
+            styles.row,
+            {
+              paddingLeft: Math.max(16, insets.left + 8),
+              paddingRight: Math.max(16, insets.right + 8),
+            },
+          ]}
+          pointerEvents="box-none"
+        >
           <BarButton symbol="chevron.backward" fallback="chevron-back" onPress={() => router.back()} accessibilityLabel={t('common.back')} />
           <Animated.View style={[styles.titleSlot, giveWay]} pointerEvents="none">
             <FormTitle title={title} />
@@ -112,7 +121,8 @@ export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLa
 }
 
 function FormTitle({ title }: { title: string }) {
-  const titleMaxWidth = useWindowDimensions().width - 160
+  const insets = useSafeAreaInsets()
+  const titleMaxWidth = useWindowDimensions().width - 160 - insets.left - insets.right
   return (
     <TabTitle maxWidth={titleMaxWidth} fit>
       {title}

@@ -345,7 +345,10 @@ export function Composer({
     // sidebar it starts after it, so the field's window x is taken from the dock's own.
     fieldBox.current?.measureInWindow((x) => {
       const show = (origin: number) => {
-        setMenuLeft(x - origin)
+        const rawLeft = x - origin
+        const minLeft = Math.max(10, insets.left + 8)
+        const maxLeft = Math.max(minLeft, windowWidth - insets.right - MENU_WIDTH - 8)
+        setMenuLeft(Math.min(Math.max(minLeft, rawLeft), maxLeft))
         setMenuMounted(true)
         setMenuShown(true)
         pop.value = withSpring(1, { damping: 20, stiffness: 300, mass: 0.7 })
@@ -413,10 +416,11 @@ export function Composer({
   const placeholderAt = { left: textLeft, top: textTop }
   const ghostRight = FIELD_PAD + (expanded ? 14 : SIDE_PAD)
   const showPlaceholder = !text && !suggesting
-  // The row sits in the bar's 10 pt padding and the field is narrowed by the inset on each side.
+  // The row sits in the bar's padding and the field is narrowed by the inset on each side.
+  const sidePad = Math.max(BAR_PAD_SIDE, Math.max(insets.left, insets.right))
   const measureWidth = Math.max(
     0,
-    Math.min(windowWidth, CHAT_COLUMN + 2 * BAR_PAD_SIDE) - 2 * (BAR_PAD_SIDE + NARROW_INSET) - (FIELD_PAD + (editing ? 14 : SIDE_PAD)) - (FIELD_PAD + SIDE_PAD)
+    Math.min(windowWidth - insets.left - insets.right, CHAT_COLUMN + 2 * sidePad) - 2 * (sidePad + NARROW_INSET) - (FIELD_PAD + (editing ? 14 : SIDE_PAD)) - (FIELD_PAD + SIDE_PAD)
   )
   // Scales with a transform only: Liquid Glass renders wrongly under a fading parent.
   const menuStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
@@ -668,18 +672,48 @@ export function Composer({
       </Animated.View>
       {isWeb ? (
         // The desktop field floats over the messages with nothing under it.
-        <View style={[styles.floatingBar, { paddingBottom: insets.bottom + BAR_PAD_BOTTOM }]} pointerEvents="box-none">
+        <View
+          style={[
+            styles.floatingBar,
+            {
+              paddingBottom: insets.bottom + BAR_PAD_BOTTOM,
+              paddingLeft: Math.max(BAR_PAD_SIDE, insets.left + 4),
+              paddingRight: Math.max(BAR_PAD_SIDE, insets.right + 4),
+            },
+          ]}
+          pointerEvents="box-none"
+        >
           {row}
         </View>
       ) : liquidGlass ? (
         // Glass controls float over the messages; the fade keeps text scrolling
         // underneath from clashing with them.
-        <View style={[styles.floatingBar, { paddingBottom: insets.bottom + BAR_PAD_BOTTOM }]} pointerEvents="box-none">
+        <View
+          style={[
+            styles.floatingBar,
+            {
+              paddingBottom: insets.bottom + BAR_PAD_BOTTOM,
+              paddingLeft: Math.max(BAR_PAD_SIDE, insets.left + 4),
+              paddingRight: Math.max(BAR_PAD_SIDE, insets.right + 4),
+            },
+          ]}
+          pointerEvents="box-none"
+        >
           <EdgeFade edge="bottom" style={styles.fade} />
           {row}
         </View>
       ) : (
-        <BlurBar edge="bottom" style={[styles.bar, { paddingBottom: insets.bottom + BAR_PAD_BOTTOM }]}>
+        <BlurBar
+          edge="bottom"
+          style={[
+            styles.bar,
+            {
+              paddingBottom: insets.bottom + BAR_PAD_BOTTOM,
+              paddingLeft: Math.max(BAR_PAD_SIDE, insets.left + 4),
+              paddingRight: Math.max(BAR_PAD_SIDE, insets.right + 4),
+            },
+          ]}
+        >
           {row}
         </BlurBar>
       )}

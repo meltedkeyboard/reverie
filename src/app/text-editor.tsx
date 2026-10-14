@@ -44,7 +44,15 @@ export default function TextEditorScreen() {
           placeholder={draft.placeholder}
           multiline
           // The padding scrolls along with the text, so it passes under the header.
-          style={[styles.input, { paddingTop: headerHeight + 12, paddingBottom: insets.bottom + 24 }]}
+          style={[
+            styles.input,
+            {
+              paddingTop: headerHeight + 12,
+              paddingBottom: insets.bottom + 24,
+              paddingLeft: Math.max(20, insets.left + 8),
+              paddingRight: Math.max(20, insets.right + 8),
+            },
+          ]}
         />
       </View>
       {/* Opened with a zoom from the field, so the header is drawn here rather than by the

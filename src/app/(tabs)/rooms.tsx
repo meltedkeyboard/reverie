@@ -147,7 +147,14 @@ export default function RoomsScreen() {
         <Animated.View
           entering={FadeInDown.springify().duration(350).dampingRatio(1)}
           exiting={FadeOutDown.duration(200)}
-          style={[styles.editBar, { bottom: insets.bottom + 12 }]}
+          style={[
+            styles.editBar,
+            {
+              bottom: insets.bottom + 12,
+              left: Math.max(16, insets.left + 8),
+              right: Math.max(16, insets.right + 8),
+            },
+          ]}
           pointerEvents="box-none"
         >
           <Button
@@ -196,7 +203,16 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    editBar: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    editBar: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      maxWidth: 720,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
   })
 
 // Room the list leaves under its last card for the edit bar.

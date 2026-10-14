@@ -157,7 +157,15 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
       onRequestClose={dismiss}
     >
       {/* Gestures inside a modal need their own root: the app's one does not reach here. */}
-      <GestureHandlerRootView style={styles.fill}>
+      <GestureHandlerRootView
+        style={[
+          styles.fill,
+          {
+            paddingLeft: Math.max(INSET, insets.left),
+            paddingRight: Math.max(INSET, insets.right),
+          },
+        ]}
+      >
         <Animated.View style={[StyleSheet.absoluteFill, liquidGlass ? styles.backdropGlass : styles.backdrop, dim]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} accessibilityLabel={t('common.close')} />
         </Animated.View>
@@ -212,7 +220,7 @@ const createStyles = (colors: Colors) =>
     backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.45)' },
     // Glass takes its look from what is behind it, so the screen is dimmed less.
     backdropGlass: { backgroundColor: 'rgba(0, 0, 0, 0.2)' },
-    slot: { width: '100%', alignSelf: 'center', marginBottom: INSET },
+    slot: { width: '100%', maxWidth: 640, alignSelf: 'center', marginBottom: INSET },
     sheet: { flexShrink: 1, borderRadius: 38 },
     solid: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
     header: { paddingTop: 7, paddingBottom: 12, paddingHorizontal: 16 },

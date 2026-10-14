@@ -32,7 +32,9 @@ type Props = {
   // How far the avatar sits from the top of the screen and from its sides with the
   // content unscrolled; the open photo reaches out over both.
   top: number
-  side: number
+  side?: number
+  sideLeft?: number
+  sideRight?: number
 }
 
 const SIZE = 96
@@ -50,10 +52,15 @@ const SPRING = { damping: 26, stiffness: 220, overshootClamping: true }
 // Everything moves by transforms: the photo is always laid out at its full size and scaled
 // down into the circle. Animating its size, or the height of its block, laid out the form
 // and its glass fields again on every frame, and the spread stuttered.
-export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: androidPull, top, side }: Props) {
-  const { width } = useWindowDimensions()
+export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: androidPull, top, side = 0, sideLeft, sideRight }: Props) {
+  const { width, height } = useWindowDimensions()
   const openViewer = useOpenViewer()
   const open = useSharedValue(false)
+  const leftInset = sideLeft ?? side
+  const rightInset = sideRight ?? side
+  // In landscape (width > height), cap the spread width so it doesn't take 900+ pt
+  const isLandscape = width > height && height > 0
+  const photoSize = isLandscape ? Math.min(width, Math.max(380, height * 0.85)) : width
 
   const tick = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
 
@@ -98,16 +105,16 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: 
     // photo moves down with the page like the rest of it.
     const pull = Math.max(0, -scrollY.value, androidPull?.value ?? 0)
     const swell = 1 + Math.min(pull / PULL_TO_OPEN, 1) * 0.12 * (1 - k)
-    const closedScale = SIZE / width
+    const closedScale = SIZE / photoSize
     const scale = (closedScale + (1 - closedScale) * k) * swell
     // Where the middle of the photo goes: the middle of the circle, or half the photo
-    // below the top of the page. It is laid out with its middle at width / 2 - top.
+    // below the top of the page. It is laid out with its middle at photoSize / 2 - top.
     const closedY = SIZE / 2
-    const openY = width / 2 - top
+    const openY = photoSize / 2 - top
     return {
       // In the photo's own, unscaled size: a circle at first, square corners when open.
-      borderRadius: (width / 2) * (1 - k),
-      transform: [{ translateY: closedY + (openY - closedY) * k - (width / 2 - top) }, { scale }],
+      borderRadius: (photoSize / 2) * (1 - k),
+      transform: [{ translateY: closedY + (openY - closedY) * k - (photoSize / 2 - top) }, { scale }],
     }
   })
 
@@ -116,9 +123,12 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: 
   // of its own. Both come in over the last part of the spread.
   const overlay = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [0.5, 1], [0, 1], 'clamp') }))
 
+  // Centered in the block if photoSize < width
+  const photoLeft = -leftInset + (width - leftInset - rightInset - photoSize) / 2
+
   return (
     <View style={styles.block}>
-      <Animated.View style={[styles.photo, { width, height: width, left: -side, top: -top }, photo]}>
+      <Animated.View style={[styles.photo, { width: photoSize, height: photoSize, left: photoLeft, top: -top }, photo]}>
         <Pressable
           onPress={() => openViewer([{ uri, aspect: 1 }])}
           accessibilityRole="imagebutton"
@@ -145,8 +155,10 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: 
 // For what follows the avatar in the page: moves it down as far as the open photo reaches
 // past the circle's place.
 export function useSpreadPush(progress: SharedValue<number>, top: number) {
-  const { width } = useWindowDimensions()
-  const reach = Math.max(0, width - top - SIZE)
+  const { width, height } = useWindowDimensions()
+  const isLandscape = width > height && height > 0
+  const photoSize = isLandscape ? Math.min(width, Math.max(380, height * 0.85)) : width
+  const reach = Math.max(0, photoSize - top - SIZE)
   return useAnimatedStyle(() => ({ transform: [{ translateY: reach * progress.value }] }))
 }
 

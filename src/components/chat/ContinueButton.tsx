@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { Easing, FadeInDown, FadeOutDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import type { LastChat } from '@/db/chats'
@@ -62,6 +63,7 @@ export function HomeContinueButton({ kind }: { kind: ContinueKind | null }) {
 // content slides out and the new one in, while the glass capsule stays where it is. On a
 // switch to the other tab the content just changes.
 export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props) {
+  const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
@@ -118,7 +120,14 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
     <Animated.View
       entering={FadeInDown.springify().duration(350).dampingRatio(1)}
       exiting={FadeOutDown.duration(200)}
-      style={[styles.slot, { bottom: bottom + 8 }]}
+      style={[
+        styles.slot,
+        {
+          bottom: bottom + 8,
+          left: Math.max(16, insets.left + 8),
+          right: Math.max(16, insets.right + 8),
+        },
+      ]}
       pointerEvents="box-none"
     >
       <SwipeToDelete
@@ -150,7 +159,13 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    slot: { position: 'absolute', left: 16, right: 16 },
+    slot: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      maxWidth: 720,
+      alignSelf: 'center',
+    },
     pill: {
       flexDirection: 'row',
       alignItems: 'center',

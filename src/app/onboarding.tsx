@@ -120,10 +120,25 @@ export default function OnboardingScreen() {
     : !modelPicked
       ? { label: t('onboarding.pickModel'), onPress: () => {}, disabled: false }
       : { label: t('onboarding.done'), onPress: () => finish(true), disabled: false }
-  const contentPad = [styles.content, { paddingTop: insets.top + 56 }]
+  const contentPad = [
+    styles.content,
+    {
+      paddingTop: insets.top + 56,
+      paddingLeft: Math.max(32, insets.left + 16),
+      paddingRight: Math.max(32, insets.right + 16),
+    },
+  ]
   // Only a transform on the footers: a fading ancestor leaves the Liquid Glass effect
   // unrendered until the app comes back from the background.
-  const footerStyle = [styles.footer, { paddingBottom: insets.bottom + 16, transform: [{ translateY: rise }] }]
+  const footerStyle = [
+    styles.footer,
+    {
+      paddingBottom: insets.bottom + 16,
+      paddingLeft: Math.max(24, insets.left + 16),
+      paddingRight: Math.max(24, insets.right + 16),
+      transform: [{ translateY: rise }],
+    },
+  ]
 
   return (
     <View style={styles.screen}>
@@ -161,7 +176,17 @@ export default function OnboardingScreen() {
             <Button variant="glass" label={t('onboarding.getStarted')} onPress={toServer} />
           </Animated.View>
           {/* Tucked in a corner, to tell which build is installed without drawing the eye. */}
-          <Animated.Text style={[styles.version, { top: insets.top + 8, opacity: appear }]} pointerEvents="none">
+          <Animated.Text
+            style={[
+              styles.version,
+              {
+                top: insets.top + 8,
+                right: Math.max(20, insets.right + 8),
+                opacity: appear,
+              },
+            ]}
+            pointerEvents="none"
+          >
             v{APP_VERSION}
           </Animated.Text>
         </View>

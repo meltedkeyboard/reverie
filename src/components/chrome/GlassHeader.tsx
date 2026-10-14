@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router'
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { columnInset, FORM_COLUMN } from '@/hooks/util/useLayoutMode'
+import { columnInset, columnInsets, FORM_COLUMN } from '@/hooks/util/useLayoutMode'
 import { floatingBars } from '@/lib/ui/nativeUI'
 import { fonts, HEADER_FONT_SCALE, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
 
@@ -34,11 +34,11 @@ export function useScreenPadding(kind: 'list' | 'form') {
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const top = insets.top + HEADER_ROW_HEIGHT
-  // A wide window gets a centered column instead of cards and fields across all of it.
-  const paddingHorizontal = columnInset(width, FORM_COLUMN, 16)
+  // A wide window or landscape orientation gets a centered column while keeping safe area margins.
+  const side = columnInsets(width, FORM_COLUMN, Math.max(16, insets.left), Math.max(16, insets.right))
   return kind === 'list'
-    ? { paddingTop: top + 16, paddingBottom: insets.bottom + 24, paddingHorizontal, flexGrow: 1 }
-    : { paddingTop: top + 20, paddingBottom: insets.bottom + 40, paddingHorizontal }
+    ? { paddingTop: top + 16, paddingBottom: insets.bottom + 24, ...side, flexGrow: 1 }
+    : { paddingTop: top + 20, paddingBottom: insets.bottom + 40, ...side }
 }
 
 export function HeaderTitle({ children }: { children: React.ReactNode }) {
@@ -85,9 +85,28 @@ export function GlassHeader({ left, right, children, floating, centerTitle }: Pr
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const row = (
-    <View style={styles.row} pointerEvents="box-none">
+    <View
+      style={[
+        styles.row,
+        {
+          paddingLeft: Math.max(8, insets.left + 4),
+          paddingRight: Math.max(8, insets.right + 4),
+        },
+      ]}
+      pointerEvents="box-none"
+    >
       {centerTitle ? (
-        <View style={styles.centered} pointerEvents="box-none">
+        <View
+          style={[
+            styles.centered,
+            {
+              left: insets.left,
+              right: insets.right,
+              paddingHorizontal: Math.max(60, Math.max(insets.left, insets.right) + 40),
+            },
+          ]}
+          pointerEvents="box-none"
+        >
           {children}
         </View>
       ) : null}

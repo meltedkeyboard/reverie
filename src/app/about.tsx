@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router'
 import { useCallback, useEffect } from 'react'
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import Animated, {
   Easing,
   Extrapolation,
@@ -52,7 +52,7 @@ export default function AboutScreen() {
   const router = useRouter()
   const db = useDatabase()
   const insets = useSafeAreaInsets()
-  const { width } = useWindowDimensions()
+  const { width, height } = useWindowDimensions()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const reduceMotion = useReducedMotion()
@@ -73,25 +73,47 @@ export default function AboutScreen() {
     return () => cancelAnimation(clock)
   }, [clock, reduceMotion])
 
-  // A narrow phone gets the whole picture a little smaller rather than cut.
-  const scale = Math.min(1, (width - 32) / COLUMN)
+  // A narrow phone or short screen in landscape gets the picture scaled or scrolled.
+  const scale = Math.min(1, (width - Math.max(32, insets.left + insets.right + 16)) / COLUMN)
+  const isLandscape = height < 520
+
+  const content = (
+    <View
+      style={[
+        styles.body,
+        {
+          paddingTop: insets.top + HEADER_ROW_HEIGHT - 24,
+          paddingBottom: insets.bottom + 16,
+          paddingLeft: Math.max(16, insets.left + 8),
+          paddingRight: Math.max(16, insets.right + 8),
+        },
+        isLandscape && { minHeight: 680, justifyContent: 'center', gap: 20 },
+      ]}
+    >
+      <View style={{ transform: [{ scale }] }} accessible accessibilityLabel={t('about.tagline')}>
+        <Hero clock={clock} />
+      </View>
+      <Text style={styles.version}>{t('about.version', { version: APP_VERSION })}</Text>
+      <View style={[styles.scene, { transform: [{ scale }] }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <ChatScene clock={clock} />
+      </View>
+      <View accessible accessibilityLabel={t('about.shakeHint')}>
+        <ShakeMark />
+      </View>
+    </View>
+  )
 
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: true, headerTransparent: true, headerShadowVisible: false, headerTitle: '', headerBackButtonDisplayMode: 'minimal' }} />
       <Pattern id="stars" />
-      <View style={[styles.body, { paddingTop: insets.top + HEADER_ROW_HEIGHT - 24, paddingBottom: insets.bottom + 16 }]}>
-        <View style={{ transform: [{ scale }] }} accessible accessibilityLabel={t('about.tagline')}>
-          <Hero clock={clock} />
-        </View>
-        <Text style={styles.version}>{t('about.version', { version: APP_VERSION })}</Text>
-        <View style={[styles.scene, { transform: [{ scale }] }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <ChatScene clock={clock} />
-        </View>
-        <View accessible accessibilityLabel={t('about.shakeHint')}>
-          <ShakeMark />
-        </View>
-      </View>
+      {isLandscape ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+          {content}
+        </ScrollView>
+      ) : (
+        content
+      )}
     </View>
   )
 }

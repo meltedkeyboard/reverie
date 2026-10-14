@@ -4,7 +4,13 @@ import type { LayoutChangeEvent } from 'react-native'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { featuredFill, isFeatured } from '@/lib/ui/featuredLayout'
 
-type Padding = { paddingTop: number; paddingBottom: number; paddingHorizontal: number }
+type Padding = {
+  paddingTop: number
+  paddingBottom: number
+  paddingHorizontal?: number
+  paddingLeft?: number
+  paddingRight?: number
+}
 
 // For a home tab: the height a lone item's card takes to fill the screen under the header
 // (undefined while there are several, or none), and whether the list must still scroll.
@@ -16,8 +22,13 @@ export function useFeaturedFill(count: number, padding: Padding, reserved: numbe
     const { width, height } = e.nativeEvent.layout
     setBox((old) => (old.width === width && old.height === height ? old : { width, height }))
   }
-  // A wide window keeps the ordinary list: one card as big as the window would be absurd.
-  if (wide || !isFeatured(count) || !box.height) return { onLayout, height: undefined, scroll: count > 0 }
-  const fill = featuredFill(box, padding.paddingTop + padding.paddingBottom + reserved, padding.paddingHorizontal)
+  // A wide window or landscape orientation (width > height) keeps the ordinary list:
+  // one card as big as the window would be absurd.
+  const landscape = box.width > box.height && box.height > 0
+  if (wide || landscape || !isFeatured(count) || !box.height) return { onLayout, height: undefined, scroll: count > 0 }
+  const side = padding.paddingLeft != null && padding.paddingRight != null
+    ? (padding.paddingLeft + padding.paddingRight) / 2
+    : padding.paddingHorizontal ?? 16
+  const fill = featuredFill(box, padding.paddingTop + padding.paddingBottom + reserved, side)
   return { onLayout, height: fill.height, scroll: fill.scroll }
 }

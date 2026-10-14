@@ -451,7 +451,14 @@ export default function CharactersScreen() {
         <Animated.View
           entering={FadeInDown.springify().duration(350).dampingRatio(1)}
           exiting={FadeOutDown.duration(200)}
-          style={[styles.editBar, { bottom: barBottom }]}
+          style={[
+            styles.editBar,
+            {
+              bottom: barBottom,
+              left: Math.max(16, insets.left + 8),
+              right: Math.max(16, insets.right + 8),
+            },
+          ]}
           pointerEvents="box-none"
         >
           <Button
@@ -596,6 +603,8 @@ const createStyles = (colors: Colors) =>
     position: 'absolute',
     left: 16,
     right: 16,
+    maxWidth: 720,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

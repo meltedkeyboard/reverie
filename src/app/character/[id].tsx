@@ -430,7 +430,8 @@ export default function CharacterEditorScreen() {
                 progress={photoSpread}
                 pull={isAndroid ? pull : undefined}
                 top={padding.paddingTop}
-                side={padding.paddingHorizontal}
+                sideLeft={padding.paddingLeft ?? padding.paddingHorizontal}
+                sideRight={padding.paddingRight ?? padding.paddingHorizontal}
               />
             ) : (
               <Avatar name={name} file={avatar} size={96} viewable={false} />
