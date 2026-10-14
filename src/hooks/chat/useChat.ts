@@ -185,7 +185,8 @@ export function useChat(chat: Chat, character: Character) {
           setMessages(next)
           // The first answer is where a chat gets its name. A failure here is not worth
           // an error card: the user can always ask for a title from the menu.
-          if (!titleRef.current && next.filter((m) => m.role === 'user').length === 1) {
+          const initialCount = characterRef.current.greeting.trim() ? 1 : 0
+          if (!titleRef.current && (next.filter((m) => m.role === 'user').length === 1 || next.length > initialCount)) {
             autoName().catch(() => {})
           }
         }

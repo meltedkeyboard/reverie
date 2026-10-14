@@ -325,8 +325,9 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
   const cast = useMemo(() => members.map((m) => ({ name: m.character.name, avatar: m.character.avatar })), [members])
   const empty = loaded && rows.length === 0
+  const initialCount = room.opening.trim() ? 1 : 0
   // Nothing written yet: a new chat from here would be the same as this one.
-  const fresh = loaded && !rows.some((r) => r.role === 'user')
+  const fresh = loaded && !rows.some((r) => r.role === 'user') && rows.length <= initialCount
 
   const asidePanel = asideOpen ? (
     <AsidePanel
@@ -377,7 +378,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
             {fresh ? (
               <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
             ) : (
-              <Link href={`/chat/new?room=${room.id}`} asChild>
+              <Link push href={`/chat/new?room=${room.id}`} asChild>
                 <GlassButton icon="create-outline" />
               </Link>
             )}

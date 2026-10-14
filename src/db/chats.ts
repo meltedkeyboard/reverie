@@ -106,13 +106,37 @@ export async function deleteChat(db: SQLiteDatabase, id: number) {
   notifyChatsChanged()
 }
 
-// A chat the user never wrote in holds at most the greeting. Such chats are dropped once
-// the user is back on a list, so opening a new chat and leaving it leaves no clutter.
+// A chat the user never interacted with holds at most the initial greeting or opening. Such
+// chats are dropped once the user is back on a list, so opening a new chat and leaving it
+// leaves no clutter.
 export async function pruneUntouchedChats(db: SQLiteDatabase) {
   await db.runAsync(`
     DELETE FROM chats
     WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = chats.id AND m.role = 'user')
-      AND (SELECT COUNT(*) FROM messages m WHERE m.chat_id = chats.id) <= 1
+      AND (
+        (SELECT COUNT(*) FROM messages m WHERE m.chat_id = chats.id) = 0
+        OR (
+          (SELECT COUNT(*) FROM messages m WHERE m.chat_id = chats.id) = 1
+          AND (
+            EXISTS (
+              SELECT 1 FROM characters c
+              JOIN messages m ON m.chat_id = chats.id
+              WHERE c.id = chats.character_id
+                AND TRIM(c.greeting) != ''
+                AND m.role = 'assistant'
+                AND m.content = TRIM(c.greeting)
+            )
+            OR EXISTS (
+              SELECT 1 FROM rooms r
+              JOIN messages m ON m.chat_id = chats.id
+              WHERE r.id = chats.room_id
+                AND TRIM(r.opening) != ''
+                AND m.kind = 'narration'
+                AND m.content = TRIM(r.opening)
+            )
+          )
+        )
+      )
   `)
 }
 
@@ -139,7 +163,17 @@ export function getLastChat(db: SQLiteDatabase, kind: 'character' | 'room', open
       LEFT JOIN characters c ON c.id = ch.character_id
       LEFT JOIN rooms r ON r.id = ch.room_id
     WHERE ch.${column} IS NOT NULL
-      AND EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.role = 'user')
+      AND (
+        EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.role = 'user')
+        OR (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ch.id) > 1
+        OR (
+          (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ch.id) = 1
+          AND NOT (
+            (TRIM(COALESCE(c.greeting, '')) != '' AND EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.role = 'assistant' AND m.content = TRIM(c.greeting)))
+            OR (TRIM(COALESCE(r.opening, '')) != '' AND EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.kind = 'narration' AND m.content = TRIM(r.opening)))
+          )
+        )
+      )
     ORDER BY ch.id = ? DESC, lastActivity DESC, ch.id DESC
     LIMIT 1
   `, openedId ?? -1)

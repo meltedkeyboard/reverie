@@ -84,6 +84,7 @@ export default function ChatScreen() {
           setLoaded({ kind: 'room', chat, room, members: await listRoomMembers(db, room.id) })
           setContinueHidden(db, 'room', false)
           setLastOpened(db, 'room', chat.id)
+          if (id === 'new') router.setParams({ id: String(chatId), room: undefined })
           return
         }
         const character = chat?.characterId ? await getCharacter(db, chat.characterId) : null
@@ -92,6 +93,7 @@ export default function ChatScreen() {
           // A continue button swiped away on the home screen comes back once a chat opens.
           setContinueHidden(db, 'character', false)
           setLastOpened(db, 'character', chat.id)
+          if (id === 'new') router.setParams({ id: String(chatId), character: undefined })
         } else router.back()
       })()
     }, [db, id, characterParam, roomParam, router])
@@ -230,8 +232,9 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
   const errorCard = error ? <ErrorCard message={error} onRetry={retry} /> : null
 
   const empty = loaded && rows.length === 0
+  const initialCount = character.greeting.trim() ? 1 : 0
   // Nothing written yet: a new chat from here would be the same as this one.
-  const fresh = loaded && !rows.some((r) => r.role === 'user')
+  const fresh = loaded && !rows.some((r) => r.role === 'user') && rows.length <= initialCount
 
   return (
     <View style={styles.screen}>
@@ -265,7 +268,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
             {fresh ? (
               <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
             ) : (
-              <Link href={`/chat/new?character=${character.id}`} asChild>
+              <Link push href={`/chat/new?character=${character.id}`} asChild>
                 <GlassButton icon="create-outline" />
               </Link>
             )}

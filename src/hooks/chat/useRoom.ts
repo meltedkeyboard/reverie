@@ -349,7 +349,12 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   const maybeName = useCallback(() => {
     const all = messagesRef.current
     const users = all.filter((m) => m.role === 'user').length
-    if (!titleRef.current && users === 1 && all.some((m) => m.role === 'assistant' && m.speakerId !== null)) {
+    const initialCount = roomRef.current.opening.trim() ? 1 : 0
+    if (
+      !titleRef.current &&
+      (users === 1 || (users === 0 && all.length > initialCount)) &&
+      all.some((m) => m.role === 'assistant' && m.speakerId !== null)
+    ) {
       autoName().catch(() => {})
     }
   }, [autoName])
@@ -403,10 +408,11 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       const history = messagesRef.current
       const planned = await resolve(ctrl, nextSpeaker(history, membersRef.current), history[history.length - 1])
       await runQueue(ctrl, planned.slice(0, 1))
+      maybeName()
     } finally {
       settle(ctrl)
     }
-  }, [task, begin, resolve, runQueue, settle])
+  }, [task, begin, resolve, runQueue, settle, maybeName])
 
   // This character takes the next turn, even one who only listens.
   const nudge = useCallback(
@@ -417,11 +423,12 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       try {
         const history = messagesRef.current
         await runQueue(ctrl, [turnFor(history[history.length - 1], characterId)])
+        maybeName()
       } finally {
         settle(ctrl)
       }
     },
-    [task, begin, runQueue, settle]
+    [task, begin, runQueue, settle, maybeName]
   )
 
   // The characters talk among themselves for `total` lines, or until stopped.
@@ -438,11 +445,12 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           if (!planned.length || !(await runQueue(ctrl, planned.slice(0, 1)))) break
           setAuto({ done: done + 1, total })
         }
+        maybeName()
       } finally {
         settle(ctrl)
       }
     },
-    [task, begin, resolve, runQueue, settle]
+    [task, begin, resolve, runQueue, settle, maybeName]
   )
 
   const regenerate = useCallback(
