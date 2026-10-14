@@ -200,6 +200,7 @@ export default function GroupScreen() {
         data={members ?? []}
         keyExtractor={(c) => String(c.id)}
         {...reorder}
+        scrollEnabled={editing || Boolean(members?.length)}
         contentContainerStyle={[
           padding,
           { paddingBottom: padding.paddingBottom + bottomSpace },

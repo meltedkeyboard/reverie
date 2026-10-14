@@ -88,6 +88,7 @@ export default function RoomScenesScreen() {
         data={chats ?? []}
         keyExtractor={(c) => String(c.id)}
         {...reorder}
+        scrollEnabled={Boolean(chats?.length)}
         contentContainerStyle={padding}
         ItemSeparatorComponent={ListSeparator}
         ListEmptyComponent={

@@ -1,6 +1,6 @@
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import ReorderableList from 'react-native-reorderable-list'
 
@@ -8,9 +8,8 @@ import { Avatar } from '@/components/visuals/Avatar'
 import { Button } from '@/components/controls/Button'
 import { ChatCard } from '@/components/lists/ChatCard'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassGroup, GlassSurface } from '@/components/chrome/Glass'
-import { IconButton } from '@/components/controls/IconButton'
-import { BackButton, GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
+import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
+import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { Pattern } from '@/components/visuals/Pattern'
 import { getCharacter, type Character } from '@/db/characters'
@@ -28,6 +27,7 @@ export default function CharacterChatsScreen() {
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
+  const glass = useGlassStyles()
   const { t } = useTranslation()
   const [character, setCharacter] = useState<Character | null>(null)
   const [chats, setChats] = useState<ChatPreview[] | null>(null)
@@ -79,6 +79,7 @@ export default function CharacterChatsScreen() {
         data={chats ?? []}
         keyExtractor={(c) => String(c.id)}
         {...reorder}
+        scrollEnabled={Boolean(chats?.length)}
         contentContainerStyle={padding}
         ItemSeparatorComponent={ListSeparator}
         ListEmptyComponent={
@@ -107,34 +108,35 @@ export default function CharacterChatsScreen() {
         floating
         centerTitle
         left={
-          <View style={styles.headerLeft}>
-            <BackButton />
-            {character ? (
-              <GlassSurface interactive style={styles.avatarButton}>
-                <Avatar name={character.name} file={character.avatar} size={36} />
-              </GlassSurface>
-            ) : null}
-          </View>
+          <GlassButton
+            icon="chevron-back"
+            iconSize={26}
+            onPress={() => router.back()}
+            accessibilityLabel={t('common.back')}
+          />
         }
         right={
           character ? (
-            <GlassGroup>
-              <IconButton
-                name="information-circle-outline"
-                onPress={() => router.push(`/character/${character.id}?profile=1`)}
-                accessibilityLabel={t('profile.title')}
-              />
-              <Link href={`/chat/new?character=${character.id}`} asChild>
-                <IconButton name="add" size={26} />
-              </Link>
-            </GlassGroup>
+            <Link href={`/chat/new?character=${character.id}`} asChild>
+              <GlassButton icon="add" iconSize={26} accessibilityLabel={t('chatsList.startChat')} />
+            </Link>
           ) : null
         }
       >
         {character ? (
-          <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
-            {character.name}
-          </Text>
+          <Pressable
+            onPress={() => router.push(`/character/${character.id}?profile=1`)}
+            style={styles.whoPress}
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.title')}
+          >
+            <GlassSurface interactive style={styles.whoPill} fallbackStyle={glass.solid}>
+              <Avatar name={character.name} file={character.avatar} size={32} viewable={false} />
+              <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
+                {character.name}
+              </Text>
+            </GlassSurface>
+          </Pressable>
         ) : null}
       </GlassHeader>
     </View>
@@ -144,13 +146,23 @@ export default function CharacterChatsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    avatarButton: {
-      width: 44,
+    whoPress: { maxWidth: '100%' },
+    whoPill: {
       height: 44,
       borderRadius: 22,
+      borderCurve: 'continuous',
+      paddingLeft: 6,
+      paddingRight: 16,
+      gap: 10,
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      maxWidth: '100%',
     },
-    name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600', textAlign: 'center' },
+    name: {
+      flexShrink: 1,
+      color: colors.text,
+      fontFamily: fonts.prose,
+      fontSize: 18,
+      fontWeight: '600',
+    },
   })

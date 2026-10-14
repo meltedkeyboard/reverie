@@ -149,7 +149,7 @@ const createStyles = (colors: Colors) =>
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 88,
+    paddingHorizontal: 60,
   },
   // The prose face stays, it is the app's own; on the desktop the titles are just smaller,
   // in proportion to the compact chrome.
