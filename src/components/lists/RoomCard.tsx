@@ -77,8 +77,7 @@ function RoomCardContent({ room, onOpen, onDelete, menu, fillHeight, editing }: 
     )
   }
   return (
-    // Solid like a character's card; reordered by the handle of the edit mode only.
-    <ListCard solid longPressDrag={false} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={room.name} style={styles.card}>
+    <ListCard longPressDrag={editing?.active} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={room.name} style={styles.card}>
       <View style={styles.faces}>
         <AvatarStack cast={room.cast} size={40} max={3} />
       </View>

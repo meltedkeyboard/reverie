@@ -180,6 +180,8 @@
   "groups.removeFromGroup": "Убрать из группы",
   "groups.addCharacter": "Добавить персонажа",
   "groups.addCharacterTitle": "Добавить в группу",
+  "groups.groupSelected": "Сгруппировать",
+  "groups.newGroup": "Новая группа",
   "groups.noCharactersToAddTitle": "Нет доступных персонажей",
   "groups.noCharactersToAddMessage": "Все персонажи уже находятся в этой группе",
   "groups.removeSelectedTitle": "Убрать {{count}} персонажей?",

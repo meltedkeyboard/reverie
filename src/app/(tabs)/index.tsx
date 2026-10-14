@@ -37,7 +37,7 @@ import { useReorder } from '@/hooks/features/useReorder'
 import { useTranslation } from '@/i18n'
 import { removeCharacterImages } from '@/lib/images/avatars'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
-import { confirm, promptText } from '@/lib/ui/dialogs'
+import { confirm, promptText, showSheet } from '@/lib/ui/dialogs'
 import { buildBackupArchive, characterSelection, exportBackup, openBackupBytes } from '@/lib/transfer/backup'
 import { buildCardPng, cardFileName, importCardFile, importCharacterCard, type CardSource } from '@/lib/transfer/importCard'
 import { showToast } from '@/lib/ui/toast'
@@ -151,6 +151,49 @@ export default function CharactersScreen() {
         reload()
       },
     })
+  }
+
+  const canGroup = groups.length > 0 ? checked.size >= 1 : checked.size >= 2
+
+  const groupChecked = () => {
+    const selected = (characters ?? []).filter((c) => checked.has(c.id))
+    if (!selected.length) return
+    const ids = selected.map((c) => c.id)
+
+    if (groups.length === 0) {
+      if (ids.length < 2) return
+      const target = selected[0]
+      run(createGroup(db, target, ids))
+      setChecked(new Set())
+      setEditing(false)
+      return
+    }
+
+    const options: { label: string; onSelect: () => void }[] = []
+    if (ids.length >= 2) {
+      options.push({
+        label: t('groups.newGroup'),
+        onSelect: () => {
+          const target = selected[0]
+          run(createGroup(db, target, ids))
+          setChecked(new Set())
+          setEditing(false)
+        },
+      })
+    }
+    for (const g of groups) {
+      const gMembers = (characters ?? []).filter((c) => c.groupId === g.id)
+      const name = g.name ?? gMembers.map((m) => m.name).join(', ')
+      options.push({
+        label: name,
+        onSelect: () => {
+          run(addToGroup(db, g.id, ids))
+          setChecked(new Set())
+          setEditing(false)
+        },
+      })
+    }
+    showSheet(t('groups.addCharacterTitle'), options)
   }
 
   // The file a drop outside the app asked for, written to the caches for the system to copy.
@@ -416,13 +459,22 @@ export default function CharactersScreen() {
             label={allChecked ? t('characters.deselectAll') : t('characters.selectAll')}
             onPress={() => setChecked(allChecked ? new Set() : new Set((characters ?? []).map((c) => c.id)))}
           />
-          <GlassButton
-            icon="trash-outline"
-            tint={checked.size ? colors.danger : undefined}
-            disabled={!checked.size}
-            onPress={deleteChecked}
-            accessibilityLabel={t('characters.deleteSelected')}
-          />
+          <View style={styles.editBarActions}>
+            <GlassButton
+              icon="folder-outline"
+              tint={canGroup ? colors.accent : undefined}
+              disabled={!canGroup}
+              onPress={groupChecked}
+              accessibilityLabel={t('groups.groupSelected')}
+            />
+            <GlassButton
+              icon="trash-outline"
+              tint={checked.size ? colors.danger : undefined}
+              disabled={!checked.size}
+              onPress={deleteChecked}
+              accessibilityLabel={t('characters.deleteSelected')}
+            />
+          </View>
         </Animated.View>
       ) : null}
       <GlassHeader
@@ -548,6 +600,7 @@ const createStyles = (colors: Colors) =>
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  editBarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 },
   createMenu: { position: 'absolute', zIndex: 100, transformOrigin: 'right top' },
   createMenuBody: { borderRadius: 22, borderCurve: 'continuous', padding: 6, minWidth: 220 },

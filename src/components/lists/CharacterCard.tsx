@@ -37,7 +37,7 @@ function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, e
   const chats = character.chatCount
   if (fillHeight !== undefined) {
     return (
-      <ListCard vertical solid longPressDrag={false} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={[styles.featured, { height: fillHeight }]}>
+      <ListCard vertical longPressDrag={editing?.active} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={[styles.featured, { height: fillHeight }]}>
         <View style={styles.hero}>
           <Avatar name={character.name} file={character.avatar} size={200} square fill />
         </View>
@@ -50,7 +50,7 @@ function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, e
     )
   }
   return (
-    <ListCard solid longPressDrag={false} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.card}>
+    <ListCard longPressDrag={editing?.active} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.card}>
       <View style={styles.avatar}>
         <Avatar name={character.name} file={character.avatar} size={AVATAR} square fill />
       </View>

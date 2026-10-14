@@ -105,45 +105,52 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
   // away, under the check sliding in.
   const checkStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
-    transform: [{ translateX: (1 - progress.value) * CHECK_WIDTH }, { scale: interpolate(progress.value, [0, 1], [0.5, 1]) }],
+    transform: [{ scale: interpolate(progress.value, [0, 1], [0.5, 1]) }],
   }))
-  const gap = Number(StyleSheet.flatten(cardStyle).gap ?? 0)
-  const insetStyle = useAnimatedStyle(() => ({ paddingRight: settled.value * CHECK_WIDTH }))
-  const menuStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value }))
-  const handleStyle = useAnimatedStyle(() => ({ opacity: progress.value }))
+  const menuStyle = useAnimatedStyle(() => ({
+    opacity: 1 - progress.value,
+  }))
 
-  if (liquidGlass && !solid) {
-    return (
-      <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete} throwAway={!isConfirmDeleteOn()}>
-        <Pressable onPress={onOpen} onLongPress={onLongPress}>
-          <GlassSurface interactive variant="clear" style={styles.layer} />
-          <View style={[cardStyle, styles.glassCard]}>
-            {children}
-            {menuButton}
-          </View>
-        </Pressable>
-      </SwipeToDelete>
-    )
-  }
+  const isGlass = liquidGlass && !solid
 
   return (
-    <SwipeToDelete radius={RADIUS} label={t('common.delete')} onDelete={onDelete} throwAway={!isConfirmDeleteOn()} disabled={active} leading={leading}>
+    <SwipeToDelete
+      radius={RADIUS}
+      label={t('common.delete')}
+      onDelete={onDelete}
+      throwAway={!isConfirmDeleteOn()}
+      disabled={active}
+      leading={leading}
+    >
       <Pressable
         onPress={active && !editing?.opens ? toggle : onOpen}
-        onLongPress={active ? undefined : onLongPress}
+        onLongPress={onLongPress}
         // On the desktop a flat list row: no outline, greyer under the pointer.
         style={(state) =>
           isDesktop
-            ? [cardStyle, (state as { hovered?: boolean }).hovered && styles.hovered, state.pressed && styles.pressedFlat]
-            : [cardStyle, state.pressed && !active && { transform: [{ scale: 0.985 }], opacity: 0.9 }]
+            ? [cardStyle, isGlass && styles.glassCard, (state as { hovered?: boolean }).hovered && styles.hovered, state.pressed && styles.pressedFlat]
+            : [
+                cardStyle,
+                isGlass && styles.glassCard,
+                state.pressed && !active && !isGlass && { transform: [{ scale: 0.985 }], opacity: 0.9 },
+              ]
         }
       >
+        {isGlass ? (
+          <GlassSurface
+            interactive
+            variant="clear"
+            style={styles.layer}
+            fallbackStyle={styles.glassFallback}
+          />
+        ) : null}
+        {children}
         {editing ? (
-          <Animated.View style={[styles.content, { gap }, insetStyle]}>
-            {children}
-            {/* Over the content, in the room its inset leaves on the right, so the check
-                takes its own tap where a tap opens the card. */}
-            <Animated.View style={[styles.check, checkStyle]} pointerEvents={active && editing.opens ? 'auto' : 'none'}>
+          <View style={[styles.menu, vertical && styles.floating]}>
+            <Animated.View style={[StyleSheet.absoluteFill, menuStyle]} pointerEvents={active ? 'none' : 'auto'}>
+              {menuButton}
+            </Animated.View>
+            <Animated.View style={[StyleSheet.absoluteFill, checkStyle]} pointerEvents={active && editing.opens ? 'auto' : 'none'}>
               <Pressable onPress={toggle} hitSlop={8} style={styles.checkTap}>
                 <SFIcon
                   name={checked ? 'checkmark.circle.fill' : 'circle'}
@@ -151,24 +158,8 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
                   size={22}
                   color={checked ? colors.accent : colors.textFaint}
                   animateChange
-                  // A tick answers at once, like in Mail.
                   changeResponse={0.18}
                 />
-              </Pressable>
-            </Animated.View>
-          </Animated.View>
-        ) : (
-          children
-        )}
-        {editing ? (
-          <View>
-            <Animated.View style={menuStyle} pointerEvents={active ? 'none' : 'auto'}>
-              {menuButton}
-            </Animated.View>
-            {/* The handle claims the touch on its own, so a press there drags at once. */}
-            <Animated.View style={[styles.handleLayer, handleStyle]} pointerEvents={active ? 'auto' : 'none'}>
-              <Pressable onPressIn={drag} hitSlop={8} style={styles.handle} accessibilityLabel={t('characters.reorder')}>
-                <SFIcon name="line.3.horizontal" fallback="reorder-three" size={20} color={colors.textFaint} />
               </Pressable>
             </Animated.View>
           </View>
@@ -188,8 +179,6 @@ export function setEditMotion({ progress, settled }: EditMotion, on: boolean) {
   progress.value = withSpring(on ? 1 : 0, { duration: 350, dampingRatio: 1 })
   settled.value = on ? 1 : 0
 }
-
-const CHECK_WIDTH = 40
 
 const RADIUS = 20
 
@@ -222,6 +211,13 @@ const createStyles = (colors: Colors) =>
     // The glass behind the content; it draws the edge in place of the border.
     layer: LAYER,
     glassCard: { borderWidth: 0, backgroundColor: 'transparent' },
+    glassFallback: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: RADIUS,
+      borderCurve: 'continuous',
+    },
     // The same box as the IconButton it replaces.
     menu: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
     vertical: { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingVertical: 0, paddingLeft: 0, paddingRight: 0 },
@@ -239,12 +235,7 @@ const createStyles = (colors: Colors) =>
           },
         }
       : {}),
-    check: { position: 'absolute', top: 0, bottom: 0, right: 0, width: CHECK_WIDTH, alignItems: 'center', justifyContent: 'center' },
-    // Stands in for the card's own row, so the content keeps its layout inside.
-    content: { flex: 1, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center' },
     checkTap: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
-    handleLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-    handle: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     hovered: { backgroundColor: colors.surfaceRaised },
     pressedFlat: { backgroundColor: colors.border },
     floating: {

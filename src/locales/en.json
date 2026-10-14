@@ -180,6 +180,8 @@
   "groups.removeFromGroup": "Remove from group",
   "groups.addCharacter": "Add character",
   "groups.addCharacterTitle": "Add to group",
+  "groups.groupSelected": "Group characters",
+  "groups.newGroup": "New group",
   "groups.noCharactersToAddTitle": "No characters available",
   "groups.noCharactersToAddMessage": "All characters are already in this group",
   "groups.removeSelectedTitle": "Remove {{count}} characters?",

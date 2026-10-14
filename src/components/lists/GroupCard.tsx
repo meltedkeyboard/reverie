@@ -44,8 +44,7 @@ export function GroupCard({ group, members, onOpen, onDelete, onUngroup, menu, e
       onProvide={onProvide}
     >
       <ListCard
-        solid
-        longPressDrag={false}
+        longPressDrag={editing?.active}
         editing={editing}
         onOpen={unlessDragging(onOpen)}
         onDelete={onDelete}
