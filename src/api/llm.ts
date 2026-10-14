@@ -118,7 +118,7 @@ export async function testConnection(cfg: ServerSettings) {
   }
 }
 
-type ReasoningOption = 'off' | 'on' | 'low' | 'medium' | 'high'
+type ReasoningOption = 'off' | 'on' | 'none' | 'low' | 'medium' | 'high' | 'minimal' | 'xhigh'
 
 type NativeModel = {
   type: string
@@ -387,16 +387,19 @@ async function reasoningFields(cfg: ServerSettings, base: string, mode: Thinking
   const allowed = model?.capabilities?.reasoning?.allowed_options ?? []
 
   if (mode === 'off') {
+    const allowsOff = allowed.includes('off') || allowed.includes('none') || !!model?.capabilities?.reasoning
     return {
       ...kwargs,
-      ...(allowed.includes('off') ? { reasoning_effort: 'off' } : {}),
+      ...(allowsOff ? { reasoning_effort: 'none' } : {}),
     }
   }
   const effort =
     allowed.includes('medium') ? 'medium' :
-    allowed.includes('on') ? 'on' :
+    allowed.includes('on') ? 'medium' :
     allowed.includes('high') ? 'high' :
-    allowed.includes('low') ? 'low' : undefined
+    allowed.includes('low') ? 'low' :
+    allowed.includes('minimal') ? 'minimal' :
+    allowed.includes('xhigh') ? 'xhigh' : undefined
   return {
     ...kwargs,
     ...(effort ? { reasoning_effort: effort } : {}),
