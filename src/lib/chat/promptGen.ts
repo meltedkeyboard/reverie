@@ -1,6 +1,8 @@
-import { streamChat, type ChatTurn, type StreamPart } from '@/api/llm'
+import { streamChat, type ChatTurn, type ContentPart, type StreamPart } from '@/api/llm'
 import type { ServerSettings } from '@/db/prefs/settings'
+import type { MessageImage } from '@/db/messages'
 import type { Locale } from '@/i18n'
+import { attachmentUri, withInlinedImages } from '@/lib/images/attachments'
 
 export type PromptLength = 'short' | 'medium' | 'long'
 export type PromptFormat = 'prose' | 'sections'
@@ -18,6 +20,7 @@ export type PromptGenInput = {
   base: string | null
   options: PromptGenOptions
   locale: Locale
+  images?: MessageImage[]
 }
 
 const LENGTH_RULES: Record<PromptLength, string> = {
@@ -38,6 +41,7 @@ function languageRule(locale: Locale) {
 }
 
 function systemRules(input: PromptGenInput) {
+  const hasImages = (input.images?.length ?? 0) > 0
   return [
     'You write system prompts for roleplay AI characters in a chat app.',
     'The prompt is addressed to the model in the second person ("You are ...") and defines the character: personality, background, speech style, habits, how they treat the user, and what they never do.',
@@ -45,11 +49,21 @@ function systemRules(input: PromptGenInput) {
     input.name.trim()
       ? `The character's name is ${input.name.trim()}.`
       : 'If no name is given, invent one that fits the character.',
+    hasImages
+      ? [
+          'Reference images are attached to guide the character creation.',
+          'Carefully analyze the visual details in the images: physical appearance (hair, eyes, face, build, distinctive features), clothing, aesthetic, expressions, posture, setting, mood, and any situational context.',
+          'Incorporate these visual elements into the character definition (appearance, persona, demeanor, and background).',
+          'If the image contains multiple characters, follow the user instructions on which character is the subject of this prompt and who the other character(s) are, describing their relationship, dynamic, and interactions accordingly.',
+        ].join(' ')
+      : '',
     LENGTH_RULES[input.options.length],
     FORMAT_RULES[input.options.format],
     languageRule(input.locale),
     'Reply with the prompt text only: no preface, no comments after it, no quotes or code fences around it.',
-  ].join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 type TextKind = 'prompt' | 'greeting'
@@ -63,7 +77,16 @@ const KIND_NAME: Record<TextKind, string> = {
 // with the rules of length and format, the model wrote it over in its own way and lost the
 // details, the sample lines and the layout. So the edit is a request of its own, with
 // nothing but the text and the change.
-function buildEditMessages(kind: TextKind, text: string, change: string): ChatTurn[] {
+function buildEditMessages(kind: TextKind, text: string, change: string, images?: MessageImage[]): ChatTurn[] {
+  const userText = `The text:\n\n${text.trim()}\n\nThe change: ${change.trim()}`
+  let content: string | ContentPart[] = userText
+  if (images && images.length > 0) {
+    const pictures: ContentPart[] = images.map((image) => ({
+      type: 'image_url' as const,
+      image_url: { url: attachmentUri(image.file) },
+    }))
+    content = [...pictures, { type: 'text' as const, text: userText }]
+  }
   return [
     {
       role: 'system',
@@ -72,11 +95,16 @@ function buildEditMessages(kind: TextKind, text: string, change: string): ChatTu
         'Change only what the request asks for. Everything else stays word for word: every sentence, detail, example, sample line of dialogue, list, heading, *action* and line break, in the same order and the same formatting.',
         'Do not reword, summarize, reorder or restyle the parts the request does not touch, and add no new sections or headings unless asked.',
         'To shorten, cut the least important sentences and keep the rest as written; to add, put new sentences where they belong and keep the rest as written.',
+        images && images.length > 0
+          ? 'Visual references (images) are attached. Incorporate visual details and situation context from the images into the requested changes. If multiple characters are present, follow instructions on which character is being edited.'
+          : '',
         'Keep the language of the text.',
         `Reply with the whole edited ${kind === 'prompt' ? 'prompt' : 'message'} only: no preface, no comments, no quotes or code fences around it.`,
-      ].join('\n'),
+      ]
+        .filter(Boolean)
+        .join('\n'),
     },
-    { role: 'user', content: `The text:\n\n${text.trim()}\n\nThe change: ${change.trim()}` },
+    { role: 'user', content },
   ]
 }
 
@@ -89,11 +117,28 @@ const IMPROVE_DEFAULT =
 // resends the latest draft, not the whole chain of drafts, so a long back-and-forth doesn't
 // eat into the model's context.
 export function buildPromptMessages(input: PromptGenInput, revision?: { draft: string; note: string }): ChatTurn[] {
-  if (revision) return buildEditMessages('prompt', revision.draft, revision.note)
-  if (input.base !== null) return buildEditMessages('prompt', input.base, input.description.trim() || IMPROVE_DEFAULT)
+  if (revision) return buildEditMessages('prompt', revision.draft, revision.note, input.images)
+  if (input.base !== null)
+    return buildEditMessages('prompt', input.base, input.description.trim() || IMPROVE_DEFAULT, input.images)
+
+  const text = input.description.trim()
+  const fallback = input.images?.length
+    ? 'Create a character system prompt based on the attached image(s).'
+    : ''
+  const userText = text || fallback
+
+  let content: string | ContentPart[] = userText
+  if (input.images && input.images.length > 0) {
+    const pictures: ContentPart[] = input.images.map((img) => ({
+      type: 'image_url' as const,
+      image_url: { url: attachmentUri(img.file) },
+    }))
+    content = [...pictures, { type: 'text' as const, text: userText }]
+  }
+
   return [
     { role: 'system', content: systemRules(input) },
-    { role: 'user', content: input.description.trim() },
+    { role: 'user', content },
   ]
 }
 
@@ -104,30 +149,52 @@ export function buildGreetingMessages(
   name: string,
   locale: Locale,
   wishes = '',
-  revision?: { draft: string; note: string }
+  revision?: { draft: string; note: string },
+  images?: MessageImage[]
 ): ChatTurn[] {
-  if (revision) return buildEditMessages('greeting', revision.draft, revision.note)
+  if (revision) return buildEditMessages('greeting', revision.draft, revision.note, images)
+
+  const hasImages = (images?.length ?? 0) > 0
+  const systemContent = [
+    "You write the opening message a roleplay character sends when a new chat starts. You receive the character's system prompt.",
+    'Write it fully in character: one to three short paragraphs that set the scene and give the user something to react to. Put actions and scene description in *asterisks*.',
+    name.trim() ? `The character's name is ${name.trim()}.` : '',
+    hasImages
+      ? [
+          'Visual references (images) are attached portraying the scene or situation.',
+          'Start directly in the situation depicted in the image: incorporate the character posture, action, facial expression, emotional tone, attire, and immediate surroundings.',
+          'If multiple characters are shown in the image, follow the user instructions on which character is speaking/acting and who the other character(s) are, reflecting their relationship, presence, and interaction in the scene.',
+        ].join(' ')
+      : '',
+    wishes.trim() ? `The user wants the greeting to be: ${wishes.trim()}` : '',
+    languageRule(locale),
+    'Reply with the message text only.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  let userContent: string | ContentPart[] = prompt.trim()
+  if (hasImages && images) {
+    const pictures: ContentPart[] = images.map((img) => ({
+      type: 'image_url' as const,
+      image_url: { url: attachmentUri(img.file) },
+    }))
+    const promptText = prompt.trim()
+      ? `Character system prompt:\n\n${prompt.trim()}`
+      : 'Start a roleplay greeting matching the character and the attached scene.'
+    const wishesText = wishes.trim() ? `\n\nUser wishes and clarifications:\n${wishes.trim()}` : ''
+    userContent = [...pictures, { type: 'text' as const, text: `${promptText}${wishesText}` }]
+  }
+
   return [
-    {
-      role: 'system',
-      content: [
-        "You write the opening message a roleplay character sends when a new chat starts. You receive the character's system prompt.",
-        'Write it fully in character: one to three short paragraphs that set the scene and give the user something to react to. Put actions and scene description in *asterisks*.',
-        name.trim() ? `The character's name is ${name.trim()}.` : '',
-        wishes.trim() ? `The user wants the greeting to be: ${wishes.trim()}` : '',
-        languageRule(locale),
-        'Reply with the message text only.',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-    },
-    { role: 'user', content: prompt.trim() },
+    { role: 'system', content: systemContent },
+    { role: 'user', content: userContent },
   ]
 }
 
 // `thinking` is the switch of the generator sheet, for this request only. An edit runs
 // cooler, so the model copies what it should keep instead of inventing it anew.
-export function streamGeneration(
+export async function* streamGeneration(
   cfg: ServerSettings,
   messages: ChatTurn[],
   signal: AbortSignal,
@@ -135,19 +202,14 @@ export function streamGeneration(
 ): AsyncGenerator<StreamPart> {
   const budget = cfg.contextTokens ? Math.max(cfg.contextTokens - 1500, 4000) : 8192
   const maxTokens = Math.min(budget, 8192)
-  return streamChat(
-    cfg,
-    // The token budget is generous because reasoning models spend part of it thinking
-    // before the prompt itself starts.
-    {
-      messages,
-      temperature: options.thinking ? (options.edit ? 0.7 : 0.8) : (options.edit ? 0.4 : 0.9),
-      maxTokens,
-      topP: 0.95,
-      thinking: options.thinking ? 'on' : 'off',
-    },
-    signal
-  )
+  const inlined = await withInlinedImages({
+    messages,
+    temperature: options.thinking ? (options.edit ? 0.7 : 0.8) : (options.edit ? 0.4 : 0.9),
+    maxTokens,
+    topP: 0.95,
+    thinking: options.thinking ? 'on' : 'off',
+  })
+  yield* streamChat(cfg, inlined, signal)
 }
 
 // Models often wrap the answer despite being told not to: a code fence, quotes, or a

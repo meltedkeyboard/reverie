@@ -1,9 +1,11 @@
 import { useState } from 'react'
 
+import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { buildPromptMessages, type PromptFormat, type PromptLength } from '@/lib/chat/promptGen'
 
 import { AreaCell, ListSection, SegmentCell, SwitchCell } from '../lists/GroupedList'
+import { GenImageAttachments } from './GenImageAttachments'
 import { GenSheet, PresetChips } from './GenSheet'
 
 type Props = {
@@ -25,6 +27,7 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
   const [description, setDescription] = useState('')
   const [length, setLength] = useState<PromptLength>('medium')
   const [format, setFormat] = useState<PromptFormat>('prose')
+  const [images, setImages] = useState<MessageImage[]>([])
 
   const improving = hasCurrent && improve
 
@@ -51,6 +54,13 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
           <PresetChips items={IDEA_KEYS.map((key) => ({ key, label: t(`${key}.title`) }))} onPick={(key) => setDescription(t(key))} />
         ) : null}
       </ListSection>
+
+      <GenImageAttachments
+        images={images}
+        onImagesChange={setImages}
+        header={t('promptGen.imagesLabel')}
+        footer={t('promptGen.imagesHint')}
+      />
 
       <ListSection footer={t('gen.thinkingHint')}>
         {/* An improvement edits the prompt as it is written, so its length and layout stay. */}
@@ -88,11 +98,11 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
       resultLabel={t('editor.systemPromptLabel')}
       current={currentPrompt}
       compose={compose}
-      canGenerate={improving || description.trim().length > 0}
+      canGenerate={improving || description.trim().length > 0 || images.length > 0}
       generateLabel={improving ? t('promptGen.improve') : t('promptGen.generate')}
       build={(revision) =>
         buildPromptMessages(
-          { description, name, base: improving ? currentPrompt : null, options: { length, format }, locale },
+          { description, name, base: improving ? currentPrompt : null, options: { length, format }, locale, images },
           revision
         )
       }
