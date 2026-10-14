@@ -100,10 +100,10 @@ function AppTabs({ listeners }: { listeners: TabListeners }) {
         <NativeTabs.Trigger.Label>{t('settings.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
       </NativeTabs.Trigger>
-      {/* On iOS 26 the search tab stands apart from the others, as its own glass button. */}
-      <NativeTabs.Trigger name="search" role="search">
+      {/* iOS 27 embeds search inline into the tab bar as a unified search role without a separate standalone tab button. */}
+      <NativeTabs.Trigger name="search" role="search" disableAutomaticContentInsets={own}>
         <NativeTabs.Trigger.Label>{t('search.title')}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
+        <NativeTabs.Trigger.Icon sf={{ default: 'magnifyingglass', selected: 'magnifyingglass' }} md="search" />
       </NativeTabs.Trigger>
     </NativeTabs>
   )
