@@ -68,7 +68,7 @@ export default function SearchScreen() {
   const { t, locale } = useTranslation()
   const searchBar = useRef<SearchBarCommands>(null)
   const insets = useSafeAreaInsets()
-  const { width } = useWindowDimensions()
+  const { width, height } = useWindowDimensions()
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<SearchScope>(getSearchScope)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -276,9 +276,9 @@ export default function SearchScreen() {
           headerLeft: isWeb ? () => null : undefined,
           headerStyle: { backgroundColor: colors.bg },
           headerShadowVisible: false,
-          headerTitleAlign: 'left',
           headerTitle: () => <TabTitle>{t('search.title')}</TabTitle>,
           headerSearchBarOptions: isWeb ? undefined : {
+            placement: width > height ? 'inline' : 'stacked',
             ref: searchBar,
             placeholder,
             autoCapitalize: 'none',
