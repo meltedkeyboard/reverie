@@ -485,7 +485,7 @@ const createStyles = (colors: Colors) =>
       marginTop: 4,
     },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14, borderCurve: 'continuous', borderWidth: isWeb ? 1 : 0, borderColor: 'transparent' },
-    rowPressed: { backgroundColor: colors.accentSoft },
+    rowPressed: { opacity: 0.65 },
     rowHover: { borderColor: colors.border },
     rowSink: { transform: [{ scale: 0.985 }] },
     leading: { width: 40, alignItems: 'flex-start' },
