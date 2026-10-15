@@ -7,7 +7,8 @@ import type { SearchBarCommands } from 'react-native-screens'
 import { Avatar } from '@/components/visuals/Avatar'
 import { AvatarStack } from '@/components/cast/AvatarStack'
 import { EmptyState } from '@/components/lists/EmptyState'
-import { TabTitle } from '@/components/chrome/GlassHeader'
+import { EdgeFade } from '@/components/chrome/BarChrome'
+import { TabTitle, useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { columnInset, FORM_COLUMN } from '@/hooks/util/useLayoutMode'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SFIcon } from '@/components/visuals/SFIcon'
@@ -68,6 +69,7 @@ export default function SearchScreen() {
   const { t, locale } = useTranslation()
   const searchBar = useRef<SearchBarCommands>(null)
   const insets = useSafeAreaInsets()
+  const headerHeight = useHeaderHeight()
   const { width, height } = useWindowDimensions()
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<SearchScope>(getSearchScope)
@@ -269,10 +271,9 @@ export default function SearchScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTransparent: false,
+          headerTransparent: true,
           // Search is a place of the sidebar on the isWeb, not a step on the way from another screen.
           headerBackVisible: !isWeb,
-          headerStyle: { backgroundColor: colors.bg },
           title: '',
           headerShadowVisible: false,
           headerTitleAlign: 'left',
@@ -306,6 +307,7 @@ export default function SearchScreen() {
         }}
       />
       {list({ paddingBottom: 24 })}
+      <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
     </View>
   )
 }
@@ -455,6 +457,7 @@ function snippet(content: string, needle: string) {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
+    fade: { pointerEvents: 'none', position: 'absolute', top: 0, left: 0, right: 0 },
     content: { flexGrow: 1, paddingHorizontal: 16 },
     field: {
       color: colors.text,
