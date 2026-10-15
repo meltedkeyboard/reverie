@@ -21,7 +21,7 @@ import { cloudSyncAvailable } from '@/lib/transfer/cloudSync'
 import { formatWhen } from '@/lib/core/format'
 import { characterPreview } from '@/lib/chat/roleplay'
 import { getSearchScope, type SearchScope, type SettingsSection } from '@/lib/core/searchScope'
-import { isAndroid, isWeb } from '@/lib/core/platform'
+import { isAndroid, isIOS, isWeb } from '@/lib/core/platform'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 
@@ -272,11 +272,25 @@ export default function SearchScreen() {
           headerTransparent: false,
           // Search is a place of the sidebar on the isWeb, not a step on the way from another screen.
           headerBackVisible: !isWeb,
-          // The isWeb header ignores headerBackVisible and draws its own arrow whenever there is a screen to go back to.
-          headerLeft: isWeb ? () => null : undefined,
           headerStyle: { backgroundColor: colors.bg },
+          title: '',
           headerShadowVisible: false,
-          headerTitle: () => <TabTitle>{t('search.title')}</TabTitle>,
+          headerTitleAlign: 'left',
+          headerTitle: isIOS ? '' : () => <TabTitle>{t('search.title')}</TabTitle>,
+          headerLeft: isWeb
+            ? () => null
+            : isIOS
+              ? () => <TabTitle>{t('search.title')}</TabTitle>
+              : undefined,
+          unstable_headerLeftItems: isIOS
+            ? () => [
+                {
+                  type: 'custom',
+                  hidesSharedBackground: true,
+                  element: <TabTitle>{t('search.title')}</TabTitle>,
+                },
+              ]
+            : undefined,
           headerSearchBarOptions: isWeb ? undefined : {
             placement: width > height ? 'inline' : 'stacked',
             ref: searchBar,
