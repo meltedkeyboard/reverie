@@ -242,7 +242,9 @@ export default function SearchScreen() {
       sections={sections}
       keyExtractor={(item) => item.key}
       renderItem={renderItem}
-      renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}
+      renderSectionHeader={({ section }) => (
+        <Text style={[styles.section, section === sections[0] && styles.firstSection]}>{section.title}</Text>
+      )}
       stickySectionHeadersEnabled={false}
       ListEmptyComponent={empty}
       scrollEnabled={sections.length > 0}
@@ -267,9 +269,7 @@ export default function SearchScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          // The scroll edge effect is drawn under a transparent bar. Android does not inset
-          // the list by an automatic content inset, so there the bar is solid and pushes it down.
-          headerTransparent: !isAndroid && !isWeb,
+          headerTransparent: false,
           // Search is a place of the sidebar on the isWeb, not a step on the way from another screen.
           headerBackVisible: !isWeb,
           // The isWeb header ignores headerBackVisible and draws its own arrow whenever there is a screen to go back to.
@@ -463,6 +463,9 @@ const createStyles = (colors: Colors) =>
       marginTop: 18,
       marginBottom: 6,
       marginHorizontal: 4,
+    },
+    firstSection: {
+      marginTop: 4,
     },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14, borderCurve: 'continuous', borderWidth: isWeb ? 1 : 0, borderColor: 'transparent' },
     rowPressed: { backgroundColor: colors.accentSoft },
