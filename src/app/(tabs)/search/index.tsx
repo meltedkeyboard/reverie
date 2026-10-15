@@ -21,7 +21,6 @@ import { cloudSyncAvailable } from '@/lib/transfer/cloudSync'
 import { formatWhen } from '@/lib/core/format'
 import { characterPreview } from '@/lib/chat/roleplay'
 import { getSearchScope, type SearchScope, type SettingsSection } from '@/lib/core/searchScope'
-import * as Haptics from '@/lib/ui/haptics'
 import { isAndroid, isWeb } from '@/lib/core/platform'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
@@ -225,64 +224,18 @@ export default function SearchScreen() {
     )
   ) : null
 
-  const scopes: { id: SearchScope; label: string; icon: React.ComponentProps<typeof SFIcon>['name'] }[] = [
-    { id: 'characters', label: t('characters.title'), icon: 'person.2' },
-    { id: 'rooms', label: t('rooms.title'), icon: 'bubble.left.and.bubble.right' },
-    { id: 'settings', label: t('settings.title'), icon: 'gearshape' },
-  ]
-
-  const selectScope = (nextScope: SearchScope) => {
-    Haptics.selectionAsync()
-    setScope(nextScope)
-  }
-
-  const listHeader = (
-    <View style={styles.headerArea}>
-      {isWeb ? (
-        // The isWeb has no native search bar in the header, so the field is part of the list.
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textFaint}
-          selectionColor={colors.accent}
-          autoFocus
-          autoCapitalize="none"
-          style={styles.field}
-        />
-      ) : null}
-      {/* iOS 27 style interactive scope tokens under the search bar */}
-      <View style={styles.scopeBar}>
-        {scopes.map((s) => {
-          const active = scope === s.id
-          return (
-            <Pressable
-              key={s.id}
-              onPress={() => selectScope(s.id)}
-              hitSlop={4}
-              style={({ pressed }) => [
-                styles.scopeChip,
-                active ? styles.scopeChipActive : styles.scopeChipInactive,
-                pressed && { opacity: 0.7 },
-              ]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-            >
-              <SFIcon
-                name={s.icon}
-                fallback="checkmark"
-                size={14}
-                color={active ? ON_ACCENT : colors.textMuted}
-              />
-              <Text style={[styles.scopeText, active ? styles.scopeTextActive : styles.scopeTextInactive]}>
-                {s.label}
-              </Text>
-            </Pressable>
-          )
-        })}
-      </View>
-    </View>
-  )
+  const listHeader = isWeb ? (
+    <TextInput
+      value={query}
+      onChangeText={setQuery}
+      placeholder={placeholder}
+      placeholderTextColor={colors.textFaint}
+      selectionColor={colors.accent}
+      autoFocus
+      autoCapitalize="none"
+      style={styles.field}
+    />
+  ) : null
 
   const list = (contentStyle: object) => (
     <SectionList
@@ -489,22 +442,6 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     content: { flexGrow: 1, paddingHorizontal: 16 },
-    headerArea: { paddingTop: 4, paddingBottom: 6 },
-    scopeBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6, flexWrap: 'wrap' },
-    scopeChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      borderCurve: 'continuous',
-    },
-    scopeChipActive: { backgroundColor: colors.accent },
-    scopeChipInactive: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-    scopeText: { fontSize: 13, fontWeight: '500' },
-    scopeTextActive: { color: ON_ACCENT, fontWeight: '600' },
-    scopeTextInactive: { color: colors.textMuted },
     field: {
       color: colors.text,
       fontSize: 16,
