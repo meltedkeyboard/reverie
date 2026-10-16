@@ -87,33 +87,6 @@ export function PopoverMenu({
     }
   }
 
-  // --- EXPERIMENTAL: Pass-through touch dismissal (attempted, kept for reference) ---
-  // The goal: tapping outside dismisses the menu while simultaneously activating the background control.
-  // Why standard approaches didn't work reliably here:
-  // 1) React Native's Responder system: onStartShouldSetResponderCapture / onTouchStart
-  //    cannot reliably inspect coordinates across nested transforms and native views without
-  //    interfering with gesture handlers (e.g. ScrollView / ReorderableList / FlatList).
-  // 2) Pointer events on Web vs Native: Web pointerdown capture works, but React Native Web
-  //    synthetic touch events and GestureHandler wrap the root container.
-  // When re-attempting, test using a transparent hit-testing root overlay or GestureHandler simultaneous recognition.
-  /*
-  const menuContainerRef = useRef<View>(null)
-  const menuBox = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 })
-  useEffect(() => {
-    if (!isWeb || !visible) return
-    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
-      const clientX = 'clientX' in e ? e.clientX : e.touches[0]?.clientX ?? 0
-      const clientY = 'clientY' in e ? e.clientY : e.touches[0]?.clientY ?? 0
-      const { x, y, width, height } = menuBox.current
-      if (clientX < x || clientX > x + width || clientY < y || clientY > y + height) {
-        onClose()
-      }
-    }
-    window.addEventListener('pointerdown', handlePointerDown, true)
-    return () => window.removeEventListener('pointerdown', handlePointerDown, true)
-  }, [visible, onClose])
-  */
-
   const menuStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pop.value }],
   }))
@@ -122,11 +95,13 @@ export function PopoverMenu({
 
   return (
     <>
-      <Pressable
-        style={styles.backdrop}
-        onPress={onClose}
-        accessibilityLabel={accessibilityLabel}
-      />
+      {visible ? (
+        <Pressable
+          style={styles.backdrop}
+          onPressIn={onClose}
+          accessibilityLabel={accessibilityLabel}
+        />
+      ) : null}
       <Animated.View style={[styles.menu, style, menuStyle]}>
         <GlassSurface style={[styles.menuBody, bodyStyle]} fallbackStyle={glass.solid}>
           {children}

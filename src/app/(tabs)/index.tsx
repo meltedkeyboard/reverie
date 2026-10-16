@@ -349,6 +349,7 @@ export default function CharactersScreen() {
         keyExtractor={(row) => row.key}
         {...reorder}
         onReorder={onReorder}
+        onScrollBeginDrag={createMenu.close}
         // The list runs under the floating header and the tab bar, where the edge zones that
         // scroll it would hide: they start where the cards can be seen.
         autoscrollThreshold={0.15}
@@ -575,5 +576,5 @@ const createStyles = (colors: Colors) =>
     justifyContent: 'space-between',
   },
   editBarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  createMenu: { position: 'absolute', transformOrigin: 'right top' },
+  createMenu: { position: 'absolute', zIndex: 100, transformOrigin: 'right top' },
 })
