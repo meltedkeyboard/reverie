@@ -26,6 +26,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { BlurBar, EdgeFade } from '../chrome/BarChrome'
 import { GlassSurface, useGlassStyles } from '../chrome/Glass'
+import { PopoverMenu, PopoverMenuDivider } from '../overlays/PopoverMenu'
 import { useInputColors } from '../controls/Field'
 import { IconButton } from '../controls/IconButton'
 import { SFIcon } from '../visuals/SFIcon'
@@ -325,8 +326,6 @@ export function Composer({
   // one grows out of its button, and with the plus inside the field it grew out of the
   // whole field. This one just pops up over the chat and leaves the keyboard alone.
   const [menuShown, setMenuShown] = useState(false)
-  const [menuMounted, setMenuMounted] = useState(false)
-  const pop = useSharedValue(0)
   // Where the field really is on screen, read when the menu opens, so the menu lines up with
   // it whatever state (narrow, wide, mid-animation) the field is in.
   const fieldBox = useRef<Animated.View>(null)
@@ -349,9 +348,7 @@ export function Composer({
         const minLeft = Math.max(10, insets.left + 8)
         const maxLeft = Math.max(minLeft, windowWidth - insets.right - MENU_WIDTH - 8)
         setMenuLeft(Math.min(Math.max(minLeft, rawLeft), maxLeft))
-        setMenuMounted(true)
         setMenuShown(true)
-        pop.value = withSpring(1, { damping: 20, stiffness: 300, mass: 0.7 })
       }
       if (dockBox.current) dockBox.current.measureInWindow((dockX) => show(dockX))
       else show(0)
@@ -393,13 +390,7 @@ export function Composer({
       if (index !== null) pickMenuItem(index)
     })
     .onFinalize(() => setMenuHover(null))
-  const closeMenu = () => {
-    if (!menuShown) return
-    setMenuShown(false)
-    pop.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
-      if (finished) scheduleOnRN(setMenuMounted, false)
-    })
-  }
+  const closeMenu = () => setMenuShown(false)
   // A resting one-line field is a little narrower than with the keyboard up.
   const narrow = useSharedValue(0)
   const resting = !focused && !expanded
@@ -422,8 +413,6 @@ export function Composer({
     0,
     Math.min(windowWidth - insets.left - insets.right, CHAT_COLUMN + 2 * sidePad) - 2 * (sidePad + NARROW_INSET) - (FIELD_PAD + (editing ? 14 : SIDE_PAD)) - (FIELD_PAD + SIDE_PAD)
   )
-  // Scales with a transform only: Liquid Glass renders wrongly under a fading parent.
-  const menuStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
 
   const plus = editing ? null : (
     <Pressable
@@ -717,90 +706,89 @@ export function Composer({
           {row}
         </BlurBar>
       )}
-      {menuMounted ? (
-        <>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} accessibilityLabel={t('common.close')} />
-          <Animated.View style={[styles.menu, { left: menuLeft, bottom: insets.bottom + 8 }, menuStyle]}>
-            <GlassSurface style={styles.menuBody} fallbackStyle={glass.solid}>
-              {recents.length ? (
-                <>
-                  <FlatList
-                    horizontal
-                    data={recents}
-                    keyExtractor={(picture) => picture.file}
-                    showsHorizontalScrollIndicator={false}
-                    keyboardShouldPersistTaps="always"
-                    style={styles.recents}
-                    contentContainerStyle={styles.recentsContent}
-                    renderItem={({ item }) => (
-                      <Pressable
-                        onPress={() => pickRecent(item)}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('attach.recent')}
-                        style={({ pressed }) => pressed && { opacity: 0.6 }}
-                      >
-                        <Image source={{ uri: pictureUri(item) }} style={styles.thumbCellImage} contentFit="cover" />
-                      </Pressable>
-                    )}
-                  />
-                  <View style={styles.recentsRule} />
-                </>
-              ) : null}
-              <GestureDetector gesture={menuTouch}>
-                <View onLayout={(e) => (menuBox.current = e.nativeEvent.layout)}>
-                  {ATTACH_ITEMS.map((item, index) => (
-                    <View
-                      key={item.source}
-                      onLayout={(e) => (menuRows.current[index] = e.nativeEvent.layout)}
-                      accessible
-                      accessibilityRole="button"
-                      accessibilityLabel={t(item.label)}
-                      onAccessibilityTap={() => pickMenuItem(index)}
-                      style={[styles.menuItem, menuHover === index && { backgroundColor: withAlpha(colors.text, 0.1) }]}
-                    >
-                      <Icon name={item.icon} size={22} color={colors.text} />
-                      <Text style={styles.menuLabel}>{t(item.label)}</Text>
-                    </View>
-                  ))}
-                </View>
-              </GestureDetector>
-              {onToggleThinking ? (
-                <>
-                  <View style={styles.menuRule} />
-                  <Pressable
-                    onPress={() => {
-                      Haptics.selectionAsync()
-                      onToggleThinking(!thinking)
-                    }}
-                    accessible
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: !!thinking }}
-                    accessibilityLabel={t('chat.thinking')}
-                    style={({ pressed }) => [
-                      styles.menuItem,
-                      styles.thinkingItem,
-                      pressed && { backgroundColor: withAlpha(colors.text, 0.1) },
-                    ]}
-                  >
-                    <View style={styles.thinkingLeft}>
-                      <SFIcon name="brain" fallback="sparkles-outline" size={20} color={colors.text} />
-                      <Text style={styles.menuLabel}>{t('chat.thinking')}</Text>
-                    </View>
-                    <View pointerEvents="none">
-                      <Switch
-                        value={!!thinking}
-                        trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
-                        {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
-                        style={liquidGlass ? switchNudge : undefined}
-                      />
-                    </View>
-                  </Pressable>
-                </>
-              ) : null}
-            </GlassSurface>
-          </Animated.View>
-        </>
-      ) : null}
+      <PopoverMenu
+        visible={menuShown}
+        onClose={closeMenu}
+        accessibilityLabel={t('common.close')}
+        style={[styles.menu, { left: menuLeft, bottom: insets.bottom + 8 }]}
+        bodyStyle={styles.menuBody}
+      >
+        {recents.length ? (
+          <>
+            <FlatList
+              horizontal
+              data={recents}
+              keyExtractor={(picture) => picture.file}
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
+              style={styles.recents}
+              contentContainerStyle={styles.recentsContent}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => pickRecent(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('attach.recent')}
+                  style={({ pressed }) => pressed && { opacity: 0.6 }}
+                >
+                  <Image source={{ uri: pictureUri(item) }} style={styles.thumbCellImage} contentFit="cover" />
+                </Pressable>
+              )}
+            />
+            <View style={styles.recentsRule} />
+          </>
+        ) : null}
+        <GestureDetector gesture={menuTouch}>
+          <View onLayout={(e) => (menuBox.current = e.nativeEvent.layout)}>
+            {ATTACH_ITEMS.map((item, index) => (
+              <View
+                key={item.source}
+                onLayout={(e) => (menuRows.current[index] = e.nativeEvent.layout)}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={t(item.label)}
+                onAccessibilityTap={() => pickMenuItem(index)}
+                style={[styles.menuItem, menuHover === index && { backgroundColor: withAlpha(colors.text, 0.1) }]}
+              >
+                <Icon name={item.icon} size={22} color={colors.text} />
+                <Text style={styles.menuLabel}>{t(item.label)}</Text>
+              </View>
+            ))}
+          </View>
+        </GestureDetector>
+        {onToggleThinking ? (
+          <>
+            <PopoverMenuDivider style={styles.menuRule} />
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync()
+                onToggleThinking(!thinking)
+              }}
+              accessible
+              accessibilityRole="switch"
+              accessibilityState={{ checked: !!thinking }}
+              accessibilityLabel={t('chat.thinking')}
+              style={({ pressed }) => [
+                styles.menuItem,
+                styles.thinkingItem,
+                pressed && { backgroundColor: withAlpha(colors.text, 0.1) },
+              ]}
+            >
+              <View style={styles.thinkingLeft}>
+                <SFIcon name="brain" fallback="sparkles-outline" size={20} color={colors.text} />
+                <Text style={styles.menuLabel}>{t('chat.thinking')}</Text>
+              </View>
+              <View pointerEvents="none">
+                <Switch
+                  value={!!thinking}
+                  trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
+                  {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
+                  style={liquidGlass ? switchNudge : undefined}
+                />
+              </View>
+            </Pressable>
+          </>
+        ) : null}
+      </PopoverMenu>
     </KeyboardStickyView>
   )
 }
@@ -858,11 +846,14 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
     ...(isWeb ? { opacity: Math.min(1, Math.max(0, 1 - offset.value / distance)) } : null),
   }))
   return (
-    <Animated.View key={shownId} style={[StyleSheet.absoluteFill, style]} pointerEvents="box-none">
+    <Animated.View key={shownId} style={[StyleSheet.absoluteFill, swapStyle, style]} pointerEvents="box-none">
       {shown.current}
     </Animated.View>
   )
 }
+
+// Keeps the composer and its attach menu above `ComposerFloat` (which houses the jump button).
+const swapStyle = { zIndex: 1 }
 
 // The plus and the send button are SIDE wide; the text of a one-line field keeps clear of
 // them by SIDE_PAD. NARROW_INSET is how much narrower the field is at rest.

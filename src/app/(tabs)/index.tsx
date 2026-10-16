@@ -17,6 +17,7 @@ import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassGroup, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
+import { PopoverMenu, usePopoverMenu } from '@/components/overlays/PopoverMenu'
 import { Pattern } from '@/components/visuals/Pattern'
 import { Icon } from '@/components/visuals/Icon'
 import { SFIcon } from '@/components/visuals/SFIcon'
@@ -82,26 +83,7 @@ export default function CharactersScreen() {
   const [serverSet, setServerSet] = useState(true)
   const { lastChat, reload: reloadLastChat } = useLastChat('character')
   const glass = useGlassStyles()
-  const [menuShown, setMenuShown] = useState(false)
-  const [menuMounted, setMenuMounted] = useState(false)
-  const pop = useSharedValue(0)
-
-  const openMenu = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    setMenuMounted(true)
-    setMenuShown(true)
-    pop.value = withSpring(1, { damping: 20, stiffness: 300, mass: 0.7 })
-  }
-
-  const closeMenu = () => {
-    if (!menuShown) return
-    setMenuShown(false)
-    pop.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
-      if (finished) scheduleOnRN(setMenuMounted, false)
-    })
-  }
-
-  const menuStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
+  const createMenu = usePopoverMenu()
 
   const anchor = useContinueAnchor()
 
@@ -500,7 +482,7 @@ export default function CharactersScreen() {
               <IconButton
                 name="add"
                 size={26}
-                onPress={() => (menuShown ? closeMenu() : openMenu())}
+                onPress={createMenu.toggle}
                 accessibilityLabel={t('characters.createCharacter')}
               />
             )}
@@ -509,45 +491,28 @@ export default function CharactersScreen() {
       >
         <TabTitle>{t('characters.title')}</TabTitle>
       </GlassHeader>
-      {menuMounted ? (
-        <>
-          <Pressable style={styles.menuBackdrop} onPress={closeMenu} accessibilityLabel={t('common.close')} />
-          <Animated.View style={[styles.createMenu, { top: insets.top + 4, right: 8 }, menuStyle]}>
-            <GlassSurface style={styles.createMenuBody} fallbackStyle={glass.solid}>
-              <Pressable
-                onPress={() => {
-                  closeMenu()
-                  router.push('/character/new')
-                }}
-                style={({ pressed }) => [styles.createMenuItem, pressed && { backgroundColor: withAlpha(colors.text, 0.1) }]}
-              >
-                <Icon name="person-add-outline" size={20} color={colors.text} />
-                <Text style={styles.createMenuLabel}>{t('characters.createCharacter')}</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  closeMenu()
-                  onImportCard('files')
-                }}
-                style={({ pressed }) => [styles.createMenuItem, pressed && { backgroundColor: withAlpha(colors.text, 0.1) }]}
-              >
-                <Icon name="folder-outline" size={20} color={colors.text} />
-                <Text style={styles.createMenuLabel}>{t('card.importFromFiles')}</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  closeMenu()
-                  onImportCard('photos')
-                }}
-                style={({ pressed }) => [styles.createMenuItem, pressed && { backgroundColor: withAlpha(colors.text, 0.1) }]}
-              >
-                <Icon name="images-outline" size={20} color={colors.text} />
-                <Text style={styles.createMenuLabel}>{t('card.importFromPhotos')}</Text>
-              </Pressable>
-            </GlassSurface>
-          </Animated.View>
-        </>
-      ) : null}
+      <PopoverMenu
+        visible={createMenu.visible}
+        onClose={createMenu.close}
+        style={[styles.createMenu, { top: insets.top + 4, right: 8 }]}
+        items={[
+          {
+            label: t('characters.createCharacter'),
+            icon: 'person-add-outline',
+            onSelect: () => router.push('/character/new'),
+          },
+          {
+            label: t('card.importFromFiles'),
+            icon: 'folder-outline',
+            onSelect: () => onImportCard('files'),
+          },
+          {
+            label: t('card.importFromPhotos'),
+            icon: 'images-outline',
+            onSelect: () => onImportCard('photos'),
+          },
+        ]}
+      />
       {backupImport.sheet}
     </View>
   )
@@ -610,9 +575,5 @@ const createStyles = (colors: Colors) =>
     justifyContent: 'space-between',
   },
   editBarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 },
-  createMenu: { position: 'absolute', zIndex: 100, transformOrigin: 'right top' },
-  createMenuBody: { borderRadius: 22, borderCurve: 'continuous', padding: 6, minWidth: 220 },
-  createMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 16, borderCurve: 'continuous' },
-  createMenuLabel: { color: colors.text, fontSize: 16, fontWeight: '500' },
+  createMenu: { position: 'absolute', transformOrigin: 'right top' },
 })
