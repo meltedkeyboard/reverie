@@ -130,7 +130,7 @@ export default function CharacterChatsScreen() {
             accessibilityLabel={t('profile.title')}
           >
             <View style={styles.whoPill}>
-              <Avatar name={character.name} file={character.avatar} size={28} viewable={false} />
+              <Avatar name={character.name} file={character.avatar} size={34} viewable={false} />
               <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
                 {character.name}
               </Text>
@@ -148,8 +148,8 @@ const createStyles = (colors: Colors) =>
     whoPress: { maxWidth: '100%' },
     whoPill: {
       height: 40,
-      borderRadius: 6,
-      paddingLeft: 6,
+      borderRadius: 20,
+      paddingLeft: 4,
       paddingRight: 14,
       gap: 10,
       flexDirection: 'row',
@@ -159,8 +159,8 @@ const createStyles = (colors: Colors) =>
     name: {
       flexShrink: 1,
       color: colors.text,
-      fontFamily: fonts.prose,
-      fontSize: 18,
-      fontWeight: '600',
+      fontSize: 17,
+      fontWeight: '700',
+      letterSpacing: -0.2,
     },
   })

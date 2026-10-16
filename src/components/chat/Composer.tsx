@@ -933,19 +933,19 @@ const createStyles = (colors: Colors) =>
   // on phone widths.
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', maxWidth: CHAT_COLUMN, alignSelf: 'center' },
   fieldBox: { flex: 1, overflow: 'hidden' },
-  glass: { borderRadius: 8 },
+  glass: { borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   // Pinned to the bottom, so a taller field reveals its text from above while the buttons stay.
   field: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: FIELD_PAD },
   hushed: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong },
   attachment: { margin: 6, marginBottom: 2, marginRight: 8 },
-  thumb: { width: 72, height: 72, borderRadius: 6 },
+  thumb: { width: 72, height: 72, borderRadius: 12 },
   thumbRemove: {
     position: 'absolute',
     top: -6,
     right: -6,
     width: 22,
     height: 22,
-    borderRadius: 4,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceRaised,
@@ -977,5 +977,5 @@ const createStyles = (colors: Colors) =>
   inputDocked: { paddingTop: 12, paddingBottom: 8 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolbar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  send: { width: SIDE, height: SIDE, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  send: { width: SIDE, height: SIDE, borderRadius: SIDE / 2, alignItems: 'center', justifyContent: 'center' },
 })

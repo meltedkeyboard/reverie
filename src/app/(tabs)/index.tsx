@@ -672,7 +672,7 @@ const createStyles = (colors: Colors) =>
   createMenuBody: { borderRadius: 8, padding: 6, minWidth: 220 },
   createMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 6 },
   createMenuLabel: { color: colors.text, fontSize: 15, fontWeight: '500' },
-  pairRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  pairRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   pairItem: { flex: 1 },
   pairItemEmpty: { flex: 1 },
 })

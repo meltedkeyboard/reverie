@@ -23,7 +23,7 @@ export function FeaturedSeparator() {
 }
 
 export function ListSeparator() {
-  return <View style={{ height: 10 }} />
+  return <View style={{ height: 16 }} />
 }
 
 const createStyles = (colors: Colors) =>

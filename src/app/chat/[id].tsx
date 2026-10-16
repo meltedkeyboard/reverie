@@ -261,15 +261,15 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
       ) : null}
 
       <GlassHeader
-        left={wide ? undefined : <IconButton name="arrow-back" size={22} onPress={() => router.back()} />}
+        left={wide ? undefined : <IconButton name="arrow-back" size={24} onPress={() => router.back()} />}
         right={
           <View style={styles.headerActions}>
             <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
             {fresh ? (
-              <IconButton name="create-outline" size={20} onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
+              <IconButton name="create-outline" size={22} onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
             ) : (
               <Link push href={`/chat/new?character=${character.id}`} asChild>
-                <IconButton name="create-outline" size={20} />
+                <IconButton name="create-outline" size={22} />
               </Link>
             )}
           </View>
@@ -277,7 +277,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
       >
         <View style={styles.headerWho}>
           <Pressable onPress={() => router.push(`/character/${character.id}`)} hitSlop={4}>
-            <Avatar name={character.name} file={character.avatar} size={32} />
+            <Avatar name={character.name} file={character.avatar} size={36} />
           </Pressable>
           <NativeMenu items={chatMenu} style={styles.whoPress}>
             <View style={styles.who}>
@@ -286,7 +286,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
                   <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
                     {character.name}
                   </Text>
-                  <Icon name="chevron-down" size={14} color={colors.textMuted} />
+                  <Icon name="chevron-down" size={13} color={colors.textMuted} />
                 </View>
                 {naming ? (
                   <ShimmerText maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} text={title ?? t('chat.namingInProgress')} />
@@ -374,7 +374,7 @@ const createStyles = (colors: Colors) =>
   whoText: { flexShrink: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
+  name: { flexShrink: 1, color: colors.text, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
   subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 1 },
   intro: { alignItems: 'center', paddingTop: 24, paddingBottom: 20, paddingHorizontal: 32 },
   introName: { color: colors.text, fontFamily: fonts.prose, fontSize: 22, marginTop: 12 },

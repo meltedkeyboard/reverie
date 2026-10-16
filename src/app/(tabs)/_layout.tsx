@@ -90,20 +90,19 @@ function AppTabs({ listeners }: { listeners: TabListeners }) {
     <NativeTabs tintColor={colors.accent} screenListeners={listeners} {...material}>
       <NativeTabs.Trigger name="index" disableAutomaticContentInsets={own}>
         <NativeTabs.Trigger.Label>{t('characters.title')}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} md="group" />
+        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} md="home" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="rooms" disableAutomaticContentInsets={own}>
         <NativeTabs.Trigger.Label>{t('rooms.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} md="forum" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings" disableAutomaticContentInsets={own}>
-        <NativeTabs.Trigger.Label>{t('settings.title')}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
-      </NativeTabs.Trigger>
-      {/* In iOS 27 search is a unified inline tab item inside the tab bar alongside other tabs, without a separate floating island */}
       <NativeTabs.Trigger name="search" disableAutomaticContentInsets={own}>
         <NativeTabs.Trigger.Label>{t('search.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'magnifyingglass', selected: 'magnifyingglass' }} md="search" />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings" disableAutomaticContentInsets={own}>
+        <NativeTabs.Trigger.Label>{t('settings.title')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} md="person" />
       </NativeTabs.Trigger>
     </NativeTabs>
   )

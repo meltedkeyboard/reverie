@@ -4,8 +4,9 @@ import type { CharacterPreview } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { countLabel } from '@/lib/core/format'
 import { characterPreview } from '@/lib/chat/roleplay'
-import { useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, type Colors } from '@/theme'
 
+import { Icon } from '../visuals/Icon'
 import { AnimatedFill } from '../visuals/AnimatedFill'
 import { Avatar } from '../visuals/Avatar'
 import { FeaturedBody } from '../cast/FeaturedBody'
@@ -33,6 +34,7 @@ type Props = {
 
 function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, editing, layout = 'vertical' }: Props) {
   const styles = useStyles(createStyles)
+  const colors = useColors()
   const { locale } = useTranslation()
   const preview = characterPreview(character)
   const chats = character.chatCount
@@ -55,22 +57,23 @@ function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, e
     return (
       <ListCard vertical longPressDrag={editing?.active} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.verticalCard}>
         <View style={styles.verticalAvatar}>
-          <Avatar name={character.name} file={character.avatar} size={160} square fill />
+          <Avatar name={character.name} file={character.avatar} size={180} square fill />
         </View>
         <View style={styles.verticalBody}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>
-              {character.name}
-            </Text>
-            {chats > 0 ? (
-              <Text style={styles.chats}>
-                {countLabel(chats, 'chat', locale)}
-              </Text>
-            ) : null}
-          </View>
+          <Text style={styles.name} numberOfLines={1}>
+            {character.name}
+          </Text>
           <Text style={styles.preview} numberOfLines={2}>
             {preview}
           </Text>
+          {chats > 0 ? (
+            <View style={styles.chatsRow}>
+              <Icon name="chatbubble-outline" size={12} color={colors.textFaint} />
+              <Text style={styles.chats}>
+                {countLabel(chats, 'chat', locale)}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </ListCard>
     )
@@ -135,13 +138,32 @@ const createStyles = (colors: Colors) =>
   card: { gap: 14, paddingLeft: 0, paddingVertical: 0, minHeight: AVATAR, overflow: 'hidden' },
   avatar: { width: AVATAR, alignSelf: 'stretch' },
   body: { flex: 1, paddingVertical: 12 },
-  verticalCard: { overflow: 'hidden', paddingVertical: 0, paddingLeft: 0, paddingRight: 0 },
-  verticalAvatar: { width: '100%', aspectRatio: 1 },
-  verticalBody: { paddingHorizontal: 12, paddingVertical: 10 },
+  verticalCard: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    overflow: 'hidden',
+    paddingVertical: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    gap: 8,
+  },
+  verticalAvatar: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  verticalBody: {
+    paddingHorizontal: 2,
+    paddingBottom: 4,
+    gap: 3,
+  },
   featured: { overflow: 'hidden' },
   hero: { aspectRatio: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 3 },
-  name: { flexShrink: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
+  name: { color: colors.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.1 },
+  chatsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   chats: { color: colors.textFaint, fontSize: 12 },
   preview: { color: colors.textMuted, fontSize: 13, lineHeight: 17 },
 })
