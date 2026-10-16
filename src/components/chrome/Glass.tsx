@@ -133,9 +133,9 @@ export function useGlassStyles() {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    group: { height: 44, borderRadius: 22, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center' },
-    circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-    circleSolid: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    group: { height: 40, borderRadius: 6, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center' },
+    circle: { width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+    circleSolid: { width: 40, height: 40, borderRadius: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     disabled: { opacity: 0.35 },
     desktopGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },

@@ -23,6 +23,8 @@ export type Colors = {
   accent: string
   accentSoft: string
   accentBorder: string
+  // Color for text/icons rendered on top of accent fill
+  onAccent: string
   danger: string
   dangerSoft: string
   dangerBorder: string
@@ -35,24 +37,25 @@ export type Colors = {
 }
 
 const darkColors: Colors = {
-  bg: '#0F0F12',
-  bgRgb: '15, 15, 18',
-  surface: '#18181D',
-  surfaceRaised: '#202027',
-  bubble: '#2A2A32',
-  border: 'rgba(255, 255, 255, 0.08)',
-  text: '#F2F2F5',
-  textMuted: 'rgba(255, 255, 255, 0.65)',
-  textFaint: 'rgba(255, 255, 255, 0.4)',
-  accent: '#756DE9',
-  accentSoft: 'rgba(117, 109, 233, 0.16)',
-  accentBorder: 'rgba(117, 109, 233, 0.35)',
-  danger: '#F0616D',
-  dangerSoft: 'rgba(240, 97, 109, 0.1)',
-  dangerBorder: 'rgba(240, 97, 109, 0.3)',
-  success: '#5FCB8B',
-  borderStrong: 'rgba(255, 255, 255, 0.14)',
-  cast: ['#F0A35E', '#6CC4E8', '#E779B2', '#7FD17F', '#B99BFF', '#F2D46B'],
+  bg: '#000000',
+  bgRgb: '0, 0, 0',
+  surface: '#121212',
+  surfaceRaised: '#181818',
+  bubble: '#222222',
+  border: '#1C1C1E',
+  text: '#FFFFFF',
+  textMuted: '#A0A0A5',
+  textFaint: '#66666A',
+  accent: '#E5E5E5',
+  accentSoft: 'rgba(255, 255, 255, 0.12)',
+  accentBorder: 'rgba(255, 255, 255, 0.25)',
+  onAccent: '#121212',
+  danger: '#F2555A',
+  dangerSoft: 'rgba(242, 85, 90, 0.12)',
+  dangerBorder: 'rgba(242, 85, 90, 0.3)',
+  success: '#38C172',
+  borderStrong: '#262626',
+  cast: ['#E28743', '#4DA8DA', '#E05A88', '#5DBB63', '#9D72FF', '#D8B23E'],
 }
 
 const lightColors: Colors = {
@@ -65,9 +68,10 @@ const lightColors: Colors = {
   text: '#17171B',
   textMuted: 'rgba(0, 0, 0, 0.6)',
   textFaint: 'rgba(0, 0, 0, 0.38)',
-  accent: '#5F55E0',
-  accentSoft: 'rgba(95, 85, 224, 0.12)',
-  accentBorder: 'rgba(95, 85, 224, 0.3)',
+  accent: '#111111',
+  accentSoft: 'rgba(0, 0, 0, 0.08)',
+  accentBorder: 'rgba(0, 0, 0, 0.2)',
+  onAccent: '#FFFFFF',
   danger: '#D6394A',
   dangerSoft: 'rgba(214, 57, 74, 0.08)',
   dangerBorder: 'rgba(214, 57, 74, 0.3)',
@@ -76,21 +80,20 @@ const lightColors: Colors = {
   cast: ['#C26A12', '#1F86B5', '#C0407F', '#2F8F3A', '#6D4FD1', '#9A7A00'],
 }
 
-// The desktop app takes flat neutral greys: the page a neutral grey rather than
-// the near-black of the phone, the sidebar and the groups of settings one step lighter
-// (or darker, in light), hairlines that show, and plainer text.
+// Flat black palette for desktop
 const desktopDarkColors: Colors = {
   ...darkColors,
-  bg: '#1E1E1E',
-  bgRgb: '30, 30, 30',
-  surface: '#262626',
-  surfaceRaised: '#303030',
-  bubble: '#303030',
-  border: '#363636',
-  borderStrong: '#424242',
-  text: '#DADADA',
-  textMuted: '#B3B3B3',
-  textFaint: '#7A7A7A',
+  bg: '#000000',
+  bgRgb: '0, 0, 0',
+  surface: '#121212',
+  surfaceRaised: '#181818',
+  bubble: '#222222',
+  border: '#1C1C1E',
+  borderStrong: '#262626',
+  text: '#F5F5F5',
+  textMuted: '#A0A0A5',
+  textFaint: '#66666A',
+  onAccent: '#121212',
 }
 
 const desktopLightColors: Colors = {
@@ -100,11 +103,12 @@ const desktopLightColors: Colors = {
   surface: '#F6F6F6',
   surfaceRaised: '#EBEBEB',
   bubble: '#EFEFEF',
-  border: '#E0E0E0',
-  borderStrong: '#D0D0D0',
+  border: '#E8E8E8',
+  borderStrong: '#DCDCDC',
   text: '#222222',
   textMuted: '#5C5C5C',
   textFaint: '#ABABAB',
+  onAccent: '#FFFFFF',
 }
 
 const palettes: Record<Scheme, Colors> = isDesktop

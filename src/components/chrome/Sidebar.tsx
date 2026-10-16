@@ -381,7 +381,7 @@ const createStyles = (colors: Colors) =>
     list: { flex: 1 },
     listContent: { paddingBottom: 8 },
     footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 8 },
-    row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 14, borderCurve: 'continuous', borderWidth: 1, borderColor: 'transparent' },
+    row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 6, borderWidth: 1, borderColor: 'transparent' },
     navLabel: { flex: 1, color: colors.text, fontSize: 15 },
     group: { color: colors.textFaint, fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingTop: 14, paddingBottom: 4 },
     empty: { color: colors.textFaint, fontSize: 14, padding: 12 },
@@ -389,7 +389,7 @@ const createStyles = (colors: Colors) =>
     chatTitle: { color: colors.text, fontFamily: fonts.prose, fontSize: 15 },
     chatOwner: { color: colors.textFaint, fontSize: 12, marginTop: 1 },
     rowWithMenu: { paddingRight: 36 },
-    tip: { position: 'absolute', left: RAIL_WIDTH + 6, transform: 'translateY(-50%)', backgroundColor: colors.surfaceRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+    tip: { position: 'absolute', left: RAIL_WIDTH + 6, transform: 'translateY(-50%)', backgroundColor: colors.surfaceRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
     tipText: { color: colors.text, fontSize: 13 },
     more: { position: 'absolute', right: 8, top: 0, bottom: 0, width: 24, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
   })

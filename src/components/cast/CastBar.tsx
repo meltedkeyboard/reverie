@@ -99,7 +99,7 @@ export function FloorButton({ floor, onChange }: { floor: FloorMode; onChange: (
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    round: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.border },
+    round: { width: 34, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.border },
     button: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -107,7 +107,7 @@ const createStyles = (colors: Colors) =>
       height: 34,
       paddingLeft: 5,
       paddingRight: 11,
-      borderRadius: 17,
+      borderRadius: 6,
       // A translucent fill rather than an outline: it sits on glass and should read
       // as part of it, like the send button's gray.
       backgroundColor: colors.border,
@@ -118,7 +118,7 @@ const createStyles = (colors: Colors) =>
     icon: {
       width: FACE,
       height: FACE,
-      borderRadius: FACE / 2,
+      borderRadius: 6,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.border,

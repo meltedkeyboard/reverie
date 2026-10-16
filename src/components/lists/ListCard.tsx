@@ -180,7 +180,7 @@ export function setEditMotion({ progress, settled }: EditMotion, on: boolean) {
   settled.value = on ? 1 : 0
 }
 
-const RADIUS = 20
+const RADIUS = 12
 
 const LAYER = {
   position: 'absolute',
@@ -189,7 +189,6 @@ const LAYER = {
   bottom: 0,
   left: 0,
   borderRadius: RADIUS,
-  borderCurve: 'continuous',
 } as const
 
 const createStyles = (colors: Colors) =>
@@ -202,8 +201,6 @@ const createStyles = (colors: Colors) =>
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: RADIUS,
-      // The corners of Liquid Glass are this curve, not a circular arc.
-      borderCurve: 'continuous',
       paddingVertical: 14,
       paddingLeft: 16,
       paddingRight: 6,
@@ -216,7 +213,6 @@ const createStyles = (colors: Colors) =>
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: RADIUS,
-      borderCurve: 'continuous',
     },
     // The same box as the IconButton it replaces.
     menu: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -228,7 +224,7 @@ const createStyles = (colors: Colors) =>
             alignItems: 'center',
             gap: 8,
             backgroundColor: colors.surface,
-            borderRadius: 8,
+            borderRadius: 10,
             paddingVertical: 10,
             paddingLeft: 14,
             paddingRight: 6,
@@ -242,7 +238,7 @@ const createStyles = (colors: Colors) =>
       position: 'absolute',
       top: 8,
       right: 8,
-      borderRadius: 20,
-      backgroundColor: 'rgba(0,0,0,0.35)',
+      borderRadius: 8,
+      backgroundColor: 'rgba(0,0,0,0.55)',
     },
   })

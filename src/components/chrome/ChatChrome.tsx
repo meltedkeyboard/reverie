@@ -1,7 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 
 import { ChatBackground } from '@/components/chat/ChatBackground'
-import { GlassButton } from '@/components/chrome/Glass'
+import { IconButton } from '@/components/controls/IconButton'
 import { Pattern } from '@/components/visuals/Pattern'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import type { Character } from '@/db/characters'
@@ -37,8 +37,8 @@ export function AsideToggleButton({ open, enabled, onPress }: { open: boolean; e
   if (!enabled && !open) return null
   const fallback: React.ComponentProps<typeof Icon>['name'] = open ? 'eye-off' : 'eye-off-outline'
   return (
-    <GlassButton icon={fallback} onPress={onPress} accessibilityLabel={t('chat.privateTitle')}>
+    <IconButton name={fallback} size={20} onPress={onPress} accessibilityLabel={t('chat.privateTitle')}>
       <SFIcon name={open ? 'eye.slash.fill' : 'eye.slash'} fallback={fallback} size={20} color={colors.text} animateChange={open} />
-    </GlassButton>
+    </IconButton>
   )
 }

@@ -31,12 +31,12 @@ const STAR_MIDDLE = { x: 60.4, y: 95.2 }
 const STAR_TURN = 95
 const STAR_WIDTH = 340
 
-// The phone's backgrounds are #F5F5F7 and #0F0F12; the desktop's, #FFFFFF and
-// #1E1E1E. The stars keep the same small step from the background on both.
-const COLORS = isDesktop ? { light: '#F1F1F1', dark: '#191919' } : { light: '#ECECEF', dark: '#0A0A0D' }
-// The tiles of the stars are pictures made for the phone's background: on the desktop's
-// they are faded until they sit as close to it as they do there.
-const TILE_OPACITY = isDesktop ? { light: 0.6, dark: 0.3 } : { light: 1, dark: 1 }
+// The phone's backgrounds are #F5F5F7 and #000000; the desktop's, #FFFFFF and
+// #000000. The stars keep a subtle step from the background on both.
+const COLORS = isDesktop ? { light: '#F1F1F1', dark: '#121212' } : { light: '#ECECEF', dark: '#111111' }
+// The tiles of the stars are pictures made for the background: in dark mode they
+// are faded so they stay faint and subtle on flat black.
+const TILE_OPACITY = isDesktop ? { light: 0.6, dark: 0.15 } : { light: 1, dark: 0.18 }
 
 type StarProps = { x: number; y: number; size: number; turn?: number; fill: string }
 

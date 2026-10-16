@@ -28,9 +28,10 @@ type Props = {
   // A member of an open group: set in under it. `groupIds` are all of that group's characters.
   inGroup?: boolean
   groupIds?: number[]
+  layout?: 'vertical' | 'horizontal'
 }
 
-function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, editing }: Props) {
+function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, editing, layout = 'vertical' }: Props) {
   const styles = useStyles(createStyles)
   const { locale } = useTranslation()
   const preview = characterPreview(character)
@@ -49,6 +50,32 @@ function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, e
       </ListCard>
     )
   }
+
+  if (layout === 'vertical') {
+    return (
+      <ListCard vertical longPressDrag={editing?.active} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.verticalCard}>
+        <View style={styles.verticalAvatar}>
+          <Avatar name={character.name} file={character.avatar} size={160} square fill />
+        </View>
+        <View style={styles.verticalBody}>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {character.name}
+            </Text>
+            {chats > 0 ? (
+              <Text style={styles.chats}>
+                {countLabel(chats, 'chat', locale)}
+              </Text>
+            ) : null}
+          </View>
+          <Text style={styles.preview} numberOfLines={2}>
+            {preview}
+          </Text>
+        </View>
+      </ListCard>
+    )
+  }
+
   return (
     <ListCard longPressDrag={editing?.active} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.card}>
       <View style={styles.avatar}>
@@ -108,10 +135,13 @@ const createStyles = (colors: Colors) =>
   card: { gap: 14, paddingLeft: 0, paddingVertical: 0, minHeight: AVATAR, overflow: 'hidden' },
   avatar: { width: AVATAR, alignSelf: 'stretch' },
   body: { flex: 1, paddingVertical: 12 },
+  verticalCard: { overflow: 'hidden', paddingVertical: 0, paddingLeft: 0, paddingRight: 0 },
+  verticalAvatar: { width: '100%', aspectRatio: 1 },
+  verticalBody: { paddingHorizontal: 12, paddingVertical: 10 },
   featured: { overflow: 'hidden' },
   hero: { aspectRatio: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 3 },
-  name: { flexShrink: 1, color: colors.text, fontSize: 17, fontWeight: '600' },
-  chats: { color: colors.textFaint, fontSize: 13 },
-  preview: { color: colors.textMuted, fontSize: 14, lineHeight: 19 },
+  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 3 },
+  name: { flexShrink: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
+  chats: { color: colors.textFaint, fontSize: 12 },
+  preview: { color: colors.textMuted, fontSize: 13, lineHeight: 17 },
 })

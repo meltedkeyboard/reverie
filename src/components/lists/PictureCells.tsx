@@ -125,8 +125,7 @@ const createStyles = (colors: Colors) =>
     thumb: {
       width: 90,
       height: 120,
-      borderRadius: 14,
-      borderCurve: 'continuous',
+      borderRadius: 6,
       overflow: 'hidden',
       backgroundColor: colors.surfaceRaised,
     },

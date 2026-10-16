@@ -50,20 +50,17 @@ export function HeaderTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-// The large title of a tab: a red star and the name in the prose face.
-// With `fit` a long name shrinks to the room it has instead of being cut off.
+// Clean title with modern sans typography
 export function TabTitle({ children, maxWidth, fit }: { children: React.ReactNode; maxWidth?: number; fit?: boolean }) {
-  const colors = useColors()
   const styles = useStyles(createStyles)
   return (
     <View style={[styles.tabTitleRow, maxWidth !== undefined && { maxWidth }]}>
-      <Star size={isDesktop ? 18 : 22} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
       <Text
         maxFontSizeMultiplier={HEADER_FONT_SCALE}
         style={styles.tabTitle}
         numberOfLines={1}
         adjustsFontSizeToFit={fit}
-        minimumFontScale={fit ? 0.5 : undefined}
+        minimumFontScale={fit ? 0.6 : undefined}
       >
         {children}
       </Text>
@@ -74,14 +71,11 @@ export function TabTitle({ children, maxWidth, fit }: { children: React.ReactNod
 // Goes back; a screen presented modally closes with a cross instead.
 export function BackButton({ close }: { close?: boolean }) {
   const router = useRouter()
-  const name = close ? 'close' : 'chevron-back'
-  const size = close ? 24 : 26
-  // iOS keeps the plain icon; elsewhere it sits on the round surface like the other bar buttons.
-  if (isIOS) return <IconButton name={name} size={size} onPress={() => router.back()} />
-  return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
+  const name = close ? 'close' : 'arrow-back'
+  return <IconButton name={name} size={22} onPress={() => router.back()} />
 }
 
-export function GlassHeader({ left, right, children, floating, centerTitle }: Props) {
+export function GlassHeader({ left, right, children, centerTitle }: Props) {
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const row = (
@@ -89,8 +83,8 @@ export function GlassHeader({ left, right, children, floating, centerTitle }: Pr
       style={[
         styles.row,
         {
-          paddingLeft: Math.max(8, insets.left + 4),
-          paddingRight: Math.max(8, insets.right + 4),
+          paddingLeft: Math.max(12, insets.left + 4),
+          paddingRight: Math.max(12, insets.right + 4),
         },
       ]}
       pointerEvents="box-none"
@@ -112,7 +106,7 @@ export function GlassHeader({ left, right, children, floating, centerTitle }: Pr
       ) : null}
       {left}
       {!centerTitle ? (
-        <View style={[styles.center, !left && { paddingLeft: 12 }]} pointerEvents="box-none">
+        <View style={[styles.center, !left && { paddingLeft: 4 }]} pointerEvents="box-none">
           {children}
         </View>
       ) : (
@@ -121,15 +115,6 @@ export function GlassHeader({ left, right, children, floating, centerTitle }: Pr
       {right}
     </View>
   )
-
-  if (floating && floatingBars) {
-    return (
-      <View style={[styles.floating, { paddingTop: insets.top }]} pointerEvents="box-none">
-        <EdgeFade edge="top" style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} />
-        {row}
-      </View>
-    )
-  }
 
   return (
     <BlurBar edge="top" style={[styles.root, { paddingTop: insets.top }]}>
@@ -140,43 +125,43 @@ export function GlassHeader({ left, right, children, floating, centerTitle }: Pr
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    title: { color: colors.text, fontFamily: fonts.prose, fontSize: 19, fontWeight: '600' },
-    tabTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
-    tabTitleStar: { marginTop: 2 },
-    tabTitle: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700', fontSize: 28, flexShrink: 1 },
+    title: { color: colors.text, fontSize: 17, fontWeight: '600' },
+    tabTitleRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+    tabTitle: { color: colors.text, fontWeight: '700', fontSize: 22, letterSpacing: -0.2, flexShrink: 1 },
     root: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
-  floating: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  fade: { position: 'absolute', top: 0, left: 0, right: 0 },
-  row: {
-    height: HEADER_ROW_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  center: { flex: 1, justifyContent: 'center', paddingHorizontal: 4 },
-  centered: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 60,
-  },
-  // The prose face stays, it is the app's own; on the desktop the titles are just smaller,
-  // in proportion to the compact chrome.
-  ...(isDesktop
-    ? {
-        title: { color: colors.text, fontFamily: fonts.prose, fontSize: 16, fontWeight: '600' as const },
-        tabTitleRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, flexShrink: 1 },
-        tabTitle: { color: colors.text, fontFamily: fonts.prose, fontWeight: '700' as const, fontSize: 22, flexShrink: 1 },
-      }
-    : {}),
-})
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      backgroundColor: colors.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    floating: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
+    fade: { position: 'absolute', top: 0, left: 0, right: 0 },
+    row: {
+      height: HEADER_ROW_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+    },
+    center: { flex: 1, justifyContent: 'center', paddingHorizontal: 4 },
+    centered: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 60,
+    },
+    ...(isDesktop
+      ? {
+          title: { color: colors.text, fontSize: 15, fontWeight: '600' as const },
+          tabTitleRow: { flexDirection: 'row' as const, alignItems: 'center' as const, flexShrink: 1 },
+          tabTitle: { color: colors.text, fontWeight: '700' as const, fontSize: 18, letterSpacing: -0.2, flexShrink: 1 },
+        }
+      : {}),
+  })

@@ -395,7 +395,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     scroll: { flexGrow: 0, flexShrink: 1 },
     scrollContent: { paddingHorizontal: 16, paddingBottom: 4 },
-    card: { borderRadius: 26, overflow: 'hidden' },
+    card: { borderRadius: 8, overflow: 'hidden' },
     secondCard: { marginTop: 20 },
     row: { flexDirection: 'row', alignItems: 'center', gap: GAP, paddingHorizontal: ROW_PADDING, paddingVertical: 13 },
     separator: { height: StyleSheet.hairlineWidth, marginRight: ROW_PADDING, backgroundColor: colors.borderStrong },

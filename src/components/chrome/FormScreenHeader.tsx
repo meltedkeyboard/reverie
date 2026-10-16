@@ -7,7 +7,7 @@ import { useTranslation } from '@/i18n'
 import { type Colors, HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { EdgeFade } from './BarChrome'
-import { GlassButton } from './Glass'
+import { IconButton } from '../controls/IconButton'
 import { TabTitle, useHeaderHeight } from './GlassHeader'
 import { SFIcon } from '../visuals/SFIcon'
 
@@ -108,15 +108,15 @@ export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLa
   const colors = useColors()
   const filled = prominent && !disabled
   return (
-    <GlassButton
-      icon={fallback}
+    <IconButton
+      name={fallback}
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={accessibilityLabel}
-      tint={prominent ? colors.accent : undefined}
+      color={prominent ? colors.accent : colors.text}
     >
       <SFIcon name={symbol} fallback={fallback} size={19} color={filled ? ON_ACCENT : colors.text} onAccent={filled} animateChange={animateChange} />
-    </GlassButton>
+    </IconButton>
   )
 }
 

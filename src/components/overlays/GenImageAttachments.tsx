@@ -92,7 +92,7 @@ const createStyles = (colors: Colors) =>
     thumb: {
       width: 72,
       height: 72,
-      borderRadius: 14,
+      borderRadius: 6,
       backgroundColor: colors.surfaceRaised,
     },
     removeBtn: {
@@ -101,7 +101,7 @@ const createStyles = (colors: Colors) =>
       right: 0,
       width: 22,
       height: 22,
-      borderRadius: 11,
+      borderRadius: 4,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surfaceRaised,

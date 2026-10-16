@@ -11,9 +11,9 @@ import { Avatar } from '@/components/visuals/Avatar'
 import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
+import { IconButton } from '@/components/controls/IconButton'
 import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
-import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
+import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { Icon } from '@/components/visuals/Icon'
 import { Pattern } from '@/components/visuals/Pattern'
 import { deleteCharacter, listCharacters, listGroupCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
@@ -38,15 +38,12 @@ import { dragModule, DropTargetView } from '../../../modules/reverie-drag'
 // Room the list leaves under its last card for the edit bar.
 const EDIT_BAR_SPACE = 64
 
-const PillSurface = nativeMenuGlass ? View : GlassSurface
-
 export default function GroupScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>()
   const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
-  const glass = useGlassStyles()
   const colors = useColors()
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
@@ -268,9 +265,9 @@ export default function GroupScreen() {
             label={allChecked ? t('characters.deselectAll') : t('characters.selectAll')}
             onPress={() => setChecked(allChecked ? new Set() : new Set((members ?? []).map((c) => c.id)))}
           />
-          <GlassButton
-            icon="trash-outline"
-            tint={checked.size ? colors.danger : undefined}
+          <IconButton
+            name="trash-outline"
+            color={checked.size ? colors.danger : undefined}
             disabled={!checked.size}
             onPress={removeChecked}
             accessibilityLabel={t('groups.removeFromGroup')}
@@ -280,12 +277,12 @@ export default function GroupScreen() {
       <GlassHeader
         floating
         centerTitle
-        left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
+        left={<IconButton name="chevron-back" size={24} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
         right={
           group && members?.length ? (
-            <GlassButton
-              icon={editing ? 'checkmark' : 'list'}
-              tint={editing ? colors.accent : undefined}
+            <IconButton
+              name={editing ? 'checkmark' : 'list'}
+              color={editing ? colors.accent : undefined}
               {...editButton}
               accessibilityLabel={editing ? t('characters.doneEditing') : t('characters.editList')}
             />
@@ -294,13 +291,11 @@ export default function GroupScreen() {
       >
         {group ? (
           <NativeMenu items={groupMenuItems} disabled={editing} style={styles.whoPress} glassRadius={22}>
-            <PillSurface
-              interactive={!editing}
+            <View
               style={[styles.whoPill, members?.length === 1 && styles.whoPillWithAvatar]}
-              fallbackStyle={glass.solid}
             >
               {members?.length === 1 ? (
-                <Avatar name={members[0].name} file={members[0].avatar} size={32} viewable={false} />
+                <Avatar name={members[0].name} file={members[0].avatar} size={28} viewable={false} />
               ) : null}
               <View style={styles.nameRow}>
                 <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
@@ -308,7 +303,7 @@ export default function GroupScreen() {
                 </Text>
                 <Icon name="chevron-down" size={14} color={colors.textMuted} />
               </View>
-            </PillSurface>
+            </View>
           </NativeMenu>
         ) : null}
       </GlassHeader>
@@ -347,10 +342,9 @@ const createStyles = (colors: Colors) =>
     headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     whoPress: { maxWidth: '100%' },
     whoPill: {
-      height: 44,
-      borderRadius: 22,
-      borderCurve: 'continuous',
-      paddingHorizontal: 16,
+      height: 40,
+      borderRadius: 6,
+      paddingHorizontal: 14,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',

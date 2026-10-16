@@ -8,7 +8,7 @@ import { Avatar } from '@/components/visuals/Avatar'
 import { Button } from '@/components/controls/Button'
 import { ChatCard } from '@/components/lists/ChatCard'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
+import { IconButton } from '@/components/controls/IconButton'
 import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { Pattern } from '@/components/visuals/Pattern'
@@ -27,7 +27,6 @@ export default function CharacterChatsScreen() {
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
-  const glass = useGlassStyles()
   const { t } = useTranslation()
   const [character, setCharacter] = useState<Character | null>(null)
   const [chats, setChats] = useState<ChatPreview[] | null>(null)
@@ -108,9 +107,9 @@ export default function CharacterChatsScreen() {
         floating
         centerTitle
         left={
-          <GlassButton
-            icon="chevron-back"
-            iconSize={26}
+          <IconButton
+            name="chevron-back"
+            size={24}
             onPress={() => router.back()}
             accessibilityLabel={t('common.back')}
           />
@@ -118,7 +117,7 @@ export default function CharacterChatsScreen() {
         right={
           character ? (
             <Link href={`/chat/new?character=${character.id}`} asChild>
-              <GlassButton icon="add" iconSize={26} accessibilityLabel={t('chatsList.startChat')} />
+              <IconButton name="add" size={24} accessibilityLabel={t('chatsList.startChat')} />
             </Link>
           ) : null
         }
@@ -130,12 +129,12 @@ export default function CharacterChatsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('profile.title')}
           >
-            <GlassSurface interactive style={styles.whoPill} fallbackStyle={glass.solid}>
-              <Avatar name={character.name} file={character.avatar} size={32} viewable={false} />
+            <View style={styles.whoPill}>
+              <Avatar name={character.name} file={character.avatar} size={28} viewable={false} />
               <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
                 {character.name}
               </Text>
-            </GlassSurface>
+            </View>
           </Pressable>
         ) : null}
       </GlassHeader>
@@ -148,11 +147,10 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     whoPress: { maxWidth: '100%' },
     whoPill: {
-      height: 44,
-      borderRadius: 22,
-      borderCurve: 'continuous',
+      height: 40,
+      borderRadius: 6,
       paddingLeft: 6,
-      paddingRight: 16,
+      paddingRight: 14,
       gap: 10,
       flexDirection: 'row',
       alignItems: 'center',

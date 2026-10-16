@@ -20,13 +20,11 @@ const glassModule =
     ? (require('expo-glass-effect') as typeof import('expo-glass-effect'))
     : null
 
-// isGlassEffectAPIAvailable guards against early iOS 26 betas that crash on the API.
-export const glassEffect =
-  glassModule?.isLiquidGlassAvailable() && glassModule.isGlassEffectAPIAvailable() ? glassModule : null
+// Disabled for flat minimal design
+export const glassEffect: (typeof import('expo-glass-effect')) | null = null
 
-export const liquidGlass = glassEffect !== null
+export const liquidGlass = false
 
-// The iOS 26 look of the bars: no bar at all, round controls floating over the content
-// with a fade under them. Android and the desktop get it with plain round surfaces in
-// place of the glass; only an iOS without Liquid Glass keeps the frosted bar.
-export const floatingBars = liquidGlass || !isIOS
+// Flat solid header bars and toolbars instead of floating liquid glass
+export const floatingBars = false
+

@@ -25,7 +25,7 @@ type Props = {
 export function Button({ label, icon, onPress, disabled, loading, variant = 'primary', style }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
-  const tint = variant === 'primary' || variant === 'glass' ? ON_ACCENT : variant === 'soft' ? colors.accent : colors.text
+  const tint = variant === 'primary' || variant === 'glass' ? colors.onAccent : variant === 'soft' ? colors.accent : colors.text
   const content = loading ? (
     <ActivityIndicator color={tint} />
   ) : (
@@ -72,27 +72,28 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    base: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14 },
-    primary: { height: 50, paddingHorizontal: 20, backgroundColor: colors.accent },
-    secondary: { height: 50, paddingHorizontal: 18, backgroundColor: colors.surfaceRaised },
-    soft: { height: 46, paddingHorizontal: 16, backgroundColor: colors.accentSoft },
-    glass: { height: 52, paddingHorizontal: 28, borderRadius: 26 },
-    label: { fontSize: 16, fontWeight: '600' },
-    primaryLabel: { color: ON_ACCENT },
+    base: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10 },
+    primary: { height: 44, paddingHorizontal: 20, backgroundColor: colors.accent },
+    secondary: { height: 44, paddingHorizontal: 18, backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.border },
+    soft: { height: 42, paddingHorizontal: 16, backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.border },
+    glass: { height: 44, paddingHorizontal: 24, borderRadius: 10 },
+    label: { fontSize: 15, fontWeight: '600' },
+    primaryLabel: { color: colors.onAccent },
     secondaryLabel: { color: colors.text, fontWeight: '500' },
-    softLabel: { color: colors.accent, fontSize: 15 },
-    glassLabel: { color: ON_ACCENT, fontSize: 17 },
+    softLabel: { color: colors.text, fontSize: 14 },
+    glassLabel: { color: colors.onAccent, fontSize: 15 },
     ...(isDesktop ? desktopOverrides(colors) : {}),
   })
 
 // Desktop buttons: compact, a small rounding, the label at the size of the text around it.
 const desktopOverrides = (colors: Colors) => ({
-  base: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 6, borderRadius: 6 },
+  base: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 6, borderRadius: 8 },
   primary: { height: 34, paddingHorizontal: 16, backgroundColor: colors.accent },
   secondary: { height: 34, paddingHorizontal: 14, backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.border },
-  soft: { height: 34, paddingHorizontal: 14, backgroundColor: colors.accentSoft },
-  glass: { height: 36, paddingHorizontal: 20, borderRadius: 6 },
+  soft: { height: 34, paddingHorizontal: 14, backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.border },
+  glass: { height: 34, paddingHorizontal: 18, borderRadius: 8 },
   label: { fontSize: 14, fontWeight: '500' as const },
-  softLabel: { color: colors.accent, fontSize: 14 },
-  glassLabel: { color: ON_ACCENT, fontSize: 14 },
+  primaryLabel: { color: colors.onAccent },
+  softLabel: { color: colors.text, fontSize: 14 },
+  glassLabel: { color: colors.onAccent, fontSize: 14 },
 })

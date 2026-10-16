@@ -37,7 +37,7 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
   const colors = useColors()
   const styles = useStyles(createStyles)
   const tint = color ?? colors.accent
-  const ink = filled ? ON_ACCENT : tint
+  const ink = filled ? colors.onAccent : tint
   const sliding = useAtLeastOneLap(!!loading && !!icon?.slide)
   const inactive = disabled || loading || sliding
   return (
@@ -140,15 +140,15 @@ export function SlidingIcon({ direction, active, children }: { direction?: 'up' 
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    pill: { minHeight: 44, paddingHorizontal: 20, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-    circle: { width: 44, paddingHorizontal: 0 },
+    pill: { minHeight: 40, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    circle: { width: 40, borderRadius: 10, paddingHorizontal: 0 },
     solid:{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     content: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     label: { fontSize: 16, fontWeight: '600' },
     // A compact flat button on the desktop, like the rest of the desktop's.
     ...(isDesktop
       ? {
-          pill: { minHeight: 32, paddingHorizontal: 14, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+          pill: { minHeight: 32, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
           circle: { width: 32, paddingHorizontal: 0 },
           solid: { backgroundColor: colors.surfaceRaised, borderWidth: 0 },
           label: { fontSize: 14, fontWeight: '500' },

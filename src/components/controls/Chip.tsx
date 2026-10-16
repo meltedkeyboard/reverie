@@ -39,7 +39,7 @@ export function Chip({ label, active, onPress, style, icon, ink, interactive = f
   const styles = useStyles(createStyles)
   const sliding = useAtLeastOneLap(!!loading && !!slide)
   const busy = !!loading || sliding
-  const color = active ? ON_ACCENT : disabled && !busy ? colors.textFaint : (ink ?? colors.textMuted)
+  const color = active ? colors.onAccent : disabled && !busy ? colors.textFaint : (ink ?? colors.textMuted)
   return (
     <Pressable
       disabled={disabled || busy}
@@ -80,7 +80,7 @@ export function Chip({ label, active, onPress, style, icon, ink, interactive = f
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    chip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     solidActive: { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.accent },
     label: { fontSize: 14, fontWeight: '600' },
@@ -88,7 +88,7 @@ const createStyles = (colors: Colors) =>
     // Segmented choices on the desktop: small flat tabs, the chosen one filled.
     ...(isDesktop
       ? {
-          chip: { minHeight: 28, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+          chip: { minHeight: 28, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
           solid: { backgroundColor: colors.surfaceRaised, borderWidth: 0 },
           solidActive: { backgroundColor: colors.accent, borderWidth: 0 },
           label: { fontSize: 13, fontWeight: '500' },

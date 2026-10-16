@@ -10,7 +10,7 @@ export const isDesktop = isWeb
 export const isElectron = isWeb && typeof globalThis !== 'undefined' && 'reverieDesktop' in globalThis
 
 export const FONTS = {
-  // Android has no Georgia; its serif is the closest system face.
-  prose: isAndroid ? 'serif' : 'Georgia',
+  prose: isAndroid ? 'sans-serif' : isWeb ? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' : 'System',
   mono: isAndroid ? 'monospace' : 'Menlo',
 } as const
+

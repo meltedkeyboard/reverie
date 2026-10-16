@@ -324,7 +324,7 @@ const baseStyles = (colors: Colors) =>
       paddingHorizontal: INSET,
       marginBottom: 7,
     },
-    group: { backgroundColor: colors.surface, borderRadius: 26, borderCurve: 'continuous', overflow: 'hidden' },
+    group: { backgroundColor: colors.surface, borderRadius: 8, overflow: 'hidden' },
     separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong, marginLeft: INSET },
     footer: { color: colors.textMuted, fontSize: 13, lineHeight: 18, paddingHorizontal: INSET, marginTop: 7 },
     danger: { color: colors.danger },

@@ -221,12 +221,12 @@ const createStyles = (colors: Colors) =>
     // Glass takes its look from what is behind it, so the screen is dimmed less.
     backdropGlass: { backgroundColor: 'rgba(0, 0, 0, 0.2)' },
     slot: { width: '100%', maxWidth: 640, alignSelf: 'center', marginBottom: INSET },
-    sheet: { flexShrink: 1, borderRadius: 38 },
+    sheet: { flexShrink: 1, borderRadius: 12 },
     solid: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
     header: { paddingTop: 7, paddingBottom: 12, paddingHorizontal: 16 },
-    grabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 2.5, backgroundColor: colors.borderStrong, marginBottom: 12 },
+    grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, marginBottom: 12 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    close: { width: CLOSE, height: CLOSE, borderRadius: CLOSE / 2, alignItems: 'center', justifyContent: 'center' },
+    close: { width: CLOSE, height: CLOSE, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
     title: { flex: 1, textAlign: 'center', color: colors.text, fontSize: 18, fontWeight: '600' },
     // Keeps the title centered against the close button.
     balance: { width: CLOSE },

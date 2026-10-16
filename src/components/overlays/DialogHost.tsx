@@ -134,8 +134,8 @@ const createStyles = (colors: Colors) =>
     backdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
     // The prompt sits in the upper part, where the keyboard never reaches.
     top: { justifyContent: 'flex-start', paddingTop: 96 },
-    sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8, paddingBottom: 24 },
-    card: { backgroundColor: colors.surface, borderRadius: 24, marginHorizontal: 24, padding: 20, gap: 12 },
+    sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 8, borderTopRightRadius: 8, paddingTop: 8, paddingBottom: 24 },
+    card: { backgroundColor: colors.surface, borderRadius: 8, marginHorizontal: 24, padding: 20, gap: 12 },
     title: { color: colors.text, fontSize: 18, fontWeight: '600', paddingHorizontal: 20, paddingVertical: 12 },
     sheetMessage: { color: colors.textMuted, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingBottom: 10 },
     promptTitle: { color: colors.text, fontSize: 18, fontWeight: '600' },
@@ -145,9 +145,9 @@ const createStyles = (colors: Colors) =>
     input: {
       color: colors.text,
       fontSize: 16,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: 1,
       borderColor: colors.borderStrong,
-      borderRadius: 12,
+      borderRadius: 6,
       paddingHorizontal: 12,
       paddingVertical: 10,
     },

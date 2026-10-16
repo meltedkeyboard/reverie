@@ -28,8 +28,8 @@ const TILE_HEIGHT = (TILE_INNER * 852) / 393 + TILE_BORDER * 2
 
 const FALLBACK_FAMILIES =
   isAndroid
-    ? ['serif', 'sans-serif', 'sans-serif-light', 'sans-serif-condensed', 'serif-monospace', 'monospace', 'casual', 'cursive']
-    : ['Georgia', 'Palatino', 'Iowan Old Style', 'Charter', 'Avenir Next', 'Times New Roman', 'Helvetica Neue', 'Menlo']
+    ? ['sans-serif', 'sans-serif-medium', 'sans-serif-light', 'sans-serif-condensed', 'monospace', 'serif', 'casual']
+    : ['System', 'Helvetica Neue', 'Avenir Next', 'Arial', 'Menlo', 'Georgia', 'Charter', 'Palatino']
 
 // Rounded to a percent, and caught by the regular size when the slider passes near it.
 function snap(value: number) {
@@ -211,8 +211,7 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     // A set height, so the card does not grow with the text: what does not fit scrolls.
     card: {
-      borderRadius: 26,
-      borderCurve: 'continuous',
+      borderRadius: 8,
       overflow: 'hidden',
       backgroundColor: colors.surface,
       paddingHorizontal: 16,
@@ -226,27 +225,26 @@ const createStyles = (colors: Colors) =>
       alignSelf: 'flex-end',
       marginLeft: 40,
       backgroundColor: colors.bubble,
-      borderRadius: 20,
-      borderCurve: 'continuous',
+      borderRadius: 8,
       paddingHorizontal: 15,
       paddingVertical: 10,
     },
     action: { fontStyle: 'italic', color: colors.textMuted },
     composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-    circle: { width: FIELD_HEIGHT, height: FIELD_HEIGHT, borderRadius: FIELD_HEIGHT / 2 },
+    circle: { width: FIELD_HEIGHT, height: FIELD_HEIGHT, borderRadius: 6 },
     field: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       minHeight: FIELD_HEIGHT,
-      borderRadius: 26,
+      borderRadius: 8,
       padding: 5,
     },
     placeholder: { flex: 1, color: colors.textFaint, fontSize: 17, paddingHorizontal: 14 },
     send: {
       width: 38,
       height: 38,
-      borderRadius: 19,
+      borderRadius: 6,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surfaceRaised,
@@ -261,8 +259,7 @@ const createStyles = (colors: Colors) =>
     tile: {
       width: TILE_WIDTH,
       height: TILE_HEIGHT,
-      borderRadius: 14,
-      borderCurve: 'continuous',
+      borderRadius: 8,
       overflow: 'hidden',
       backgroundColor: colors.bg,
       borderWidth: TILE_BORDER,

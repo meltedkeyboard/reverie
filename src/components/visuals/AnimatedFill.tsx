@@ -37,7 +37,7 @@ export function AnimatedFill({ fillHeight, children }: Props) {
   }, [fillHeight, height])
 
   const style = useAnimatedStyle(() =>
-    height.value < 0 ? {} : { height: height.value, overflow: 'hidden', borderRadius: 20, borderCurve: 'continuous' }
+    height.value < 0 ? {} : { height: height.value, overflow: 'hidden', borderRadius: 8 }
   )
 
   const onLayout = (e: LayoutChangeEvent) => {

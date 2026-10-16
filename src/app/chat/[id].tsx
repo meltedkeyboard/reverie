@@ -2,7 +2,7 @@ import { Icon } from '@/components/visuals/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -11,6 +11,7 @@ import { AsidePanel } from '@/components/chat/AsidePanel'
 import { Avatar } from '@/components/visuals/Avatar'
 import { Composer, ComposerFloat, ComposerSwap } from '@/components/chat/Composer'
 import { ConversationList, ErrorCard, JumpButton } from '@/components/chat/ConversationList'
+import { IconButton } from '@/components/controls/IconButton'
 import { GlassButton, GlassSurface } from '@/components/chrome/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { MessageRow, type RowMessage } from '@/components/chat/MessageRow'
@@ -260,31 +261,26 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
       ) : null}
 
       <GlassHeader
-        floating
-        left={wide ? undefined : <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
+        left={wide ? undefined : <IconButton name="arrow-back" size={22} onPress={() => router.back()} />}
         right={
           <View style={styles.headerActions}>
             <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
             {fresh ? (
-              <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
+              <IconButton name="create-outline" size={20} onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
             ) : (
               <Link push href={`/chat/new?character=${character.id}`} asChild>
-                <GlassButton icon="create-outline" />
+                <IconButton name="create-outline" size={20} />
               </Link>
             )}
           </View>
         }
       >
         <View style={styles.headerWho}>
-          {/* The photo is a button of its own, as in Telegram: it opens full screen, and
-              the pill beside it keeps the menu. */}
-          <GlassSurface interactive style={styles.photo}>
-            <Avatar name={character.name} file={character.avatar} size={38} />
-          </GlassSurface>
-          {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
-              of the pill. */}
-          <NativeMenu items={chatMenu} style={styles.whoPress} glassRadius={22}>
-            <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
+          <Pressable onPress={() => router.push(`/character/${character.id}`)} hitSlop={4}>
+            <Avatar name={character.name} file={character.avatar} size={32} />
+          </Pressable>
+          <NativeMenu items={chatMenu} style={styles.whoPress}>
+            <View style={styles.who}>
               <View style={styles.whoText}>
                 <View style={styles.nameRow}>
                   <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
@@ -300,7 +296,7 @@ function ChatView({ chat, character, focusMessageId }: ChatViewProps) {
                   </Text>
                 ) : null}
               </View>
-            </PillSurface>
+            </View>
           </NativeMenu>
         </View>
       </GlassHeader>
@@ -371,10 +367,10 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   headerWho: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  photo: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  photo: { width: 36, height: 36, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   whoPress: { flexShrink: 1 },
-  who: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
-  whoPill: { borderRadius: 22, paddingVertical: 4, paddingHorizontal: 16 },
+  who: { flexDirection: 'row', alignItems: 'center', minHeight: 40 },
+  whoPill: { borderRadius: 6, paddingVertical: 4, paddingHorizontal: 12 },
   whoText: { flexShrink: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },

@@ -14,11 +14,12 @@ import { CastBar, FloorButton } from '@/components/cast/CastBar'
 import { CastSheet } from '@/components/cast/CastSheet'
 import { Composer, ComposerFloat, ComposerSwap } from '@/components/chat/Composer'
 import { ConversationList, ErrorCard, JumpButton } from '@/components/chat/ConversationList'
-import { GlassButton, GlassSurface } from '@/components/chrome/Glass'
+import { IconButton } from '@/components/controls/IconButton'
+import { GlassSurface } from '@/components/chrome/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { useOpenViewer } from '@/components/visuals/ImageLink'
 import { MessageRow, type RowMessage, type RowScene } from '@/components/chat/MessageRow'
-import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
+import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { ShimmerText } from '@/components/visuals/ShimmerText'
 import { TypingIndicator } from '@/components/chat/TypingIndicator'
 import { type Chat } from '@/db/chats'
@@ -371,22 +372,22 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
 
       <GlassHeader
         floating
-        left={wide ? undefined : <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} />}
+        left={wide ? undefined : <IconButton name="arrow-back" size={22} onPress={() => router.back()} />}
         right={
           <View style={styles.headerActions}>
             <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={toggleAside} />
             {fresh ? (
-              <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
+              <IconButton name="create-outline" size={20} onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
             ) : (
               <Link push href={`/chat/new?room=${room.id}`} asChild>
-                <GlassButton icon="create-outline" />
+                <IconButton name="create-outline" size={20} />
               </Link>
             )}
           </View>
         }
       >
         <NativeMenu items={roomMenu} style={styles.whoPress} glassRadius={22}>
-          <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
+          <View style={styles.who}>
             <AvatarStack cast={cast} size={28} viewable={false} />
             <View style={styles.whoText}>
               <View style={styles.nameRow}>
@@ -403,7 +404,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
                 </Text>
               ) : null}
             </View>
-          </PillSurface>
+          </View>
         </NativeMenu>
       </GlassHeader>
 
@@ -552,8 +553,6 @@ function RoomIntro({ room, cast, hint }: { room: Room; cast: { name: string; ava
     </View>
   )
 }
-
-const PillSurface = nativeMenuGlass ? View : GlassSurface
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({

@@ -22,7 +22,7 @@ export function MenuGlassButton({ icon, items, size = 44, disabled }: Props) {
   const colors = useColors()
   const styles = useGlassStyles()
   const glyph = <Icon name={icon} size={22} color={colors.text} />
-  const shape = { width: size, height: size, borderRadius: size / 2 }
+  const shape = { width: size, height: size, borderRadius: 6 }
   const circle = (
     <GlassSurface interactive style={[styles.circle, shape]} fallbackStyle={styles.solid}>
       {glyph}
@@ -40,7 +40,7 @@ export function MenuGlassButton({ icon, items, size = 44, disabled }: Props) {
   // With Liquid Glass the menu draws the circle's glass and hosts the icon inside its
   // label, so the menu morphs out of the button.
   return (
-    <NativeMenu items={items} disabled={disabled} glassRadius={size / 2}>
+    <NativeMenu items={items} disabled={disabled} glassRadius={6}>
       {nativeMenuGlass ? <View style={[styles.circle, shape]}>{glyph}</View> : circle}
     </NativeMenu>
   )

@@ -9,7 +9,7 @@ import { Avatar } from '@/components/visuals/Avatar'
 import { Button } from '@/components/controls/Button'
 import { ChatCard } from '@/components/lists/ChatCard'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
+import { IconButton } from '@/components/controls/IconButton'
 import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { Icon } from '@/components/visuals/Icon'
@@ -31,7 +31,6 @@ export default function RoomScenesScreen() {
   const router = useRouter()
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
-  const glass = useGlassStyles()
   const colors = useColors()
   const { t, locale } = useTranslation()
   const [room, setRoom] = useState<Room | null>(null)
@@ -135,9 +134,9 @@ export default function RoomScenesScreen() {
         floating
         centerTitle
         left={
-          <GlassButton
-            icon="chevron-back"
-            iconSize={26}
+          <IconButton
+            name="chevron-back"
+            size={24}
             onPress={() => router.back()}
             accessibilityLabel={t('common.back')}
           />
@@ -145,7 +144,7 @@ export default function RoomScenesScreen() {
         right={
           room ? (
             <Link href={`/chat/new?room=${room.id}`} asChild>
-              <GlassButton icon="add" iconSize={26} accessibilityLabel={t('rooms.startScene')} />
+              <IconButton name="add" size={24} accessibilityLabel={t('rooms.startScene')} />
             </Link>
           ) : null
         }
@@ -155,23 +154,21 @@ export default function RoomScenesScreen() {
             {cast.length > 1 ? (
               <View style={styles.imessageHeader}>
                 <View style={styles.avatarRow}>
-                  <AvatarStack cast={cast} size={34} max={3} viewable={false} />
+                  <AvatarStack cast={cast} size={30} max={3} viewable={false} />
                 </View>
-                <GlassSurface interactive style={styles.namePill} fallbackStyle={glass.solid}>
+                <View style={styles.namePill}>
                   <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.imessageName} numberOfLines={1}>
                     {room.name}
                   </Text>
                   <Icon name="chevron-forward" size={11} color={colors.textMuted} />
-                </GlassSurface>
+                </View>
               </View>
             ) : (
-              <GlassSurface
-                interactive
+              <View
                 style={[styles.whoPill, !cast.length && styles.whoPillNoAvatar]}
-                fallbackStyle={glass.solid}
               >
                 {cast.length === 1 ? (
-                  <Avatar name={cast[0].name} file={cast[0].avatar} size={32} viewable={false} />
+                  <Avatar name={cast[0].name} file={cast[0].avatar} size={28} viewable={false} />
                 ) : null}
                 <View style={styles.nameRow}>
                   <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
@@ -179,7 +176,7 @@ export default function RoomScenesScreen() {
                   </Text>
                   <Icon name="chevron-down" size={14} color={colors.textMuted} />
                 </View>
-              </GlassSurface>
+              </View>
             )}
           </NativeMenu>
         ) : null}
@@ -193,18 +190,17 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     whoPress: { maxWidth: '100%', alignItems: 'center' },
     whoPill: {
-      height: 44,
-      borderRadius: 22,
-      borderCurve: 'continuous',
+      height: 40,
+      borderRadius: 6,
       paddingLeft: 6,
-      paddingRight: 16,
+      paddingRight: 14,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
       maxWidth: '100%',
     },
     whoPillNoAvatar: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 14,
     },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
     name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
@@ -220,8 +216,7 @@ const createStyles = (colors: Colors) =>
     },
     namePill: {
       height: 22,
-      borderRadius: 11,
-      borderCurve: 'continuous',
+      borderRadius: 4,
       paddingHorizontal: 8,
       flexDirection: 'row',
       alignItems: 'center',

@@ -36,13 +36,13 @@ export function IconButton({ name, onPress, onPressIn, onPressOut, size = 22, co
       style={(state) => [
         isDesktop
           ? [
-              { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+              { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
               (state as { hovered?: boolean }).hovered && { backgroundColor: colors.surfaceRaised },
               state.pressed && { backgroundColor: colors.border },
             ]
           : [
-              { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
-              state.pressed && { opacity: 0.55, transform: [{ scale: 0.92 }] },
+              { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+              state.pressed && { opacity: 0.55 },
             ],
         disabled && { opacity: 0.35 },
         style,

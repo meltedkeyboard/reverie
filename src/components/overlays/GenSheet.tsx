@@ -461,6 +461,6 @@ const createStyles = (colors: Colors) =>
     presets: { paddingVertical: 12 },
     noteRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingLeft: 16, paddingRight: 8, paddingVertical: 8 },
     noteInput: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, paddingTop: 7, paddingBottom: 7, paddingHorizontal: 0, maxHeight: 120 },
-    sendButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+    sendButton: { width: 34, height: 34, borderRadius: 6, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
     footer: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.bg },
   })

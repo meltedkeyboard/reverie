@@ -44,7 +44,7 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 14,
+      borderRadius: 10,
       color: colors.text,
       fontSize: 16,
       paddingHorizontal: 14,

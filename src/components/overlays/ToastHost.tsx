@@ -94,13 +94,13 @@ const createStyles = (colors: Colors) =>
     layer: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 12, zIndex: 2000 },
     // The shadow belongs to the box the card fills, so the width limit and the radius are here.
     slide: Platform.select({
-      web: { boxShadow: '0 6px 16px rgba(0, 0, 0, 0.18)', borderRadius: 24, width: '100%', maxWidth: 560, alignSelf: 'center' },
+      web: { boxShadow: '0 6px 16px rgba(0, 0, 0, 0.45)', borderRadius: 8, width: '100%', maxWidth: 560, alignSelf: 'center' },
       default: { width: '100%', maxWidth: 560, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
     }),
-    card: { borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12 },
+    card: { borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12 },
     body: {},
     // A failure is the same glass with a red cast.
-    failedTint: { ...FILL, borderRadius: 24, backgroundColor: colors.dangerSoft },
+    failedTint: { ...FILL, borderRadius: 8, backgroundColor: colors.dangerSoft },
     failedBorder: { borderColor: colors.dangerBorder },
     text: { flex: 1, gap: 2 },
     title: { color: colors.text, fontFamily: fonts.prose, fontSize: 16, fontWeight: '600' },

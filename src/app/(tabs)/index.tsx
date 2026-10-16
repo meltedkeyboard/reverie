@@ -49,12 +49,16 @@ import { dragModule, DropTargetView, type DropFile } from '../../../modules/reve
 // The server notice above the list: its height and the margin under it.
 const NOTICE_HEIGHT = 74
 
-// A row of the home list: a group, or a character standing alone.
-type Row =
+// A row of the home list: a pair of items (or single item), or a full-width group.
+type SingleItem =
   | { kind: 'group'; key: string; group: CharacterGroup; members: CharacterPreview[] }
   | { kind: 'character'; key: string; character: CharacterPreview }
 
-// Groups and lone characters share one order, highest first; on a tie a group comes first.
+type Row =
+  | { kind: 'pair'; key: string; items: SingleItem[] }
+  | SingleItem
+
+// Build pairs of characters (or groups) for 2 cards per row.
 function buildRows(characters: CharacterPreview[], groups: CharacterGroup[]): Row[] {
   const members = new Map<number, CharacterPreview[]>()
   for (const c of characters) if (c.groupId !== null) members.set(c.groupId, [...(members.get(c.groupId) ?? []), c])
@@ -62,11 +66,30 @@ function buildRows(characters: CharacterPreview[], groups: CharacterGroup[]): Ro
     ...groups.filter((g) => members.has(g.id)).map((g) => ({ order: g.sortOrder, tie: 1, id: g.id, group: g as CharacterGroup | undefined, character: undefined })),
     ...characters.filter((c) => c.groupId === null).map((c) => ({ order: c.sortOrder, tie: 0, id: c.id, group: undefined, character: c as CharacterPreview | undefined })),
   ].sort((a, b) => b.order - a.order || b.tie - a.tie || b.id - a.id)
-  return top.map((entry): Row => {
+
+  const items: SingleItem[] = top.map((entry): SingleItem => {
     if (entry.character) return { kind: 'character', key: `c${entry.id}`, character: entry.character }
     const list = members.get(entry.id)!
     return { kind: 'group', key: `g${entry.id}`, group: entry.group!, members: list }
   })
+
+  const rows: Row[] = []
+  for (let i = 0; i < items.length; i += 2) {
+    if (i + 1 < items.length) {
+      rows.push({
+        kind: 'pair',
+        key: `pair_${items[i].key}_${items[i + 1].key}`,
+        items: [items[i], items[i + 1]],
+      })
+    } else {
+      rows.push({
+        kind: 'pair',
+        key: `pair_${items[i].key}`,
+        items: [items[i]],
+      })
+    }
+  }
+  return rows
 }
 
 
@@ -304,12 +327,17 @@ export default function CharactersScreen() {
   // The new order is shown at once and saved: groups and lone characters among themselves.
   const moveRow = ({ from, to }: ReorderableListReorderEvent) => {
     const next = reorderItems(rows, from, to)
-    const order = new Map(next.map((row, index) => [row.key, next.length - index]))
+    const flatItems: SingleItem[] = []
+    for (const r of next) {
+      if (r.kind === 'pair') flatItems.push(...r.items)
+      else flatItems.push(r)
+    }
+    const order = new Map(flatItems.map((item, index) => [item.key, flatItems.length - index]))
     setGroups((prev) => prev.map((g) => ({ ...g, sortOrder: order.get(`g${g.id}`) ?? g.sortOrder })))
     setCharacters((prev) => prev && prev.map((c) => ({ ...c, sortOrder: order.get(`c${c.id}`) ?? c.sortOrder })))
     saveHomeOrder(
       db,
-      next.map((row) => (row.kind === 'group' ? { kind: 'group', id: row.group.id } : { kind: 'character', id: row.character.id })),
+      flatItems.map((item) => (item.kind === 'group' ? { kind: 'group', id: item.group.id } : { kind: 'character', id: item.character.id })),
       []
     ).catch((err) => reportError(t('groups.failed'), err))
   }
@@ -318,12 +346,17 @@ export default function CharactersScreen() {
   // other one stays, with its settings, and takes over the chats of the dropped one.
   const onReorder = (event: ReorderableListReorderEvent) => {
     moveRow(event)
-    const near = [rows[event.to], rows[event.to + (event.to > event.from ? 1 : -1)]]
-    const moved = rows[event.from]
+    const flatItems: SingleItem[] = []
+    for (const r of rows) {
+      if (r.kind === 'pair') flatItems.push(...r.items)
+      else flatItems.push(r)
+    }
+    const moved = flatItems[event.from]
     if (moved?.kind !== 'character') return
     const dragged = moved.character
+    const near = [flatItems[event.to], flatItems[event.to + (event.to > event.from ? 1 : -1)]]
     const target = near
-      .map((row) => (row?.kind === 'character' ? row.character : undefined))
+      .map((item) => (item?.kind === 'character' ? item.character : undefined))
       .find((other) => other && other.id !== dragged.id && sameCharacter(other, dragged))
     if (!target) return
     confirm({
@@ -355,6 +388,38 @@ export default function CharactersScreen() {
   // The continue button is gone while editing; the edit bar takes its place.
   const barBottom = insets.bottom + 12
   const bottomSpace = editing ? EDIT_BAR_SPACE : lastChat ? CONTINUE_BUTTON_SPACE : 0
+
+  const renderSingleItem = (item: SingleItem, fillH?: number) => {
+    if (item.kind === 'group') {
+      const ids = item.members.map((m) => m.id)
+      return (
+        <GroupCard
+          group={item.group}
+          members={item.members}
+          onOpen={() => router.push(`/groups/${item.group.id}`)}
+          onDelete={() => deleteWholeGroup(item.group, item.members)}
+          onUngroup={() => run(ungroup(db, item.group.id))}
+          menu={groupMenu(item.group, item.members)}
+          editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), motion: editMotion }}
+          onDropCards={(dropped) => run(addToGroup(db, item.group.id, dropped))}
+          onProvide={provide}
+        />
+      )
+    }
+    const { character } = item
+    return (
+      <CharacterCard
+        character={character}
+        onOpen={() => router.push(`/chats/${character.id}`)}
+        onDelete={() => confirmDelete(character)}
+        menu={menuItems(character)}
+        fillHeight={fillH}
+        editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]), motion: editMotion }}
+        onProvide={provide}
+        onDropCards={(dropped) => dropOnCharacter(character, dropped)}
+      />
+    )
+  }
 
   const screen = (
     <View style={styles.screen} ref={anchor.ref} onLayout={(e) => {
@@ -416,35 +481,29 @@ export default function CharactersScreen() {
           ) : null
         }
         renderItem={({ item: row }) => {
-          if (row.kind === 'group') {
-            const ids = row.members.map((m) => m.id)
+          if (row.kind === 'pair') {
+            if (row.items.length === 1) {
+              return (
+                <View style={styles.pairRow}>
+                  <View style={styles.pairItem}>
+                    {renderSingleItem(row.items[0], fillHeight)}
+                  </View>
+                  <View style={styles.pairItemEmpty} />
+                </View>
+              )
+            }
             return (
-              <GroupCard
-                group={row.group}
-                members={row.members}
-                onOpen={() => router.push(`/groups/${row.group.id}`)}
-                onDelete={() => deleteWholeGroup(row.group, row.members)}
-                onUngroup={() => run(ungroup(db, row.group.id))}
-                menu={groupMenu(row.group, row.members)}
-                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), motion: editMotion }}
-                onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
-                onProvide={provide}
-              />
+              <View style={styles.pairRow}>
+                <View style={styles.pairItem}>
+                  {renderSingleItem(row.items[0])}
+                </View>
+                <View style={styles.pairItem}>
+                  {renderSingleItem(row.items[1])}
+                </View>
+              </View>
             )
           }
-          const { character } = row
-          return (
-            <CharacterCard
-              character={character}
-              onOpen={() => router.push(`/chats/${character.id}`)}
-              onDelete={() => confirmDelete(character)}
-              menu={menuItems(character)}
-              fillHeight={fillHeight}
-              editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]), motion: editMotion }}
-              onProvide={provide}
-              onDropCards={(dropped) => dropOnCharacter(character, dropped)}
-            />
-          )
+          return renderSingleItem(row, fillHeight)
         }}
       />
       {editing ? (
@@ -467,16 +526,16 @@ export default function CharactersScreen() {
             onPress={() => setChecked(allChecked ? new Set() : new Set((characters ?? []).map((c) => c.id)))}
           />
           <View style={styles.editBarActions}>
-            <GlassButton
-              icon="folder-outline"
-              tint={canGroup ? colors.accent : undefined}
+            <IconButton
+              name="folder-outline"
+              color={canGroup ? colors.accent : undefined}
               disabled={!canGroup}
               onPress={groupChecked}
               accessibilityLabel={t('groups.groupSelected')}
             />
-            <GlassButton
-              icon="trash-outline"
-              tint={checked.size ? colors.danger : undefined}
+            <IconButton
+              name="trash-outline"
+              color={checked.size ? colors.danger : undefined}
               disabled={!checked.size}
               onPress={deleteChecked}
               accessibilityLabel={t('characters.deleteSelected')}
@@ -577,10 +636,9 @@ const createStyles = (colors: Colors) =>
     alignItems: 'center',
     gap: 12,
     backgroundColor: colors.surface,
-    borderWidth: isDesktop ? 0 : 1,
+    borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: isDesktop ? 8 : 20,
-    borderCurve: 'continuous',
+    borderRadius: 8,
     paddingVertical: 12,
     paddingLeft: 14,
     paddingRight: 12,
@@ -589,8 +647,7 @@ const createStyles = (colors: Colors) =>
   noticeTile: {
     width: 30,
     height: 30,
-    borderRadius: 7,
-    borderCurve: 'continuous',
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accent,
@@ -612,7 +669,10 @@ const createStyles = (colors: Colors) =>
   editBarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 },
   createMenu: { position: 'absolute', zIndex: 100, transformOrigin: 'right top' },
-  createMenuBody: { borderRadius: 22, borderCurve: 'continuous', padding: 6, minWidth: 220 },
-  createMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 16, borderCurve: 'continuous' },
-  createMenuLabel: { color: colors.text, fontSize: 16, fontWeight: '500' },
+  createMenuBody: { borderRadius: 8, padding: 6, minWidth: 220 },
+  createMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 6 },
+  createMenuLabel: { color: colors.text, fontSize: 15, fontWeight: '500' },
+  pairRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  pairItem: { flex: 1 },
+  pairItemEmpty: { flex: 1 },
 })

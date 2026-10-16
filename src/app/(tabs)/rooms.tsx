@@ -9,7 +9,7 @@ import ReorderableList from 'react-native-reorderable-list'
 import { Button } from '@/components/controls/Button'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassButton } from '@/components/chrome/Glass'
+import { IconButton } from '@/components/controls/IconButton'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Pattern } from '@/components/visuals/Pattern'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
@@ -162,9 +162,9 @@ export default function RoomsScreen() {
             label={allChecked ? t('characters.deselectAll') : t('characters.selectAll')}
             onPress={() => setChecked(allChecked ? new Set() : new Set((rooms ?? []).map((r) => r.id)))}
           />
-          <GlassButton
-            icon="trash-outline"
-            tint={checked.size ? colors.danger : undefined}
+          <IconButton
+            name="trash-outline"
+            color={checked.size ? colors.danger : undefined}
             disabled={!checked.size}
             onPress={deleteChecked}
             accessibilityLabel={t('rooms.deleteSelected')}
@@ -176,9 +176,9 @@ export default function RoomsScreen() {
         right={
           <View style={styles.headerButtons}>
             {rooms?.length ? (
-              <GlassButton
-                icon={editing ? 'checkmark' : 'list'}
-                tint={editing ? colors.accent : undefined}
+              <IconButton
+                name={editing ? 'checkmark' : 'list'}
+                color={editing ? colors.accent : undefined}
                 {...editButton}
                 accessibilityLabel={editing ? t('characters.doneEditing') : t('rooms.editList')}
               />
@@ -186,7 +186,7 @@ export default function RoomsScreen() {
             {editing ? null : (
               <Link href="/room/new" asChild>
                 <Link.AppleZoom>
-                  <GlassButton icon="add" iconSize={26} accessibilityLabel={t('rooms.createRoom')} />
+                  <IconButton name="add" size={24} accessibilityLabel={t('rooms.createRoom')} />
                 </Link.AppleZoom>
               </Link>
             )}
