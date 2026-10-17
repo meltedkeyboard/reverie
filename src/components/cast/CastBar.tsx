@@ -68,7 +68,7 @@ export function CastBar({ members, addressees, whisper, narration, onOpen }: Pro
 
 const FLOORS: FloorMode[] = ['addressee', 'reactions', 'open']
 
-const FLOOR_ICONS = {
+export const FLOOR_ICONS = {
   addressee: { icon: 'person-outline', sf: 'person' },
   reactions: { icon: 'chatbubbles-outline', sf: 'bubble.left.and.bubble.right' },
   open: { icon: 'mic-outline', sf: 'mic' },

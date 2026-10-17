@@ -11,7 +11,7 @@ import { isDesktop } from '@/lib/core/platform'
 import { AsideToggleButton, ChatSurface, bubbleOpacityOf } from '@/components/chrome/ChatChrome'
 import { AsidePanel } from '@/components/chat/AsidePanel'
 import { AvatarStack, castGallery } from '@/components/cast/AvatarStack'
-import { CastBar, FloorButton } from '@/components/cast/CastBar'
+import { CastBar, FloorButton, FLOOR_ICONS } from '@/components/cast/CastBar'
 import { CastSheet } from '@/components/cast/CastSheet'
 import { Composer, ComposerFloat, ComposerSwap } from '@/components/chat/Composer'
 import { ConversationList, ErrorCard, JumpButton } from '@/components/chat/ConversationList'
@@ -296,16 +296,6 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     setRoomFloor(db, room.id, mode)
   }
 
-  const chooseFloor = () => {
-    showSheet(
-      t('room.floorTitle'),
-      FLOORS.map((mode) => ({
-        label: `${t(`room.floor.${mode}`)}${mode === floor ? t('room.floorCurrent') : ''}`,
-        onSelect: () => changeFloor(mode),
-      }))
-    )
-  }
-
   const chooseAutoplay = () => {
     if (!idle || !members.some((m) => m.present && !m.muted)) return
     showSheet(
@@ -327,9 +317,13 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: () => promptRenameChat(title, rename) },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     {
-      label: t('room.menuFloor', { mode: t(`room.floor.${floor}`) }),
+      label: t('room.floorTitle'),
       systemImage: 'person.wave.2',
-      onSelect: chooseFloor,
+      children: FLOORS.map((mode) => ({
+        label: t(`room.floor.${mode}`),
+        systemImage: mode === floor ? 'checkmark' : FLOOR_ICONS[mode].sf,
+        onSelect: () => changeFloor(mode),
+      })),
     },
     { label: t('room.menuAutoplay'), systemImage: 'bubble.left.and.bubble.right', onSelect: chooseAutoplay },
     { label: t('room.menuEditRoom'), systemImage: 'slider.horizontal.3', onSelect: () => router.push(`/room/${room.id}`) },

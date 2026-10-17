@@ -201,16 +201,7 @@ export function CastSheet({
         <CrossFade texts={[t('room.castHint'), t('room.castBusy')]} index={canMove ? 0 : 1} style={styles.hint} />
 
         <View style={[styles.sheetCard, styles.sheetCardSecondary, { backgroundColor: tones.card }]}>
-          <Pressable
-            onPress={() => {
-              Haptics.selectionAsync()
-              onToggleWhisper()
-            }}
-            disabled={!canWhisper}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: whisper && canWhisper, disabled: !canWhisper }}
-            style={({ pressed }) => [styles.row, styles.whisperRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
-          >
+          <View style={[styles.row, styles.whisperRow, { backgroundColor: tones.row }]}>
             <Animated.View style={[styles.modeIcon, { opacity: canWhisper ? 1 : AWAY }, FADE]}>
               <Icon name="lock-closed" size={18} color={colors.accent} />
             </Animated.View>
@@ -231,7 +222,7 @@ export function CastSheet({
                 {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
               />
             </Animated.View>
-          </Pressable>
+          </View>
         </View>
       </ScrollView>
     </BottomSheet>
@@ -467,12 +458,22 @@ const createStyles = (colors: Colors) =>
       bottom: 0,
       right: 0,
       overflow: 'hidden',
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+    },
+    behindLabel: {
+      position: 'absolute',
+      right: 18,
+      width: 120,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-end',
-      paddingRight: 22,
+      gap: 6,
     },
-    behindLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    behindText: { color: ON_ACCENT, fontSize: 15, fontWeight: '600' },
+    behindText: {
+      color: ON_ACCENT,
+      fontSize: 15,
+      fontWeight: '600',
+    },
     hint: { color: colors.textMuted, fontSize: 14, lineHeight: 19, paddingHorizontal: 16, paddingTop: 12 },
   })

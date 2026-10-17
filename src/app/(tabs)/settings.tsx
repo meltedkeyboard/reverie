@@ -64,7 +64,19 @@ import type { SettingsSection } from '@/lib/core/searchScope'
 import { isShownInFiles } from '@/lib/core/storage'
 import { reportError } from '@/lib/transfer/report'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
-import { type Colors, useColors, useStyles } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { Icon } from '@/components/visuals/Icon'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
+import * as Haptics from '@/lib/ui/haptics'
 
 
 export default function SettingsScreen() {
@@ -820,16 +832,13 @@ export default function SettingsScreen() {
             const isCurrent = index === activeLoadedModelIndex
             const isUnloading = unloadingModelIds.has(entry.id)
             return (
-              <SwipeToDelete
+              <SwipeToUnloadModelRow
                 key={entry.id}
-                label={t('settings.unloadModel')}
-                actionLabel={t('settings.unload')}
-                actionIcon="close-circle-outline"
-                actionIconSF="eject.fill"
-                radius={0}
-                throwAway
-                onDelete={() => onUnloadSingle(entry)}
+                enabled={!isUnloading}
+                onUnload={() => onUnloadSingle(entry)}
                 onPress={() => onSelectActiveModel(entry, index)}
+                name={entry.key || entry.id}
+                actionLabel={t('settings.unload')}
               >
                 <Pressable
                   onPress={() => onSelectActiveModel(entry, index)}
@@ -855,11 +864,6 @@ export default function SettingsScreen() {
                     <Text style={[styles.loadedModelName, isCurrent && { fontWeight: '600' }]} numberOfLines={1}>
                       {entry.key || entry.id}
                     </Text>
-                    {isCurrent ? (
-                      <View style={styles.currentBadge}>
-                        <Text style={styles.currentBadgeText}>{t('settings.loadedModelCurrent')}</Text>
-                      </View>
-                    ) : null}
                   </View>
                   {entry.contextLength ? (
                     <Text style={styles.loadedModelTokens}>{formatContextTokens(entry.contextLength)}</Text>
@@ -881,7 +885,7 @@ export default function SettingsScreen() {
                     </Pressable>
                   ) : null}
                 </Pressable>
-              </SwipeToDelete>
+              </SwipeToUnloadModelRow>
             )
           })}
           <ButtonCell
@@ -1117,17 +1121,6 @@ const createStyles = (colors: Colors) =>
       fontSize: 16,
       flexShrink: 1,
     },
-    currentBadge: {
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 6,
-      backgroundColor: colors.accentSoft,
-    },
-    currentBadgeText: {
-      color: colors.accent,
-      fontSize: 11,
-      fontWeight: '600',
-    },
     loadedModelTokens: {
       color: colors.textMuted,
       fontSize: 15,
@@ -1138,4 +1131,103 @@ const createStyles = (colors: Colors) =>
       borderRadius: 6,
       marginLeft: 4,
     },
+    unloadBehind: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      right: 0,
+      overflow: 'hidden',
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+    },
+    unloadBehindLabel: {
+      position: 'absolute',
+      right: 18,
+      width: 120,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 6,
+    },
+    unloadBehindText: {
+      color: ON_ACCENT,
+      fontSize: 15,
+      fontWeight: '600',
+    },
   })
+
+const UNLOAD_TRIGGER = 88
+const UNLOAD_SPRING = { damping: 24, stiffness: 240 }
+
+type SwipeToUnloadProps = {
+  enabled: boolean
+  onUnload: () => void
+  onPress: () => void
+  name: string
+  actionLabel: string
+  children: React.ReactNode
+}
+
+function SwipeToUnloadModelRow({ enabled, onUnload, onPress, name, actionLabel, children }: SwipeToUnloadProps) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  const offset = useSharedValue(0)
+  const armed = useSharedValue(false)
+
+  const tick = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+
+  const pan = Gesture.Pan()
+    .enabled(enabled)
+    .activeOffsetX([-12, 12])
+    .failOffsetY([-10, 10])
+    .onUpdate((e) => {
+      offset.value = e.translationX > 0 ? e.translationX * 0.15 : e.translationX
+      const past = -offset.value > UNLOAD_TRIGGER
+      if (past !== armed.value) {
+        armed.value = past
+        scheduleOnRN(tick)
+      }
+    })
+    .onEnd(() => {
+      const fire = armed.value
+      armed.value = false
+      offset.value = withTiming(0, { duration: 200 }, (finished) => {
+        if (finished && fire) scheduleOnRN(onUnload)
+      })
+    })
+
+  const peek = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    offset.value = withSequence(withTiming(-40, { duration: 150 }), withSpring(0, UNLOAD_SPRING))
+  }
+
+  const content = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }))
+  const behind = useAnimatedStyle(() => ({
+    width: Math.max(0, -offset.value),
+    opacity: interpolate(-offset.value, [0, 28], [0, 1], 'clamp'),
+  }))
+  const icon = useAnimatedStyle(() => ({ transform: [{ scale: withTiming(armed.value ? 1.2 : 1, { duration: 120 }) }] }))
+
+  return (
+    <View>
+      <Animated.View style={[styles.unloadBehind, { backgroundColor: colors.danger }, behind]}>
+        <Animated.View style={[styles.unloadBehindLabel, icon]}>
+          <Icon name="close-circle-outline" size={20} color={ON_ACCENT} />
+          <Text style={styles.unloadBehindText}>{actionLabel}</Text>
+        </Animated.View>
+      </Animated.View>
+      <GestureDetector gesture={pan}>
+        <Animated.View style={content}>
+          <Pressable
+            onPress={enabled ? onPress : peek}
+            accessibilityLabel={name}
+            accessibilityActions={enabled ? [{ name: 'unload', label: actionLabel }] : undefined}
+            onAccessibilityAction={() => onUnload()}
+          >
+            {children}
+          </Pressable>
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  )
+}
