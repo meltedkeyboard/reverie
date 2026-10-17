@@ -262,7 +262,12 @@ export function listRoomChats(db: SQLiteDatabase, roomId: number) {
 export async function createRoomChat(db: SQLiteDatabase, room: Room) {
   let chatId = 0
   await db.withTransactionAsync(async () => {
-    const res = await db.runAsync('INSERT INTO chats (room_id, created_at) VALUES (?, ?)', [room.id, Date.now()])
+    const defaultPersona = await db.getFirstAsync<{ id: number }>('SELECT id FROM personas WHERE is_default = 1 LIMIT 1')
+    const res = await db.runAsync('INSERT INTO chats (room_id, created_at, persona_id) VALUES (?, ?, ?)', [
+      room.id,
+      Date.now(),
+      defaultPersona?.id ?? null,
+    ])
     chatId = res.lastInsertRowId
     const opening = room.opening.trim()
     if (opening) await addMessage(db, chatId, 'assistant', opening, { kind: 'narration' })

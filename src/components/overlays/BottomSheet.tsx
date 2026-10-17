@@ -17,6 +17,7 @@ type Props = {
   visible: boolean
   onClose: () => void
   onDismissed?: () => void
+  onBack?: () => void
   title: string
   rightItem?: React.ReactNode
   compactHeader?: boolean
@@ -65,6 +66,7 @@ export function BottomSheet({
   rightItem,
   compactHeader = false,
   noGlass = false,
+  onBack,
   children,
 }: Props) {
   const styles = useStyles(createStyles)
@@ -183,7 +185,30 @@ export function BottomSheet({
               {title}
             </Text>
           </View>
-          {isGlass ? (
+          {onBack ? (
+            isGlass ? (
+              <GlassButton
+                icon="chevron-back"
+                iconSize={compactHeader ? 22 : 26}
+                onPress={onBack}
+                accessibilityLabel={t('common.back')}
+              />
+            ) : (
+              <Pressable
+                onPress={onBack}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
+                style={({ pressed }) => [
+                  styles.close,
+                  compactHeader && styles.closeCompact,
+                  { backgroundColor: pressed ? tones.pressed : tones.card },
+                ]}
+              >
+                <Icon name="chevron-back" size={compactHeader ? 20 : 24} color={colors.text} />
+              </Pressable>
+            )
+          ) : isGlass ? (
             <GlassButton
               icon="close"
               iconSize={compactHeader ? 22 : 26}

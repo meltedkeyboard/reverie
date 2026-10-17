@@ -45,6 +45,13 @@ import { liquidGlass } from '@/lib/ui/nativeUI'
 import { alertError } from '@/lib/transfer/report'
 import { isDesktop, isIOS, isWeb } from '@/lib/core/platform'
 import { type Colors, ON_ACCENT, useColors, useStyles, useTheme } from '@/theme'
+import { useRouter } from 'expo-router'
+import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
+import { Button } from '@/components/controls/Button'
+import { Avatar } from '@/components/visuals/Avatar'
+import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
+import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
+import { Star } from '@/components/visuals/motifs/Star'
 
 type Props = {
   height: SharedValue<number>
@@ -83,6 +90,10 @@ type Props = {
   // Whether reasoning / thinking is active for this chat.
   thinking?: boolean
   onToggleThinking?: (thinking: boolean) => void
+  // The persona currently bound to this chat
+  persona?: Persona | null
+  personaId?: number | null
+  onSelectPersona?: (personaId: number | null) => void
 }
 
 export function Composer({
@@ -108,6 +119,9 @@ export function Composer({
   onSuggestionDismissed,
   thinking,
   onToggleThinking,
+  persona,
+  personaId,
+  onSelectPersona,
 }: Props) {
   const insets = useSafeAreaInsets()
   const { width: windowWidth } = useWindowDimensions()
@@ -118,6 +132,26 @@ export function Composer({
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
+  const db = useDatabase()
+  const router = useRouter()
+  const [sheetScreen, setSheetScreen] = useState<'attach' | 'persona'>('attach')
+  const [personas, setPersonas] = useState<Persona[]>([])
+
+  useEffect(() => {
+    let alive = true
+    const load = () => {
+      listPersonas(db).then((list) => {
+        if (alive) setPersonas(list)
+      })
+    }
+    load()
+    const unsub = onPersonasChanged(load)
+    return () => {
+      alive = false
+      unsub()
+    }
+  }, [db])
+
   const [text, setText] = useState(initialText)
   const textRef = useRef(text)
   textRef.current = text
@@ -298,7 +332,12 @@ export function Composer({
     closeMenu()
   }
 
+  const triggerPersonaPicker = () => {
+    setSheetScreen('persona')
+  }
+
   const onSheetDismissed = () => {
+    setSheetScreen('attach')
     const source = pendingAttachSource.current
     if (source) {
       pendingAttachSource.current = null
@@ -379,7 +418,6 @@ export function Composer({
     setMenuShown(true)
   }
   // The latest pictures sent, offered in the cards row; read when the menu opens.
-  const db = useDatabase()
   const [recents, setRecents] = useState<MessageImage[]>([])
 
   const toggleSelectRecent = (picture: MessageImage) => {
@@ -408,6 +446,7 @@ export function Composer({
 
   const closeMenu = () => {
     setMenuShown(false)
+    setSheetScreen('attach')
     setSelectedRecents([])
   }
 
@@ -735,11 +774,26 @@ export function Composer({
         visible={menuShown}
         onClose={closeMenu}
         onDismissed={onSheetDismissed}
-        title={t('attach.addToChat')}
+        title={sheetScreen === 'persona' ? t('persona.pickerTitle') : t('attach.addToChat')}
+        onBack={sheetScreen === 'persona' ? () => setSheetScreen('attach') : undefined}
         compactHeader
         noGlass
         rightItem={
-          !isWeb ? (
+          sheetScreen === 'persona' ? (
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                closeMenu()
+                router.push('/persona/new')
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('persona.create')}
+              style={({ pressed }) => [styles.headerIconBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Icon name="add" size={24} color={colors.accent} />
+            </Pressable>
+          ) : !isWeb ? (
             <Pressable
               onPress={() => triggerAttach('library')}
               hitSlop={8}
@@ -752,6 +806,117 @@ export function Composer({
           ) : null
         }
       >
+        {sheetScreen === 'persona' ? (
+          <View style={styles.sheetContent}>
+            {personas.length === 0 ? (
+              <View style={styles.personaEmptyContainer}>
+                <EmptyState
+                  title={t('persona.emptyTitle')}
+                  text={t('persona.emptyText')}
+                  action={
+                    <Button
+                      variant="glass"
+                      label={t('persona.create')}
+                      style={emptyButtonStyle}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                        closeMenu()
+                        router.push('/persona/new')
+                      }}
+                    />
+                  }
+                />
+              </View>
+            ) : (
+              <View style={[styles.sheetCard, { backgroundColor: tones.card }]}>
+                {/* None row */}
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync()
+                    onSelectPersona?.(null)
+                    closeMenu()
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('persona.none')}
+                  style={({ pressed }) => [
+                    styles.personaRow,
+                    { backgroundColor: pressed ? tones.pressed : tones.row },
+                  ]}
+                >
+                  <View style={[styles.personaIconCircle, { backgroundColor: colors.surfaceRaised }]}>
+                    <Icon name="person-outline" size={20} color={colors.textMuted} />
+                  </View>
+                  <View style={styles.personaTextContainer}>
+                    <Text style={styles.personaName}>{t('persona.none')}</Text>
+                    <Text style={styles.personaSubtitle}>{t('persona.noneSubtitle')}</Text>
+                  </View>
+                  {(personaId ?? persona?.id ?? null) === null ? (
+                    <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} />
+                  ) : null}
+                </Pressable>
+
+                {personas.map((item) => {
+                  const isSelected = (personaId ?? persona?.id ?? null) === item.id
+                  const personaMenu: MenuItem[] = [
+                    {
+                      label: t('persona.edit'),
+                      systemImage: 'pencil',
+                      onSelect: () => {
+                        closeMenu()
+                        router.push(`/persona/${item.id}`)
+                      },
+                    },
+                  ]
+                  return (
+                    <View key={item.id}>
+                      <View style={[styles.sheetCardSeparator, { backgroundColor: colors.borderStrong }]} />
+                      <Pressable
+                        onPress={() => {
+                          Haptics.selectionAsync()
+                          onSelectPersona?.(item.id)
+                          closeMenu()
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={item.name}
+                        style={({ pressed }) => [
+                          styles.personaRow,
+                          { backgroundColor: pressed ? tones.pressed : tones.row },
+                        ]}
+                      >
+                        <Avatar name={item.name} file={item.avatar} size={36} />
+                        <View style={styles.personaTextContainer}>
+                          <View style={styles.personaNameRow}>
+                            <Text style={styles.personaName} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            {item.isDefault ? (
+                              <Star size={12} color={colors.accent} />
+                            ) : null}
+                          </View>
+                          {item.description ? (
+                            <Text style={styles.personaSubtitle} numberOfLines={1}>
+                              {item.description}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <View style={styles.personaTrailingRow}>
+                          {isSelected ? (
+                            <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} />
+                          ) : null}
+                          <NativeMenu items={personaMenu}>
+                            <View style={styles.personaEditButton}>
+                              <Icon name="ellipsis-horizontal" size={18} color={colors.textFaint} />
+                            </View>
+                          </NativeMenu>
+                        </View>
+                      </Pressable>
+                    </View>
+                  )
+                })}
+              </View>
+            )}
+          </View>
+        ) : (
         <View style={styles.sheetContent}>
           {/* Top row: Camera tile + Recent picture thumbnails (or library button on web) */}
           <ScrollView
@@ -819,11 +984,11 @@ export function Composer({
 
             <View style={[styles.sheetCardSeparator, { backgroundColor: colors.borderStrong }]} />
 
-            {/* Persona placeholder: currently inactive / does nothing */}
+            {/* Persona row: opens persona picker sheet */}
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                showToast({ title: t('attach.personaPlaceholder'), tone: 'info' })
+                triggerPersonaPicker()
               }}
               accessibilityRole="button"
               accessibilityLabel={t('attach.persona')}
@@ -835,7 +1000,9 @@ export function Composer({
               <Icon name="person-outline" size={22} color={colors.text} />
               <Text style={styles.sheetCardLabel}>{t('attach.persona')}</Text>
               <View style={styles.sheetCardTrailing}>
-                <Text style={styles.sheetCardTrailingText}>{t('attach.personaNone')}</Text>
+                <Text style={styles.sheetCardTrailingText} numberOfLines={1}>
+                  {persona?.name ? persona.name : t('attach.personaNone')}
+                </Text>
                 <Icon name="chevron-forward" size={17} color={colors.textFaint} />
               </View>
             </Pressable>
@@ -899,6 +1066,7 @@ export function Composer({
             </Pressable>
           </View>
         </View>
+        )}
       </BottomSheet>
     </KeyboardStickyView>
   )
@@ -1072,6 +1240,63 @@ const createStyles = (colors: Colors) =>
     paddingVertical: 12,
     paddingRight: 16,
     minHeight: 52,
+  },
+  personaEmptyContainer: {
+    paddingVertical: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 56,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 14,
+  },
+  personaIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personaTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  personaNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  personaName: {
+    fontSize: 16,
+    color: colors.text,
+    letterSpacing: -0.2,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  personaSubtitle: {
+    fontSize: 12,
+    color: colors.textFaint,
+    letterSpacing: -0.1,
+  },
+  personaTrailingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  personaEditButton: {
+    padding: 6,
+  },
+  headerIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   thinkingLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
   nativeSwitch: { marginVertical: 0 },

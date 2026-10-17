@@ -12,6 +12,7 @@ export type Chat = {
   title: string | null
   createdAt: number
   thinking?: ThinkingMode | null
+  personaId?: number | null
 }
 
 export type ChatPreview = Chat & {
@@ -23,7 +24,8 @@ export type ChatPreview = Chat & {
 // A message that is only a picture has empty text, so the list shows a label instead.
 export const PREVIEW = "CASE WHEN m.content = '' AND m.images IS NOT NULL THEN 'Фото' ELSE m.content END"
 
-export const CHAT_COLUMNS = 'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking'
+export const CHAT_COLUMNS =
+  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId'
 
 export function listChats(db: SQLiteDatabase, characterId: number) {
   return db.getAllAsync<ChatPreview>(
@@ -57,9 +59,11 @@ export function getChat(db: SQLiteDatabase, id: number) {
 export async function createChat(db: SQLiteDatabase, character: Character) {
   let chatId = 0
   await db.withTransactionAsync(async () => {
-    const res = await db.runAsync('INSERT INTO chats (character_id, created_at) VALUES (?, ?)', [
+    const defaultPersona = await db.getFirstAsync<{ id: number }>('SELECT id FROM personas WHERE is_default = 1 LIMIT 1')
+    const res = await db.runAsync('INSERT INTO chats (character_id, created_at, persona_id) VALUES (?, ?, ?)', [
       character.id,
       Date.now(),
+      defaultPersona?.id ?? null,
     ])
     chatId = res.lastInsertRowId
     const greeting = character.greeting.trim()
@@ -86,7 +90,7 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
   let chatId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      'INSERT INTO chats (character_id, room_id, title, created_at, thinking) SELECT character_id, room_id, ?, created_at, thinking FROM chats WHERE id = ?',
+      'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id) SELECT character_id, room_id, ?, created_at, thinking, persona_id FROM chats WHERE id = ?',
       [title, id]
     )
     chatId = res.lastInsertRowId

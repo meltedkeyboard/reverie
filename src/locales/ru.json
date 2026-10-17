@@ -648,5 +648,24 @@
   "sync.pushAnyway": "Всё равно отправить",
   "sync.pullOverTitle": "На этом устройстве есть изменения",
   "sync.pullOverText": "Получение заменит переписки на этом устройстве данными из папки. Текущие данные сначала откладываются в сторону",
-  "sync.pullAnyway": "Всё равно получить"
+  "sync.pullAnyway": "Всё равно получить",
+
+  "persona.title": "Персоны",
+  "persona.pickerTitle": "Личность пользователя",
+  "persona.new": "Новая персона",
+  "persona.edit": "Редактировать персону",
+  "persona.create": "Создать персону",
+  "persona.none": "Без персоны",
+  "persona.noneSubtitle": "Стандартный нейтральный диалог",
+  "persona.nameLabel": "Имя",
+  "persona.namePlaceholder": "Как вас зовут (например, Саша)",
+  "persona.descriptionLabel": "О персоне",
+  "persona.descriptionHint": "Внешность, характер, роль, привычки, как персонажи воспринимают вас...",
+  "persona.descriptionPlaceholder": "Опишите себя: внешность, характер, особенности или предысторию...",
+  "persona.defaultLabel": "По умолчанию",
+  "persona.defaultHint": "Использовать эту персону во всех новых чатах",
+  "persona.delete": "Удалить персону",
+  "persona.deleteConfirm": "Удалить персону «{{name}}»? В чатах с ней персона будет сброшена на «Нет».",
+  "persona.emptyTitle": "Нет персон",
+  "persona.emptyText": "Создайте персону, чтобы не описывать себя заново в каждом чате"
 }

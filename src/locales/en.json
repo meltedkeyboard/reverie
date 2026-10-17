@@ -648,5 +648,24 @@
   "sync.pushAnyway": "Push anyway",
   "sync.pullOverTitle": "This device has changes",
   "sync.pullOverText": "Pulling replaces this device's chats with the ones in the folder. The current data is put aside first",
-  "sync.pullAnyway": "Pull anyway"
+  "sync.pullAnyway": "Pull anyway",
+
+  "persona.title": "Personas",
+  "persona.pickerTitle": "User Persona",
+  "persona.new": "New persona",
+  "persona.edit": "Edit persona",
+  "persona.create": "Create persona",
+  "persona.none": "No persona",
+  "persona.noneSubtitle": "Standard neutral roleplay",
+  "persona.nameLabel": "Name",
+  "persona.namePlaceholder": "Your name (e.g. Alex)",
+  "persona.descriptionLabel": "About persona",
+  "persona.descriptionHint": "Appearance, personality, role, habits, how characters view you...",
+  "persona.descriptionPlaceholder": "Describe yourself: appearance, traits, background...",
+  "persona.defaultLabel": "Default",
+  "persona.defaultHint": "Use this persona in all new chats",
+  "persona.delete": "Delete persona",
+  "persona.deleteConfirm": "Delete persona \"{{name}}\"? Chats using it will revert to \"None\".",
+  "persona.emptyTitle": "No personas",
+  "persona.emptyText": "Create a persona so you don't have to re-describe yourself in every chat"
 }

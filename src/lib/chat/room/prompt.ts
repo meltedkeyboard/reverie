@@ -4,12 +4,14 @@ import type { Message } from '@/db/messages'
 import type { Room, RoomMember } from '@/db/rooms'
 import { selectHistory, turnTokens } from '@/lib/core/context'
 import { toTurn, withReplyLimit } from '@/lib/chat/replyStream'
+import type { Persona } from '@/db/personas'
+import { formatPersonaPrompt } from '@/lib/chat/persona'
 
 import { hearing, USER } from './audience'
 import type { Planned } from './floor'
 
-export function userNameOf(room: Room) {
-  return room.userName.trim() || 'User'
+export function userNameOf(room: Room, persona?: Persona | null) {
+  return persona?.name.trim() || room.userName.trim() || 'User'
 }
 
 function list(names: string[]) {
@@ -29,14 +31,15 @@ type Context = {
   guidance?: string
   window: Window
   thinking?: ThinkingMode
+  persona?: Persona | null
 }
 
 // The scene as this one character lived it: their own lines as the assistant, everyone
 // else's as the user with a name in front, and nothing they could not have heard.
-export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking }: Context): ChatRequest {
+export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking, persona }: Context): ChatRequest {
   const me = speaker.characterId
   const name = speaker.character.name
-  const userName = userNameOf(room)
+  const userName = userNameOf(room, persona)
   const nameOf = (id: number | null) =>
     id === USER ? userName : (members.find((m) => m.characterId === id)?.character.name ?? 'Someone')
   // Only those in the scene now: someone who stepped out is not in the room to talk to.
@@ -44,6 +47,7 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
   const listener = (id: number) => (id === me ? 'you' : nameOf(id))
 
   const away = members.filter((m) => m.characterId !== me && !m.present).map((m) => m.character.name)
+  const personaBlock = formatPersonaPrompt(persona ?? null)
   const group = [
     'This is a group scene with several characters.',
     room.scenario.trim() ? `Scene: ${room.scenario.trim()}` : '',
@@ -55,6 +59,7 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
       ? `${name} may leave the scene, send someone out or let someone in when the story calls for it; show it as ${name}'s own action.`
       : '',
     `You are ${name}. Write only ${name}'s next line: what ${name} says and does. Never write lines, actions or thoughts for ${list([...others, userName])}. Do not start your reply with your name.`,
+    personaBlock ? personaBlock : '',
   ]
     .filter(Boolean)
     .join('\n')

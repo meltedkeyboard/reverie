@@ -12,6 +12,8 @@ import { selectHistory, turnTokens } from '@/lib/core/context'
 import { errorMessage } from '@/lib/core/errors'
 import * as Haptics from '@/lib/ui/haptics'
 import { CONTINUE_NOTE, emptyReplyReason, runReplyStream, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
+import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
+import { formatPersonaPrompt } from '@/lib/chat/persona'
 
 export type ChatPhase = 'idle' | 'waiting' | 'streaming'
 
@@ -74,6 +76,41 @@ export function useChat(chat: Chat, character: Character) {
   const chatThinkingRef = useRef(chatThinking)
   chatThinkingRef.current = chatThinking
 
+  const [personaId, setPersonaId] = useState<number | null>(chat.personaId ?? null)
+  const [persona, setPersona] = useState<Persona | null>(null)
+  const personaRef = useRef<Persona | null>(null)
+  personaRef.current = persona
+
+  useEffect(() => {
+    setPersonaId(chat.personaId ?? null)
+  }, [chat.id, chat.personaId])
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      if (!personaId) {
+        if (alive) setPersona(null)
+        return
+      }
+      const found = await getPersona(db, personaId)
+      if (alive) setPersona(found)
+    }
+    load()
+    const unsub = onPersonasChanged(load)
+    return () => {
+      alive = false
+      unsub()
+    }
+  }, [db, personaId])
+
+  const selectPersona = useCallback(
+    async (id: number | null) => {
+      setPersonaId(id)
+      await setChatPersona(db, chat.id, id)
+    },
+    [db, chat.id]
+  )
+
   useEffect(() => {
     setChatThinkingState(chat.thinking ?? null)
   }, [chat.id, chat.thinking])
@@ -134,7 +171,9 @@ export function useChat(chat: Chat, character: Character) {
 
       try {
         const cfg = await loadSettings(db)
-        const system = withReplyLimit(target.systemPrompt.trim(), target.replyLimit)
+        const personaBlock = formatPersonaPrompt(personaRef.current)
+        const fullSystem = [target.systemPrompt.trim(), personaBlock].filter(Boolean).join('\n\n')
+        const system = withReplyLimit(fullSystem, target.replyLimit)
         const turns = selectHistory(history.map(toTurn), turnTokens, cfg, {
           messages: cfg.chatMessages,
           system,
@@ -259,6 +298,9 @@ export function useChat(chat: Chat, character: Character) {
     reasoningMs,
     thinking,
     toggleThinking,
+    persona,
+    personaId,
+    selectPersona,
     send,
     stop,
     regenerate,

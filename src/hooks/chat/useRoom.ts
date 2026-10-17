@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { ThinkingMode } from '@/db/characters'
 import { setChatThinking, type Chat } from '@/db/chats'
+import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
 import { addMessage, addVariant, listMessages, type Message, type MessageImage, type MessageKind, type Thought } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { setMemberPresent, type Room, type RoomMember } from '@/db/rooms'
@@ -99,6 +100,41 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   const [chatThinking, setChatThinkingState] = useState<ThinkingMode | null>(chat.thinking ?? null)
   const chatThinkingRef = useRef(chatThinking)
   chatThinkingRef.current = chatThinking
+
+  const [personaId, setPersonaId] = useState<number | null>(chat.personaId ?? null)
+  const [persona, setPersona] = useState<Persona | null>(null)
+  const personaRef = useRef<Persona | null>(null)
+  personaRef.current = persona
+
+  useEffect(() => {
+    setPersonaId(chat.personaId ?? null)
+  }, [chat.id, chat.personaId])
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      if (!personaId) {
+        if (alive) setPersona(null)
+        return
+      }
+      const found = await getPersona(db, personaId)
+      if (alive) setPersona(found)
+    }
+    load()
+    const unsub = onPersonasChanged(load)
+    return () => {
+      alive = false
+      unsub()
+    }
+  }, [db, personaId])
+
+  const selectPersona = useCallback(
+    async (id: number | null) => {
+      setPersonaId(id)
+      await setChatPersona(db, chat.id, id)
+    },
+    [db, chat.id]
+  )
 
   useEffect(() => {
     setChatThinkingState(chat.thinking ?? null)
@@ -203,7 +239,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       const name = speaker.character.name
       const others = [
         ...membersRef.current.filter((m) => m !== speaker).map((m) => m.character.name),
-        userNameOf(roomRef.current),
+        userNameOf(roomRef.current, personaRef.current),
       ]
       setReplacingId(replacing?.id ?? null)
       setPhase('waiting')
@@ -224,6 +260,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           guidance,
           window: cfg,
           thinking: chatThinkingRef.current ?? speaker.character.thinking,
+          persona: personaRef.current,
         })
         const streamed = await runReplyStream(cfg, req, ctrl.signal, {
           onStart: () => setPhase('streaming'),
@@ -509,6 +546,9 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     auto,
     thinking,
     toggleThinking,
+    persona,
+    personaId,
+    selectPersona,
     send,
     stop,
     proceed,

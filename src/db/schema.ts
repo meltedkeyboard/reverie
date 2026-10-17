@@ -240,6 +240,21 @@ const MIGRATIONS = [
   `
     ALTER TABLE chats ADD COLUMN thinking TEXT;
   `,
+  // User personas: identity and description the user takes on in chats.
+  `
+    CREATE TABLE personas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      avatar TEXT,
+      avatar_original TEXT,
+      avatar_crop TEXT,
+      description TEXT NOT NULL DEFAULT '',
+      is_default INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    ALTER TABLE chats ADD COLUMN persona_id INTEGER REFERENCES personas(id) ON DELETE SET NULL;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

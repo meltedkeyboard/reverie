@@ -21,6 +21,7 @@ export type SettingsSection =
   | 'language'
   | 'continue'
   | 'private'
+  | 'personas'
   | 'suggest'
   | 'confirmDelete'
   | 'recents'

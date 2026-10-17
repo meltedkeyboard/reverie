@@ -4,7 +4,8 @@ import * as LocalAuthentication from 'expo-local-authentication'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
-import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
+import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, MenuCell, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
+import type { MenuItem } from '@/components/overlays/NativeMenu'
 import {
   inspectLoadedModel,
   listLoadedModels,
@@ -33,6 +34,7 @@ import {
   DEFAULT_RECENT_COUNT,
 } from '@/db/recentAttachments'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/prefs/privateChat'
+import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
 import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, saveSettings, typedCount, type ServerSettings } from '@/db/prefs/settings'
 import { isSuggestionsEnabled, setSuggestionsEnabled } from '@/db/prefs/suggestions'
@@ -244,6 +246,22 @@ export default function SettingsScreen() {
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
   const [appLock, setAppLock] = useStoredFlag(isAppLockEnabled, setAppLockEnabled, false)
+
+  const [personas, setPersonas] = useState<Persona[]>([])
+  useEffect(() => {
+    let alive = true
+    const load = () => {
+      listPersonas(db).then((list) => {
+        if (alive) setPersonas(list)
+      })
+    }
+    load()
+    const unsub = onPersonasChanged(load)
+    return () => {
+      alive = false
+      unsub()
+    }
+  }, [db])
 
   const [showInFiles, setShowInFiles] = useState(isShownInFiles)
   const [movingFiles, setMovingFiles] = useState(false)
@@ -686,6 +704,16 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
+  const personasRow = (
+    <ListSection header={t('persona.title')} footer={t('persona.emptyText')}>
+      <LinkCell
+        label={t('persona.title')}
+        value={personas.length > 0 ? String(personas.length) : t('persona.none')}
+        onPress={() => router.push('/personas')}
+      />
+    </ListSection>
+  )
+
   const privateRow = (
     <ListSection header={t('settings.chats')} footer={t('settings.privateButtonNote')}>
       <SwitchCell label={t('settings.privateButton')} value={privateButton} onValueChange={togglePrivateButton} />
@@ -1064,6 +1092,7 @@ export default function SettingsScreen() {
           {block('language', language)}
           {block('continue', continueRows)}
           {block('private', privateRow)}
+          {block('personas', personasRow)}
           {block('suggest', suggestRow)}
           {block('recents', recentRow)}
           {block('confirmDelete', confirmDeleteRow)}
