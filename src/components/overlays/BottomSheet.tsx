@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { useTranslation } from '@/i18n'
+import { isIOS } from '@/lib/core/platform'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { HEADER_FONT_SCALE, useStyles, useTheme, type Colors } from '@/theme'
 
@@ -15,7 +16,11 @@ import { GlassButton, GlassSurface } from '../chrome/Glass'
 type Props = {
   visible: boolean
   onClose: () => void
+  onDismissed?: () => void
   title: string
+  rightItem?: React.ReactNode
+  compactHeader?: boolean
+  noGlass?: boolean
   children: React.ReactNode
 }
 
@@ -37,9 +42,9 @@ const INSET = 8
 // over the glass and a row is see-through until pressed; an opaque card would hide the
 // glass it sits on. Without it, the iOS way: in the dark the cards are lighter than the
 // sheet, in the light the sheet is gray and the cards white.
-export function useSheetTones() {
+export function useSheetTones(options?: { noGlass?: boolean }) {
   const { colors, scheme } = useTheme()
-  if (liquidGlass) {
+  if (liquidGlass && !options?.noGlass) {
     return scheme === 'light'
       ? { sheet: 'transparent', card: 'rgba(255, 255, 255, 0.55)', row: 'transparent', pressed: 'rgba(0, 0, 0, 0.06)' }
       : { sheet: 'transparent', card: 'rgba(255, 255, 255, 0.07)', row: 'transparent', pressed: 'rgba(255, 255, 255, 0.08)' }
@@ -52,9 +57,19 @@ export function useSheetTones() {
 // A card that floats up from the bottom over a dimmed screen, sized to its content, with
 // a round close button and a centered title. Dragging the top down or tapping outside
 // closes it too.
-export function BottomSheet({ visible, onClose, title, children }: Props) {
+export function BottomSheet({
+  visible,
+  onClose,
+  onDismissed,
+  title,
+  rightItem,
+  compactHeader = false,
+  noGlass = false,
+  children,
+}: Props) {
   const styles = useStyles(createStyles)
-  const tones = useSheetTones()
+  const tones = useSheetTones({ noGlass })
+  const isGlass = liquidGlass && !noGlass
   const { colors } = useTheme()
   const { t } = useTranslation()
   const { height } = useWindowDimensions()
@@ -67,6 +82,7 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
   const presented = useRef(false)
   const measured = useRef(false)
   const opened = useRef(false)
+  const dismissHandled = useRef(false)
   const offset = useSharedValue(height)
   // The distance to just below the screen edge: the sheet's own height, not the
   // window's, or it would fly in from far away and look rushed.
@@ -74,11 +90,23 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
   const closing = useSharedValue(false)
   const grab = useSharedValue(0)
 
+  const triggerDismissed = () => {
+    if (!dismissHandled.current) {
+      dismissHandled.current = true
+      onDismissed?.()
+    }
+  }
+
   const hide = () => {
     presented.current = false
     measured.current = false
     opened.current = false
     setMounted(false)
+    if (!isIOS) {
+      scheduleOnRN(triggerDismissed)
+    } else {
+      setTimeout(triggerDismissed, 150)
+    }
   }
 
   const open = () => {
@@ -106,6 +134,7 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
 
   useEffect(() => {
     if (visible) {
+      dismissHandled.current = false
       setMounted(true)
       // Reopened while still sliding down: the modal is up, so onShow won't come.
       if (opened.current) {
@@ -118,6 +147,7 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
       presented.current = false
       measured.current = false
       setMounted(false)
+      triggerDismissed()
     }
   }, [visible])
 
@@ -143,6 +173,50 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
   const dim = useAnimatedStyle(() => ({ opacity: interpolate(offset.value, [0, travel.value], [1, 0], 'clamp') }))
   const slide = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }))
 
+  const sheetBody = (
+    <>
+      <View style={[styles.header, compactHeader && styles.headerCompact]}>
+        <View style={[styles.grabber, compactHeader && styles.grabberCompact]} />
+        <View style={styles.titleRow}>
+          <View style={styles.titleCenterContainer} pointerEvents="none">
+            <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+          </View>
+          {isGlass ? (
+            <GlassButton
+              icon="close"
+              iconSize={compactHeader ? 22 : 26}
+              onPress={dismiss}
+              accessibilityLabel={t('common.close')}
+            />
+          ) : (
+            <Pressable
+              onPress={dismiss}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={({ pressed }) => [
+                styles.close,
+                compactHeader && styles.closeCompact,
+                { backgroundColor: pressed ? tones.pressed : tones.card },
+              ]}
+            >
+              <Icon name="close" size={compactHeader ? 20 : 24} color={colors.text} />
+            </Pressable>
+          )}
+          <View style={styles.spacer} />
+          {rightItem ? (
+            <View style={[styles.rightItemContainer, compactHeader && styles.rightItemCompact]}>{rightItem}</View>
+          ) : (
+            <View style={[styles.balance, compactHeader && styles.balanceCompact]} />
+          )}
+        </View>
+      </View>
+      {children}
+    </>
+  )
+
   return (
     <Modal
       transparent
@@ -151,9 +225,11 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
       statusBarTranslucent
       navigationBarTranslucent
       onShow={() => {
+        dismissHandled.current = false
         presented.current = true
         open()
       }}
+      onDismiss={triggerDismissed}
       onRequestClose={dismiss}
     >
       {/* Gestures inside a modal need their own root: the app's one does not reach here. */}
@@ -166,7 +242,7 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
           },
         ]}
       >
-        <Animated.View style={[StyleSheet.absoluteFill, liquidGlass ? styles.backdropGlass : styles.backdrop, dim]}>
+        <Animated.View style={[StyleSheet.absoluteFill, isGlass ? styles.backdropGlass : styles.backdrop, dim]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} accessibilityLabel={t('common.close')} />
         </Animated.View>
         {/* Only moved, never faded: Liquid Glass renders wrongly under a fading parent. */}
@@ -178,36 +254,26 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
             open()
           }}
         >
-          <GlassSurface
-            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
-            fallbackStyle={[styles.solid, { backgroundColor: tones.sheet }]}
-          >
-            <GestureDetector gesture={drag}>
-              <View style={styles.header}>
-                <View style={styles.grabber} />
-                <View style={styles.titleRow}>
-                  {liquidGlass ? (
-                    <GlassButton icon="close" iconSize={26} onPress={dismiss} accessibilityLabel={t('common.close')} />
-                  ) : (
-                    <Pressable
-                      onPress={dismiss}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('common.close')}
-                      style={({ pressed }) => [styles.close, { backgroundColor: pressed ? tones.pressed : tones.card }]}
-                    >
-                      <Icon name="close" size={24} color={colors.text} />
-                    </Pressable>
-                  )}
-                  <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1}>
-                    {title}
-                  </Text>
-                  <View style={styles.balance} />
-                </View>
+          <GestureDetector gesture={drag}>
+            {isGlass ? (
+              <GlassSurface
+                style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
+                fallbackStyle={[styles.solid, { backgroundColor: tones.sheet }]}
+              >
+                {sheetBody}
+              </GlassSurface>
+            ) : (
+              <View
+                style={[
+                  styles.sheet,
+                  styles.solid,
+                  { backgroundColor: tones.sheet, paddingBottom: Math.max(insets.bottom, 16) },
+                ]}
+              >
+                {sheetBody}
               </View>
-            </GestureDetector>
-            {children}
-          </GlassSurface>
+            )}
+          </GestureDetector>
         </Animated.View>
       </GestureHandlerRootView>
     </Modal>
@@ -224,10 +290,27 @@ const createStyles = (colors: Colors) =>
     sheet: { flexShrink: 1, borderRadius: 38 },
     solid: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
     header: { paddingTop: 7, paddingBottom: 12, paddingHorizontal: 16 },
+    headerCompact: { paddingTop: 6, paddingBottom: 6 },
     grabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 2.5, backgroundColor: colors.borderStrong, marginBottom: 12 },
+    grabberCompact: { marginBottom: 6 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    titleCenterContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 56,
+    },
+    spacer: { flex: 1 },
     close: { width: CLOSE, height: CLOSE, borderRadius: CLOSE / 2, alignItems: 'center', justifyContent: 'center' },
-    title: { flex: 1, textAlign: 'center', color: colors.text, fontSize: 18, fontWeight: '600' },
+    closeCompact: { width: 36, height: 36, borderRadius: 18 },
+    title: { textAlign: 'center', color: colors.text, fontSize: 18, fontWeight: '600' },
     // Keeps the title centered against the close button.
     balance: { width: CLOSE },
+    balanceCompact: { width: 36 },
+    rightItemContainer: { minWidth: CLOSE, height: CLOSE, alignItems: 'center', justifyContent: 'center' },
+    rightItemCompact: { minWidth: 36, height: 36 },
   })

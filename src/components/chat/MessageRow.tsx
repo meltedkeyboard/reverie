@@ -328,7 +328,7 @@ type ThoughtProps = {
   ms: number | null
 }
 
-// Folded by default like in ChatGPT and Claude. While the model thinks, the folded block
+// Folded by default like in ChatGPT. While the model thinks, the folded block
 // shows the latest lines so it is clear something is happening; afterwards only the
 // header stays, and a tap unfolds the whole reasoning either way.
 export function ThoughtBlock({ text, ms }: ThoughtProps) {

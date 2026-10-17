@@ -23,7 +23,7 @@ type Props = {
 const FACE = 24
 
 // Who a room's message goes to, as a pop-up button in the composer's lower tier: the
-// same height as the send button across from it, like the model picker in the Claude app.
+// same height as the send button across from it.
 export function CastBar({ members, addressees, whisper, narration, onOpen }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)

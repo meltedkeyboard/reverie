@@ -428,6 +428,14 @@
   "attach.title": "Attach",
   "attach.takePhoto": "Take photo",
   "attach.chooseFile": "Choose file",
+  "attach.addToChat": "Add to Chat",
+  "attach.photos": "Photos",
+  "attach.addFiles": "Add files",
+  "attach.persona": "Persona",
+  "attach.personaNone": "None",
+  "attach.personaPlaceholder": "Persona selection is a placeholder and does nothing yet",
+  "attach.attachSingle": "Attach 1 photo",
+  "attach.attachMultiple": "Attach {{count}} photos",
 
 
   "message.thinking": "Thinking...",

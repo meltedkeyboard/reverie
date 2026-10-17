@@ -13,6 +13,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
   Easing,
+  FadeInDown,
+  FadeOutDown,
   interpolateColor,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -26,7 +28,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { BlurBar, EdgeFade } from '../chrome/BarChrome'
 import { GlassSurface, useGlassStyles } from '../chrome/Glass'
-import { PopoverMenu, PopoverMenuDivider } from '../overlays/PopoverMenu'
+import { BottomSheet, useSheetTones } from '../overlays/BottomSheet'
 import { useInputColors } from '../controls/Field'
 import { IconButton } from '../controls/IconButton'
 import { SFIcon } from '../visuals/SFIcon'
@@ -40,10 +42,11 @@ import { withAlpha } from '@/lib/core/color'
 import { pickMessageImages, pictureUri } from '@/lib/images/attachments'
 import type { ImageSource } from '@/lib/images/images'
 import * as Haptics from '@/lib/ui/haptics'
+import { showToast } from '@/lib/ui/toast'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { alertError } from '@/lib/transfer/report'
 import { isDesktop, isIOS, isWeb } from '@/lib/core/platform'
-import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles, useTheme } from '@/theme'
 
 type Props = {
   height: SharedValue<number>
@@ -111,6 +114,8 @@ export function Composer({
   const insets = useSafeAreaInsets()
   const { width: windowWidth } = useWindowDimensions()
   const colors = useColors()
+  const { scheme } = useTheme()
+  const tones = useSheetTones({ noGlass: true })
   const inputColors = useInputColors()
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
@@ -273,8 +278,12 @@ export function Composer({
     }
   }
 
+  // Pickers on iOS must not open while the sheet modal is still dismissing, or iOS
+  // tears down the picker view controller with the modal. We queue the source and
+  // launch the system picker once the modal has fully unmounted.
+  const pendingAttachSource = useRef<ImageSource | null>(null)
+
   const attach = async (source: ImageSource) => {
-    closeMenu()
     setPicking(true)
     try {
       const picked = await pickMessageImages(source)
@@ -283,6 +292,21 @@ export function Composer({
       alertError(t('composer.attachFailedTitle'), err)
     } finally {
       setPicking(false)
+    }
+  }
+
+  const triggerAttach = (source: ImageSource) => {
+    pendingAttachSource.current = source
+    closeMenu()
+  }
+
+  const onSheetDismissed = () => {
+    const source = pendingAttachSource.current
+    if (source) {
+      pendingAttachSource.current = null
+      setTimeout(() => {
+        attach(source)
+      }, 50)
     }
   }
 
@@ -310,7 +334,7 @@ export function Composer({
     </Pressable>
   )
 
-  // With a toolbar the field has two tiers, as in the Claude app: the text across the
+  // With a toolbar the field has two tiers: the text across the
   // whole width, and under it the toolbar on the left and the send button on the right.
   const docked = toolbar !== undefined && toolbar !== null && !editing
   // As in ChatGPT: one line is a capsule with the plus and the send button at the sides;
@@ -322,17 +346,13 @@ export function Composer({
     ? styles.inputExpanded
     : { paddingLeft: editing ? 14 : SIDE_PAD, paddingRight: SIDE_PAD }
 
-  // The attach menu is drawn here, above the field, instead of by a native menu: the system
-  // one grows out of its button, and with the plus inside the field it grew out of the
-  // whole field. This one just pops up over the chat and leaves the keyboard alone.
+  // The attach menu is shown in a bottom sheet over the composer.
   const [menuShown, setMenuShown] = useState(false)
-  // Where the field really is on screen, read when the menu opens, so the menu lines up with
-  // it whatever state (narrow, wide, mid-animation) the field is in.
-  const fieldBox = useRef<Animated.View>(null)
-  const dockBox = useRef<Animated.View>(null)
-  const [menuLeft, setMenuLeft] = useState(10)
+  const [selectedRecents, setSelectedRecents] = useState<MessageImage[]>([])
+
   const openMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setSelectedRecents([])
     isRecentAttachmentsEnabled(db)
       .then(async (on) => {
         if (!on) return []
@@ -340,57 +360,40 @@ export function Composer({
         return listRecentAttachments(db, unlimited ? null : count)
       })
       .then(setRecents, () => setRecents([]))
-    // The dock is the menu's frame. On a phone it starts at the window's edge; beside the
-    // sidebar it starts after it, so the field's window x is taken from the dock's own.
-    fieldBox.current?.measureInWindow((x) => {
-      const show = (origin: number) => {
-        const rawLeft = x - origin
-        const minLeft = Math.max(10, insets.left + 8)
-        const maxLeft = Math.max(minLeft, windowWidth - insets.right - MENU_WIDTH - 8)
-        setMenuLeft(Math.min(Math.max(minLeft, rawLeft), maxLeft))
-        setMenuShown(true)
-      }
-      if (dockBox.current) dockBox.current.measureInWindow((dockX) => show(dockX))
-      else show(0)
-    })
+    setMenuShown(true)
   }
-  // The row under the finger while it is down on the menu.
-  const [menuHover, setMenuHover] = useState<number | null>(null)
-  const menuBox = useRef({ width: 0, height: 0 })
-  const menuRows = useRef<{ y: number; height: number }[]>([])
-  // The latest pictures sent, offered again above the sources; read when the menu opens.
+  // The latest pictures sent, offered in the cards row; read when the menu opens.
   const db = useDatabase()
   const [recents, setRecents] = useState<MessageImage[]>([])
-  const rowAt = (x: number, y: number) => {
-    if (x < 0 || x > menuBox.current.width) return null
-    const index = menuRows.current.findIndex((r) => y >= r.y && y < r.y + r.height)
-    return index < 0 ? null : index
-  }
-  const pickMenuItem = (index: number) => {
-    closeMenu()
-    attach(ATTACH_ITEMS[index].source)
-  }
-  const pickRecent = (picture: MessageImage) => {
-    closeMenu()
+
+  const toggleSelectRecent = (picture: MessageImage) => {
     Haptics.selectionAsync()
-    setImages((current) => (current.some((p) => p.file === picture.file) ? current : [...current, picture]))
-  }
-  // One gesture for the rows, so a finger dragged over them lights each one it passes, and
-  // letting go on a row picks it (as in a system menu). The row of pictures scrolls, so it
-  // has its own touches.
-  const menuTouch = Gesture.Pan()
-    .runOnJS(true)
-    .minDistance(0)
-    .onBegin((e) => setMenuHover(rowAt(e.x, e.y)))
-    .onUpdate((e) => setMenuHover(rowAt(e.x, e.y)))
-    // Not onEnd: a Pan only ends as active once the finger has moved, and a plain tap never does.
-    .onTouchesUp((e) => {
-      const touch = e.changedTouches[0]
-      const index = touch ? rowAt(touch.x, touch.y) : null
-      if (index !== null) pickMenuItem(index)
+    setSelectedRecents((current) => {
+      const exists = current.some((p) => p.file === picture.file)
+      if (exists) {
+        return current.filter((p) => p.file !== picture.file)
+      } else {
+        return [...current, picture]
+      }
     })
-    .onFinalize(() => setMenuHover(null))
-  const closeMenu = () => setMenuShown(false)
+  }
+
+  const confirmAttachRecents = () => {
+    if (!selectedRecents.length) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    closeMenu()
+    setImages((current) => {
+      const existing = new Set(current.map((p) => p.file))
+      const toAdd = selectedRecents.filter((p) => !existing.has(p.file))
+      return [...current, ...toAdd]
+    })
+    setSelectedRecents([])
+  }
+
+  const closeMenu = () => {
+    setMenuShown(false)
+    setSelectedRecents([])
+  }
   // A resting one-line field is a little narrower than with the keyboard up.
   const narrow = useSharedValue(0)
   const resting = !focused && !expanded
@@ -401,11 +404,9 @@ export function Composer({
 
   // The placeholder and the suggestion sit where the text will start: at once in the opened
   // field, no gliding between the two layouts.
-  const textLeft = FIELD_PAD + (expanded ? 14 : editing ? 14 : SIDE_PAD)
-  // The placeholder is drawn over the box, so it goes down by the row of pictures above the text.
-  const textTop = FIELD_PAD + (pictured ? imagesH : 0) + (docked ? 12 : expanded ? 10 : 8)
-  const placeholderAt = { left: textLeft, top: textTop }
-  const ghostRight = FIELD_PAD + (expanded ? 14 : SIDE_PAD)
+  const textLeft = expanded ? 14 : editing ? 14 : SIDE_PAD
+  const textRight = expanded ? 14 : SIDE_PAD
+  const textTop = docked ? 12 : expanded ? 10 : 8
   const showPlaceholder = !text && !suggesting
   // The row sits in the bar's padding and the field is narrowed by the inset on each side.
   const sidePad = Math.max(BAR_PAD_SIDE, Math.max(insets.left, insets.right))
@@ -442,16 +443,15 @@ export function Composer({
     else boxHeight.value = h
     fitted.current = true
   }
-  // What the list reserves is the field as it is with one line, worked out from the parts
-  // that do not depend on the text. The text itself cannot be used: a multiline field grows
-  // natively before React hears of the new text, so a layout event can show a taller field
-  // with a stale (even empty) text, which once made the whole chat jump.
+  // What the list reserves is the baseline floor as it is with one line, worked out from
+  // the parts that do not depend on the text or dynamic attachments. Attachments and multiline
+  // text expand boxHeight smoothly; keeping dynamic media heights out of reserve ensures
+  // the list extra padding eases smoothly via withTiming instead of jumping instantly.
   const [bannerH, setBannerH] = useState(0)
   const [toolsH, setToolsH] = useState(0)
   const reserve =
     2 * FIELD_PAD +
     (editing ? bannerH : 0) +
-    (images.length && !editing ? imagesH : 0) +
     (docked ? DOCKED_INPUT + toolsH : ONE_LINE_INPUT) +
     barExtra
   // The list reserves the room the field really takes, so a taller one (a few lines, a
@@ -493,7 +493,7 @@ export function Composer({
 
   const row = (
     <Animated.View style={[styles.row, narrowStyle]}>
-      <Animated.View ref={fieldBox} style={[styles.fieldBox, boxStyle]} collapsable={false}>
+      <Animated.View style={[styles.fieldBox, boxStyle]} collapsable={false}>
         {/* The glass is a sibling of the content, so the box can grow under the text. */}
         <GlassSurface style={[StyleSheet.absoluteFill, styles.glass, hushed && styles.hushed]} fallbackStyle={glass.solid} />
         <View style={styles.field} onLayout={fit}>
@@ -513,7 +513,7 @@ export function Composer({
           >
             {imageUris.map((uri, index) => (
               <View key={index} style={styles.attachment}>
-                <Image source={{ uri }} style={styles.thumb} contentFit="cover" />
+                <Image source={{ uri }} style={styles.thumb} contentFit="cover" transition={200} />
                 <Pressable
                   onPress={() => setImages((current) => current.filter((_, i) => i !== index))}
                   hitSlop={8}
@@ -577,6 +577,28 @@ export function Composer({
                 ]}
               />
             </MaskedView>
+            {suggesting ? (
+              <Animated.View
+                style={[styles.ghost, { left: textLeft, top: textTop, right: textRight }]}
+                pointerEvents="none"
+              >
+                <Text style={styles.ghostText} onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}>
+                  {suggestion}
+                </Text>
+              </Animated.View>
+            ) : null}
+            {showPlaceholder ? (
+              <Animated.Text
+                style={[
+                  styles.placeholder,
+                  { left: textLeft, top: textTop, right: textRight, color: inputColors.placeholderTextColor },
+                ]}
+                numberOfLines={1}
+                pointerEvents="none"
+              >
+                {placeholder ?? t('chat.messagePlaceholder')}
+              </Animated.Text>
+            ) : null}
           </View>
         </GestureDetector>
         {docked ? (
@@ -613,27 +635,6 @@ export function Composer({
           </>
         )}
         </View>
-        {/* In the box, not in the content: the content is pinned to the bottom and its top jumps
-            when the field opens, the box's top moves with the growth. */}
-        {suggesting ? (
-          <Animated.View
-            style={[styles.ghost, placeholderAt, { right: ghostRight }]}
-            pointerEvents="none"
-          >
-            <Text style={styles.ghostText} onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}>
-              {suggestion}
-            </Text>
-          </Animated.View>
-        ) : null}
-        {showPlaceholder ? (
-          <Animated.Text
-            style={[styles.placeholder, placeholderAt, { color: inputColors.placeholderTextColor }]}
-            numberOfLines={1}
-            pointerEvents="none"
-          >
-            {placeholder ?? t('chat.messagePlaceholder')}
-          </Animated.Text>
-        ) : null}
       </Animated.View>
     </Animated.View>
   )
@@ -649,7 +650,6 @@ export function Composer({
       pointerEvents="box-none"
     >
       <Animated.View
-        ref={dockBox}
         collapsable={false}
         style={[styles.accessory, accessoryStyle]}
         pointerEvents="box-none"
@@ -706,89 +706,175 @@ export function Composer({
           {row}
         </BlurBar>
       )}
-      <PopoverMenu
+      <BottomSheet
         visible={menuShown}
         onClose={closeMenu}
-        accessibilityLabel={t('common.close')}
-        style={[styles.menu, { left: menuLeft, bottom: insets.bottom + 8 }]}
-        bodyStyle={styles.menuBody}
-      >
-        {recents.length ? (
-          <>
-            <FlatList
-              horizontal
-              data={recents}
-              keyExtractor={(picture) => picture.file}
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="always"
-              style={styles.recents}
-              contentContainerStyle={styles.recentsContent}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => pickRecent(item)}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('attach.recent')}
-                  style={({ pressed }) => pressed && { opacity: 0.6 }}
-                >
-                  <Image source={{ uri: pictureUri(item) }} style={styles.thumbCellImage} contentFit="cover" />
-                </Pressable>
-              )}
-            />
-            <View style={styles.recentsRule} />
-          </>
-        ) : null}
-        <GestureDetector gesture={menuTouch}>
-          <View onLayout={(e) => (menuBox.current = e.nativeEvent.layout)}>
-            {ATTACH_ITEMS.map((item, index) => (
-              <View
-                key={item.source}
-                onLayout={(e) => (menuRows.current[index] = e.nativeEvent.layout)}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel={t(item.label)}
-                onAccessibilityTap={() => pickMenuItem(index)}
-                style={[styles.menuItem, menuHover === index && { backgroundColor: withAlpha(colors.text, 0.1) }]}
-              >
-                <Icon name={item.icon} size={22} color={colors.text} />
-                <Text style={styles.menuLabel}>{t(item.label)}</Text>
-              </View>
-            ))}
-          </View>
-        </GestureDetector>
-        {onToggleThinking ? (
-          <>
-            <PopoverMenuDivider style={styles.menuRule} />
+        onDismissed={onSheetDismissed}
+        title={t('attach.addToChat')}
+        compactHeader
+        noGlass
+        rightItem={
+          !isWeb ? (
             <Pressable
-              onPress={() => {
-                Haptics.selectionAsync()
-                onToggleThinking(!thinking)
-              }}
-              accessible
-              accessibilityRole="switch"
-              accessibilityState={{ checked: !!thinking }}
-              accessibilityLabel={t('chat.thinking')}
+              onPress={() => triggerAttach('library')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('attach.photos')}
+              style={({ pressed }) => [styles.photosHeaderBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.photosHeaderText}>{t('attach.photos')}</Text>
+            </Pressable>
+          ) : null
+        }
+      >
+        <View style={styles.sheetContent}>
+          {/* Top row: Camera tile + Recent picture thumbnails (or library button on web) */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            contentContainerStyle={styles.tilesRow}
+          >
+            {!isWeb ? (
+              <Pressable
+                onPress={() => triggerAttach('camera')}
+                accessibilityRole="button"
+                accessibilityLabel={t('attach.takePhoto')}
+                style={({ pressed }) => [
+                  styles.cameraTile,
+                  { backgroundColor: pressed ? tones.pressed : tones.card },
+                ]}
+              >
+                <Icon name="camera-outline" size={30} color={colors.text} />
+                <Text style={styles.cameraLabel} numberOfLines={1}>
+                  {t('imageSource.camera')}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {recents.map((item) => {
+              const isSelected = selectedRecents.some((p) => p.file === item.file)
+              return (
+                <Pressable
+                  key={item.file}
+                  onPress={() => toggleSelectRecent(item)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isSelected }}
+                  accessibilityLabel={t('attach.recent')}
+                  style={({ pressed }) => [
+                    styles.recentTile,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
+                  {isSelected ? (
+                    <View style={styles.recentCheckBadge}>
+                      <Icon name="checkmark" size={13} color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+
+          {/* First card: Add files & Persona placeholder */}
+          <View style={[styles.sheetCard, { backgroundColor: tones.card }]}>
+            <Pressable
+              onPress={() => triggerAttach('files')}
+              accessibilityRole="button"
+              accessibilityLabel={t('attach.addFiles')}
               style={({ pressed }) => [
-                styles.menuItem,
-                styles.thinkingItem,
-                pressed && { backgroundColor: withAlpha(colors.text, 0.1) },
+                styles.sheetCardRow,
+                { backgroundColor: pressed ? tones.pressed : tones.row },
               ]}
             >
-              <View style={styles.thinkingLeft}>
-                <SFIcon name="brain" fallback="sparkles-outline" size={20} color={colors.text} />
-                <Text style={styles.menuLabel}>{t('chat.thinking')}</Text>
-              </View>
-              <View pointerEvents="none">
-                <Switch
-                  value={!!thinking}
-                  trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
-                  {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
-                  style={liquidGlass ? switchNudge : undefined}
-                />
+              <Icon name="document-outline" size={22} color={colors.text} />
+              <Text style={styles.sheetCardLabel}>{t('attach.addFiles')}</Text>
+            </Pressable>
+
+            <View style={[styles.sheetCardSeparator, { backgroundColor: colors.borderStrong }]} />
+
+            {/* Persona placeholder: currently inactive / does nothing */}
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                showToast({ title: t('attach.personaPlaceholder'), tone: 'info' })
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('attach.persona')}
+              style={({ pressed }) => [
+                styles.sheetCardRow,
+                { backgroundColor: pressed ? tones.pressed : tones.row },
+              ]}
+            >
+              <Icon name="person-outline" size={22} color={colors.text} />
+              <Text style={styles.sheetCardLabel}>{t('attach.persona')}</Text>
+              <View style={styles.sheetCardTrailing}>
+                <Text style={styles.sheetCardTrailingText}>{t('attach.personaNone')}</Text>
+                <Icon name="chevron-forward" size={17} color={colors.textFaint} />
               </View>
             </Pressable>
-          </>
-        ) : null}
-      </PopoverMenu>
+          </View>
+
+          {/* Second card: Thinking toggle switch */}
+          {onToggleThinking ? (
+            <View style={[styles.sheetCard, styles.sheetCardSecondary, { backgroundColor: tones.card }]}>
+              <View style={[styles.sheetCardRow, styles.thinkingCardRow]}>
+                <View style={styles.thinkingLeft}>
+                  <SFIcon name="brain" fallback="sparkles-outline" size={22} color={colors.text} />
+                  <Text style={styles.sheetCardLabel}>{t('chat.thinking')}</Text>
+                </View>
+                <Switch
+                  value={!!thinking}
+                  onValueChange={(val) => {
+                    Haptics.selectionAsync()
+                    onToggleThinking(val)
+                  }}
+                  accessibilityLabel={t('chat.thinking')}
+                  trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
+                  {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
+                  style={[liquidGlass ? switchNudge : undefined, styles.nativeSwitch]}
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {/* Bottom CTA button to attach selected photos */}
+          {selectedRecents.length > 0 ? (
+            <Animated.View
+              entering={FadeInDown.springify().damping(20).stiffness(200)}
+              exiting={FadeOutDown.duration(160)}
+              style={styles.attachActionSlot}
+            >
+              <Pressable
+                onPress={confirmAttachRecents}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  selectedRecents.length === 1
+                    ? t('attach.attachSingle')
+                    : t('attach.attachMultiple', { count: selectedRecents.length })
+                }
+                style={({ pressed }) => [
+                  styles.attachActionButton,
+                  { backgroundColor: scheme === 'light' ? colors.text : '#FFFFFF' },
+                  pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.attachActionText,
+                    { color: scheme === 'light' ? colors.bg : '#000000' },
+                  ]}
+                >
+                  {selectedRecents.length === 1
+                    ? t('attach.attachSingle')
+                    : t('attach.attachMultiple', { count: selectedRecents.length })}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          ) : null}
+        </View>
+      </BottomSheet>
     </KeyboardStickyView>
   )
 }
@@ -871,17 +957,7 @@ const BAR_PAD_TOP = 8
 const BAR_PAD_BOTTOM = 8
 const BAR_PAD_SIDE = 10
 // The recent pictures of the attach menu: one row that scrolls sideways.
-const THUMB = 52
-const THUMB_GAP = 6
-const MENU_WIDTH = 250
 
-const ALL_ATTACH_ITEMS = [
-  { source: 'camera', icon: 'camera-outline', label: 'attach.takePhoto' },
-  { source: 'library', icon: 'images-outline', label: 'attach.choosePhoto' },
-  { source: 'files', icon: 'folder-outline', label: 'attach.chooseFile' },
-] as const
-// The desktop has no camera or photo library to tell apart from files: only the file row.
-const ATTACH_ITEMS = isWeb ? ALL_ATTACH_ITEMS.filter((item) => item.source === 'files') : ALL_ATTACH_ITEMS
 // Absolute children are placed from the field's outer edge, not inside its padding.
 const EDGE = 7
 const FIELD_PAD = 5
@@ -902,17 +978,80 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, justifyContent: 'flex-end' },
   plus: { width: SIDE, height: SIDE, alignItems: 'center', justifyContent: 'center' },
-  menu: { position: 'absolute', transformOrigin: 'left bottom' },
-  menuBody: { borderRadius: 24, padding: 6, width: MENU_WIDTH },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 18 },
-  menuRule: { height: 1, marginHorizontal: 8, marginVertical: 4, backgroundColor: colors.border },
-  thinkingItem: { justifyContent: 'space-between' },
-  thinkingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  recents: { flexGrow: 0, height: THUMB + 12 },
-  recentsContent: { gap: THUMB_GAP, padding: 6 },
-  thumbCellImage: { width: THUMB, height: THUMB, borderRadius: 12, borderCurve: 'continuous', backgroundColor: colors.surface },
-  recentsRule: { height: 1, marginHorizontal: 8, marginBottom: 6, backgroundColor: colors.border },
-  menuLabel: { color: colors.text, fontSize: 17 },
+  photosHeaderBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  photosHeaderText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
+  sheetContent: { paddingHorizontal: 16, paddingBottom: 6 },
+  tilesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
+  cameraTile: {
+    width: 96,
+    height: 96,
+    borderRadius: 22,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  cameraLabel: { color: colors.text, fontSize: 14, fontWeight: '500' },
+  recentTile: {
+    width: 96,
+    height: 96,
+    borderRadius: 22,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  recentTileImage: { width: '100%', height: '100%', backgroundColor: colors.surface },
+  recentCheckBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachActionSlot: {
+    marginTop: 14,
+  },
+  attachActionButton: {
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  attachActionText: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  sheetCard: { borderRadius: 24, overflow: 'hidden' },
+  sheetCardSecondary: { marginTop: 14 },
+  sheetCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  sheetCardSeparator: { height: StyleSheet.hairlineWidth, marginLeft: 52 },
+  sheetCardLabel: { flex: 1, color: colors.text, fontSize: 17 },
+  sheetCardTrailing: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sheetCardTrailingText: { color: colors.textMuted, fontSize: 16 },
+  thinkingCardRow: {
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingRight: 16,
+    minHeight: 52,
+  },
+  thinkingLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  nativeSwitch: { marginRight: 0 },
   accessory: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   bar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: BAR_PAD_SIDE },
   floatingBar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: BAR_PAD_SIDE },
@@ -946,7 +1085,7 @@ const createStyles = (colors: Colors) =>
   plusAt: { position: 'absolute', left: EDGE, bottom: EDGE },
   sendAt: { position: 'absolute', right: EDGE, bottom: EDGE },
   // Never seen: the text laid out at the one-line width, to count its lines.
-  placeholder: { position: 'absolute', right: FIELD_PAD + SIDE_PAD, fontSize: 17, lineHeight: 22 },
+  placeholder: { position: 'absolute', fontSize: 17, lineHeight: 22 },
   maskFill: { flex: 1, backgroundColor: 'transparent' },
   maskEdge: { height: FADE },
   maskMiddle: { flex: 1, backgroundColor: SOLID },
