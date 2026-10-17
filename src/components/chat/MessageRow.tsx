@@ -97,6 +97,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
 
   const text = (
     <Markdown
+      key={message.streaming ? 'stream' : `${message.variant}:${message.content}`}
       text={message.content}
       style={
         narration
@@ -193,7 +194,13 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           ) : null}
         </View>
       ) : null}
-      {thought ? <ThoughtBlock text={thought.text} ms={thought.ms} /> : null}
+      {thought ? (
+        <ThoughtBlock
+          key={message.streaming ? 'stream' : `${message.variant}:${thought.text}`}
+          text={thought.text}
+          ms={thought.ms}
+        />
+      ) : null}
       {waiting && thought ? null : waiting ? (
         <TypingIndicator />
       ) : (

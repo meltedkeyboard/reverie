@@ -204,7 +204,14 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
   let run: ReactNode[] = []
   const flush = () => {
     if (!run.length) return
-    views.push(<Block key={views.length} style={style}>{run}</Block>)
+    views.push(
+      <Block
+        key={streaming ? views.length : `${views.length}:${text}`}
+        style={style}
+      >
+        {run}
+      </Block>
+    )
     run = []
   }
   pieces.forEach((piece, i) => {

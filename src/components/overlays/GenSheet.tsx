@@ -280,6 +280,7 @@ export function GenSheet({
               </Text>
             ) : (
               <TextInput
+                key={index}
                 value={result ?? ''}
                 onChangeText={(text) => setVersions((prev) => prev.map((v, i) => (i === index ? text : v)))}
                 multiline

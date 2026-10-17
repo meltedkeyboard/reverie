@@ -66,11 +66,12 @@ function systemRules(input: PromptGenInput) {
     .join('\n')
 }
 
-type TextKind = 'prompt' | 'greeting'
+type TextKind = 'prompt' | 'greeting' | 'persona'
 
 const KIND_NAME: Record<TextKind, string> = {
   prompt: 'system prompt of a roleplay character',
   greeting: 'opening message of a roleplay character',
+  persona: 'user persona description for roleplay',
 }
 
 // A change to a text that is already there is an edit, not a new text: asked from scratch
@@ -87,6 +88,7 @@ function buildEditMessages(kind: TextKind, text: string, change: string, images?
     }))
     content = [...pictures, { type: 'text' as const, text: userText }]
   }
+  const kindTarget = kind === 'prompt' ? 'prompt' : kind === 'greeting' ? 'message' : 'description'
   return [
     {
       role: 'system',
@@ -99,7 +101,7 @@ function buildEditMessages(kind: TextKind, text: string, change: string, images?
           ? 'Visual references (images) are attached. Incorporate visual details and situation context from the images into the requested changes. If multiple characters are present, follow instructions on which character is being edited.'
           : '',
         'Keep the language of the text.',
-        `Reply with the whole edited ${kind === 'prompt' ? 'prompt' : 'message'} only: no preface, no comments, no quotes or code fences around it.`,
+        `Reply with the whole edited ${kindTarget} only: no preface, no comments, no quotes or code fences around it.`,
       ]
         .filter(Boolean)
         .join('\n'),
@@ -192,6 +194,90 @@ export function buildGreetingMessages(
   ]
 }
 
+export type PersonaLength = 'short' | 'medium' | 'long'
+export type PersonaFormat = 'prose' | 'sections'
+
+export type PersonaGenOptions = {
+  length: PersonaLength
+  format: PersonaFormat
+}
+
+export type PersonaGenInput = {
+  description: string
+  name: string
+  base: string | null
+  options: PersonaGenOptions
+  locale: Locale
+  images?: MessageImage[]
+}
+
+const PERSONA_LENGTH_RULES: Record<PersonaLength, string> = {
+  short: 'Keep it compact: about 60-120 words focusing on key visual traits, role, and core personality.',
+  medium: 'Aim for about 150-250 words: appearance, personality, demeanor, background, and quirks.',
+  long: 'Be thorough: about 300-500 words with rich details: physical appearance, clothing, personality nuances, background, habits, and how others perceive them.',
+}
+
+const PERSONA_FORMAT_RULES: Record<PersonaFormat, string> = {
+  prose: 'Write concise, flowing prose paragraphs without headings or bullet lists.',
+  sections:
+    'Structure it with short Markdown headings (for example: Appearance, Personality, Background, Quirks) and concise text or bullet points under each.',
+}
+
+function personaSystemRules(input: PersonaGenInput) {
+  const hasImages = (input.images?.length ?? 0) > 0
+  return [
+    'You write user persona descriptions for roleplay chats in an AI chat app.',
+    "The persona defines the user's character: appearance, personality, background, role/occupation, speech or demeanor, quirks, and how AI characters should perceive or treat them.",
+    'Make the persona vivid, coherent and specific: concrete details, aesthetic notes, and clear traits beat generic descriptions. Do not add rules about being an AI, safety disclaimers, or instructions for the AI model.',
+    input.name.trim()
+      ? `The user's character name is ${input.name.trim()}.`
+      : 'If no name is specified, focus on the persona description.',
+    hasImages
+      ? [
+          'Reference images are attached portraying the user persona / character.',
+          'Carefully analyze the visual details in the images: physical appearance (hair, eyes, face, build, distinctive features, scars/tattoos), clothing, aesthetic, expressions, posture, setting, and mood.',
+          'Incorporate these visual elements directly into the persona description (appearance, style, aesthetic, demeanor).',
+          'If multiple figures are shown, follow user instructions on which figure represents this persona.',
+        ].join(' ')
+      : '',
+    PERSONA_LENGTH_RULES[input.options.length],
+    PERSONA_FORMAT_RULES[input.options.format],
+    languageRule(input.locale),
+    'Reply with the persona description only: no preface, no comments after it, no quotes or code fences around it.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+const IMPROVE_PERSONA_DEFAULT =
+  'fill the gaps and add vivid concrete details (appearance, quirks, habits, background); keep what is already written'
+
+export function buildPersonaMessages(input: PersonaGenInput, revision?: { draft: string; note: string }): ChatTurn[] {
+  if (revision) return buildEditMessages('persona', revision.draft, revision.note, input.images)
+  if (input.base !== null)
+    return buildEditMessages('persona', input.base, input.description.trim() || IMPROVE_PERSONA_DEFAULT, input.images)
+
+  const text = input.description.trim()
+  const fallback = input.images?.length
+    ? 'Create a user persona description based on the attached image(s).'
+    : ''
+  const userText = text || fallback
+
+  let content: string | ContentPart[] = userText
+  if (input.images && input.images.length > 0) {
+    const pictures: ContentPart[] = input.images.map((img) => ({
+      type: 'image_url' as const,
+      image_url: { url: attachmentUri(img.file) },
+    }))
+    content = [...pictures, { type: 'text' as const, text: userText }]
+  }
+
+  return [
+    { role: 'system', content: personaSystemRules(input) },
+    { role: 'user', content },
+  ]
+}
+
 // `thinking` is the switch of the generator sheet, for this request only. An edit runs
 // cooler, so the model copies what it should keep instead of inventing it anew.
 export async function* streamGeneration(
@@ -223,7 +309,7 @@ export function cleanGenerated(text: string) {
   out = out.replace(/^<think>[\s\S]*/gi, '').trim()
   const fence = out.match(/^```[\w-]*\n([\s\S]*?)\n```$/)
   if (fence) out = fence[1].trim()
-  out = out.replace(/^(system prompt|системный промпт|промпт|prompt)\s*:\s*\n?/i, '')
+  out = out.replace(/^(system prompt|системный промпт|промпт|prompt|user persona|persona|персона|описание персоны)\s*:\s*\n?/i, '')
   if (/^["«“].*["»”]$/s.test(out) && !/["«“»”]/.test(out.slice(1, -1))) out = out.slice(1, -1)
   return out.trim()
 }

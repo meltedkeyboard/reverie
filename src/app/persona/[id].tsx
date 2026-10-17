@@ -13,6 +13,7 @@ import { useDatabase } from '@/db/provider'
 import { useImageSlot } from '@/hooks/features/useImageSlot'
 import { useTranslation } from '@/i18n'
 import { setAvatarCropDraft } from '@/lib/images/avatarCrop'
+import { setGenDraft } from '@/lib/chat/genDraft'
 import { acceptMoving, pickAvatar, type CropRect } from '@/lib/images/avatars'
 import type { ImageSource } from '@/lib/images/images'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
@@ -34,6 +35,7 @@ export default function PersonaEditorScreen() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isDefault, setIsDefault] = useState(false)
+  const [beforeGen, setBeforeGen] = useState<string | null>(null)
 
   const [avatar, setAvatar] = useState<string | null>(null)
   const [avatarOriginal, setAvatarOriginal] = useState<string | null>(null)
@@ -170,6 +172,27 @@ export default function PersonaEditorScreen() {
     })
   }
 
+  const openPersonaGen = () => {
+    setGenDraft({
+      kind: 'persona',
+      name,
+      currentDescription: description,
+      onApply: applyGenerated,
+    })
+    router.push('/generate')
+  }
+
+  const applyGenerated = (text: string) => {
+    setBeforeGen(description)
+    setDescription(text)
+  }
+
+  const undoGenerated = () => {
+    if (beforeGen === null) return
+    setDescription(beforeGen)
+    setBeforeGen(null)
+  }
+
   const photoUri = avatarSlot.shown(avatar)
   const hasPhoto = Boolean(photoUri)
   const canRecrop = hasPhoto
@@ -230,9 +253,17 @@ export default function PersonaEditorScreen() {
               title={t('persona.descriptionLabel')}
               value={description}
               placeholder={t('persona.descriptionPlaceholder')}
-              onChangeText={setDescription}
+              onChangeText={(v) => {
+                setDescription(v)
+                setBeforeGen(null)
+              }}
               lines={6}
             />
+            <ButtonCell
+              label={description.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
+              onPress={openPersonaGen}
+            />
+            {beforeGen !== null ? <ButtonCell label={t('editor.undoGenerated')} onPress={undoGenerated} /> : null}
           </ListSection>
 
           <ListSection footer={<ListFooter>{t('persona.defaultHint')}</ListFooter>}>

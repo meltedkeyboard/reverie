@@ -3,6 +3,7 @@
 export type GenDraft =
   | { kind: 'prompt'; name: string; currentPrompt: string; onApply: (prompt: string) => void }
   | { kind: 'greeting'; name: string; systemPrompt: string; currentGreeting: string; onApply: (greeting: string) => void }
+  | { kind: 'persona'; name: string; currentDescription: string; onApply: (description: string) => void }
 
 let pending: GenDraft | null = null
 
