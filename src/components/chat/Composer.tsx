@@ -727,7 +727,7 @@ export function Composer({
           ) : null
         }
       >
-        <View style={[styles.sheetContent, selectedRecents.length > 0 && styles.sheetContentWithAction]}>
+        <View style={styles.sheetContent}>
           {/* Top row: Camera tile + Recent picture thumbnails (or library button on web) */}
           <ScrollView
             horizontal
@@ -858,16 +858,11 @@ export function Composer({
               }
               style={({ pressed }) => [
                 styles.attachActionButton,
-                { backgroundColor: scheme === 'light' ? colors.text : '#FFFFFF' },
-                pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                { backgroundColor: colors.accent },
+                pressed && { opacity: 0.85 },
               ]}
             >
-              <Text
-                style={[
-                  styles.attachActionText,
-                  { color: scheme === 'light' ? colors.bg : '#000000' },
-                ]}
-              >
+              <Text style={[styles.attachActionText, { color: ON_ACCENT }]}>
                 {selectedRecents.length === 1
                   ? t('attach.attachSingle')
                   : t('attach.attachMultiple', { count: selectedRecents.length })}
@@ -981,8 +976,7 @@ const createStyles = (colors: Colors) =>
   plus: { width: SIDE, height: SIDE, alignItems: 'center', justifyContent: 'center' },
   photosHeaderBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   photosHeaderText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
-  sheetContent: { paddingHorizontal: 16, paddingBottom: 6 },
-  sheetContentWithAction: { paddingBottom: 68 },
+  sheetContent: { paddingHorizontal: 16, paddingBottom: 70 },
   tilesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
   cameraTile: {
     width: 96,
