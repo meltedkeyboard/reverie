@@ -61,7 +61,7 @@ type CellProps = { label: string; disabled?: boolean }
 export function SwitchCell({ label, value, onValueChange, disabled }: CellProps & { value: boolean; onValueChange: (v: boolean) => void }) {
   const styles = useStyles(createStyles)
   return (
-    <View style={[styles.row, disabled && styles.disabled]}>
+    <View style={[styles.row, styles.switchRow, disabled && styles.disabled]}>
       <Text style={styles.label}>{label}</Text>
       <CellSwitch value={value} disabled={disabled} onValueChange={onValueChange} />
     </View>
@@ -325,6 +325,7 @@ const baseStyles = (colors: Colors) =>
     footer: { color: colors.textMuted, fontSize: 13, lineHeight: 18, paddingHorizontal: INSET, marginTop: 7 },
     danger: { color: colors.danger },
     row: { minHeight: ROW_HEIGHT + 8, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: INSET, paddingVertical: 8 },
+    switchRow: { minHeight: 53, paddingVertical: 11 },
     pressed: { backgroundColor: colors.surfaceRaised },
     disabled: { opacity: 0.4 },
     label: { flex: 1, color: colors.text, fontSize: 17 },
