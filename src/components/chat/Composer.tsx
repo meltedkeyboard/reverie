@@ -50,7 +50,8 @@ import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { Button } from '@/components/controls/Button'
 import { Avatar } from '@/components/visuals/Avatar'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
-import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
+import { deletePersona, listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
+import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { Star } from '@/components/visuals/motifs/Star'
 
 type Props = {
@@ -124,7 +125,7 @@ export function Composer({
   onSelectPersona,
 }: Props) {
   const insets = useSafeAreaInsets()
-  const { width: windowWidth } = useWindowDimensions()
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   const colors = useColors()
   const { scheme } = useTheme()
   const tones = useSheetTones({ noGlass: true })
@@ -135,6 +136,8 @@ export function Composer({
   const db = useDatabase()
   const router = useRouter()
   const [sheetScreen, setSheetScreen] = useState<'attach' | 'persona'>('attach')
+  const [attachHeight, setAttachHeight] = useState<number | undefined>(undefined)
+  const sheetProgress = useSharedValue(0)
   const [personas, setPersonas] = useState<Persona[]>([])
 
   useEffect(() => {
@@ -334,10 +337,17 @@ export function Composer({
 
   const triggerPersonaPicker = () => {
     setSheetScreen('persona')
+    sheetProgress.value = withSpring(1, { stiffness: 280, damping: 28, mass: 0.9 })
+  }
+
+  const goToAttach = () => {
+    setSheetScreen('attach')
+    sheetProgress.value = withSpring(0, { stiffness: 280, damping: 28, mass: 0.9 })
   }
 
   const onSheetDismissed = () => {
     setSheetScreen('attach')
+    sheetProgress.value = 0
     const source = pendingAttachSource.current
     if (source) {
       pendingAttachSource.current = null
@@ -447,6 +457,7 @@ export function Composer({
   const closeMenu = () => {
     setMenuShown(false)
     setSheetScreen('attach')
+    sheetProgress.value = 0
     setSelectedRecents([])
   }
 
@@ -458,6 +469,22 @@ export function Composer({
   const attachActiveBgStyle = useAnimatedStyle(() => ({
     opacity: attachArmed.value,
   }))
+
+  // Sliding sheet transitions between attach menu and persona picker
+  const attachPaneStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: -sheetProgress.value * (windowWidth * 0.35) }],
+      opacity: 1 - sheetProgress.value,
+    }
+  })
+
+  const personaPaneStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: (1 - sheetProgress.value) * windowWidth }],
+      opacity: sheetProgress.value > 0.05 ? 1 : 0,
+    }
+  })
+
   // A resting one-line field is a little narrower than with the keyboard up.
   const narrow = useSharedValue(0)
   const resting = !focused && !expanded
@@ -775,9 +802,10 @@ export function Composer({
         onClose={closeMenu}
         onDismissed={onSheetDismissed}
         title={sheetScreen === 'persona' ? t('persona.pickerTitle') : t('attach.addToChat')}
-        onBack={sheetScreen === 'persona' ? () => setSheetScreen('attach') : undefined}
+        onBack={sheetScreen === 'persona' ? goToAttach : undefined}
         compactHeader
         noGlass
+        contentPaddingBottom={0}
         rightItem={
           sheetScreen === 'persona' ? (
             <Pressable
@@ -806,267 +834,324 @@ export function Composer({
           ) : null
         }
       >
-        {sheetScreen === 'persona' ? (
-          <View style={styles.sheetContent}>
-            {personas.length === 0 ? (
-              <View style={styles.personaEmptyContainer}>
-                <EmptyState
-                  title={t('persona.emptyTitle')}
-                  text={t('persona.emptyText')}
-                  action={
-                    <Button
-                      variant="glass"
-                      label={t('persona.create')}
-                      style={emptyButtonStyle}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                        closeMenu()
-                        router.push('/persona/new')
-                      }}
-                    />
-                  }
-                />
-              </View>
-            ) : (
+        <View style={styles.sheetSlider}>
+          {/* Main Attach screen */}
+          <Animated.View
+            style={[
+              styles.sheetPane,
+              sheetScreen === 'attach' ? styles.sheetPaneActive : styles.sheetPaneAbsolute,
+              attachPaneStyle,
+            ]}
+            pointerEvents={sheetScreen === 'attach' ? 'auto' : 'none'}
+            onLayout={(e) => {
+              const h = e.nativeEvent.layout.height
+              if (h > 0) setAttachHeight(h)
+            }}
+          >
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Top row: Camera tile + Recent picture thumbnails (or library button on web) */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="always"
+                contentContainerStyle={styles.tilesRow}
+              >
+                {!isWeb ? (
+                  <Pressable
+                    onPress={() => triggerAttach('camera')}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('imageSource.camera')}
+                    style={({ pressed }) => [
+                      styles.cameraTile,
+                      { backgroundColor: pressed ? tones.pressed : tones.card },
+                    ]}
+                  >
+                    <Icon name="camera-outline" size={30} color={colors.text} />
+                    <Text style={styles.cameraLabel} numberOfLines={1}>
+                      {t('imageSource.camera')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {recents.map((item) => {
+                  const isSelected = selectedRecents.some((p) => p.file === item.file)
+                  return (
+                    <Pressable
+                      key={item.file}
+                      onPress={() => toggleSelectRecent(item)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: isSelected }}
+                      accessibilityLabel={t('attach.recent')}
+                      style={({ pressed }) => [
+                        styles.recentTile,
+                        pressed && { opacity: 0.8 },
+                      ]}
+                    >
+                      <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
+                      {isSelected ? (
+                        <View style={styles.recentCheckBadge}>
+                          <Icon name="checkmark" size={13} color="#FFFFFF" />
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  )
+                })}
+              </ScrollView>
+
+              {/* First card: Add files & Persona placeholder */}
               <View style={[styles.sheetCard, { backgroundColor: tones.card }]}>
-                {/* None row */}
                 <Pressable
-                  onPress={() => {
-                    Haptics.selectionAsync()
-                    onSelectPersona?.(null)
-                    closeMenu()
-                  }}
+                  onPress={() => triggerAttach('files')}
                   accessibilityRole="button"
-                  accessibilityLabel={t('persona.none')}
+                  accessibilityLabel={t('attach.addFiles')}
                   style={({ pressed }) => [
-                    styles.personaRow,
+                    styles.sheetCardRow,
                     { backgroundColor: pressed ? tones.pressed : tones.row },
                   ]}
                 >
-                  <View style={[styles.personaIconCircle, { backgroundColor: colors.surfaceRaised }]}>
-                    <Icon name="person-outline" size={20} color={colors.textMuted} />
-                  </View>
-                  <View style={styles.personaTextContainer}>
-                    <Text style={styles.personaName}>{t('persona.none')}</Text>
-                    <Text style={styles.personaSubtitle}>{t('persona.noneSubtitle')}</Text>
-                  </View>
-                  {(personaId ?? persona?.id ?? null) === null ? (
-                    <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} />
-                  ) : null}
+                  <Icon name="document-outline" size={22} color={colors.text} />
+                  <Text style={styles.sheetCardLabel}>{t('attach.addFiles')}</Text>
                 </Pressable>
 
-                {personas.map((item) => {
-                  const isSelected = (personaId ?? persona?.id ?? null) === item.id
-                  const personaMenu: MenuItem[] = [
-                    {
-                      label: t('persona.edit'),
-                      systemImage: 'pencil',
-                      onSelect: () => {
-                        closeMenu()
-                        router.push(`/persona/${item.id}`)
-                      },
-                    },
-                  ]
-                  return (
-                    <View key={item.id}>
-                      <View style={[styles.sheetCardSeparator, { backgroundColor: colors.borderStrong }]} />
-                      <Pressable
-                        onPress={() => {
-                          Haptics.selectionAsync()
-                          onSelectPersona?.(item.id)
-                          closeMenu()
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel={item.name}
-                        style={({ pressed }) => [
-                          styles.personaRow,
-                          { backgroundColor: pressed ? tones.pressed : tones.row },
-                        ]}
-                      >
-                        <Avatar name={item.name} file={item.avatar} size={36} />
-                        <View style={styles.personaTextContainer}>
-                          <View style={styles.personaNameRow}>
-                            <Text style={styles.personaName} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            {item.isDefault ? (
-                              <Star size={12} color={colors.accent} />
-                            ) : null}
-                          </View>
-                          {item.description ? (
-                            <Text style={styles.personaSubtitle} numberOfLines={1}>
-                              {item.description}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <View style={styles.personaTrailingRow}>
-                          {isSelected ? (
-                            <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} />
-                          ) : null}
-                          <NativeMenu items={personaMenu}>
-                            <View style={styles.personaEditButton}>
-                              <Icon name="ellipsis-horizontal" size={18} color={colors.textFaint} />
-                            </View>
-                          </NativeMenu>
-                        </View>
-                      </Pressable>
-                    </View>
-                  )
-                })}
-              </View>
-            )}
-          </View>
-        ) : (
-        <View style={styles.sheetContent}>
-          {/* Top row: Camera tile + Recent picture thumbnails (or library button on web) */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="always"
-            contentContainerStyle={styles.tilesRow}
-          >
-            {!isWeb ? (
-              <Pressable
-                onPress={() => triggerAttach('camera')}
-                accessibilityRole="button"
-                accessibilityLabel={t('attach.takePhoto')}
-                style={({ pressed }) => [
-                  styles.cameraTile,
-                  { backgroundColor: pressed ? tones.pressed : tones.card },
-                ]}
-              >
-                <Icon name="camera-outline" size={30} color={colors.text} />
-                <Text style={styles.cameraLabel} numberOfLines={1}>
-                  {t('imageSource.camera')}
-                </Text>
-              </Pressable>
-            ) : null}
+                <View style={[styles.sheetCardSeparator, { backgroundColor: colors.borderStrong }]} />
 
-            {recents.map((item) => {
-              const isSelected = selectedRecents.some((p) => p.file === item.file)
-              return (
+                {/* Persona row: opens persona picker sheet */}
                 <Pressable
-                  key={item.file}
-                  onPress={() => toggleSelectRecent(item)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: isSelected }}
-                  accessibilityLabel={t('attach.recent')}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                    triggerPersonaPicker()
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('attach.persona')}
                   style={({ pressed }) => [
-                    styles.recentTile,
-                    pressed && { opacity: 0.8 },
+                    styles.sheetCardRow,
+                    { backgroundColor: pressed ? tones.pressed : tones.row },
                   ]}
                 >
-                  <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
-                  {isSelected ? (
-                    <View style={styles.recentCheckBadge}>
-                      <Icon name="checkmark" size={13} color="#FFFFFF" />
-                    </View>
-                  ) : null}
+                  <Icon name="person-outline" size={22} color={colors.text} />
+                  <Text style={styles.sheetCardLabel}>{t('attach.persona')}</Text>
+                  <View style={styles.sheetCardTrailing}>
+                    <Text style={styles.sheetCardTrailingText} numberOfLines={1}>
+                      {persona?.name ? persona.name : t('attach.personaNone')}
+                    </Text>
+                    <Icon name="chevron-forward" size={17} color={colors.textFaint} />
+                  </View>
                 </Pressable>
-              )
-            })}
-          </ScrollView>
-
-          {/* First card: Add files & Persona placeholder */}
-          <View style={[styles.sheetCard, { backgroundColor: tones.card }]}>
-            <Pressable
-              onPress={() => triggerAttach('files')}
-              accessibilityRole="button"
-              accessibilityLabel={t('attach.addFiles')}
-              style={({ pressed }) => [
-                styles.sheetCardRow,
-                { backgroundColor: pressed ? tones.pressed : tones.row },
-              ]}
-            >
-              <Icon name="document-outline" size={22} color={colors.text} />
-              <Text style={styles.sheetCardLabel}>{t('attach.addFiles')}</Text>
-            </Pressable>
-
-            <View style={[styles.sheetCardSeparator, { backgroundColor: colors.borderStrong }]} />
-
-            {/* Persona row: opens persona picker sheet */}
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                triggerPersonaPicker()
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('attach.persona')}
-              style={({ pressed }) => [
-                styles.sheetCardRow,
-                { backgroundColor: pressed ? tones.pressed : tones.row },
-              ]}
-            >
-              <Icon name="person-outline" size={22} color={colors.text} />
-              <Text style={styles.sheetCardLabel}>{t('attach.persona')}</Text>
-              <View style={styles.sheetCardTrailing}>
-                <Text style={styles.sheetCardTrailingText} numberOfLines={1}>
-                  {persona?.name ? persona.name : t('attach.personaNone')}
-                </Text>
-                <Icon name="chevron-forward" size={17} color={colors.textFaint} />
               </View>
-            </Pressable>
-          </View>
 
-          {/* Second card: Thinking toggle switch */}
-          {onToggleThinking ? (
-            <View style={[styles.sheetCard, styles.sheetCardSecondary, { backgroundColor: tones.card }]}>
-              <View style={[styles.sheetCardRow, styles.thinkingCardRow]}>
-                <View style={styles.thinkingLeft}>
-                  <SFIcon name="brain" fallback="sparkles-outline" size={22} color={colors.text} />
-                  <Text style={styles.sheetCardLabel}>{t('chat.thinking')}</Text>
+              {/* Second card: Thinking toggle switch */}
+              {onToggleThinking ? (
+                <View style={[styles.sheetCard, styles.sheetCardSecondary, { backgroundColor: tones.card }]}>
+                  <View style={[styles.sheetCardRow, styles.thinkingCardRow]}>
+                    <View style={styles.thinkingLeft}>
+                      <SFIcon name="brain" fallback="sparkles-outline" size={22} color={colors.text} />
+                      <Text style={styles.sheetCardLabel}>{t('chat.thinking')}</Text>
+                    </View>
+                    <Switch
+                      value={!!thinking}
+                      onValueChange={(val) => {
+                        Haptics.selectionAsync()
+                        onToggleThinking(val)
+                      }}
+                      accessibilityLabel={t('chat.thinking')}
+                      trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
+                      {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
+                      style={styles.nativeSwitch}
+                    />
+                  </View>
                 </View>
-                <Switch
-                  value={!!thinking}
-                  onValueChange={(val) => {
-                    Haptics.selectionAsync()
-                    onToggleThinking(val)
-                  }}
-                  accessibilityLabel={t('chat.thinking')}
-                  trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
-                  {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
-                  style={styles.nativeSwitch}
-                />
-              </View>
-            </View>
-          ) : null}
+              ) : null}
 
-          {/* Permanent bottom CTA button to attach selected photos */}
-          <View style={styles.attachActionSlot}>
-            <Pressable
-              onPress={confirmAttachRecents}
-              disabled={selectedRecents.length === 0}
-              accessibilityRole="button"
-              accessibilityLabel={
-                selectedRecents.length === 0
-                  ? t('attach.attachAction')
-                  : selectedRecents.length === 1
-                    ? t('attach.attachSingle')
-                    : t('attach.attachMultiple', { count: selectedRecents.length })
-              }
-              style={({ pressed }) => [
-                styles.attachActionButton,
-                pressed && selectedRecents.length > 0 && { opacity: 0.85 },
-              ]}
+              {/* Permanent bottom CTA button to attach selected photos */}
+              <View style={styles.attachActionSlot}>
+                <Pressable
+                  onPress={confirmAttachRecents}
+                  disabled={selectedRecents.length === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    selectedRecents.length === 0
+                      ? t('attach.attachAction')
+                      : selectedRecents.length === 1
+                        ? t('attach.attachSingle')
+                        : t('attach.attachMultiple', { count: selectedRecents.length })
+                  }
+                  style={({ pressed }) => [
+                    styles.attachActionButton,
+                    pressed && selectedRecents.length > 0 && { opacity: 0.85 },
+                  ]}
+                >
+                  <View style={[StyleSheet.absoluteFill, styles.attachActionBg, { backgroundColor: colors.surfaceRaised }]} />
+                  <Animated.View style={[StyleSheet.absoluteFill, styles.attachActionBg, { backgroundColor: colors.accent }, attachActiveBgStyle]} />
+                  <Text
+                    style={[
+                      styles.attachActionText,
+                      { color: selectedRecents.length > 0 ? ON_ACCENT : colors.textMuted },
+                    ]}
+                  >
+                    {selectedRecents.length === 0
+                      ? t('attach.attachAction')
+                      : selectedRecents.length === 1
+                        ? t('attach.attachSingle')
+                        : t('attach.attachMultiple', { count: selectedRecents.length })}
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Animated.View>
+
+          {/* Sub-screen: Persona selector */}
+          <Animated.View
+            style={[
+              styles.sheetPane,
+              sheetScreen === 'persona' ? styles.sheetPaneActive : styles.sheetPaneAbsolute,
+              attachHeight ? { minHeight: attachHeight } : null,
+              { backgroundColor: tones.sheet },
+              personaPaneStyle,
+            ]}
+            pointerEvents={sheetScreen === 'persona' ? 'auto' : 'none'}
+          >
+            <ScrollView
+              style={[styles.sheetScroll, attachHeight ? { maxHeight: Math.max(attachHeight, 380) } : null]}
+              contentContainerStyle={[styles.sheetContent, { paddingBottom: 24 }]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <View style={[StyleSheet.absoluteFill, styles.attachActionBg, { backgroundColor: colors.surfaceRaised }]} />
-              <Animated.View style={[StyleSheet.absoluteFill, styles.attachActionBg, { backgroundColor: colors.accent }, attachActiveBgStyle]} />
-              <Text
-                style={[
-                  styles.attachActionText,
-                  { color: selectedRecents.length > 0 ? ON_ACCENT : colors.textMuted },
-                ]}
-              >
-                {selectedRecents.length === 0
-                  ? t('attach.attachAction')
-                  : selectedRecents.length === 1
-                    ? t('attach.attachSingle')
-                    : t('attach.attachMultiple', { count: selectedRecents.length })}
-              </Text>
-            </Pressable>
-          </View>
+              {personas.length === 0 ? (
+                <View style={styles.personaEmptyContainer}>
+                  <EmptyState
+                    title={t('persona.emptyTitle')}
+                    text={t('persona.emptyText')}
+                    action={
+                      <Button
+                        variant="glass"
+                        label={t('persona.create')}
+                        style={emptyButtonStyle}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                          closeMenu()
+                          router.push('/persona/new')
+                        }}
+                      />
+                    }
+                  />
+                </View>
+              ) : (
+                <View style={[styles.sheetCard, { backgroundColor: tones.card }]}>
+                  {/* None row */}
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync()
+                      onSelectPersona?.(null)
+                      closeMenu()
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('persona.none')}
+                    style={({ pressed }) => [
+                      styles.personaRow,
+                      { backgroundColor: pressed ? tones.pressed : tones.row },
+                    ]}
+                  >
+                    <View style={[styles.personaIconCircle, { backgroundColor: colors.surfaceRaised }]}>
+                      <Icon name="person-outline" size={20} color={colors.textMuted} />
+                    </View>
+                    <View style={styles.personaTextContainer}>
+                      <Text style={styles.personaName}>{t('persona.none')}</Text>
+                      <Text style={styles.personaSubtitle}>{t('persona.noneSubtitle')}</Text>
+                    </View>
+                    {(personaId ?? persona?.id ?? null) === null ? (
+                      <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} />
+                    ) : null}
+                  </Pressable>
+
+                  {personas.map((item) => {
+                    const isSelected = (personaId ?? persona?.id ?? null) === item.id
+                    const personaMenu: MenuItem[] = [
+                      {
+                        label: t('persona.edit'),
+                        systemImage: 'pencil',
+                        onSelect: () => {
+                          closeMenu()
+                          router.push(`/persona/${item.id}`)
+                        },
+                      },
+                      {
+                        label: t('persona.delete'),
+                        systemImage: 'trash',
+                        destructive: true,
+                        onSelect: () => {
+                          confirmDeletion({
+                            title: t('persona.delete'),
+                            message: t('persona.deleteConfirm', { name: item.name }),
+                            confirmLabel: t('persona.delete'),
+                            destructive: true,
+                            onConfirm: async () => {
+                              if (isSelected) {
+                                onSelectPersona?.(null)
+                              }
+                              await deletePersona(db, item.id)
+                            },
+                          })
+                        },
+                      },
+                    ]
+                    return (
+                      <View key={item.id}>
+                        <View style={[styles.sheetCardSeparator, { backgroundColor: colors.borderStrong }]} />
+                        <View style={styles.personaRowContainer}>
+                          <Pressable
+                            onPress={() => {
+                              Haptics.selectionAsync()
+                              onSelectPersona?.(item.id)
+                              closeMenu()
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={item.name}
+                            style={({ pressed }) => [
+                              styles.personaRow,
+                              { backgroundColor: pressed ? tones.pressed : tones.row },
+                            ]}
+                          >
+                            <Avatar name={item.name} file={item.avatar} size={36} />
+                            <View style={styles.personaTextContainer}>
+                              <View style={styles.personaNameRow}>
+                                <Text style={styles.personaName} numberOfLines={1}>
+                                  {item.name}
+                                </Text>
+                                {item.isDefault ? (
+                                  <Star size={12} color={colors.accent} />
+                                ) : null}
+                              </View>
+                              {item.description ? (
+                                <Text style={styles.personaSubtitle} numberOfLines={1}>
+                                  {item.description}
+                                </Text>
+                              ) : null}
+                            </View>
+                            {isSelected ? (
+                              <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} />
+                            ) : null}
+                          </Pressable>
+                          <View style={styles.personaMenuWrapper} onStartShouldSetResponder={() => true}>
+                            <NativeMenu items={personaMenu}>
+                              <View style={styles.personaEditButton}>
+                                <Icon name="ellipsis-horizontal" size={18} color={colors.textFaint} />
+                              </View>
+                            </NativeMenu>
+                          </View>
+                        </View>
+                      </View>
+                    )
+                  })}
+                </View>
+              )}
+            </ScrollView>
+          </Animated.View>
         </View>
-        )}
       </BottomSheet>
     </KeyboardStickyView>
   )
@@ -1172,7 +1257,28 @@ const createStyles = (colors: Colors) =>
   plus: { width: SIDE, height: SIDE, alignItems: 'center', justifyContent: 'center' },
   photosHeaderBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   photosHeaderText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
-  sheetContent: { paddingHorizontal: 16, paddingBottom: 10 },
+  sheetSlider: {
+    overflow: 'hidden',
+    position: 'relative',
+    width: '100%',
+  },
+  sheetPane: {
+    width: '100%',
+  },
+  sheetPaneActive: {
+    position: 'relative',
+  },
+  sheetPaneAbsolute: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  sheetScroll: {
+    flexGrow: 0,
+  },
+  sheetContent: { paddingHorizontal: 16, paddingBottom: 16 },
   tilesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
   cameraTile: {
     width: 96,
@@ -1246,11 +1352,17 @@ const createStyles = (colors: Colors) =>
     alignItems: 'center',
     justifyContent: 'center',
   },
+  personaRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   personaRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 56,
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 8,
     paddingVertical: 10,
     gap: 14,
   },
@@ -1288,8 +1400,18 @@ const createStyles = (colors: Colors) =>
     alignItems: 'center',
     gap: 10,
   },
+  personaMenuWrapper: {
+    paddingRight: 12,
+    paddingLeft: 4,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   personaEditButton: {
-    padding: 6,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerIconBtn: {
     width: 32,

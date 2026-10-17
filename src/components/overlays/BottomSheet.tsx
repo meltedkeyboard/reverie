@@ -22,6 +22,9 @@ type Props = {
   rightItem?: React.ReactNode
   compactHeader?: boolean
   noGlass?: boolean
+  height?: number
+  minHeight?: number
+  contentPaddingBottom?: number
   children: React.ReactNode
 }
 
@@ -66,6 +69,9 @@ export function BottomSheet({
   rightItem,
   compactHeader = false,
   noGlass = false,
+  height: fixedHeight,
+  minHeight: customMinHeight,
+  contentPaddingBottom,
   onBack,
   children,
 }: Props) {
@@ -272,7 +278,13 @@ export function BottomSheet({
         </Animated.View>
         {/* Only moved, never faded: Liquid Glass renders wrongly under a fading parent. */}
         <Animated.View
-          style={[styles.slot, { maxHeight: height - insets.top - 24 }, slide]}
+          style={[
+            styles.slot,
+            { maxHeight: height - insets.top - 24 },
+            fixedHeight ? { height: fixedHeight } : null,
+            customMinHeight ? { minHeight: customMinHeight } : null,
+            slide,
+          ]}
           onLayout={(e) => {
             travel.value = e.nativeEvent.layout.height + INSET * 2
             measured.current = true
@@ -282,7 +294,12 @@ export function BottomSheet({
           <GestureDetector gesture={drag}>
             {isGlass ? (
               <GlassSurface
-                style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
+                style={[
+                  styles.sheet,
+                  fixedHeight ? { height: '100%' } : null,
+                  customMinHeight ? { minHeight: customMinHeight } : null,
+                  { paddingBottom: contentPaddingBottom !== undefined ? contentPaddingBottom : Math.max(insets.bottom, 16) },
+                ]}
                 fallbackStyle={[styles.solid, { backgroundColor: tones.sheet }]}
               >
                 {sheetBody}
@@ -292,7 +309,12 @@ export function BottomSheet({
                 style={[
                   styles.sheet,
                   styles.solid,
-                  { backgroundColor: tones.sheet, paddingBottom: Math.max(insets.bottom, 16) },
+                  fixedHeight ? { height: '100%' } : null,
+                  customMinHeight ? { minHeight: customMinHeight } : null,
+                  {
+                    backgroundColor: tones.sheet,
+                    paddingBottom: contentPaddingBottom !== undefined ? contentPaddingBottom : Math.max(insets.bottom, 16),
+                  },
                 ]}
               >
                 {sheetBody}
