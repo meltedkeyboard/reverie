@@ -395,14 +395,14 @@ export function Composer({
 
   const attachArmed = useSharedValue(0)
   useEffect(() => {
-    attachArmed.value = withTiming(selectedRecents.length > 0 ? 1 : 0, { duration: 200 })
+    attachArmed.value = withTiming(selectedRecents.length > 0 ? 1 : 0, { duration: 220 })
   }, [selectedRecents.length, attachArmed])
 
   const attachButtonStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       attachArmed.value,
       [0, 1],
-      [scheme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', colors.accent],
+      [withAlpha(colors.accent, scheme === 'light' ? 0.12 : 0.16), colors.accent],
     ),
   }))
 
@@ -410,7 +410,7 @@ export function Composer({
     color: interpolateColor(
       attachArmed.value,
       [0, 1],
-      [colors.textFaint, ON_ACCENT],
+      [colors.accent, ON_ACCENT],
     ),
   }))
   // A resting one-line field is a little narrower than with the keyboard up.
