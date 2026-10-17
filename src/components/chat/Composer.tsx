@@ -398,20 +398,8 @@ export function Composer({
     attachArmed.value = withTiming(selectedRecents.length > 0 ? 1 : 0, { duration: 220 })
   }, [selectedRecents.length, attachArmed])
 
-  const attachButtonStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      attachArmed.value,
-      [0, 1],
-      [withAlpha(colors.accent, scheme === 'light' ? 0.12 : 0.16), colors.accent],
-    ),
-  }))
-
-  const attachTextStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(
-      attachArmed.value,
-      [0, 1],
-      [colors.accent, ON_ACCENT],
-    ),
+  const attachActiveBgStyle = useAnimatedStyle(() => ({
+    opacity: attachArmed.value,
   }))
   // A resting one-line field is a little narrower than with the keyboard up.
   const narrow = useSharedValue(0)
@@ -876,14 +864,20 @@ export function Composer({
                 pressed && selectedRecents.length > 0 && { opacity: 0.85 },
               ]}
             >
-              <Animated.View style={[StyleSheet.absoluteFill, styles.attachActionBg, attachButtonStyle]} />
-              <Animated.Text style={[styles.attachActionText, attachTextStyle]}>
+              <View style={[StyleSheet.absoluteFill, styles.attachActionBg, { backgroundColor: colors.surfaceRaised }]} />
+              <Animated.View style={[StyleSheet.absoluteFill, styles.attachActionBg, { backgroundColor: colors.accent }, attachActiveBgStyle]} />
+              <Text
+                style={[
+                  styles.attachActionText,
+                  { color: selectedRecents.length > 0 ? ON_ACCENT : colors.textMuted },
+                ]}
+              >
                 {selectedRecents.length === 0
                   ? t('attach.attachAction')
                   : selectedRecents.length === 1
                     ? t('attach.attachSingle')
                     : t('attach.attachMultiple', { count: selectedRecents.length })}
-              </Animated.Text>
+              </Text>
             </Pressable>
           </View>
         </View>

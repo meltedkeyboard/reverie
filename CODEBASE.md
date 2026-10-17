@@ -111,6 +111,8 @@ After every finished reply `useSuggestion` (`src/hooks/chat/useSuggestion.ts`) a
 
 The streaming loop itself (reasoning, per-frame batching) is `runReplyStream` in `src/lib/chat/replyStream.ts`, shared with rooms.
 
+The attach drawer (`Composer.tsx`) opens from the plus button inside a `BottomSheet`: it offers a camera tile, a horizontal scroll row of recent picture thumbnails with multi-selection checkmarks, file picking, and per-chat thinking toggle. A permanent CTA button sits at the bottom of the drawer: in its idle state it is neutral gray (`colors.surfaceRaised`) and disabled; once photos are selected, it smoothly transitions to the accent color (`colors.accent`) with white text via Reanimated opacity layers without UI-thread color crashes, showing the selected count and confirming attachment. In `GroupedList.tsx`, switches use a dedicated `switchRow` with symmetric vertical padding to stay centered against system `UISwitch` geometry.
+
 ## Rooms
 
 A room is a cast of characters (`room_members`) and settings; its chats are scenes (`chats.room_id`, with `character_id` NULL). `chat/[id].tsx` shows a scene with `src/components/cast/RoomView.tsx`, driven by `useRoom`.
