@@ -727,7 +727,7 @@ export function Composer({
           ) : null
         }
       >
-        <View style={styles.sheetContent}>
+        <View style={[styles.sheetContent, selectedRecents.length > 0 && styles.sheetContentWithAction]}>
           {/* Top row: Camera tile + Recent picture thumbnails (or library button on web) */}
           <ScrollView
             horizontal
@@ -839,41 +839,42 @@ export function Composer({
             </View>
           ) : null}
 
-          {/* Bottom CTA button to attach selected photos */}
-          {selectedRecents.length > 0 ? (
-            <Animated.View
-              entering={FadeInDown.springify().damping(20).stiffness(200)}
-              exiting={FadeOutDown.duration(160)}
-              style={styles.attachActionSlot}
+        </View>
+        {/* Bottom CTA button to attach selected photos */}
+        {selectedRecents.length > 0 ? (
+          <Animated.View
+            entering={FadeInDown.springify().duration(250).dampingRatio(1)}
+            exiting={FadeOutDown.duration(160)}
+            style={[styles.attachActionSlot, { bottom: Math.max(insets.bottom, 16) }]}
+            pointerEvents="box-none"
+          >
+            <Pressable
+              onPress={confirmAttachRecents}
+              accessibilityRole="button"
+              accessibilityLabel={
+                selectedRecents.length === 1
+                  ? t('attach.attachSingle')
+                  : t('attach.attachMultiple', { count: selectedRecents.length })
+              }
+              style={({ pressed }) => [
+                styles.attachActionButton,
+                { backgroundColor: scheme === 'light' ? colors.text : '#FFFFFF' },
+                pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+              ]}
             >
-              <Pressable
-                onPress={confirmAttachRecents}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  selectedRecents.length === 1
-                    ? t('attach.attachSingle')
-                    : t('attach.attachMultiple', { count: selectedRecents.length })
-                }
-                style={({ pressed }) => [
-                  styles.attachActionButton,
-                  { backgroundColor: scheme === 'light' ? colors.text : '#FFFFFF' },
-                  pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+              <Text
+                style={[
+                  styles.attachActionText,
+                  { color: scheme === 'light' ? colors.bg : '#000000' },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.attachActionText,
-                    { color: scheme === 'light' ? colors.bg : '#000000' },
-                  ]}
-                >
-                  {selectedRecents.length === 1
-                    ? t('attach.attachSingle')
-                    : t('attach.attachMultiple', { count: selectedRecents.length })}
-                </Text>
-              </Pressable>
-            </Animated.View>
-          ) : null}
-        </View>
+                {selectedRecents.length === 1
+                  ? t('attach.attachSingle')
+                  : t('attach.attachMultiple', { count: selectedRecents.length })}
+              </Text>
+            </Pressable>
+          </Animated.View>
+        ) : null}
       </BottomSheet>
     </KeyboardStickyView>
   )
@@ -981,6 +982,7 @@ const createStyles = (colors: Colors) =>
   photosHeaderBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   photosHeaderText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
   sheetContent: { paddingHorizontal: 16, paddingBottom: 6 },
+  sheetContentWithAction: { paddingBottom: 68 },
   tilesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
   cameraTile: {
     width: 96,
@@ -1014,7 +1016,10 @@ const createStyles = (colors: Colors) =>
     justifyContent: 'center',
   },
   attachActionSlot: {
-    marginTop: 14,
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 10,
   },
   attachActionButton: {
     height: 54,
@@ -1022,10 +1027,10 @@ const createStyles = (colors: Colors) =>
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   attachActionText: {
     fontSize: 17,
