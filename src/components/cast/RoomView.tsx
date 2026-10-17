@@ -1,8 +1,9 @@
 import { Icon } from '@/components/visuals/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { KeyboardController } from 'react-native-keyboard-controller'
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -105,7 +106,29 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
   const [whisper, setWhisper] = useState(false)
   const [narration, setNarration] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
+  const restoreKeyboardOnClose = useRef(false)
   const { privateEnabled, suggestEnabled } = useChatSwitches()
+
+  const openCast = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    const isKeyboardUp = KeyboardController.isVisible()
+    restoreKeyboardOnClose.current = isKeyboardUp
+
+    if (isKeyboardUp) {
+      await KeyboardController.dismiss({ animated: true })
+    }
+
+    setCastOpen(true)
+  }
+
+  const onCastDismissed = () => {
+    if (restoreKeyboardOnClose.current) {
+      restoreKeyboardOnClose.current = false
+      setTimeout(() => {
+        // Let user continue typing or open keyboard
+      }, 50)
+    }
+  }
 
   const scene = useMemo(() => roomScene(room, members), [room, members])
   const aside = useAside(scene, messages)
@@ -430,10 +453,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
                   addressees={addressees}
                   whisper={whisper}
                   narration={narration}
-                  onOpen={() => {
-                    Keyboard.dismiss()
-                    setCastOpen(true)
-                  }}
+                  onOpen={openCast}
                 />
                 <FloorButton floor={floor} onChange={changeFloor} />
               </>
@@ -478,6 +498,7 @@ export function RoomView({ chat, room: initialRoom, members: initialMembers, foc
       <CastSheet
         visible={castOpen}
         onClose={() => setCastOpen(false)}
+        onDismissed={onCastDismissed}
         members={members}
         addressees={addressees}
         narration={narration}

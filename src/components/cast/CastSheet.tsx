@@ -1,6 +1,6 @@
 import { Icon } from '@/components/visuals/Icon'
 import { Fragment, useEffect } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View, type StyleProp, type TextStyle } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
@@ -17,6 +17,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import type { RoomMember } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
+import { isDesktop, isIOS } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
@@ -28,6 +29,7 @@ import { StarToggle } from '../visuals/motifs/StarToggle'
 type Props = {
   visible: boolean
   onClose: () => void
+  onDismissed?: () => void
   members: RoomMember[]
   addressees: number[]
   narration: boolean
@@ -44,9 +46,9 @@ type Props = {
   onMemberMenu: (member: RoomMember) => void
 }
 
-const AVATAR = 40
+const AVATAR = 38
 const ROW_PADDING = 16
-const GAP = 12
+const GAP = 14
 // Dimming of someone out of the scene, or of a switch that can't be used now.
 const AWAY = 0.45
 const FADE: CSSTransitionProperties = { transitionProperty: 'opacity', transitionDuration: 180 }
@@ -58,6 +60,7 @@ const DOT: CSSTransitionProperties = { transitionProperty: ['width', 'marginRigh
 export function CastSheet({
   visible,
   onClose,
+  onDismissed,
   members,
   addressees,
   narration,
@@ -72,7 +75,7 @@ export function CastSheet({
   onMemberMenu,
 }: Props) {
   const colors = useColors()
-  const tones = useSheetTones()
+  const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   // While narrating nobody is spoken to, whatever was picked before.
@@ -113,9 +116,22 @@ export function CastSheet({
   }
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title={t('room.castTitle')}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} bounces={false}>
-        <View style={[styles.card, { backgroundColor: tones.card }]}>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      onDismissed={onDismissed}
+      title={t('room.castTitle')}
+      compactHeader
+      noGlass
+    >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.sheetContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+        bounces={false}
+      >
+        <View style={[styles.sheetCard, { backgroundColor: tones.card }]}>
           <ModeRow
             icon="people"
             title={t('room.everyone')}
@@ -123,7 +139,7 @@ export function CastSheet({
             on={!picked.length && !narration}
             onPress={() => pickOnly([])}
           />
-          <View style={[styles.separator, { marginLeft: ROW_PADDING + AVATAR + GAP }]} />
+          <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
           <ModeRow
             icon="book"
             title={t('room.narration')}
@@ -141,7 +157,7 @@ export function CastSheet({
             const live = speaking || queuedIds.includes(id)
             return (
               <Fragment key={id}>
-                <View style={[styles.separator, { marginLeft: ROW_PADDING + AVATAR + GAP }]} />
+                <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
                 <SwipeRow
                   enabled={canMove}
                   present={member.present}
@@ -184,7 +200,7 @@ export function CastSheet({
         </View>
         <CrossFade texts={[t('room.castHint'), t('room.castBusy')]} index={canMove ? 0 : 1} style={styles.hint} />
 
-        <View style={[styles.card, styles.secondCard, { backgroundColor: tones.card }]}>
+        <View style={[styles.sheetCard, styles.sheetCardSecondary, { backgroundColor: tones.card }]}>
           <Pressable
             onPress={() => {
               Haptics.selectionAsync()
@@ -193,7 +209,7 @@ export function CastSheet({
             disabled={!canWhisper}
             accessibilityRole="switch"
             accessibilityState={{ checked: whisper && canWhisper, disabled: !canWhisper }}
-            style={({ pressed }) => [styles.row, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+            style={({ pressed }) => [styles.row, styles.whisperRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
           >
             <Animated.View style={[styles.modeIcon, { opacity: canWhisper ? 1 : AWAY }, FADE]}>
               <Icon name="lock-closed" size={18} color={colors.accent} />
@@ -203,7 +219,17 @@ export function CastSheet({
               <CrossFade texts={whisperHints} index={whisperHint} style={styles.status} />
             </View>
             <Animated.View style={[{ opacity: canWhisper ? 1 : AWAY }, FADE]} pointerEvents={canWhisper ? 'auto' : 'none'}>
-              <StarToggle value={whisper && canWhisper} onValueChange={onToggleWhisper} />
+              <Switch
+                value={whisper && canWhisper}
+                onValueChange={() => {
+                  Haptics.selectionAsync()
+                  onToggleWhisper()
+                }}
+                disabled={!canWhisper}
+                accessibilityLabel={t('room.whisper')}
+                trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
+                {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
+              />
             </Animated.View>
           </Pressable>
         </View>
@@ -223,7 +249,7 @@ type ModeRowProps = {
 // A row that is not a character: the whole room, or the narrator's voice.
 function ModeRow({ icon, title, hint, on, onPress }: ModeRowProps) {
   const colors = useColors()
-  const tones = useSheetTones()
+  const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
   return (
     <Pressable
@@ -294,7 +320,7 @@ const SPRING = { damping: 24, stiffness: 240 }
 // then the row springs back; there is nothing to confirm, the way back is the same swipe.
 function SwipeRow({ enabled, present, onToggle, onPress, onLongPress, name, children }: SwipeRowProps) {
   const colors = useColors()
-  const tones = useSheetTones()
+  const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const offset = useSharedValue(0)
@@ -394,11 +420,24 @@ const ringStyle = StyleSheet.create({
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     scroll: { flexGrow: 0, flexShrink: 1 },
-    scrollContent: { paddingHorizontal: 16, paddingBottom: 4 },
-    card: { borderRadius: 26, overflow: 'hidden' },
-    secondCard: { marginTop: 20 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: GAP, paddingHorizontal: ROW_PADDING, paddingVertical: 13 },
-    separator: { height: StyleSheet.hairlineWidth, marginRight: ROW_PADDING, backgroundColor: colors.borderStrong },
+    sheetContent: { paddingHorizontal: 16, paddingBottom: 10 },
+    sheetCard: { borderRadius: 24, overflow: 'hidden' },
+    sheetCardSecondary: { marginTop: 14 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: GAP,
+      paddingHorizontal: ROW_PADDING,
+      paddingVertical: 14,
+    },
+    whisperRow: {
+      paddingVertical: 12,
+      minHeight: 52,
+    },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      marginLeft: ROW_PADDING + AVATAR + GAP,
+    },
     modeIcon: {
       width: AVATAR,
       height: AVATAR,
