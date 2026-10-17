@@ -13,8 +13,6 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
   Easing,
-  FadeInDown,
-  FadeOutDown,
   interpolateColor,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -394,6 +392,27 @@ export function Composer({
     setMenuShown(false)
     setSelectedRecents([])
   }
+
+  const attachArmed = useSharedValue(0)
+  useEffect(() => {
+    attachArmed.value = withTiming(selectedRecents.length > 0 ? 1 : 0, { duration: 200 })
+  }, [selectedRecents.length, attachArmed])
+
+  const attachButtonStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      attachArmed.value,
+      [0, 1],
+      [scheme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', colors.accent],
+    ),
+  }))
+
+  const attachTextStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      attachArmed.value,
+      [0, 1],
+      [colors.textFaint, ON_ACCENT],
+    ),
+  }))
   // A resting one-line field is a little narrower than with the keyboard up.
   const narrow = useSharedValue(0)
   const resting = !focused && !expanded
@@ -839,37 +858,35 @@ export function Composer({
             </View>
           ) : null}
 
-        </View>
-        {/* Bottom CTA button to attach selected photos */}
-        {selectedRecents.length > 0 ? (
-          <Animated.View
-            entering={FadeInDown.springify().duration(250).dampingRatio(1)}
-            exiting={FadeOutDown.duration(160)}
-            style={[styles.attachActionSlot, { bottom: Math.max(insets.bottom, 16) }]}
-            pointerEvents="box-none"
-          >
+          {/* Permanent bottom CTA button to attach selected photos */}
+          <View style={styles.attachActionSlot}>
             <Pressable
               onPress={confirmAttachRecents}
+              disabled={selectedRecents.length === 0}
               accessibilityRole="button"
               accessibilityLabel={
-                selectedRecents.length === 1
-                  ? t('attach.attachSingle')
-                  : t('attach.attachMultiple', { count: selectedRecents.length })
+                selectedRecents.length === 0
+                  ? t('attach.attachAction')
+                  : selectedRecents.length === 1
+                    ? t('attach.attachSingle')
+                    : t('attach.attachMultiple', { count: selectedRecents.length })
               }
               style={({ pressed }) => [
                 styles.attachActionButton,
-                { backgroundColor: colors.accent },
-                pressed && { opacity: 0.85 },
+                pressed && selectedRecents.length > 0 && { opacity: 0.85 },
               ]}
             >
-              <Text style={[styles.attachActionText, { color: ON_ACCENT }]}>
-                {selectedRecents.length === 1
-                  ? t('attach.attachSingle')
-                  : t('attach.attachMultiple', { count: selectedRecents.length })}
-              </Text>
+              <Animated.View style={[StyleSheet.absoluteFill, styles.attachActionBg, attachButtonStyle]} />
+              <Animated.Text style={[styles.attachActionText, attachTextStyle]}>
+                {selectedRecents.length === 0
+                  ? t('attach.attachAction')
+                  : selectedRecents.length === 1
+                    ? t('attach.attachSingle')
+                    : t('attach.attachMultiple', { count: selectedRecents.length })}
+              </Animated.Text>
             </Pressable>
-          </Animated.View>
-        ) : null}
+          </View>
+        </View>
       </BottomSheet>
     </KeyboardStickyView>
   )
@@ -975,7 +992,7 @@ const createStyles = (colors: Colors) =>
   plus: { width: SIDE, height: SIDE, alignItems: 'center', justifyContent: 'center' },
   photosHeaderBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   photosHeaderText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
-  sheetContent: { paddingHorizontal: 16, paddingBottom: 70 },
+  sheetContent: { paddingHorizontal: 16, paddingBottom: 10 },
   tilesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
   cameraTile: {
     width: 96,
@@ -1009,21 +1026,17 @@ const createStyles = (colors: Colors) =>
     justifyContent: 'center',
   },
   attachActionSlot: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 10,
+    marginTop: 18,
   },
   attachActionButton: {
-    height: 54,
-    borderRadius: 27,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    overflow: 'hidden',
+  },
+  attachActionBg: {
+    borderRadius: 26,
   },
   attachActionText: {
     fontSize: 17,

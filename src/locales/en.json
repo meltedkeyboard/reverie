@@ -434,6 +434,7 @@
   "attach.persona": "Persona",
   "attach.personaNone": "None",
   "attach.personaPlaceholder": "Persona selection is a placeholder and does nothing yet",
+  "attach.attachAction": "Attach",
   "attach.attachSingle": "Attach 1 photo",
   "attach.attachMultiple": "Attach {{count}} photos",
 

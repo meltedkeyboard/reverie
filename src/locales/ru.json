@@ -434,6 +434,7 @@
   "attach.persona": "Персона",
   "attach.personaNone": "Нет",
   "attach.personaPlaceholder": "Выбор персоны — пока заглушка и ничего не делает",
+  "attach.attachAction": "Прикрепить",
   "attach.attachSingle": "Прикрепить 1 фото",
   "attach.attachMultiple": "Прикрепить {{count}} фото",
 
