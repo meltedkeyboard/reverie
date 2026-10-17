@@ -13,7 +13,6 @@ import { SlidingIcon, useAtLeastOneLap } from '@/components/controls/PillButton'
 import { setTextDraft } from '@/lib/chat/textDraft'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import * as Haptics from '@/lib/ui/haptics'
-import { liquidGlass } from '@/lib/ui/nativeUI'
 import { isDesktop, isIOS } from '@/lib/core/platform'
 import { type Colors, useColors, useStyles } from '@/theme'
 
@@ -85,12 +84,9 @@ function CellSwitch({ value, onValueChange, disabled }: { value: boolean; onValu
       trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
       // react-native-web paints the thumb in its own teal; here it is white either way.
       {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
-      style={liquidGlass ? switchNudge : undefined}
     />
   )
 }
-
-const switchNudge = { transform: [{ translateY: 1.5 }] }
 
 // A choice among the rows of its group, marked with a checkmark like a ringtone list.
 export function CheckCell({ label, checked, onPress, disabled }: CellProps & { checked: boolean; onPress: () => void }) {

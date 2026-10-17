@@ -833,7 +833,7 @@ export function Composer({
                   accessibilityLabel={t('chat.thinking')}
                   trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
                   {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
-                  style={[liquidGlass ? switchNudge : undefined, styles.nativeSwitch]}
+                  style={styles.nativeSwitch}
                 />
               </View>
             </View>
@@ -968,7 +968,6 @@ const ICONS = {
   continue: { sf: 'forward.fill', fallback: 'play-forward' },
 } as const
 
-const switchNudge = { transform: [{ translateY: 1.5 }] }
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
@@ -1045,12 +1044,12 @@ const createStyles = (colors: Colors) =>
   sheetCardTrailingText: { color: colors.textMuted, fontSize: 16 },
   thinkingCardRow: {
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingRight: 16,
     minHeight: 52,
   },
   thinkingLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  nativeSwitch: { marginRight: 0 },
+  nativeSwitch: { marginVertical: 0 },
   accessory: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   bar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: BAR_PAD_SIDE },
   floatingBar: { paddingTop: BAR_PAD_TOP, paddingHorizontal: BAR_PAD_SIDE },
