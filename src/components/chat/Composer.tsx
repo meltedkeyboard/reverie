@@ -3,14 +3,14 @@ import NativeMaskedView from '@react-native-masked-view/masked-view'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native'
+import { FlatList, Keyboard, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native'
 
 // The isWeb has no native mask: the package paints the mask element itself, a black slab
 // over the field. There the field is shown as it is, without the fade at its edges.
 const MaskedView: typeof NativeMaskedView =
   isWeb ? (({ children }: { children?: React.ReactNode }) => <>{children}</>) as never : NativeMaskedView
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import { KeyboardStickyView } from 'react-native-keyboard-controller'
+import { KeyboardController, KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
   Easing,
   interpolateColor,
@@ -305,6 +305,14 @@ export function Composer({
       setTimeout(() => {
         attach(source)
       }, 50)
+      return
+    }
+
+    if (restoreKeyboardOnClose.current) {
+      restoreKeyboardOnClose.current = false
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 50)
     }
   }
 
@@ -347,9 +355,19 @@ export function Composer({
   // The attach menu is shown in a bottom sheet over the composer.
   const [menuShown, setMenuShown] = useState(false)
   const [selectedRecents, setSelectedRecents] = useState<MessageImage[]>([])
+  // Whether the keyboard was up when opening the attach drawer, so we restore it on close
+  const restoreKeyboardOnClose = useRef(false)
 
-  const openMenu = () => {
+  const openMenu = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    const isKeyboardUp = KeyboardController.isVisible() || focused || !!inputRef.current?.isFocused?.()
+    restoreKeyboardOnClose.current = isKeyboardUp
+
+    if (isKeyboardUp) {
+      inputRef.current?.blur?.()
+      await KeyboardController.dismiss({ animated: true })
+    }
+
     setSelectedRecents([])
     isRecentAttachmentsEnabled(db)
       .then(async (on) => {
