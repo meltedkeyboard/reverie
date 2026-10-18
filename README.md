@@ -1,8 +1,26 @@
 <p align="center">
-  <img src="assets/brand/wordmark.svg" alt="Reverie" width="420" />
+  <img src="assets/readme/combined.png" alt="Reverie. Your stories, your models, your device. Rooms: many voices, one scene. Reply suggestions and search." />
 </p>
 
-Roleplay chat client for iOS and Android, built with Expo. It talks directly to a local model server over an OpenAI-compatible API (LM Studio, llama.cpp, Ollama). All data stays on the device.
+<p align="center">
+  Roleplay chat client for iOS and Android, built with Expo.<br />
+  It talks directly to a local model server over an OpenAI-compatible API (LM Studio, llama.cpp, Ollama). All data stays on the device.
+</p>
+
+<p align="center">
+  <a href="https://github.com/meltedkeyboard/reverie/releases/latest"><b>Download</b></a> ·
+  <a href="#install">Install</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#quick-start">Build from source</a>
+</p>
+
+## Install
+
+1. Download the `.ipa` (iOS) or the `.apk` (Android) from the [latest release](https://github.com/meltedkeyboard/reverie/releases/latest).
+2. On iOS, sign and install the `.ipa` with Sideloadly or AltStore using your Apple ID (a free account gives a 7-day signature). On Android, open the `.apk` and allow installing from this source.
+3. Start a model server on your computer (LM Studio, llama.cpp, Ollama or anything OpenAI-compatible), then enter its address in Settings, for example `http://192.168.1.10:1234`.
+
+Character cards from other apps (V1, V2, V3; JSON or PNG) import with the download button on the Characters tab.
 
 ## Features
 
