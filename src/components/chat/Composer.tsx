@@ -1029,7 +1029,9 @@ export function Composer({
             pointerEvents={sheetScreen === 'persona' ? 'auto' : 'none'}
           >
             <ScrollView
-              style={[styles.sheetScroll, attachHeight ? { maxHeight: Math.max(attachHeight, 380) } : null]}
+              // As tall as the pane even with one or two personas, so a drag anywhere below
+              // them scrolls the list instead of pulling the sheet down.
+              style={[styles.sheetScroll, attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 380) } : null]}
               contentContainerStyle={[styles.sheetContent, { paddingBottom: 24 }]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
