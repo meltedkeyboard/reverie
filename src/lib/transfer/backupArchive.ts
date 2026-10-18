@@ -5,6 +5,7 @@ import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate'
 //   characters/<id>-<name>.json
 //   rooms/<id>-<name>.json   the room with its members
 //   chats/<id>-<title>.json  the chat with its messages
+//   personas/<id>-<name>.json   the user's personas (chats point at them by id)
 //   avatars/<file>, backgrounds/<file>   the pictures as they are, originals included
 //   attachments/<file>   the pictures attached to messages (a message lists their names)
 // Only the folders matter to the reader; the names after the id are there for people.
@@ -18,6 +19,7 @@ export type ArchiveParts = {
   roomMembers: { roomId: number }[]
   chats: (WithId & { title: string | null })[]
   messages: { chatId: number }[]
+  personas: (WithId & { name: string })[]
   // Every picture by its path in the zip ("avatars/1.jpg").
   files: { path: string; bytes: Uint8Array }[]
 }
@@ -47,6 +49,7 @@ export function packArchive(parts: ArchiveParts) {
   for (const room of parts.rooms) files[`rooms/${fileName(room.id, room.name)}`] = json({ ...room, members: members.get(room.id) ?? [] })
   const messages = groupBy(parts.messages, (m) => m.chatId)
   for (const chat of parts.chats) files[`chats/${fileName(chat.id, chat.title)}`] = json({ ...chat, messages: messages.get(chat.id) ?? [] })
+  for (const persona of parts.personas) files[`personas/${fileName(persona.id, persona.name)}`] = json(persona)
   // Pictures are compressed already; storing them is faster and no bigger.
   for (const file of parts.files) files[file.path] = [file.bytes, { level: 0 }]
   return zipSync(files)
@@ -72,6 +75,8 @@ export function unpackArchive(bytes: Uint8Array): OpenedArchive {
     roomMembers: rooms.flatMap((room) => room.members ?? []),
     chats: chats.map(({ messages: _messages, ...chat }) => chat),
     messages: chats.flatMap((chat) => chat.messages ?? []),
+    // Backups from before personas have no such folder.
+    personas: folder('personas').sort(byId),
     file: (path) => files[path],
   }
 }

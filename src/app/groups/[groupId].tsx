@@ -170,6 +170,7 @@ export default function GroupScreen() {
               characters: new Set(picked.flatMap((p) => [...p.characters])),
               rooms: new Set(),
               chats: new Set(picked.flatMap((p) => [...p.chats])),
+              personas: new Set(picked.flatMap((p) => [...p.personas])),
             })
           },
         },

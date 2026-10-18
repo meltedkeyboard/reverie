@@ -9,6 +9,7 @@ import { pickBackupFile } from '@/lib/transfer/pickBackup'
 import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/images/avatars'
 import { isArchive, packArchive, unpackArchive } from '@/lib/transfer/backupArchive'
 import { insertGroup } from '@/db/groups'
+import { insertPersona, notifyPersonasChanged } from '@/db/personas'
 import { applySelection, buildTree, type BackupTree, type Selection } from '@/lib/transfer/backupSelection'
 import { saveFile } from '@/lib/transfer/download'
 import { fromByteArray } from 'base64-js'
@@ -16,8 +17,9 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 9: a zip of JSON files and pictures. Up to 8 it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 9
+// 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
+// it was one JSON file with the pictures in base64.
+const BACKUP_VERSION = 10
 
 type BackupCharacter = {
   id: number
@@ -49,7 +51,27 @@ type BackupCharacter = {
 type BackupGroupSlot = { id: number; name: string | null; position: number }
 
 // Backups from before rooms have no roomId, and every chat has a character.
-type BackupChat = { id: number; characterId: number | null; roomId?: number | null; title: string | null; createdAt: number; thinking?: ThinkingMode | null }
+type BackupChat = {
+  id: number
+  characterId: number | null
+  roomId?: number | null
+  title: string | null
+  createdAt: number
+  thinking?: ThinkingMode | null
+  // Backups from before personas leave it out.
+  personaId?: number | null
+}
+
+type BackupPersona = {
+  id: number
+  name: string
+  avatar: string | null
+  avatarOriginal: string | null
+  avatarCrop: string | null
+  description: string
+  isDefault: boolean | number
+  createdAt: number
+}
 
 type BackupRoom = {
   id: number
@@ -112,12 +134,17 @@ type Backup = {
   roomMembers?: BackupMember[]
   chats: BackupChat[]
   messages: BackupMessage[]
+  personas?: BackupPersona[]
   // Only in the old single-file backups: the pictures by name, in base64.
   avatars?: Record<string, string>
   settings?: { baseUrl?: string; model?: string }
 }
 
-// The tree the export sheet shows: characters and rooms with their chats, from the database.
+// The personas as the export takes them: top down like their screen.
+const PERSONA_ROWS = `SELECT id, name, avatar, avatar_original AS avatarOriginal, avatar_crop AS avatarCrop, description,
+  is_default AS isDefault, created_at AS createdAt FROM personas ORDER BY sort_order DESC, id DESC`
+
+// The tree the export sheet shows: characters and rooms with their chats and the personas, from the database.
 export async function loadBackupTree(db: SQLiteDatabase): Promise<BackupTree> {
   // Top down like the home list, so a group stands where it does there.
   const rows = await db.getAllAsync<{ id: number; name: string; avatar: string | null; groupId: number | null; groupName: string | null }>(
@@ -127,18 +154,34 @@ export async function loadBackupTree(db: SQLiteDatabase): Promise<BackupTree> {
   )
   const characters = rows.map(({ groupId, groupName, ...c }) => ({ ...c, group: groupId === null ? null : { id: groupId, name: groupName } }))
   const rooms = await db.getAllAsync<{ id: number; name: string }>('SELECT id, name FROM rooms ORDER BY sort_order, id')
-  const chats = await db.getAllAsync<{ id: number; characterId: number | null; roomId: number | null; title: string | null; messageCount: number }>(
-    `SELECT ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title,
+  const chats = await db.getAllAsync<{
+    id: number
+    characterId: number | null
+    roomId: number | null
+    personaId: number | null
+    title: string | null
+    messageCount: number
+  }>(
+    `SELECT ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.persona_id AS personaId, ch.title,
             (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ch.id) AS messageCount
      FROM chats ch ORDER BY ch.sort_order, ch.id`
   )
-  return buildTree({ characters, rooms, chats })
+  const personas = await db.getAllAsync<BackupPersona>(PERSONA_ROWS)
+  return buildTree({ characters, rooms, chats, personas })
 }
 
-// One character with all its chats, for a card dragged out of the list.
+// One character with all its chats and the personas they are held in, for a card dragged out of the list.
 export async function characterSelection(db: SQLiteDatabase, id: number): Promise<Selection> {
-  const chats = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE character_id = ? AND room_id IS NULL', id)
-  return { characters: new Set([id]), rooms: new Set(), chats: new Set(chats.map((chat) => chat.id)) }
+  const chats = await db.getAllAsync<{ id: number; personaId: number | null }>(
+    'SELECT id, persona_id AS personaId FROM chats WHERE character_id = ? AND room_id IS NULL',
+    id
+  )
+  return {
+    characters: new Set([id]),
+    rooms: new Set(),
+    chats: new Set(chats.map((chat) => chat.id)),
+    personas: new Set(chats.flatMap((chat) => (chat.personaId ? [chat.personaId] : []))),
+  }
 }
 
 // Everything when `selection` is left out.
@@ -165,13 +208,22 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       `SELECT room_id AS roomId, character_id AS characterId, position, talkativeness, perception, triggers, muted, present
        FROM room_members ORDER BY room_id, position`
     ),
-    chats: await db.getAllAsync<{ id: number; characterId: number | null; roomId: number | null; title: string | null; thinking?: ThinkingMode | null }>(
-      'SELECT id, character_id AS characterId, room_id AS roomId, title, created_at AS createdAt, thinking FROM chats ORDER BY sort_order, id'
+    chats: await db.getAllAsync<{
+      id: number
+      characterId: number | null
+      roomId: number | null
+      personaId: number | null
+      title: string | null
+      thinking?: ThinkingMode | null
+    }>(
+      `SELECT id, character_id AS characterId, room_id AS roomId, persona_id AS personaId, title, created_at AS createdAt, thinking
+       FROM chats ORDER BY sort_order, id`
     ),
     messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
+    personas: (await db.getAllAsync<BackupPersona>(PERSONA_ROWS)).map((p) => ({ ...p, isDefault: Boolean(p.isDefault) })),
   }
   const picked = selection ? applySelection(all, selection) : all
-  const { rooms = [], roomMembers = [], chats } = picked
+  const { rooms = [], roomMembers = [], chats, personas = [] } = picked
   const groupSlots = selection?.keepGroups === false ? new Map<number, BackupGroupSlot>() : await loadGroupSlots(db)
   const characters = picked.characters.map(({ groupId: _groupId, sortOrder: _sortOrder, ...character }) => {
     const group = groupSlots.get(character.id)
@@ -190,6 +242,10 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
     want(character.avatarOriginal, 'avatars')
     want(character.background, 'backgrounds')
     want(character.backgroundOriginal, 'backgrounds')
+  }
+  for (const persona of personas) {
+    want(persona.avatar, 'avatars')
+    want(persona.avatarOriginal, 'avatars')
   }
   for (const room of rooms) {
     want(room.background, 'backgrounds')
@@ -216,6 +272,7 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
     roomMembers: roomMembers as { roomId: number }[],
     chats: chats as { id: number; title: string | null }[],
     messages: messages as unknown as { chatId: number }[],
+    personas,
     files,
   })
 }
@@ -267,8 +324,30 @@ export function openBackupBytes(bytes: Uint8Array): OpenedBackup {
     throw new Error(t('backup.notBackup'))
   }
   const tree = buildTree({ ...dump, chats: dump.chats ?? [], messages: dump.messages ?? [] })
-  for (const node of tree.characters) node.avatarUri = avatarPreview(opened.file, node.avatar)
+  for (const node of [...tree.characters, ...tree.personas]) node.avatarUri = avatarPreview(opened.file, node.avatar)
   return { ...opened, tree }
+}
+
+// A persona is the same one when its name and description are: the import then takes the one
+// the device has instead of making a second.
+const personaKey = (persona: { name: string; description?: string | null }) => JSON.stringify([persona.name.trim(), (persona.description ?? '').trim()])
+
+async function existingPersonas(db: SQLiteDatabase) {
+  const rows = await db.getAllAsync<{ id: number; name: string; description: string }>('SELECT id, name, description FROM personas ORDER BY id')
+  const byKey = new Map<string, number>()
+  for (const row of rows) if (!byKey.has(personaKey(row))) byKey.set(personaKey(row), row.id)
+  return byKey
+}
+
+// Marks the backup's personas the device already has, for the sheet to say so.
+export async function markExistingPersonas(db: SQLiteDatabase, opened: OpenedBackup) {
+  const existing = await existingPersonas(db)
+  const byId = new Map((opened.dump.personas ?? []).map((p) => [p.id, p]))
+  for (const node of opened.tree.personas) {
+    const persona = byId.get(node.id)
+    node.exists = persona ? existing.has(personaKey(persona)) : false
+  }
+  return opened
 }
 
 // A small still avatar of the backup as a data URL for the list; a big or moving one would
@@ -291,13 +370,14 @@ export async function importBackup(
   db: SQLiteDatabase,
   opened: OpenedBackup,
   selection?: Selection
-): Promise<{ characters: number; rooms: number; chats: number }> {
+): Promise<{ characters: number; rooms: number; chats: number; personas: number }> {
   const { file } = opened
   const dump = selection ? applySelection({ ...opened.dump, chats: opened.dump.chats ?? [], messages: opened.dump.messages ?? [] }, selection) : opened.dump
 
   const characterIds = new Map<number, number>()
   const roomIds = new Map<number, number>()
   const chatIds = new Map<number, number>()
+  const personaIds = new Map<number, number>()
   // The user (0) stays 0; a character that did not come along is dropped from the list.
   const remapIds = (json: string | null | undefined) => {
     if (!json) return null
@@ -319,6 +399,34 @@ export async function importBackup(
         avatarNames.set(`${kind}/${name}`, stored)
       }
       return stored
+    }
+
+    // Bottom up, so the ones that come new keep their order at the top of the list.
+    const existing = await existingPersonas(db)
+    let hasDefault = (await db.getFirstAsync('SELECT id FROM personas WHERE is_default = 1 LIMIT 1')) !== null
+    for (const persona of [...(dump.personas ?? [])].reverse()) {
+      const same = existing.get(personaKey(persona))
+      if (same) {
+        personaIds.set(persona.id, same)
+        continue
+      }
+      // The backup's default only becomes the device's when it has none.
+      const isDefault = Boolean(persona.isDefault) && !hasDefault
+      if (isDefault) hasDefault = true
+      const id = await insertPersona(
+        db,
+        {
+          name: persona.name,
+          avatar: await importImage(persona.avatar),
+          avatarOriginal: await importImage(persona.avatarOriginal),
+          avatarCrop: persona.avatarCrop ?? null,
+          description: persona.description ?? '',
+          isDefault,
+        },
+        persona.createdAt
+      )
+      existing.set(personaKey(persona), id)
+      personaIds.set(persona.id, id)
     }
 
     for (const character of dump.characters) {
@@ -398,12 +506,13 @@ export async function importBackup(
       const roomId = chat.roomId ? roomIds.get(chat.roomId) : undefined
       const characterId = chat.characterId ? characterIds.get(chat.characterId) : undefined
       if (!roomId && !characterId) continue
-      const res = await db.runAsync('INSERT INTO chats (character_id, room_id, title, created_at, thinking) VALUES (?, ?, ?, ?, ?)', [
+      const res = await db.runAsync('INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id) VALUES (?, ?, ?, ?, ?, ?)', [
         roomId ? null : characterId!,
         roomId ?? null,
         chat.title,
         chat.createdAt,
         chat.thinking ?? null,
+        chat.personaId ? (personaIds.get(chat.personaId) ?? null) : null,
       ])
       chatIds.set(chat.id, res.lastInsertRowId)
     }
@@ -457,20 +566,23 @@ export async function importBackup(
     }
   })
 
+  if (personaIds.size) notifyPersonasChanged()
+
   if (dump.settings?.baseUrl) {
     const current = await loadSettings(db)
     if (!current.baseUrl) await saveSettings(db, { ...current, baseUrl: dump.settings.baseUrl, model: dump.settings.model ?? current.model })
   }
 
-  return { characters: characterIds.size, rooms: roomIds.size, chats: chatIds.size }
+  return { characters: characterIds.size, rooms: roomIds.size, chats: chatIds.size, personas: personaIds.size }
 }
 
-// Deletes every room, character, chat, message and avatar, plus the server settings. Cascades
-// take care of chats and messages; only the app_settings table and avatar files need
+// Deletes every room, character, persona, chat, message and avatar, plus the server settings.
+// Cascades take care of chats and messages; only the app_settings table and avatar files need
 // clearing by hand.
 export async function wipeAllData(db: SQLiteDatabase) {
   await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM rooms; DELETE FROM characters; DELETE FROM character_groups; DELETE FROM app_settings;')
+    await db.execAsync('DELETE FROM rooms; DELETE FROM characters; DELETE FROM character_groups; DELETE FROM personas; DELETE FROM app_settings;')
   })
   removeAllAvatars()
+  notifyPersonasChanged()
 }

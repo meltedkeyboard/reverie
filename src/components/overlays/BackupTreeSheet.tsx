@@ -28,17 +28,23 @@ import {
   isEmpty,
   membersSelected,
   nodeState,
+  ownerState,
   selectAll,
   selectNone,
   toggleChat,
   toggleGroup,
   toggleNode,
+  togglePersona,
+  togglePersonaChat,
+  togglePersonaOwner,
   type BackupTree,
   type Branch,
   type CheckState,
+  type PersonaOwner,
   type Selection,
   type TreeGroup,
   type TreeNode,
+  type TreePersona,
 } from '@/lib/transfer/backupSelection'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
@@ -130,8 +136,8 @@ function Chevron({ open }: { open: boolean }) {
   )
 }
 
-// A tree of characters with their chats and rooms with their scenes to tick what a backup
-// takes (export) or brings in (import). Everything is ticked to begin with.
+// A tree of characters with their chats, rooms with their scenes and the personas to tick what
+// a backup takes (export) or brings in (import). Everything is ticked to begin with.
 export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Props) {
   const { t } = useTranslation()
   const styles = useStyles(createStyles)
@@ -149,7 +155,8 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
   const allOn =
     selection.characters.size === everything.characters.size &&
     selection.rooms.size === everything.rooms.size &&
-    selection.chats.size === everything.chats.size
+    selection.chats.size === everything.chats.size &&
+    selection.personas.size === everything.personas.size
 
   const toggleOpen = (key: string) =>
     setOpen((prev) => {
@@ -158,23 +165,28 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
       return next
     })
 
-  // A character or a room, the chats under it when open.
-  const nodeBlock = (branch: Branch, node: TreeNode) => {
-    const key = `${branch}:${node.id}`
+  // A character or a room, the chats under it when open. Under a persona it stands for only the
+  // chats held in that persona, and ticking there brings the persona along.
+  const nodeBlock = (branch: Branch, whole: TreeNode, under?: { persona: TreePersona; owner: PersonaOwner }) => {
+    const node = under ? { ...whole, chats: under.owner.chats } : whole
+    const key = under ? `personas:${under.persona.id}:${branch}:${node.id}` : `${branch}:${node.id}`
     const expanded = open.has(key)
+    const toggle = (s: Selection) => (under ? togglePersonaOwner(s, under.persona, under.owner) : toggleNode(s, branch, node))
+    const toggleOne = (s: Selection, chatId: number) =>
+      under ? togglePersonaChat(s, under.persona, under.owner, chatId) : toggleChat(s, branch, node, chatId)
     return (
       <Animated.View key={key} layout={LinearTransition.duration(200)}>
         <View style={styles.nodeRow}>
           <Pressable
             onPress={() => {
               Haptics.selectionAsync()
-              setSelection((s) => toggleNode(s, branch, node))
+              setSelection(toggle)
             }}
             style={styles.ringHit}
             accessibilityRole="checkbox"
             accessibilityLabel={node.name}
           >
-            <Ring state={nodeState(selection, branch, node)}>
+            <Ring state={under ? ownerState(selection, under.owner) : nodeState(selection, branch, node)}>
               {branch === 'characters' ? (
                 <Avatar name={node.name} file={node.avatar} uri={node.avatarUri} size={40} viewable={false} />
               ) : (
@@ -186,7 +198,7 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
           </Pressable>
           <Pressable
             style={styles.rowMain}
-            onPress={() => (node.chats.length ? toggleOpen(key) : setSelection((s) => toggleNode(s, branch, node)))}
+            onPress={() => (node.chats.length ? toggleOpen(key) : setSelection(toggle))}
           >
             <Text style={styles.name} numberOfLines={1}>
               {node.name}
@@ -216,7 +228,7 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
                 style={[styles.row, styles.child]}
                 onPress={() => {
                   Haptics.selectionAsync()
-                  setSelection((s) => toggleChat(s, branch, node, chat.id))
+                  setSelection((s) => toggleOne(s, chat.id))
                 }}
               >
                 <CheckMark state={selection.chats.has(chat.id) ? 'all' : 'none'} />
@@ -294,6 +306,53 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
       </View>
     ) : null
 
+  // A persona: the characters and rooms of its chats under it when open, each with just those
+  // chats, on branches like a group's members.
+  const personaBlock = (persona: TreePersona) => {
+    const key = `personas:${persona.id}`
+    const expanded = open.has(key)
+    const toggle = () => {
+      Haptics.selectionAsync()
+      setSelection((s) => togglePersona(s, persona))
+    }
+    const notes = [persona.exists ? t('backup.personaExists') : null, persona.isDefault ? t('backup.personaDefault') : null].filter(Boolean)
+    return (
+      <Animated.View key={key} layout={LinearTransition.duration(200)}>
+        <View style={styles.nodeRow}>
+          <Pressable onPress={toggle} style={styles.ringHit} accessibilityRole="checkbox" accessibilityLabel={persona.name}>
+            <Ring state={nodeState(selection, 'personas', persona)}>
+              <Avatar name={persona.name} file={persona.avatar} uri={persona.avatarUri} size={40} viewable={false} />
+            </Ring>
+          </Pressable>
+          <Pressable style={styles.rowMain} onPress={() => (persona.owners.length ? toggleOpen(key) : toggle())}>
+            <View style={styles.toggleText}>
+              <Text style={styles.name} numberOfLines={1}>
+                {persona.name}
+              </Text>
+              {notes.length ? <Text style={styles.toggleNote}>{notes.join(' · ')}</Text> : null}
+            </View>
+            {persona.chats.length ? (
+              <Text style={styles.count}>{t('backup.selected', { selected: chatsSelected(selection, persona), total: persona.chats.length })}</Text>
+            ) : null}
+            {persona.owners.length ? <Chevron open={expanded} /> : null}
+          </Pressable>
+        </View>
+        {expanded
+          ? persona.owners.map((owner, index) => (
+              <Animated.View key={`${owner.branch}:${owner.node.id}`} entering={FadeInUp.duration(220)} exiting={FadeOutUp.duration(120)}>
+                <View pointerEvents="none" needsOffscreenAlphaCompositing style={styles.branch}>
+                  {index === 0 ? <View style={styles.stem} /> : null}
+                  <View style={index === persona.owners.length - 1 ? [styles.trunk, styles.trunkEnd] : styles.trunk} />
+                  <View style={[styles.elbow, styles.memberElbow]} />
+                </View>
+                <View style={styles.member}>{nodeBlock(owner.branch, owner.node, { persona, owner })}</View>
+              </Animated.View>
+            ))
+          : null}
+      </Animated.View>
+    )
+  }
+
   // Whether the groups come along, or the characters alone.
   const keepGroups = tree?.groups.length ? (
     <Animated.View layout={LinearTransition.duration(200)} style={styles.toggleRow}>
@@ -353,6 +412,19 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
             {tree.rooms.length ? (
               <Animated.Text layout={LinearTransition.duration(200)} style={styles.note}>
                 {t('backup.roomNote')}
+              </Animated.Text>
+            ) : null}
+            {tree.personas.length ? (
+              <View>
+                <Animated.Text layout={LinearTransition.duration(200)} style={styles.section}>
+                  {t('backup.personas')}
+                </Animated.Text>
+                {tree.personas.map(personaBlock)}
+              </View>
+            ) : null}
+            {tree.personas.some((p) => p.chats.length) ? (
+              <Animated.Text layout={LinearTransition.duration(200)} style={styles.note}>
+                {t('backup.personaNote')}
               </Animated.Text>
             ) : null}
           </>

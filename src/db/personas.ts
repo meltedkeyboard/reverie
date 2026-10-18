@@ -100,26 +100,32 @@ export async function getDefaultPersona(db: SQLiteDatabase): Promise<Persona | n
   }
 }
 
+// The bare row, for callers inside a transaction of their own (the backup import): the
+// default is not cleared from the others and nobody is told.
+export async function insertPersona(db: SQLiteDatabase, fields: PersonaFields, createdAt = Date.now()): Promise<number> {
+  const res = await db.runAsync(
+    `INSERT INTO personas (name, avatar, avatar_original, avatar_crop, description, is_default, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      fields.name.trim(),
+      fields.avatar ?? null,
+      fields.avatarOriginal ?? null,
+      fields.avatarCrop ?? null,
+      (fields.description ?? '').trim(),
+      fields.isDefault ? 1 : 0,
+      createdAt,
+    ]
+  )
+  return res.lastInsertRowId
+}
+
 export async function createPersona(db: SQLiteDatabase, fields: PersonaFields): Promise<number> {
   let id = 0
   await db.withTransactionAsync(async () => {
     if (fields.isDefault) {
       await db.runAsync('UPDATE personas SET is_default = 0')
     }
-    const res = await db.runAsync(
-      `INSERT INTO personas (name, avatar, avatar_original, avatar_crop, description, is_default, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        fields.name.trim(),
-        fields.avatar ?? null,
-        fields.avatarOriginal ?? null,
-        fields.avatarCrop ?? null,
-        (fields.description ?? '').trim(),
-        fields.isDefault ? 1 : 0,
-        Date.now(),
-      ]
-    )
-    id = res.lastInsertRowId
+    id = await insertPersona(db, fields)
   })
   notifyPersonasChanged()
   return id

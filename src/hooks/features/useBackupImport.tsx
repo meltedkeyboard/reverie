@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { BackupTreeSheet } from '@/components/overlays/BackupTreeSheet'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
-import { importBackup, readBackup, type OpenedBackup } from '@/lib/transfer/backup'
+import { importBackup, markExistingPersonas, readBackup, type OpenedBackup } from '@/lib/transfer/backup'
 import type { Selection } from '@/lib/transfer/backupSelection'
 import { reportError } from '@/lib/transfer/report'
 import { showToast } from '@/lib/ui/toast'
@@ -21,7 +21,8 @@ export function useBackupImport(onImported?: () => void) {
   const open = async (read: () => Promise<OpenedBackup[]>) => {
     setImporting(true)
     try {
-      const opened = await read()
+      // The personas the device has already are marked: the import takes those instead.
+      const opened = await Promise.all((await read()).map((backup) => markExistingPersonas(db, backup)))
       setQueue((prev) => [...prev, ...opened])
     } catch (err) {
       reportError(t('settings.importFailedTitle'), err)
@@ -42,7 +43,7 @@ export function useBackupImport(onImported?: () => void) {
       showToast({
         tone: 'success',
         title: t('settings.importDoneTitle'),
-        message: t('settings.importDoneMessage', { characters: res.characters, rooms: res.rooms, chats: res.chats }),
+        message: t('settings.importDoneMessage', { characters: res.characters, rooms: res.rooms, chats: res.chats, personas: res.personas }),
       })
       onImported?.()
     } catch (err) {
