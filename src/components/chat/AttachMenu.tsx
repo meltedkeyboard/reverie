@@ -1,5 +1,6 @@
 import { Icon } from '@/components/visuals/Icon'
 import { Image } from 'expo-image'
+import type { SQLiteDatabase } from 'expo-sqlite'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native'
@@ -27,6 +28,17 @@ import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 import { GlassButton } from '../chrome/Glass'
 import { BottomSheet, useSheetTones } from '../overlays/BottomSheet'
 import { SFIcon } from '../visuals/SFIcon'
+
+// The latest pictures sent for the row at the top of the menu, null when it is switched off.
+export async function loadRecentPictures(db: SQLiteDatabase): Promise<MessageImage[] | null> {
+  try {
+    if (!(await isRecentAttachmentsEnabled(db))) return null
+    const { count, unlimited } = await loadRecentSettings(db)
+    return await listRecentAttachments(db, unlimited ? null : count)
+  } catch {
+    return []
+  }
+}
 
 // Closes the menu; `then` runs once it is fully off the screen (see attachSession.ts).
 type Close = (then?: () => void) => void
@@ -56,26 +68,19 @@ export function AttachMenu({
   const { t } = useTranslation()
   const db = useDatabase()
   const [thinking, setThinking] = useState(!!session.thinking)
-  const [recents, setRecents] = useState<MessageImage[]>([])
+  // undefined while being read, null when the row is switched off in Settings.
+  const [recents, setRecents] = useState<MessageImage[] | null | undefined>(session.recents)
   const [selected, setSelected] = useState<MessageImage[]>([])
 
-  // The latest pictures sent, read each time the menu opens.
+  // Read here only when the opening did not bring them.
   useEffect(() => {
+    if (session.recents !== undefined) return
     let alive = true
-    isRecentAttachmentsEnabled(db)
-      .then(async (on) => {
-        if (!on) return []
-        const { count, unlimited } = await loadRecentSettings(db)
-        return listRecentAttachments(db, unlimited ? null : count)
-      })
-      .then(
-        (list) => alive && setRecents(list),
-        () => alive && setRecents([])
-      )
+    loadRecentPictures(db).then((list) => alive && setRecents(list))
     return () => {
       alive = false
     }
-  }, [db])
+  }, [db, session])
 
   const toggleRecent = (picture: MessageImage) => {
     Haptics.selectionAsync()
@@ -104,6 +109,20 @@ export function AttachMenu({
         ? t('attach.attachSingle')
         : t('attach.attachMultiple', { count: selected.length })
 
+  const camera = !isWeb ? (
+    <Pressable
+      onPress={() => onClose(() => session.onPick('camera'))}
+      accessibilityRole="button"
+      accessibilityLabel={t('imageSource.camera')}
+      style={({ pressed }) => [styles.cameraTile, { backgroundColor: pressed ? tones.pressed : tones.card }]}
+    >
+      <Icon name="camera-outline" size={30} color={colors.text} />
+      <Text style={styles.cameraLabel} numberOfLines={1}>
+        {t('imageSource.camera')}
+      </Text>
+    </Pressable>
+  ) : null
+
   return (
     <ScrollView
       style={[styles.scroll, scrollStyle]}
@@ -111,44 +130,51 @@ export function AttachMenu({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={styles.tilesRow}>
-        {!isWeb ? (
-          <Pressable
-            onPress={() => onClose(() => session.onPick('camera'))}
-            accessibilityRole="button"
-            accessibilityLabel={t('imageSource.camera')}
-            style={({ pressed }) => [styles.cameraTile, { backgroundColor: pressed ? tones.pressed : tones.card }]}
-          >
-            <Icon name="camera-outline" size={30} color={colors.text} />
-            <Text style={styles.cameraLabel} numberOfLines={1}>
-              {t('imageSource.camera')}
-            </Text>
-          </Pressable>
-        ) : null}
+      {recents === null ? null : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={styles.tilesRow}>
+          {camera}
 
-        {recents.map((item) => {
-          const isSelected = selected.some((p) => p.file === item.file)
-          return (
-            <Pressable
-              key={item.file}
-              onPress={() => toggleRecent(item)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: isSelected }}
-              accessibilityLabel={t('attach.recent')}
-              style={({ pressed }) => [styles.recentTile, pressed && { opacity: 0.8 }]}
-            >
-              <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
-              {isSelected ? (
-                <View style={styles.recentCheckBadge}>
-                  <Icon name="checkmark" size={13} color="#FFFFFF" />
-                </View>
-              ) : null}
-            </Pressable>
-          )
-        })}
-      </ScrollView>
+          {(recents ?? []).map((item) => {
+            const isSelected = selected.some((p) => p.file === item.file)
+            return (
+              <Pressable
+                key={item.file}
+                onPress={() => toggleRecent(item)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isSelected }}
+                accessibilityLabel={t('attach.recent')}
+                style={({ pressed }) => [styles.recentTile, pressed && { opacity: 0.8 }]}
+              >
+                <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
+                {isSelected ? (
+                  <View style={styles.recentCheckBadge}>
+                    <Icon name="checkmark" size={13} color="#FFFFFF" />
+                  </View>
+                ) : null}
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+      )}
 
       <View style={[styles.card, { backgroundColor: tones.card }]}>
+        {/* With the pictures row switched off, the camera is a row of its own here. */}
+        {recents === null && !isWeb ? (
+          <>
+            <Pressable
+              onPress={() => onClose(() => session.onPick('camera'))}
+              accessibilityRole="button"
+              accessibilityLabel={t('imageSource.camera')}
+              style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+            >
+              <Icon name="camera-outline" size={22} color={colors.text} />
+              <Text style={styles.cardLabel}>{t('imageSource.camera')}</Text>
+            </Pressable>
+
+            <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+          </>
+        ) : null}
+
         <Pressable
           onPress={() => onClose(() => session.onPick('files'))}
           accessibilityRole="button"
@@ -180,6 +206,7 @@ export function AttachMenu({
           </View>
         </Pressable>
       </View>
+      {recents === null ? <Text style={styles.recentsOff}>{t('attach.recentsOff')}</Text> : null}
 
       {session.onToggleThinking ? (
         <View style={[styles.card, styles.cardSecondary, { backgroundColor: tones.card }]}>
@@ -204,20 +231,22 @@ export function AttachMenu({
         </View>
       ) : null}
 
-      {/* Always there: gray and idle until a picture in the row is ticked. */}
-      <View style={styles.actionSlot}>
-        <Pressable
-          onPress={confirmRecents}
-          disabled={selected.length === 0}
-          accessibilityRole="button"
-          accessibilityLabel={actionLabel}
-          style={({ pressed }) => [styles.actionButton, pressed && selected.length > 0 && { opacity: 0.85 }]}
-        >
-          <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.surfaceRaised }]} />
-          <Animated.View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }, armedStyle]} />
-          <Text style={[styles.actionText, { color: selected.length > 0 ? ON_ACCENT : colors.textMuted }]}>{actionLabel}</Text>
-        </Pressable>
-      </View>
+      {/* Gray and idle until a picture in the row is ticked; gone with the row switched off. */}
+      {recents !== null ? (
+        <View style={styles.actionSlot}>
+          <Pressable
+            onPress={confirmRecents}
+            disabled={selected.length === 0}
+            accessibilityRole="button"
+            accessibilityLabel={actionLabel}
+            style={({ pressed }) => [styles.actionButton, pressed && selected.length > 0 && { opacity: 0.85 }]}
+          >
+            <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.surfaceRaised }]} />
+            <Animated.View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }, armedStyle]} />
+            <Text style={[styles.actionText, { color: selected.length > 0 ? ON_ACCENT : colors.textMuted }]}>{actionLabel}</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </ScrollView>
   )
 }
@@ -477,7 +506,7 @@ export function AttachSheet({
               if (h > 0) setAttachHeight(h)
             }}
           >
-            <AttachMenu session={session} onClose={onClose} onOpenPersonas={() => go('persona')} />
+            <AttachMenu key={session.opened} session={session} onClose={onClose} onOpenPersonas={() => go('persona')} />
           </Animated.View>
 
           {/* Keeps the height of the main screen, so the sheet does not jump as it slides. */}
@@ -528,6 +557,7 @@ const createStyles = (colors: Colors) =>
       justifyContent: 'center',
       gap: 6,
     },
+    recentsOff: { color: colors.textMuted, fontSize: 13, marginTop: 8, paddingHorizontal: 16 },
     cameraLabel: { color: colors.text, fontSize: 14, fontWeight: '500' },
     recentTile: { width: 96, height: 96, borderRadius: 22, borderCurve: 'continuous', overflow: 'hidden' },
     recentTileImage: { width: '100%', height: '100%', backgroundColor: colors.surface },

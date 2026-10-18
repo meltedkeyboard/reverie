@@ -22,7 +22,7 @@ import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveTh
 import { CloudSyncProvider } from '@/hooks/features/useCloudSync'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
-import { finishAttachSession } from '@/lib/chat/attachSession'
+import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
 import { ChatTextProvider } from '@/lib/chat/chatText'
 import { isElectron, isWeb } from '@/lib/core/platform'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
@@ -135,14 +135,14 @@ function AppShell() {
                   to the full height, down to close, with a stack of its own inside. */}
               <Stack.Screen
                 name="attach"
-                options={{
+                options={() => ({
                   presentation: 'formSheet',
-                  sheetAllowedDetents: [0.55, 1],
+                  sheetAllowedDetents: [attachDetent(), 1],
                   sheetGrabberVisible: true,
                   headerShown: false,
                   // Solid, not the glass a partial sheet has on iOS 26.
                   contentStyle: { backgroundColor: sheetTones.sheet },
-                }}
+                })}
                 listeners={{
                   transitionEnd: (e) => {
                     if (e.data.closing) finishAttachSession()

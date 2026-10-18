@@ -1,14 +1,27 @@
+import { Dimensions } from 'react-native'
+
 import type { MessageImage } from '@/db/messages'
 import type { Persona } from '@/db/personas'
 import type { ImageSource } from '@/lib/images/images'
+
+// The share of the screen the system sheet opens at with every part of the menu in it.
+const FULL_MENU = 0.55
+// What the menu loses with the pictures row off: the row (108) and the attach button (70),
+// less the camera row (50) and the note under it (24).
+const WITHOUT_RECENTS = 104
 
 // What the attach menu of the composer works with and where its choices go: the field's
 // pictures, the chat's thinking switch and persona. On iOS the menu is a form sheet of the
 // stack (app/attach), so it is passed around the router like the generator's draft.
 export type AttachSession = {
+  // Tells one opening from the next, so the app's own sheet starts its menu afresh.
+  opened: number
   thinking?: boolean
   onToggleThinking?: (thinking: boolean) => void
   persona?: Persona | null
+  // The latest pictures sent, read before the menu opens so the row is there from its first frame.
+  // null when the row is switched off in Settings.
+  recents?: MessageImage[] | null
   personaId?: number | null
   onSelectPersona?: (personaId: number | null) => void
   onPick: (source: ImageSource) => void
@@ -18,6 +31,8 @@ export type AttachSession = {
 }
 
 let current: AttachSession | null = null
+// The height the system sheet opens at, a share of the screen (see attachDetent).
+let detent = FULL_MENU
 // What to do once the menu is fully off the screen: a picker, or a screen pushed, must not
 // start while the sheet is still going away, or iOS tears it down with the sheet.
 let after: (() => void) | null = null
@@ -25,6 +40,13 @@ let after: (() => void) | null = null
 export function setAttachSession(session: AttachSession) {
   current = session
   after = null
+  const height = Dimensions.get('window').height
+  detent = session.recents === null && height > 0 ? FULL_MENU - WITHOUT_RECENTS / height : FULL_MENU
+}
+
+// Read by the root layout as the sheet is presented, so a menu with less in it opens lower.
+export function attachDetent() {
+  return detent
 }
 
 export function attachSession() {

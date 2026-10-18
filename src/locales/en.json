@@ -425,6 +425,7 @@
 
   "attach.choosePhoto": "Choose photo",
   "attach.recent": "Recent picture",
+  "attach.recentsOff": "Recent pictures are turned off in Settings",
   "attach.title": "Attach",
   "attach.takePhoto": "Take photo",
   "attach.chooseFile": "Choose file",

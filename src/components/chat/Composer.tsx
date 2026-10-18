@@ -26,11 +26,12 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { BlurBar, EdgeFade } from '../chrome/BarChrome'
 import { GlassSurface, useGlassStyles } from '../chrome/Glass'
-import { AttachSheet } from './AttachMenu'
+import { AttachSheet, loadRecentPictures } from './AttachMenu'
 import { useInputColors } from '../controls/Field'
 import { IconButton } from '../controls/IconButton'
 import { SFIcon } from '../visuals/SFIcon'
 import type { MessageImage } from '@/db/messages'
+import { useDatabase } from '@/db/provider'
 import { CHAT_COLUMN } from '@/hooks/util/useLayoutMode'
 import { useTranslation } from '@/i18n'
 import { withAlpha } from '@/lib/core/color'
@@ -125,6 +126,7 @@ export function Composer({
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const router = useRouter()
+  const db = useDatabase()
   const [text, setText] = useState(initialText)
   const textRef = useRef(text)
   textRef.current = text
@@ -348,6 +350,8 @@ export function Composer({
     }
 
     const next: AttachSession = {
+      opened: Date.now(),
+      recents: await loadRecentPictures(db),
       thinking,
       onToggleThinking,
       persona,
@@ -809,7 +813,9 @@ const createStyles = (colors: Colors) =>
   // Matches MessageRow's cap so the composer lines up with the message column; a no-op
   // on phone widths.
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, width: '100%', maxWidth: CHAT_COLUMN, alignSelf: 'center' },
-  fieldBox: { flex: 1, overflow: 'hidden' },
+  // Clipped to the glass's own corners: a square clip let what the field draws (the
+  // suggestion's taller input) show as dark corners outside the rounded glass.
+  fieldBox: { flex: 1, overflow: 'hidden', borderRadius: 26 },
   glass: { borderRadius: 26 },
   // Pinned to the bottom, so a taller field reveals its text from above while the buttons stay.
   field: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: FIELD_PAD },
