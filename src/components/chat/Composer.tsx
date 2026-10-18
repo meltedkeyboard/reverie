@@ -805,6 +805,7 @@ export function Composer({
         onBack={sheetScreen === 'persona' ? goToAttach : undefined}
         compactHeader
         noGlass
+        glassButtons
         contentPaddingBottom={0}
         rightItem={
           sheetScreen === 'persona' ? (

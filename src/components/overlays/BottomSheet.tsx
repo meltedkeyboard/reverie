@@ -22,6 +22,8 @@ type Props = {
   rightItem?: React.ReactNode
   compactHeader?: boolean
   noGlass?: boolean
+  // Force glass-style close/back buttons even when the sheet itself uses noGlass.
+  glassButtons?: boolean
   height?: number
   minHeight?: number
   contentPaddingBottom?: number
@@ -69,6 +71,7 @@ export function BottomSheet({
   rightItem,
   compactHeader = false,
   noGlass = false,
+  glassButtons = false,
   height: fixedHeight,
   minHeight: customMinHeight,
   contentPaddingBottom,
@@ -78,6 +81,8 @@ export function BottomSheet({
   const styles = useStyles(createStyles)
   const tones = useSheetTones({ noGlass })
   const isGlass = liquidGlass && !noGlass
+  // Header buttons use glass either when the sheet itself is glass, or when explicitly requested.
+  const isGlassButtons = liquidGlass && (!noGlass || glassButtons)
   const { colors } = useTheme()
   const { t } = useTranslation()
   const { height } = useWindowDimensions()
@@ -97,6 +102,24 @@ export function BottomSheet({
   const travel = useSharedValue(height)
   const closing = useSharedValue(false)
   const grab = useSharedValue(0)
+
+  // 0 = close button visible, 1 = back button visible. Drives the native spring transition.
+  const backProgress = useSharedValue(onBack ? 1 : 0)
+  useEffect(() => {
+    backProgress.value = withSpring(onBack ? 1 : 0, { stiffness: 280, damping: 24, mass: 0.85 })
+  }, [!!onBack])
+
+  // The outgoing button shrinks and fades; the incoming one grows and fades in.
+  // position:'absolute' is kept in the static style (buttonOverlay) — not in the animated
+  // style — so that Reanimated does not rebuild the shadow node on every frame.
+  const closeButtonStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(backProgress.value, [0, 0.5], [1, 0], 'clamp'),
+    transform: [{ scale: interpolate(backProgress.value, [0, 0.6], [1, 0.6], 'clamp') }],
+  }))
+  const backButtonStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(backProgress.value, [0.4, 1], [0, 1], 'clamp'),
+    transform: [{ scale: interpolate(backProgress.value, [0.4, 1], [0.6, 1], 'clamp') }],
+  }))
 
   const triggerDismissed = () => {
     if (!dismissHandled.current) {
@@ -183,7 +206,7 @@ export function BottomSheet({
 
   const sheetBody = (
     <>
-      <View style={[styles.header, compactHeader && styles.headerCompact]}>
+      <View style={[styles.header, compactHeader && styles.headerCompact, compactHeader && isGlassButtons && styles.headerCompactGlass]}>
         <View style={[styles.grabber, compactHeader && styles.grabberCompact]} />
         <View style={styles.titleRow}>
           <View style={styles.titleCenterContainer} pointerEvents="none">
@@ -191,51 +214,62 @@ export function BottomSheet({
               {title}
             </Text>
           </View>
-          {onBack ? (
-            isGlass ? (
-              <GlassButton
-                icon="chevron-back"
-                iconSize={compactHeader ? 22 : 26}
-                onPress={onBack}
-                accessibilityLabel={t('common.back')}
-              />
-            ) : (
-              <Pressable
-                onPress={onBack}
-                hitSlop={6}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.back')}
-                style={({ pressed }) => [
-                  styles.close,
-                  compactHeader && styles.closeCompact,
-                  { backgroundColor: pressed ? tones.pressed : tones.card },
-                ]}
-              >
-                <Icon name="chevron-back" size={compactHeader ? 20 : 24} color={colors.text} />
-              </Pressable>
-            )
-          ) : isGlass ? (
-            <GlassButton
-              icon="close"
-              iconSize={compactHeader ? 22 : 26}
-              onPress={dismiss}
-              accessibilityLabel={t('common.close')}
-            />
-          ) : (
-            <Pressable
-              onPress={dismiss}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.close')}
-              style={({ pressed }) => [
-                styles.close,
-                compactHeader && styles.closeCompact,
-                { backgroundColor: pressed ? tones.pressed : tones.card },
-              ]}
-            >
-              <Icon name="close" size={compactHeader ? 20 : 24} color={colors.text} />
-            </Pressable>
-          )}
+          {/* Both buttons are always mounted; a spring animates between them so the
+              transition is native and frame-perfect. The container holds the 44pt
+              footprint of GlassButton so the title stays centred throughout.
+              position:'absolute' lives in buttonOverlay (a static style) so
+              Reanimated never needs to rebuild the shadow node on each frame, and
+              GlassSurface always gets a measured non-zero frame to render into. */}
+          <View style={[styles.buttonSlot, compactHeader && !isGlassButtons && styles.buttonSlotCompact]}>
+            <Animated.View style={[styles.buttonOverlay, closeButtonStyle]} pointerEvents={onBack ? 'none' : 'auto'}>
+              {isGlassButtons ? (
+                <GlassButton
+                  icon="close"
+                  iconSize={compactHeader ? 22 : 26}
+                  onPress={dismiss}
+                  accessibilityLabel={t('common.close')}
+                />
+              ) : (
+                <Pressable
+                  onPress={dismiss}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.close')}
+                  style={({ pressed }) => [
+                    styles.close,
+                    compactHeader && styles.closeCompact,
+                    { backgroundColor: pressed ? tones.pressed : tones.card },
+                  ]}
+                >
+                  <Icon name="close" size={compactHeader ? 20 : 24} color={colors.text} />
+                </Pressable>
+              )}
+            </Animated.View>
+            <Animated.View style={[styles.buttonOverlay, backButtonStyle]} pointerEvents={onBack ? 'auto' : 'none'}>
+              {isGlassButtons ? (
+                <GlassButton
+                  icon="chevron-back"
+                  iconSize={compactHeader ? 22 : 26}
+                  onPress={onBack ?? dismiss}
+                  accessibilityLabel={t('common.back')}
+                />
+              ) : (
+                <Pressable
+                  onPress={onBack ?? dismiss}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.back')}
+                  style={({ pressed }) => [
+                    styles.close,
+                    compactHeader && styles.closeCompact,
+                    { backgroundColor: pressed ? tones.pressed : tones.card },
+                  ]}
+                >
+                  <Icon name="chevron-back" size={compactHeader ? 20 : 24} color={colors.text} />
+                </Pressable>
+              )}
+            </Animated.View>
+          </View>
           <View style={styles.spacer} />
           {rightItem ? (
             <View style={[styles.rightItemContainer, compactHeader && styles.rightItemCompact]}>{rightItem}</View>
@@ -308,7 +342,11 @@ export function BottomSheet({
               <View
                 style={[
                   styles.sheet,
-                  styles.solid,
+                  // overflow:'hidden' clips GlassSurface children (UIKit paints glass layers
+                  // outside view bounds). When glass buttons are used, skip the clip and let
+                  // borderRadius handle the visual rounding of the sheet background.
+                  !glassButtons && styles.solid,
+                  glassButtons && styles.solidNoClip,
                   fixedHeight ? { height: '100%' } : null,
                   customMinHeight ? { minHeight: customMinHeight } : null,
                   {
@@ -336,6 +374,9 @@ const createStyles = (colors: Colors) =>
     slot: { width: '100%', maxWidth: 640, alignSelf: 'center', marginBottom: INSET },
     sheet: { flexShrink: 1, borderRadius: 38 },
     solid: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
+    // Like solid but without overflow:'hidden': UIKit renders glass effect layers outside
+    // their view bounds, so a clipping ancestor makes the glass material disappear.
+    solidNoClip: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
     header: { paddingTop: 7, paddingBottom: 12, paddingHorizontal: 16 },
     headerCompact: { paddingTop: 6, paddingBottom: 6 },
     grabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 2.5, backgroundColor: colors.borderStrong, marginBottom: 12 },
@@ -360,4 +401,24 @@ const createStyles = (colors: Colors) =>
     balanceCompact: { width: 36 },
     rightItemContainer: { minWidth: CLOSE, height: CLOSE, alignItems: 'center', justifyContent: 'center' },
     rightItemCompact: { minWidth: 36, height: 36 },
+    // Container that always occupies the 44pt GlassButton footprint so the title
+    // stays centred during the spring transition between close and back.
+    buttonSlot: { width: CLOSE, height: CLOSE, alignItems: 'center', justifyContent: 'center' },
+    // Only applied when glassButtons is false — glass buttons are always 44pt.
+    buttonSlotCompact: { width: 36, height: 36 },
+    // Absolutely fills buttonSlot so each Animated.View has a measured non-zero
+    // frame; GlassSurface inside GlassButton can only render once it has a size.
+    buttonOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // Compact header with glass buttons: add enough vertical padding for the 44pt
+    // circles to breathe without clipping.
+    headerCompactGlass: { paddingTop: 8, paddingBottom: 8 },
   })
+
