@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 
 import { AppLock } from '@/components/startup/AppLock'
+import { useSheetTones } from '@/components/overlays/BottomSheet'
 import { DialogHost } from '@/components/overlays/DialogHost'
 import { Sidebar } from '@/components/chrome/Sidebar'
 import { SplashOverlay } from '@/components/startup/SplashOverlay'
@@ -21,6 +22,7 @@ import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveTh
 import { CloudSyncProvider } from '@/hooks/features/useCloudSync'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
+import { finishAttachSession } from '@/lib/chat/attachSession'
 import { ChatTextProvider } from '@/lib/chat/chatText'
 import { isElectron, isWeb } from '@/lib/core/platform'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
@@ -77,6 +79,7 @@ const WITHOUT_SIDEBAR = ['/onboarding', '/viewer', '/background', '/avatar-crop'
 
 function AppShell() {
   const { colors, scheme } = useTheme()
+  const sheetTones = useSheetTones({ noGlass: true })
   const wide = useLayoutMode() === 'wide'
   const pathname = usePathname()
   const sidebar = wide && !WITHOUT_SIDEBAR.includes(pathname)
@@ -126,6 +129,24 @@ function AppShell() {
                   headerStyle: { backgroundColor: colors.bg },
                   headerTintColor: colors.accent,
                   headerTitleStyle: { color: colors.text },
+                }}
+              />
+              {/* The composer's attach menu, the system sheet of iOS: half the screen, pulled up
+                  to the full height, down to close, with a stack of its own inside. */}
+              <Stack.Screen
+                name="attach"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: [0.55, 1],
+                  sheetGrabberVisible: true,
+                  headerShown: false,
+                  // Solid, not the glass a partial sheet has on iOS 26.
+                  contentStyle: { backgroundColor: sheetTones.sheet },
+                }}
+                listeners={{
+                  transitionEnd: (e) => {
+                    if (e.data.closing) finishAttachSession()
+                  },
                 }}
               />
             </Stack>
