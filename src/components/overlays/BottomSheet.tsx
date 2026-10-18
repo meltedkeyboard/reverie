@@ -2,7 +2,7 @@ import { Icon } from '@/components/visuals/Icon'
 import { useEffect, useRef, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
-import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Animated, { LayoutAnimationConfig, ZoomIn, ZoomOut, interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
@@ -214,22 +214,32 @@ export function BottomSheet({
               {title}
             </Text>
           </View>
-          {/* Both buttons are always mounted; a spring animates between them so the
-              transition is native and frame-perfect. The container holds the 44pt
-              footprint of GlassButton so the title stays centred throughout.
-              position:'absolute' lives in buttonOverlay (a static style) so
-              Reanimated never needs to rebuild the shadow node on each frame, and
-              GlassSurface always gets a measured non-zero frame to render into. */}
-          <View style={[styles.buttonSlot, compactHeader && !isGlassButtons && styles.buttonSlotCompact]}>
-            <Animated.View style={[styles.buttonOverlay, closeButtonStyle]} pointerEvents={onBack ? 'none' : 'auto'}>
-              {isGlassButtons ? (
-                <GlassButton
-                  icon="close"
-                  iconSize={compactHeader ? 22 : 26}
-                  onPress={dismiss}
-                  accessibilityLabel={t('common.close')}
-                />
-              ) : (
+          {isGlassButtons ? (
+            // Liquid Glass does not render when it appears under a parent with opacity, so the
+            // glass buttons are not cross-faded: only the current one is mounted and it swaps
+            // by scale alone. The first one shows as is when the sheet opens.
+            <LayoutAnimationConfig skipEntering>
+              <View style={styles.buttonSlot}>
+                <Animated.View
+                  key={onBack ? 'back' : 'close'}
+                  entering={ZoomIn.springify().stiffness(280).damping(24).mass(0.85)}
+                  exiting={ZoomOut.duration(140)}
+                  style={styles.buttonOverlay}
+                >
+                  <GlassButton
+                    icon={onBack ? 'chevron-back' : 'close'}
+                    iconSize={compactHeader ? 22 : 26}
+                    onPress={onBack ?? dismiss}
+                    accessibilityLabel={onBack ? t('common.back') : t('common.close')}
+                  />
+                </Animated.View>
+              </View>
+            </LayoutAnimationConfig>
+          ) : (
+            // Both buttons stay mounted and cross-fade on a spring; the slot keeps the
+            // title centred throughout.
+            <View style={[styles.buttonSlot, compactHeader && styles.buttonSlotCompact]}>
+              <Animated.View style={[styles.buttonOverlay, closeButtonStyle]} pointerEvents={onBack ? 'none' : 'auto'}>
                 <Pressable
                   onPress={dismiss}
                   hitSlop={6}
@@ -243,17 +253,8 @@ export function BottomSheet({
                 >
                   <Icon name="close" size={compactHeader ? 20 : 24} color={colors.text} />
                 </Pressable>
-              )}
-            </Animated.View>
-            <Animated.View style={[styles.buttonOverlay, backButtonStyle]} pointerEvents={onBack ? 'auto' : 'none'}>
-              {isGlassButtons ? (
-                <GlassButton
-                  icon="chevron-back"
-                  iconSize={compactHeader ? 22 : 26}
-                  onPress={onBack ?? dismiss}
-                  accessibilityLabel={t('common.back')}
-                />
-              ) : (
+              </Animated.View>
+              <Animated.View style={[styles.buttonOverlay, backButtonStyle]} pointerEvents={onBack ? 'auto' : 'none'}>
                 <Pressable
                   onPress={onBack ?? dismiss}
                   hitSlop={6}
@@ -267,9 +268,9 @@ export function BottomSheet({
                 >
                   <Icon name="chevron-back" size={compactHeader ? 20 : 24} color={colors.text} />
                 </Pressable>
-              )}
-            </Animated.View>
-          </View>
+              </Animated.View>
+            </View>
+          )}
           <View style={styles.spacer} />
           {rightItem ? (
             <View style={[styles.rightItemContainer, compactHeader && styles.rightItemCompact]}>{rightItem}</View>
@@ -404,7 +405,6 @@ const createStyles = (colors: Colors) =>
     // Container that always occupies the 44pt GlassButton footprint so the title
     // stays centred during the spring transition between close and back.
     buttonSlot: { width: CLOSE, height: CLOSE, alignItems: 'center', justifyContent: 'center' },
-    // Only applied when glassButtons is false — glass buttons are always 44pt.
     buttonSlotCompact: { width: 36, height: 36 },
     // Absolutely fills buttonSlot so each Animated.View has a measured non-zero
     // frame; GlassSurface inside GlassButton can only render once it has a size.
