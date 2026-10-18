@@ -19,13 +19,15 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  ZoomIn,
+  ZoomOut,
   type SharedValue,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { BlurBar, EdgeFade } from '../chrome/BarChrome'
-import { GlassSurface, useGlassStyles } from '../chrome/Glass'
+import { GlassButton, GlassSurface, useGlassStyles } from '../chrome/Glass'
 import { BottomSheet, useSheetTones } from '../overlays/BottomSheet'
 import { useInputColors } from '../controls/Field'
 import { IconButton } from '../controls/IconButton'
@@ -338,6 +340,12 @@ export function Composer({
   const triggerPersonaPicker = () => {
     setSheetScreen('persona')
     sheetProgress.value = withSpring(1, { stiffness: 280, damping: 28, mass: 0.9 })
+  }
+
+  const createPersona = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    closeMenu()
+    router.push('/persona/new')
   }
 
   const goToAttach = () => {
@@ -809,19 +817,23 @@ export function Composer({
         contentPaddingBottom={0}
         rightItem={
           sheetScreen === 'persona' ? (
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                closeMenu()
-                router.push('/persona/new')
-              }}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('persona.create')}
-              style={({ pressed }) => [styles.headerIconBtn, pressed && { opacity: 0.6 }]}
-            >
-              <Icon name="add" size={24} color={colors.accent} />
-            </Pressable>
+            liquidGlass ? (
+              // Glass like the back button beside it, and for the same reason it comes in
+              // by scale alone: glass does not render under a parent with opacity.
+              <Animated.View entering={ZoomIn.springify().stiffness(280).damping(24).mass(0.85)} exiting={ZoomOut.duration(140)}>
+                <GlassButton icon="add" onPress={createPersona} accessibilityLabel={t('persona.create')} />
+              </Animated.View>
+            ) : (
+              <Pressable
+                onPress={createPersona}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('persona.create')}
+                style={({ pressed }) => [styles.headerIconBtn, pressed && { opacity: 0.6 }]}
+              >
+                <Icon name="add" size={24} color={colors.accent} />
+              </Pressable>
+            )
           ) : !isWeb ? (
             <Pressable
               onPress={() => triggerAttach('library')}
