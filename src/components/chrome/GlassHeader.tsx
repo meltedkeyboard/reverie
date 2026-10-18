@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router'
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { columnInset, columnInsets, FORM_COLUMN } from '@/hooks/util/useLayoutMode'
@@ -51,16 +52,31 @@ export function HeaderTitle({ children }: { children: React.ReactNode }) {
 }
 
 // The large title of a tab: a red star and the name in the prose face.
-// With `fit` a long name shrinks to the room it has instead of being cut off.
-export function TabTitle({ children, maxWidth, fit }: { children: React.ReactNode; maxWidth?: number; fit?: boolean }) {
+// With `fit` a long name shrinks to the room it has instead of being cut off. `color` and
+// `starStyle` are for a title that moves out of the header (see DrawnFormScreenHeader).
+export function TabTitle({
+  children,
+  maxWidth,
+  fit,
+  color,
+  starStyle,
+}: {
+  children: React.ReactNode
+  maxWidth?: number
+  fit?: boolean
+  color?: string
+  starStyle?: React.ComponentProps<typeof Animated.View>['style']
+}) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
     <View style={[styles.tabTitleRow, maxWidth !== undefined && { maxWidth }]}>
-      <Star size={isDesktop ? 18 : 22} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
+      <Animated.View style={starStyle}>
+        <Star size={TAB_TITLE_STAR} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
+      </Animated.View>
       <Text
         maxFontSizeMultiplier={HEADER_FONT_SCALE}
-        style={styles.tabTitle}
+        style={[styles.tabTitle, color !== undefined && { color }]}
         numberOfLines={1}
         adjustsFontSizeToFit={fit}
         minimumFontScale={fit ? 0.5 : undefined}
@@ -70,6 +86,10 @@ export function TabTitle({ children, maxWidth, fit }: { children: React.ReactNod
     </View>
   )
 }
+
+const TAB_TITLE_STAR = isDesktop ? 18 : 22
+// How far the name of a TabTitle stands from its left edge: the star and the gap after it.
+export const TAB_TITLE_STAR_ROOM = TAB_TITLE_STAR + (isDesktop ? 8 : 10)
 
 // Goes back; a screen presented modally closes with a cross instead.
 export function BackButton({ close }: { close?: boolean }) {

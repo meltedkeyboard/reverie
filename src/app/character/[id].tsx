@@ -11,7 +11,7 @@ import { Avatar } from '@/components/visuals/Avatar'
 import { CharacterProfile } from '@/components/cast/CharacterProfile'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
-import { ExpandingAvatar, useSpreadPush } from '@/components/cast/ExpandingAvatar'
+import { ExpandingAvatar, usePhotoNameSpot, useSpreadPush } from '@/components/cast/ExpandingAvatar'
 import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import {
@@ -330,7 +330,11 @@ export default function CharacterEditorScreen() {
   const scrollY = useSharedValue(0)
   const dragging = useSharedValue(false)
   const photoSpread = useSharedValue(0)
-  const pushed = useSpreadPush(photoSpread, padding.paddingTop)
+  // The profile's avatar stands a little lower under the header than the editor's form.
+  // The open photo still reaches the top of the screen, whatever this is.
+  const contentPadding = editing ? padding : { ...padding, paddingTop: padding.paddingTop + PROFILE_TOP_GAP }
+  const pushed = useSpreadPush(photoSpread, contentPadding.paddingTop, scrollY)
+  const nameSpot = usePhotoNameSpot(padding.paddingLeft ?? padding.paddingHorizontal, padding.paddingRight ?? padding.paddingHorizontal)
   // Over the open photo the status bar turns light, whatever the theme.
   const [photoOpen, setPhotoOpen] = useState(false)
   useAnimatedReaction(
@@ -384,8 +388,11 @@ export default function CharacterEditorScreen() {
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
-          contentContainerStyle={padding}
+          contentContainerStyle={contentPadding}
           onScroll={onScroll}
+          // Over the open photo a further pull scrolls under a page that stays put (pinOpen),
+          // and the indicator would give it away.
+          showsVerticalScrollIndicator={!photoOpen}
         >
           <View style={styles.avatarBlock}>
             {/* In the profile a tap on the photo opens it and a pull spreads it out. */}
@@ -429,7 +436,7 @@ export default function CharacterEditorScreen() {
                 dragging={dragging}
                 progress={photoSpread}
                 pull={isAndroid ? pull : undefined}
-                top={padding.paddingTop}
+                top={contentPadding.paddingTop}
                 sideLeft={padding.paddingLeft ?? padding.paddingHorizontal}
                 sideRight={padding.paddingRight ?? padding.paddingHorizontal}
               />
@@ -572,6 +579,8 @@ export default function CharacterEditorScreen() {
       <DrawnFormScreenHeader
         title={title}
         overPhoto={photoSpread}
+        // A name of its own moves down onto the photo; a fallback title only gives way.
+        nameSpot={name.trim() ? { ...nameSpot, scrollY } : undefined}
         right={
           <View style={styles.headerButtons}>
             {/* One button that turns from the pencil into the checkmark, so the change is
@@ -591,6 +600,8 @@ export default function CharacterEditorScreen() {
     </View>
   )
 }
+
+const PROFILE_TOP_GAP = 14
 
 // Android only: carries the gesture that stands in for the overscroll pull of iOS. Elsewhere
 // it renders its children as they are.

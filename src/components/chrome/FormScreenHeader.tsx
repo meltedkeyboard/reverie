@@ -1,6 +1,7 @@
 import { Stack, useRouter } from 'expo-router'
+import { useState } from 'react'
 import { StyleSheet, View, useWindowDimensions } from 'react-native'
-import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated'
+import Animated, { interpolate, useAnimatedStyle, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
@@ -8,7 +9,7 @@ import { type Colors, HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles } from 
 
 import { EdgeFade } from './BarChrome'
 import { GlassButton } from './Glass'
-import { TabTitle, useHeaderHeight } from './GlassHeader'
+import { TAB_TITLE_STAR_ROOM, TabTitle, useHeaderHeight } from './GlassHeader'
 import { SFIcon } from '../visuals/SFIcon'
 
 
@@ -44,16 +45,19 @@ export function FormScreenHeader({ title }: { title: string }) {
 // Liquid Glass back button, the title centered, the actions on the right.
 //
 // overPhoto, from 0 to 1, is how far a photo has spread under the header (the character
-// editor's avatar): the fade and the title give way to it, while the glass buttons stay,
-// since Liquid Glass renders wrongly under a fading parent.
+// editor's avatar): the fade gives way to it, while the glass buttons stay, since Liquid
+// Glass renders wrongly under a fading parent. The title gives way too, or, with nameSpot,
+// moves down onto the photo and turns white, as the name in a Telegram profile does.
 export function DrawnFormScreenHeader({
   title,
   right,
   overPhoto,
+  nameSpot,
 }: {
   title: string
   right?: React.ReactNode
   overPhoto?: SharedValue<number>
+  nameSpot?: NameSpot
 }) {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
@@ -78,9 +82,15 @@ export function DrawnFormScreenHeader({
           pointerEvents="box-none"
         >
           <BarButton symbol="chevron.backward" fallback="chevron-back" onPress={() => router.back()} accessibilityLabel={t('common.back')} />
-          <Animated.View style={[styles.titleSlot, giveWay]} pointerEvents="none">
-            <FormTitle title={title} />
-          </Animated.View>
+          {overPhoto && nameSpot ? (
+            <View style={styles.titleSlot} pointerEvents="none">
+              <MovingTitle title={title} progress={overPhoto} spot={nameSpot} />
+            </View>
+          ) : (
+            <Animated.View style={[styles.titleSlot, giveWay]} pointerEvents="none">
+              <FormTitle title={title} />
+            </Animated.View>
+          )}
           {right}
         </View>
       </View>
@@ -117,6 +127,51 @@ export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLa
     >
       <SFIcon name={symbol} fallback={fallback} size={19} color={filled ? ON_ACCENT : colors.text} onAccent={filled} animateChange={animateChange} />
     </GlassButton>
+  )
+}
+
+// Where the name lies on the open photo, in screen points: its left edge, and the bottom of
+// its line with the page unscrolled. The photo moves with the scroll, and the name with it.
+export type NameSpot = { left: number; bottom: number; scrollY: SharedValue<number> }
+
+// The title, carried from the middle of the header to the bottom left of the photo as it
+// spreads. A white copy over it comes in on the way; the star goes out, the photo has none.
+function MovingTitle({ title, progress, spot }: { title: string; progress: SharedValue<number>; spot: NameSpot }) {
+  const insets = useSafeAreaInsets()
+  const titleMaxWidth = useWindowDimensions().width - 160 - insets.left - insets.right
+  // Where the title stands in the header row, for the way down from there.
+  const [from, setFrom] = useState<{ x: number; y: number; height: number } | null>(null)
+
+  const move = useAnimatedStyle(() => {
+    if (!from) return {}
+    const k = progress.value
+    const dx = spot.left - TAB_TITLE_STAR_ROOM - from.x
+    // The open photo doesn't follow the page below the top (pinOpen of ExpandingAvatar).
+    const scrolled = spot.scrollY.value - Math.min(0, spot.scrollY.value) * k
+    const dy = spot.bottom - scrolled - from.height - (insets.top + from.y)
+    return { transform: [{ translateX: dx * k }, { translateY: dy * k }] }
+  })
+  const star = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [0, 0.4], [1, 0], 'clamp') }))
+  const white = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [0.2, 0.9], [0, 1], 'clamp') }))
+  const hidden = { opacity: 0 }
+
+  return (
+    <Animated.View
+      style={move}
+      onLayout={(e) => {
+        const { x, y, height } = e.nativeEvent.layout
+        setFrom({ x, y, height })
+      }}
+    >
+      <TabTitle maxWidth={titleMaxWidth} fit starStyle={star}>
+        {title}
+      </TabTitle>
+      <Animated.View style={[StyleSheet.absoluteFill, white]}>
+        <TabTitle maxWidth={titleMaxWidth} fit color={ON_ACCENT} starStyle={hidden}>
+          {title}
+        </TabTitle>
+      </Animated.View>
+    </Animated.View>
   )
 }
 
