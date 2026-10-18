@@ -87,7 +87,7 @@ export function TabTitle({
   )
 }
 
-const TAB_TITLE_STAR = isDesktop ? 18 : 22
+export const TAB_TITLE_STAR = isDesktop ? 18 : 22
 // How far the name of a TabTitle stands from its left edge: the star and the gap after it.
 export const TAB_TITLE_STAR_ROOM = TAB_TITLE_STAR + (isDesktop ? 8 : 10)
 

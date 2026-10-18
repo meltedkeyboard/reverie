@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
@@ -12,7 +12,7 @@ import { CharacterProfile } from '@/components/cast/CharacterProfile'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
 import { ExpandingAvatar, usePhotoNameSpot, useSpreadPush } from '@/components/cast/ExpandingAvatar'
-import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
+import { BarButton, DrawnFormScreenHeader, useAvatarHandOff } from '@/components/chrome/FormScreenHeader'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import {
   DEFAULT_SAMPLING,
@@ -334,7 +334,20 @@ export default function CharacterEditorScreen() {
   // The open photo still reaches the top of the screen, whatever this is.
   const contentPadding = editing ? padding : { ...padding, paddingTop: padding.paddingTop + PROFILE_TOP_GAP }
   const pushed = useSpreadPush(photoSpread, contentPadding.paddingTop, scrollY)
-  const nameSpot = usePhotoNameSpot(padding.paddingLeft ?? padding.paddingHorizontal, padding.paddingRight ?? padding.paddingHorizontal)
+  const sideLeft = padding.paddingLeft ?? padding.paddingHorizontal
+  const sideRight = padding.paddingRight ?? padding.paddingHorizontal
+  const nameSpot = usePhotoNameSpot(sideLeft, sideRight)
+  // Scrolled past, the profile's avatar goes up into the header in place of the star.
+  const handOff = useAvatarHandOff(photoSpread, scrollY)
+  const { width: screenWidth } = useWindowDimensions()
+  const headerAvatar = editing
+    ? undefined
+    : {
+        node: <Avatar name={name} file={avatar} uri={photoUri} size={AVATAR_SIZE} viewable={false} />,
+        size: AVATAR_SIZE,
+        centerX: sideLeft + (screenWidth - sideLeft - sideRight) / 2,
+        centerY: contentPadding.paddingTop + AVATAR_SIZE / 2,
+      }
   // Over the open photo the status bar turns light, whatever the theme.
   const [photoOpen, setPhotoOpen] = useState(false)
   useAnimatedReaction(
@@ -429,19 +442,23 @@ export default function CharacterEditorScreen() {
                 </View>
               </View>
             ) : photoUri ? (
-              <ExpandingAvatar
-                name={name}
-                uri={photoUri}
-                scrollY={scrollY}
-                dragging={dragging}
-                progress={photoSpread}
-                pull={isAndroid ? pull : undefined}
-                top={contentPadding.paddingTop}
-                sideLeft={padding.paddingLeft ?? padding.paddingHorizontal}
-                sideRight={padding.paddingRight ?? padding.paddingHorizontal}
-              />
+              <Animated.View style={[styles.spreadHost, handOff]}>
+                <ExpandingAvatar
+                  name={name}
+                  uri={photoUri}
+                  scrollY={scrollY}
+                  dragging={dragging}
+                  progress={photoSpread}
+                  pull={isAndroid ? pull : undefined}
+                  top={contentPadding.paddingTop}
+                  sideLeft={sideLeft}
+                  sideRight={sideRight}
+                />
+              </Animated.View>
             ) : (
-              <Avatar name={name} file={avatar} size={96} viewable={false} />
+              <Animated.View style={handOff}>
+                <Avatar name={name} file={avatar} size={AVATAR_SIZE} viewable={false} />
+              </Animated.View>
             )}
           </View>
           {/* Pushed down by a transform while the photo spreads: animating the height of
@@ -579,8 +596,10 @@ export default function CharacterEditorScreen() {
       <DrawnFormScreenHeader
         title={title}
         overPhoto={photoSpread}
+        scrollY={scrollY}
         // A name of its own moves down onto the photo; a fallback title only gives way.
-        nameSpot={name.trim() ? { ...nameSpot, scrollY } : undefined}
+        nameSpot={name.trim() ? nameSpot : undefined}
+        avatar={headerAvatar}
         right={
           <View style={styles.headerButtons}>
             {/* One button that turns from the pencil into the checkmark, so the change is
@@ -602,6 +621,7 @@ export default function CharacterEditorScreen() {
 }
 
 const PROFILE_TOP_GAP = 14
+const AVATAR_SIZE = 96
 
 // Android only: carries the gesture that stands in for the overscroll pull of iOS. Elsewhere
 // it renders its children as they are.
@@ -619,6 +639,7 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     avatarBlock: { alignItems: 'center', marginBottom: 24 },
+    spreadHost: { alignSelf: 'stretch' },
     editorAvatar: { flexDirection: 'row', alignItems: 'center', gap: 16, alignSelf: 'stretch' },
     // The group's own bottom margin is the block's.
     editorAvatarActions: { flex: 1, marginBottom: -28 },
