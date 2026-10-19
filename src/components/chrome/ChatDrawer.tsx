@@ -58,6 +58,11 @@ type DrawerHandle = {
   // The drag that opens it, for a gesture inside the chat that must win over it
   // (`blocksExternalGesture`), as the composer's swipe of a suggestion does.
   pan: PanGesture
+  // Off while a sheet is up over the chat. A touch that opens one (the composer's plus)
+  // begins this drag too, and with the sheet taking the screen its end never arrives: the
+  // drag stays begun and the chat takes no touch for seconds after the sheet is gone.
+  // Turning it off resets it.
+  suspend: (suspended: boolean) => void
 }
 
 const DrawerContext = createContext<DrawerHandle | null>(null)
@@ -108,6 +113,7 @@ export function ChatDrawer({ character, chatId, enabled, onStage, flipTo, onSele
   // The state the drawer is going to, so a drag that falls back where it was gives no tap.
   const target = useSharedValue(0)
   const [open, setOpen] = useState(false)
+  const [suspended, setSuspended] = useState(false)
   const [chats, setChats] = useState<ChatPreview[]>([])
   const [rooms, setRooms] = useState<RoomPreview[]>([])
 
@@ -236,7 +242,7 @@ export function ChatDrawer({ character, chatId, enabled, onStage, flipTo, onSele
   const openPan = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(enabled)
+        .enabled(enabled && !suspended)
         .activeOffsetX(14)
         .failOffsetX(-10)
         .failOffsetY([-12, 12])
@@ -248,9 +254,12 @@ export function ChatDrawer({ character, chatId, enabled, onStage, flipTo, onSele
         .onEnd((e) => release(e.velocityX)),
     // begin, follow and release change only with shift.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enabled, shift, runPrepare]
+    [enabled, suspended, shift, runPrepare]
   )
-  const handle = useMemo(() => (enabled ? { open: show, pan: openPan } : null), [enabled, openPan, show])
+  const handle = useMemo(
+    () => (enabled ? { open: show, pan: openPan, suspend: setSuspended } : null),
+    [enabled, openPan, show]
+  )
 
   // The strip of the chat still showing: a tap brings it back, a drag carries it.
   const stripPan = Gesture.Pan()

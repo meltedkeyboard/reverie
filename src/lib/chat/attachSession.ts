@@ -29,6 +29,8 @@ export type AttachSession = {
   onAttach: (pictures: MessageImage[]) => void
   // The menu is gone and nothing was chosen to follow it: the field may take the keyboard back.
   onClosed: () => void
+  // The menu is gone, whatever follows it.
+  onGone?: () => void
 }
 
 let current: AttachSession | null = null
@@ -74,6 +76,7 @@ export function finishAttachSession(only?: AttachSession | null) {
   const action = after
   current = null
   after = null
+  session.onGone?.()
   if (action) action()
   else session.onClosed()
 }

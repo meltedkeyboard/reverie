@@ -251,10 +251,13 @@ export function Composer({
     onSuggestionDismissed?.()
   }
   const drawer = useChatDrawer()
+  // While the attach menu is up the composer's gestures are off, as the drawer's drag is
+  // (see suspend in ChatDrawer): the touch on the plus that opened it never ends for them.
+  const [menuUp, setMenuUp] = useState(false)
   // Stays out of the way of taps, which focus the field, and of vertical scrolling.
   const swipe = Gesture.Pan()
     .runOnJS(true)
-    .enabled(suggesting)
+    .enabled(suggesting && !menuUp)
     .activeOffsetX([-18, 18])
     .failOffsetY([-14, 14])
     .onEnd((e) => {
@@ -267,10 +270,10 @@ export function Composer({
   // never activates, so the field keeps its touches, and fails only as the finger lifts,
   // which is too late for the drawer's drag to start.
   const guard = useMemo(() => {
-    const touch = Gesture.Manual()
+    const touch = Gesture.Manual().enabled(!menuUp)
     if (drawer) touch.blocksExternalGesture(drawer.pan)
     return touch
-  }, [drawer])
+  }, [drawer, menuUp])
   const mode = editing
     ? value
       ? 'save'
@@ -369,6 +372,8 @@ export function Composer({
 
   const openMenu = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setMenuUp(true)
+    drawer?.suspend(true)
     const isKeyboardUp = KeyboardController.isVisible() || focused || !!inputRef.current?.isFocused?.()
     restoreKeyboardOnClose.current = isKeyboardUp
 
@@ -395,6 +400,10 @@ export function Composer({
           const existing = new Set(current.map((p) => p.file))
           return [...current, ...pictures.filter((p) => !existing.has(p.file))]
         }),
+      onGone: () => {
+        setMenuUp(false)
+        drawer?.suspend(false)
+      },
       onClosed: () => {
         if (!restoreKeyboardOnClose.current) return
         restoreKeyboardOnClose.current = false
