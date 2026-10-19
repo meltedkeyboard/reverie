@@ -557,11 +557,13 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
   const data = useStore(store)
   const awayFromEnd = useStore(away)
   const asideOpen = data?.asideOpen ?? false
+  const hasCustomBackground = Boolean(lookOf(owner).background)
 
   return (
     <>
       <GlassHeader
         floating
+        fade={!hasCustomBackground}
         left={
           drawer ? (
             <GlassButton icon="menu" iconSize={22} onPress={drawer.open} accessibilityLabel={t('chatDrawer.open')} />
@@ -608,7 +610,7 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
         // With the private thread open the field talks to the model aside, and the thread
         // takes the accessory slot so it rides the keyboard with the field.
         <ComposerSwap id={asideOpen ? 'aside' : 'scene'}>
-          <Composer {...data.composer} height={composerHeight} top={composerTop} resetKey={data.chatId} />
+          <Composer {...data.composer} height={composerHeight} top={composerTop} resetKey={data.chatId} fade={!hasCustomBackground} />
         </ComposerSwap>
       ) : null}
       {/* Outside the swap, so it neither sinks with the field nor goes missing in Private. */}

@@ -371,6 +371,7 @@ export default function BackgroundScreen() {
 
       <GlassHeader
         floating
+        fade={false}
         left={<GlassButton icon="chevron-back" iconSize={26} onPress={close} />}
         right={framed ? <GlassButton icon="refresh" iconSize={22} onPress={reset} accessibilityLabel={t('background.reset')} /> : null}
       >

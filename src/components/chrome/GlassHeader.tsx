@@ -21,6 +21,8 @@ type Props = {
   // and a fade stands in for the scroll edge effect of iOS 26.
   floating?: boolean
   centerTitle?: boolean
+  // Whether to draw the edge fade behind the floating bar. Defaults to true.
+  fade?: boolean
 }
 
 const FADE_OVERHANG = 28
@@ -101,7 +103,7 @@ export function BackButton({ close }: { close?: boolean }) {
   return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
 }
 
-export function GlassHeader({ left, right, children, floating, centerTitle }: Props) {
+export function GlassHeader({ left, right, children, floating, centerTitle, fade = true }: Props) {
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const row = (
@@ -145,7 +147,7 @@ export function GlassHeader({ left, right, children, floating, centerTitle }: Pr
   if (floating && floatingBars) {
     return (
       <View style={[styles.floating, { paddingTop: insets.top }]} pointerEvents="box-none">
-        <EdgeFade edge="top" style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} />
+        {fade ? <EdgeFade edge="top" style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} /> : null}
         {row}
       </View>
     )

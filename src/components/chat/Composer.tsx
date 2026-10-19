@@ -92,11 +92,14 @@ type Props = {
   persona?: Persona | null
   personaId?: number | null
   onSelectPersona?: (personaId: number | null) => void
+  // Whether to draw the edge fade behind the floating bar. Defaults to true.
+  fade?: boolean
 }
 
 export function Composer({
   height,
   top,
+  fade = true,
   generating,
   editing,
   accessory,
@@ -720,7 +723,7 @@ export function Composer({
           ]}
           pointerEvents="box-none"
         >
-          <EdgeFade edge="bottom" style={styles.fade} />
+          {fade ? <EdgeFade edge="bottom" style={styles.fade} /> : null}
           {row}
         </View>
       ) : (
