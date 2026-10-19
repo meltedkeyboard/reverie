@@ -31,6 +31,18 @@ export function turnTokens(turn: ChatTurn) {
   return turn.content.reduce((sum, p) => sum + (p.type === 'text' ? estimateTokens(p.text) : IMAGE_TOKENS), 4)
 }
 
+// What a request with a fixed prompt may ask for: the reply and the thinking budget as
+// set, both cut down by the same share when together they would not fit the window
+// after the prompt.
+export function fitOutput(contextTokens: number, messages: ChatTurn[], maxTokens: number, reasoningBudget: number) {
+  const room = contextTokens - messages.reduce((sum, turn) => sum + turnTokens(turn), 0) - MARGIN
+  const wanted = maxTokens + reasoningBudget
+  if (wanted <= room) return { maxTokens, reasoningBudget }
+  const share = Math.max(room, 0) / wanted
+  // A window too small for the prompt is the server's to report; the request still asks for something.
+  return { maxTokens: Math.max(Math.floor(maxTokens * share), 64), reasoningBudget: Math.floor(reasoningBudget * share) }
+}
+
 // The newest turns that fit what the window leaves after the system prompt and the room
 // kept for the reply. The last turn is always kept, so a small window never sends nothing.
 export function fitHistory<T>(

@@ -12,19 +12,20 @@ export type AsideQuestion = { text: string; images: MessageImage[] }
 export type AsideTurn = { question: AsideQuestion; answer: string; thought: Thought | null }
 
 // What the model is told about the scene, how a line of the transcript is signed, and
-// whether the model thinks first, as the character's own setting says.
+// whether the model thinks first and for how long it may answer, as the character's own
+// settings say.
 export type AsideScene = {
   brief: string
   label: (m: Message) => string
   thinking: ThinkingMode
+  maxTokens: number
+  reasoningBudget: number
 }
 
 // Only text goes out, so a long stretch of the scene stays cheap.
 const TRANSCRIPT_LINES = 30
 // A room brief carries every member's sheet; a very long one is cut to keep the room.
 const SHEET_MAX = 1500
-// Answers explain and analyze, which takes more room than a line of roleplay.
-const MAX_TOKENS = 1200
 
 const SYSTEM = [
   'You are an AI assistant stepping outside a roleplay. The user has paused the story to ask you something privately; the characters cannot hear this conversation.',
@@ -45,6 +46,8 @@ export function characterScene(character: Character): AsideScene {
       .join('\n\n'),
     label: (m) => (m.role === 'user' ? 'User' : character.name),
     thinking: character.thinking,
+    maxTokens: character.maxTokens,
+    reasoningBudget: character.reasoningBudget,
   }
 }
 
@@ -75,6 +78,9 @@ export function roomScene(room: Room, members: RoomMember[]): AsideScene {
       return targets.length ? `${who} (to ${targets.join(', ')})` : who
     },
     thinking: modes.size === 1 ? [...modes][0] : 'auto',
+    // The most any member is allowed, so no one's answer is cut shorter than their own.
+    maxTokens: Math.max(DEFAULT_SAMPLING.maxTokens, ...members.map((m) => m.character.maxTokens)),
+    reasoningBudget: Math.max(DEFAULT_SAMPLING.reasoningBudget, ...members.map((m) => m.character.reasoningBudget)),
   }
 }
 
@@ -101,7 +107,8 @@ export function buildAsideRequest(scene: AsideScene, history: Message[], thread:
   return {
     messages: [{ role: 'system', content: SYSTEM }, ...turns],
     temperature: DEFAULT_SAMPLING.temperature,
-    maxTokens: MAX_TOKENS,
+    maxTokens: scene.maxTokens,
+    reasoningBudget: scene.reasoningBudget,
     topP: DEFAULT_SAMPLING.topP,
     thinking: scene.thinking,
   }

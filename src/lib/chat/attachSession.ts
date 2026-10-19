@@ -6,9 +6,10 @@ import type { ImageSource } from '@/lib/images/images'
 
 // The share of the screen the system sheet opens at with every part of the menu in it.
 const FULL_MENU = 0.55
-// What the menu loses with the pictures row off: the row (108) and the attach button (70),
-// less the camera row (50) and the note under it (24).
-const WITHOUT_RECENTS = 104
+// What the menu loses without the pictures row: the row (108) and the attach button (70),
+// less the camera row (50); the note under it (24) only says so when the row is switched off.
+const WITHOUT_RECENTS = 128
+const RECENTS_OFF_NOTE = 24
 
 // What the attach menu of the composer works with and where its choices go: the field's
 // pictures, the chat's thinking switch and persona. On iOS the menu is a form sheet of the
@@ -20,7 +21,7 @@ export type AttachSession = {
   onToggleThinking?: (thinking: boolean) => void
   persona?: Persona | null
   // The latest pictures sent, read before the menu opens so the row is there from its first frame.
-  // null when the row is switched off in Settings.
+  // null when the row is switched off in Settings; with none sent yet there is no row either.
   recents?: MessageImage[] | null
   personaId?: number | null
   onSelectPersona?: (personaId: number | null) => void
@@ -41,7 +42,8 @@ export function setAttachSession(session: AttachSession) {
   current = session
   after = null
   const height = Dimensions.get('window').height
-  detent = session.recents === null && height > 0 ? FULL_MENU - WITHOUT_RECENTS / height : FULL_MENU
+  const lost = session.recents === null ? WITHOUT_RECENTS - RECENTS_OFF_NOTE : session.recents?.length === 0 ? WITHOUT_RECENTS : 0
+  detent = lost && height > 0 ? FULL_MENU - lost / height : FULL_MENU
 }
 
 // Read by the root layout as the sheet is presented, so a menu with less in it opens lower.

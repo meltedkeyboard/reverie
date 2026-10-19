@@ -107,6 +107,17 @@ export function defineChoice<T extends string>(key: string, allowed: readonly T[
   }
 }
 
+// A whole number from min to max under one key; anything else, or nothing, is the fallback.
+export function defineNumber(key: string, min: number, max: number, fallback: number) {
+  return {
+    async load(db: SQLiteDatabase) {
+      const n = Number(await getSetting(db, key))
+      return Number.isSafeInteger(n) && n >= min && n <= max ? n : fallback
+    },
+    save: (db: SQLiteDatabase, value: number) => setSetting(db, key, String(value)),
+  }
+}
+
 function storedContext(value: string | undefined) {
   const n = Number(value)
   return Number.isSafeInteger(n) && n >= MIN_CONTEXT_TOKENS && n <= MAX_CONTEXT_TOKENS

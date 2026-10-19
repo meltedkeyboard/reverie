@@ -1,4 +1,4 @@
-import type { ChatRequest, ChatTurn, ContentPart } from '@/api/llm'
+import { tokenLimit, type ChatRequest, type ChatTurn, type ContentPart } from '@/api/llm'
 import type { ThinkingMode } from '@/db/characters'
 import type { Message } from '@/db/messages'
 import type { Room, RoomMember } from '@/db/rooms'
@@ -80,7 +80,11 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
     history.filter((m) => hearing(m, me)),
     (m) => turnTokens(toTurn(m)) + 12,
     window,
-    { messages: window.roomMessages, system, maxTokens: speaker.character.maxTokens }
+    {
+      messages: window.roomMessages,
+      system,
+      maxTokens: tokenLimit({ ...speaker.character, thinking: thinking ?? speaker.character.thinking }),
+    }
   )
   for (const m of visible) {
     if (m.kind === 'narration') {
@@ -131,6 +135,7 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
     // A reaction is kept short by the one-paragraph limit, not by the token budget: a
     // reasoning model spends most of the budget thinking before it writes a word.
     maxTokens: character.maxTokens,
+    reasoningBudget: character.reasoningBudget,
     topP: character.topP,
     thinking: thinking ?? character.thinking,
   }

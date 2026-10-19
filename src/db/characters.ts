@@ -14,6 +14,9 @@ export type CharacterFields = {
   greeting: string
   temperature: number
   maxTokens: number
+  // Tokens the model may think for before the reply, added to maxTokens when thinking is
+  // not off, so a long thought never eats into the reply.
+  reasoningBudget: number
   topP: number
   // Paragraphs kept before the reply is cut off; null leaves it unbounded.
   replyLimit: number | null
@@ -47,13 +50,13 @@ export type CharacterPreview = Character & {
   sortOrder: number
 }
 
-export const DEFAULT_SAMPLING = { temperature: 0.8, maxTokens: 800, topP: 0.95 } as const
+export const DEFAULT_SAMPLING = { temperature: 0.8, maxTokens: 800, reasoningBudget: 2048, topP: 0.95 } as const
 
 // Unqualified so the backup can select them too; in listCharacters the subqueries
 // qualify their own columns, so these still refer to the outer characters row.
 export const CHARACTER_COLUMNS = `
   id, name, avatar, avatar_original AS avatarOriginal, avatar_crop AS avatarCrop, system_prompt AS systemPrompt, greeting,
-  temperature, max_tokens AS maxTokens, top_p AS topP, reply_limit AS replyLimit,
+  temperature, max_tokens AS maxTokens, reasoning_budget AS reasoningBudget, top_p AS topP, reply_limit AS replyLimit,
   thinking, background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
   background_effect AS backgroundEffect,
   background_intensity AS backgroundIntensity,
@@ -109,7 +112,7 @@ export function getCharacter(db: SQLiteDatabase, id: number) {
 }
 
 const FIELD_COLUMNS =
-  'name, avatar, avatar_original, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency'
+  'name, avatar, avatar_original, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget'
 
 function fieldValues(fields: CharacterFields) {
   return [
@@ -130,6 +133,7 @@ function fieldValues(fields: CharacterFields) {
     fields.backgroundEffect,
     fields.backgroundIntensity,
     fields.backgroundBubbleTransparency,
+    fields.reasoningBudget,
   ]
 }
 
@@ -147,7 +151,7 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
     `UPDATE characters
      SET name = ?, avatar = ?, avatar_original = ?, avatar_crop = ?, system_prompt = ?, greeting = ?, temperature = ?, max_tokens = ?, top_p = ?, reply_limit = ?, thinking = ?,
          background = ?, background_original = ?, background_crop = ?, background_effect = ?, background_intensity = ?,
-         background_bubble_transparency = ?
+         background_bubble_transparency = ?, reasoning_budget = ?
      WHERE id = ?`,
     [...fieldValues(fields), id]
   )
@@ -171,7 +175,7 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
       // The copy stays in the original's group.
       `INSERT INTO characters (${FIELD_COLUMNS}, created_at, group_id)
        SELECT ?, ?, ?, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking,
-         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, ?, group_id
+         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget, ?, group_id
        FROM characters WHERE id = ?`,
       [name, images.avatar, images.avatarOriginal, images.background, images.backgroundOriginal, Date.now(), id]
     )

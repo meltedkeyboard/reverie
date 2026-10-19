@@ -255,6 +255,10 @@ const MIGRATIONS = [
     );
     ALTER TABLE chats ADD COLUMN persona_id INTEGER REFERENCES personas(id) ON DELETE SET NULL;
   `,
+  // Tokens a character may spend thinking, on top of max_tokens for the reply itself.
+  `
+    ALTER TABLE characters ADD COLUMN reasoning_budget INTEGER NOT NULL DEFAULT 2048;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

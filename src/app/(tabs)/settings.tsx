@@ -37,7 +37,13 @@ import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/prefs/privateC
 import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
 import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, saveSettings, typedCount, type ServerSettings } from '@/db/prefs/settings'
-import { isSuggestionsEnabled, setSuggestionsEnabled } from '@/db/prefs/suggestions'
+import {
+  isSuggestionsEnabled,
+  loadSuggestionTokens,
+  saveSuggestionTokens,
+  setSuggestionsEnabled,
+  SUGGESTION_TOKENS,
+} from '@/db/prefs/suggestions'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useServerForm } from '@/hooks/features/useServerForm'
 import { useStoredFlag } from '@/hooks/util/useStoredFlag'
@@ -229,6 +235,10 @@ export default function SettingsScreen() {
   const [continueByVisit, setContinueByVisitValue] = useStoredFlag(isContinueByVisit, setContinueByVisit, true)
   const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
   const [suggestions, toggleSuggestions] = useStoredFlag(isSuggestionsEnabled, setSuggestionsEnabled, false)
+  const [suggestionTokens, setSuggestionTokens] = useState<number>(SUGGESTION_TOKENS.default)
+  useEffect(() => {
+    loadSuggestionTokens(db).then(setSuggestionTokens)
+  }, [db])
   const [recentPictures, toggleRecentPictures] = useStoredFlag(isRecentAttachmentsEnabled, setRecentAttachmentsEnabled, true)
   // How many of them: a number that may be empty while retyped, or no limit.
   const [recent, setRecent] = useState<RecentSettings>({ count: DEFAULT_RECENT_COUNT, unlimited: false })
@@ -723,6 +733,19 @@ export default function SettingsScreen() {
   const suggestRow = (
     <ListSection footer={t('settings.suggestButtonNote')}>
       <SwitchCell label={t('settings.suggestButton')} value={suggestions} onValueChange={toggleSuggestions} />
+      {suggestions ? (
+        <SliderCell
+          label={t('settings.suggestTokens')}
+          value={suggestionTokens}
+          min={SUGGESTION_TOKENS.min}
+          max={SUGGESTION_TOKENS.max}
+          step={SUGGESTION_TOKENS.step}
+          onChange={(tokens) => {
+            setSuggestionTokens(tokens)
+            saveSuggestionTokens(db, tokens)
+          }}
+        />
+      ) : null}
     </ListSection>
   )
 

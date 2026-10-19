@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Message } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
+import { loadSuggestionTokens } from '@/db/prefs/suggestions'
 import type { AsideScene } from '@/lib/chat/aside'
 import { suggestReply } from '@/lib/chat/suggest'
 
@@ -31,8 +32,8 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
     const show = (text: string | null) => {
       if (!ctrl.signal.aborted) setSuggestion(text)
     }
-    loadSettings(db)
-      .then((cfg) => suggestReply(cfg, sceneRef.current, messagesRef.current, ctrl.signal, show))
+    Promise.all([loadSettings(db), loadSuggestionTokens(db)])
+      .then(([cfg, maxTokens]) => suggestReply(cfg, maxTokens, sceneRef.current, messagesRef.current, ctrl.signal, show))
       .then(show)
       .catch(() => show(null))
     return () => ctrl.abort()

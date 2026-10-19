@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { CHARACTER_COLUMNS, insertCharacter, type BackgroundEffect, type ThinkingMode } from '@/db/characters'
+import { CHARACTER_COLUMNS, DEFAULT_SAMPLING, insertCharacter, type BackgroundEffect, type ThinkingMode } from '@/db/characters'
 import { MESSAGE_COLUMNS } from '@/db/messages'
 import { DEFAULT_MEMBER, DEFAULT_ROOM, insertRoom, ROOM_COLUMNS, type FloorMode } from '@/db/rooms'
 import { loadSettings, saveSettings } from '@/db/prefs/settings'
@@ -32,6 +32,8 @@ type BackupCharacter = {
   greeting: string
   temperature: number
   maxTokens: number
+  // Backups from before the thinking budget leave it out.
+  reasoningBudget?: number
   topP: number
   replyLimit: number | null
   thinking?: ThinkingMode
@@ -440,6 +442,7 @@ export async function importBackup(
           avatarCrop: character.avatarCrop ?? null,
           replyLimit: character.replyLimit ?? null,
           thinking: character.thinking ?? 'auto',
+          reasoningBudget: character.reasoningBudget ?? DEFAULT_SAMPLING.reasoningBudget,
           background: await importImage(character.background, 'backgrounds'),
           backgroundOriginal: await importImage(character.backgroundOriginal, 'backgrounds'),
           backgroundCrop: character.backgroundCrop ?? null,

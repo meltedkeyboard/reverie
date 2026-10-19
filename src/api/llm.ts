@@ -16,9 +16,18 @@ export type ChatRequest = {
   messages: ChatTurn[]
   temperature: number
   maxTokens: number
+  // What thinking may take on top of maxTokens; none is added with thinking off.
+  reasoningBudget?: number
   topP: number
   // 'auto' omits the field entirely, leaving thinking mode to the server's own setting.
   thinking: ThinkingMode
+}
+
+// max_tokens covers the thought and the reply together, so the thinking budget is added
+// to the reply's own. With 'auto' the model may or may not think, so it is added too: it
+// is only a ceiling.
+export function tokenLimit(req: Pick<ChatRequest, 'maxTokens' | 'reasoningBudget' | 'thinking'>) {
+  return req.maxTokens + (req.thinking === 'off' ? 0 : (req.reasoningBudget ?? 0))
 }
 
 export function normalizeBaseUrl(raw: string) {
@@ -360,11 +369,15 @@ export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Pr
 // llama.cpp and vLLM switch thinking with chat_template_kwargs. LM Studio and Ollama
 // ignore it and take reasoning_effort instead, where "none" is off and any other
 // effort is on. LM Studio rejects a setting the model doesn't allow, so it is checked
-// against the model first.
-async function reasoningFields(cfg: ServerSettings, base: string, mode: ThinkingMode) {
-  if (mode === 'auto') return {}
-  const kwargs = { chat_template_kwargs: { enable_thinking: mode === 'on' } }
+// against the model first. LM Studio also cuts the thought off at thinking_budget_tokens
+// and lets the model answer, so the budget holds there whatever the model's habits;
+// elsewhere it is only the share of max_tokens set aside for thinking.
+async function reasoningFields(cfg: ServerSettings, base: string, mode: ThinkingMode, budget?: number) {
+  if (mode === 'auto' && !budget) return {}
   const server = await detectServer(cfg, base)
+  const capped = server.kind === 'lmstudio' && mode !== 'off' && budget ? { thinking_budget_tokens: budget } : {}
+  if (mode === 'auto') return capped
+  const kwargs = { chat_template_kwargs: { enable_thinking: mode === 'on' } }
   // Ollama's reasoning models think by default, so only "off" needs its own field.
   if (server.kind === 'ollama') return mode === 'off' ? { ...kwargs, reasoning_effort: 'none' } : kwargs
   if (server.kind === 'other') return kwargs
@@ -403,6 +416,7 @@ async function reasoningFields(cfg: ServerSettings, base: string, mode: Thinking
   return {
     ...kwargs,
     ...(effort ? { reasoning_effort: effort } : {}),
+    ...capped,
   }
 }
 
@@ -672,7 +686,7 @@ async function requestCompletion(
 
   if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
 
-  const reasoning = await reasoningFields(cfg, base, req.thinking)
+  const reasoning = await reasoningFields(cfg, base, req.thinking, req.reasoningBudget)
   const postChat = (includeReasoning: boolean) =>
     fetch(`${base}/v1/chat/completions`, {
       method: 'POST',
@@ -683,7 +697,7 @@ async function requestCompletion(
         messages: req.messages,
         stream,
         temperature: req.temperature,
-        max_tokens: req.maxTokens,
+        max_tokens: tokenLimit(req),
         top_p: req.topP,
         ...(includeReasoning ? reasoning : {}),
       }),

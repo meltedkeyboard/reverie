@@ -81,6 +81,7 @@ export default function CharacterEditorScreen() {
   } | null>(null)
   const [temperature, setTemperature] = useState<number>(DEFAULT_SAMPLING.temperature)
   const [maxTokens, setMaxTokens] = useState<number>(DEFAULT_SAMPLING.maxTokens)
+  const [reasoningBudget, setReasoningBudget] = useState<number>(DEFAULT_SAMPLING.reasoningBudget)
   const [topP, setTopP] = useState<number>(DEFAULT_SAMPLING.topP)
   const [replyLimit, setReplyLimit] = useState<number | null>(null)
   const [thinking, setThinking] = useState<ThinkingMode>('auto')
@@ -109,6 +110,7 @@ export default function CharacterEditorScreen() {
       setAvatarCrop(found.avatarCrop)
       setTemperature(found.temperature)
       setMaxTokens(found.maxTokens)
+      setReasoningBudget(found.reasoningBudget)
       setTopP(found.topP)
       setReplyLimit(found.replyLimit)
       setThinking(found.thinking)
@@ -240,6 +242,7 @@ export default function CharacterEditorScreen() {
         greeting,
         temperature,
         maxTokens,
+        reasoningBudget,
         topP,
         replyLimit,
         thinking,
@@ -535,6 +538,7 @@ export default function CharacterEditorScreen() {
                     <>
                       <ListFooter>{t('editor.replyLengthHint')}</ListFooter>
                       <ListFooter>{t('editor.thinkingHint')}</ListFooter>
+                      <ListFooter>{t('editor.reasoningBudgetHint')}</ListFooter>
                     </>
                   }
                 >
@@ -568,6 +572,15 @@ export default function CharacterEditorScreen() {
                   />
                   {/* Segments rather than a menu: the system menu jumps as it closes on iOS 26 and 27. */}
                   <SegmentCell label={t('editor.thinkingSection')} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
+                  {/* Kept with thinking off too: a chat can still turn it on for itself. */}
+                  <SliderCell
+                    label={t('editor.reasoningBudget')}
+                    value={reasoningBudget}
+                    min={256}
+                    max={16384}
+                    step={256}
+                    onChange={setReasoningBudget}
+                  />
                 </ListSection>
 
                 {!isNew ? (
@@ -585,6 +598,7 @@ export default function CharacterEditorScreen() {
                   { label: t('editor.topP'), value: topP.toFixed(2) },
                   { label: t('editor.maxTokens'), value: String(maxTokens) },
                   { label: t('editor.thinkingSection'), value: thinkingLabel },
+                  { label: t('editor.reasoningBudget'), value: String(reasoningBudget) },
                   { label: t('editor.paragraphLimit'), value: replyLengthLabel },
                 ]}
                 background={backgroundUri ? { uri: backgroundUri, effect: bgEffect, intensity: bgIntensity } : null}

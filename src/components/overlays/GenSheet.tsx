@@ -1,13 +1,21 @@
 import { Icon } from '@/components/visuals/Icon'
 import { ShimmerText } from '@/components/visuals/ShimmerText'
 import { useNavigation, useRouter } from 'expo-router'
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { ChatTurn } from '@/api/llm'
 import { useDatabase } from '@/db/provider'
+import {
+  GEN_REASONING,
+  GEN_TOKENS,
+  loadGenReasoning,
+  loadGenTokens,
+  saveGenReasoning,
+  saveGenTokens,
+} from '@/db/prefs/generation'
 import { loadSettings } from '@/db/prefs/settings'
 import { useAbortable } from '@/hooks/util/useAbortable'
 import { useElapsedSeconds } from '@/hooks/util/useElapsedSeconds'
@@ -24,7 +32,7 @@ import { Chip } from '../controls/Chip'
 import { PillButton } from '../controls/PillButton'
 import { Segmented } from '../controls/Segmented'
 import { FadingRow } from '../controls/ChipGroup'
-import { ListFooter, ListSection, SwitchCell } from '../lists/GroupedList'
+import { ListFooter, ListSection, SliderCell, SwitchCell } from '../lists/GroupedList'
 import { Pager } from '../lists/Pager'
 
 export type Revision = { draft: string; note: string }
@@ -76,6 +84,10 @@ export function GenSheet({
   const [phase, setPhase] = useState<'compose' | 'result'>('compose')
   // For this request only: it is not the character's own thinking mode.
   const [thinking, setThinking] = useState(false)
+  // The limits are kept from one opening to the next; the window only says when they are cut.
+  const [maxTokens, setMaxTokens] = useState<number>(GEN_TOKENS.default)
+  const [reasoningBudget, setReasoningBudget] = useState<number>(GEN_REASONING.default)
+  const [contextTokens, setContextTokens] = useState<number | null>(null)
   const [versions, setVersions] = useState<string[]>([])
   const [index, setIndex] = useState(0)
   const [live, setLive] = useState<string | null>(null)
@@ -96,6 +108,12 @@ export function GenSheet({
     [hasBefore, before, result]
   )
 
+  useEffect(() => {
+    loadGenTokens(db).then(setMaxTokens)
+    loadGenReasoning(db).then(setReasoningBudget)
+    loadSettings(db).then((cfg) => setContextTokens(cfg.contextTokens))
+  }, [db])
+
   const pushVersion = (version: string) => {
     setIndex(versionCount.current)
     versionCount.current += 1
@@ -115,7 +133,12 @@ export function GenSheet({
       let hadCutoff = false
       let hadReasoning = false
       let thoughts = ''
-      for await (const part of streamGeneration(cfg, build(revision), ctrl.signal, { thinking, edit: edits || !!revision })) {
+      for await (const part of streamGeneration(cfg, build(revision), ctrl.signal, {
+        thinking,
+        edit: edits || !!revision,
+        maxTokens,
+        reasoningBudget,
+      })) {
         if (part.kind === 'reasoning') {
           hadReasoning = true
           setActivity((prev) => (prev?.thinking ? prev : { thinking: true, since: Date.now() }))
@@ -190,7 +213,44 @@ export function GenSheet({
         ? countLabel(countWords(result), 'word', locale)
         : ''
 
-  const composeView = compose(<SwitchCell label={t('gen.thinking')} value={thinking} onValueChange={setThinking} />)
+  const wanted = maxTokens + (thinking ? reasoningBudget : 0)
+  const composeView = (
+    <>
+      {compose(<SwitchCell label={t('gen.thinking')} value={thinking} onValueChange={setThinking} />)}
+      <ListSection
+        footer={
+          contextTokens !== null && wanted > contextTokens
+            ? t('gen.limitsOverWindow', { window: contextTokens })
+            : t('gen.limitsHint')
+        }
+      >
+        <SliderCell
+          label={t('gen.maxTokens')}
+          value={maxTokens}
+          min={GEN_TOKENS.min}
+          max={GEN_TOKENS.max}
+          step={GEN_TOKENS.step}
+          onChange={(tokens) => {
+            setMaxTokens(tokens)
+            saveGenTokens(db, tokens)
+          }}
+        />
+        {thinking ? (
+          <SliderCell
+            label={t('editor.reasoningBudget')}
+            value={reasoningBudget}
+            min={GEN_REASONING.min}
+            max={GEN_REASONING.max}
+            step={GEN_REASONING.step}
+            onChange={(tokens) => {
+              setReasoningBudget(tokens)
+              saveGenReasoning(db, tokens)
+            }}
+          />
+        ) : null}
+      </ListSection>
+    </>
+  )
 
   const resultView = (
     <>

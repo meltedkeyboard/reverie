@@ -71,6 +71,8 @@ export function AttachMenu({
   // undefined while being read, null when the row is switched off in Settings.
   const [recents, setRecents] = useState<MessageImage[] | null | undefined>(session.recents)
   const [selected, setSelected] = useState<MessageImage[]>([])
+  // No row until there is a picture to put in it: the camera then sits in the card, as with the row off.
+  const showRow = !!recents?.length
 
   // Read here only when the opening did not bring them.
   useEffect(() => {
@@ -130,11 +132,11 @@ export function AttachMenu({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {recents === null ? null : (
+      {showRow ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={styles.tilesRow}>
           {camera}
 
-          {(recents ?? []).map((item) => {
+          {recents.map((item) => {
             const isSelected = selected.some((p) => p.file === item.file)
             return (
               <Pressable
@@ -155,11 +157,11 @@ export function AttachMenu({
             )
           })}
         </ScrollView>
-      )}
+      ) : null}
 
       <View style={[styles.card, { backgroundColor: tones.card }]}>
-        {/* With the pictures row switched off, the camera is a row of its own here. */}
-        {recents === null && !isWeb ? (
+        {/* Without the pictures row, the camera is a row of its own here. */}
+        {!showRow && !isWeb ? (
           <>
             <Pressable
               onPress={() => onClose(() => session.onPick('camera'))}
@@ -231,8 +233,8 @@ export function AttachMenu({
         </View>
       ) : null}
 
-      {/* Gray and idle until a picture in the row is ticked; gone with the row switched off. */}
-      {recents !== null ? (
+      {/* Gray and idle until a picture in the row is ticked; gone with the row. */}
+      {showRow ? (
         <View style={styles.actionSlot}>
           <Pressable
             onPress={confirmRecents}

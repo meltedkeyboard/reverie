@@ -7,7 +7,6 @@ import { runReplyStream } from '@/lib/chat/replyStream'
 // request fast on a local server.
 const TRANSCRIPT_LINES = 6
 const LINE_MAX = 800
-const MAX_TOKENS = 200
 
 const SYSTEM = [
   'You predict what the user will write next in a roleplay chat.',
@@ -17,8 +16,10 @@ const SYSTEM = [
 ].join('\n')
 
 // onText gets everything streamed so far, once per frame; the finished text is returned.
+// maxTokens is the limit set in Settings.
 export async function suggestReply(
   cfg: ServerSettings,
+  maxTokens: number,
   scene: AsideScene,
   history: Message[],
   signal: AbortSignal,
@@ -37,7 +38,7 @@ export async function suggestReply(
       },
     ],
     temperature: 0.8,
-    maxTokens: MAX_TOKENS,
+    maxTokens,
     topP: 0.95,
     // A guess needs no thinking, and a model that thinks anyway would burn the short budget.
     thinking: 'off' as const,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { ChatTurn } from '@/api/llm'
+import { tokenLimit, type ChatTurn } from '@/api/llm'
 import type { Character, ThinkingMode } from '@/db/characters'
 import { setChatThinking, type Chat } from '@/db/chats'
 import { addVariant, type Message, type MessageImage, type Thought } from '@/db/messages'
@@ -178,20 +178,21 @@ export function useChat(chat: Chat, character: Character) {
         const personaBlock = formatPersonaPrompt(personaRef.current)
         const fullSystem = [target.systemPrompt.trim(), personaBlock].filter(Boolean).join('\n\n')
         const system = withReplyLimit(fullSystem, target.replyLimit)
+        const sampling = {
+          temperature: target.temperature,
+          maxTokens: target.maxTokens,
+          reasoningBudget: target.reasoningBudget,
+          topP: target.topP,
+          thinking: chatThinkingRef.current ?? target.thinking,
+        }
         const turns = selectHistory(history.map(toTurn), turnTokens, cfg, {
           messages: cfg.chatMessages,
           system,
-          maxTokens: target.maxTokens,
+          maxTokens: tokenLimit(sampling),
         })
         const streamed = await runReplyStream(
           cfg,
-          {
-            messages: requestTurns(system, turns, guidance),
-            temperature: target.temperature,
-            maxTokens: target.maxTokens,
-            topP: target.topP,
-            thinking: chatThinkingRef.current ?? target.thinking,
-          },
+          { messages: requestTurns(system, turns, guidance), ...sampling },
           ctrl.signal,
           {
             onStart: () => setPhase('streaming'),

@@ -2,6 +2,7 @@ import { streamChat, type ChatTurn, type ContentPart, type StreamPart } from '@/
 import type { ServerSettings } from '@/db/prefs/settings'
 import type { MessageImage } from '@/db/messages'
 import type { Locale } from '@/i18n'
+import { fitOutput } from '@/lib/core/context'
 import { attachmentUri, withInlinedImages } from '@/lib/images/attachments'
 
 export type PromptLength = 'short' | 'medium' | 'long'
@@ -278,20 +279,19 @@ export function buildPersonaMessages(input: PersonaGenInput, revision?: { draft:
   ]
 }
 
-// `thinking` is the switch of the generator sheet, for this request only. An edit runs
-// cooler, so the model copies what it should keep instead of inventing it anew.
+// `thinking` and both limits are the generator sheet's own, for this request only. An
+// edit runs cooler, so the model copies what it should keep instead of inventing it anew.
 export async function* streamGeneration(
   cfg: ServerSettings,
   messages: ChatTurn[],
   signal: AbortSignal,
-  options: { thinking: boolean; edit: boolean }
+  options: { thinking: boolean; edit: boolean; maxTokens: number; reasoningBudget: number }
 ): AsyncGenerator<StreamPart> {
-  const budget = cfg.contextTokens ? Math.max(cfg.contextTokens - 1500, 4000) : 8192
-  const maxTokens = Math.min(budget, 8192)
+  const limits = fitOutput(cfg.contextTokens, messages, options.maxTokens, options.thinking ? options.reasoningBudget : 0)
   const inlined = await withInlinedImages({
     messages,
     temperature: options.thinking ? (options.edit ? 0.7 : 0.8) : (options.edit ? 0.4 : 0.9),
-    maxTokens,
+    ...limits,
     topP: 0.95,
     thinking: options.thinking ? 'on' : 'off',
   })
