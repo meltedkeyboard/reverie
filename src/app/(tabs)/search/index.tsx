@@ -111,7 +111,7 @@ export default function SearchScreen() {
 
   const settings = useMemo<SettingEntry[]>(() => {
     const entries: SettingEntry[] = [
-      { label: t('settings.appearance'), keywords: [t('settings.theme'), t('theme.light'), t('theme.dark'), t('settings.chatFontField'), t('settings.chatTextSize'), t('settings.chatPattern')], symbol: 'paintbrush', fallback: 'color-palette-outline', href: settingsAt('appearance') },
+      { label: t('settings.appearance'), keywords: [t('settings.theme'), t('theme.light'), t('theme.warm'), t('theme.dark'), t('theme.black'), t('theme.grey'), t('settings.chatFontField'), t('settings.chatTextSize'), t('settings.chatPattern')], symbol: 'paintbrush', fallback: 'color-palette-outline', href: settingsAt('appearance') },
       { label: t('settings.language'), keywords: [t('language.ru'), t('language.en')], symbol: 'globe', fallback: 'globe-outline', href: settingsAt('language') },
       { label: t('settings.continueButton'), keywords: [t('settings.homeScreen')], symbol: 'play.circle', fallback: 'play-circle-outline', href: settingsAt('continue') },
       { label: t('settings.privateButton'), keywords: [t('settings.chats')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('private') },

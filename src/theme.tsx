@@ -5,7 +5,8 @@ import { FONTS, isDesktop, isWeb } from '@/lib/core/platform'
 import { createRequiredContext } from '@/lib/core/requiredContext'
 
 export type Scheme = 'light' | 'dark'
-export type ThemePreference = Scheme | 'system'
+export type AppTheme = 'light' | 'dark' | 'black' | 'grey' | 'warm'
+export type ThemePreference = AppTheme | 'system'
 
 export type Colors = {
   bg: string
@@ -30,6 +31,8 @@ export type Colors = {
   // A stronger hairline than `border`, for outlines that need to read as a shape's
   // edge (shard chips/buttons) rather than a faint divider.
   borderStrong: string
+  // Color for decorative background patterns (stars, dots, rings) against bg.
+  pattern: string
   // Name colors for the characters of a room, by their place in it; readable on bg.
   cast: string[]
 }
@@ -52,7 +55,40 @@ const darkColors: Colors = {
   dangerBorder: 'rgba(240, 97, 109, 0.3)',
   success: '#5FCB8B',
   borderStrong: 'rgba(255, 255, 255, 0.14)',
+  pattern: '#0A0A0D',
   cast: ['#F0A35E', '#6CC4E8', '#E779B2', '#7FD17F', '#B99BFF', '#F2D46B'],
+}
+
+// True pure black for OLED screens: zero backlight on black pixels, neutral greys for surfaces.
+const blackColors: Colors = {
+  ...darkColors,
+  bg: '#000000',
+  bgRgb: '0, 0, 0',
+  surface: '#121212',
+  surfaceRaised: '#1C1C1C',
+  bubble: '#222222',
+  border: 'rgba(255, 255, 255, 0.10)',
+  borderStrong: 'rgba(255, 255, 255, 0.18)',
+  pattern: '#040404',
+  text: '#F5F5F5',
+  textMuted: 'rgba(255, 255, 255, 0.65)',
+  textFaint: 'rgba(255, 255, 255, 0.4)',
+}
+
+// Clean neutral grey with no violet or blue undertones: perfectly balanced RGB components.
+const greyColors: Colors = {
+  ...darkColors,
+  bg: '#141414',
+  bgRgb: '20, 20, 20',
+  surface: '#1E1E1E',
+  surfaceRaised: '#282828',
+  bubble: '#303030',
+  border: 'rgba(255, 255, 255, 0.08)',
+  borderStrong: 'rgba(255, 255, 255, 0.14)',
+  pattern: '#0E0E0E',
+  text: '#F0F0F0',
+  textMuted: 'rgba(255, 255, 255, 0.65)',
+  textFaint: 'rgba(255, 255, 255, 0.4)',
 }
 
 const lightColors: Colors = {
@@ -73,7 +109,31 @@ const lightColors: Colors = {
   dangerBorder: 'rgba(214, 57, 74, 0.3)',
   success: '#2F9A5C',
   borderStrong: 'rgba(0, 0, 0, 0.14)',
+  pattern: '#ECECEF',
   cast: ['#C26A12', '#1F86B5', '#C0407F', '#2F8F3A', '#6D4FD1', '#9A7A00'],
+}
+
+// Warm paper / linen palette for comfortable reading: soft parchment background, warm dark ink, terracotta accent.
+const warmColors: Colors = {
+  bg: '#F5EFEB',
+  bgRgb: '245, 239, 235',
+  surface: '#FFFDF9',
+  surfaceRaised: '#EAE2D5',
+  bubble: '#E4DBCB',
+  border: 'rgba(60, 48, 36, 0.08)',
+  borderStrong: 'rgba(60, 48, 36, 0.15)',
+  pattern: '#EAE2D5',
+  text: '#28231D',
+  textMuted: 'rgba(40, 35, 29, 0.62)',
+  textFaint: 'rgba(40, 35, 29, 0.40)',
+  accent: '#B85D2A',
+  accentSoft: 'rgba(184, 93, 42, 0.12)',
+  accentBorder: 'rgba(184, 93, 42, 0.32)',
+  danger: '#C0392B',
+  dangerSoft: 'rgba(192, 57, 43, 0.08)',
+  dangerBorder: 'rgba(192, 57, 43, 0.3)',
+  success: '#2E7D32',
+  cast: ['#B85D2A', '#267385', '#A23B68', '#3F7A3E', '#6B4FB8', '#8F6F00'],
 }
 
 // The desktop app takes flat neutral greys: the page a neutral grey rather than
@@ -88,9 +148,30 @@ const desktopDarkColors: Colors = {
   bubble: '#303030',
   border: '#363636',
   borderStrong: '#424242',
+  pattern: '#191919',
   text: '#DADADA',
   textMuted: '#B3B3B3',
   textFaint: '#7A7A7A',
+}
+
+const desktopBlackColors: Colors = {
+  ...blackColors,
+  bg: '#000000',
+  bgRgb: '0, 0, 0',
+  surface: '#111111',
+  surfaceRaised: '#181818',
+  bubble: '#181818',
+  border: '#242424',
+  borderStrong: '#303030',
+  pattern: '#040404',
+  text: '#DADADA',
+  textMuted: '#B3B3B3',
+  textFaint: '#7A7A7A',
+}
+
+const desktopGreyColors: Colors = {
+  ...desktopDarkColors,
+  pattern: '#181818',
 }
 
 const desktopLightColors: Colors = {
@@ -102,17 +183,33 @@ const desktopLightColors: Colors = {
   bubble: '#EFEFEF',
   border: '#E0E0E0',
   borderStrong: '#D0D0D0',
+  pattern: '#F1F1F1',
   text: '#222222',
   textMuted: '#5C5C5C',
   textFaint: '#ABABAB',
 }
 
-const palettes: Record<Scheme, Colors> = isDesktop
-  ? { dark: desktopDarkColors, light: desktopLightColors }
-  : { dark: darkColors, light: lightColors }
+const desktopWarmColors: Colors = {
+  ...warmColors,
+  bg: '#F3EDE7',
+  bgRgb: '243, 237, 231',
+  surface: '#FAF6F0',
+  surfaceRaised: '#E8E0D4',
+  bubble: '#E8E0D4',
+  border: '#DED5C7',
+  borderStrong: '#CEC3B3',
+  pattern: '#E8E0D4',
+  text: '#28231D',
+  textMuted: '#685F54',
+  textFaint: '#9E9487',
+}
 
-// A palette by its scheme, for what keeps one look whatever the theme.
-export const paletteOf = (scheme: Scheme): Colors => palettes[scheme]
+const palettes: Record<AppTheme, Colors> = isDesktop
+  ? { dark: desktopDarkColors, light: desktopLightColors, black: desktopBlackColors, grey: desktopGreyColors, warm: desktopWarmColors }
+  : { dark: darkColors, light: lightColors, black: blackColors, grey: greyColors, warm: warmColors }
+
+// A palette by its theme or scheme, for what keeps one look whatever the theme.
+export const paletteOf = (choice: AppTheme | Scheme): Colors => palettes[choice] ?? (choice === 'light' || choice === 'warm' ? palettes.light : palettes.dark)
 
 // Exported for the handful of places that render before ThemeContextProvider can mount
 // (StartupBoundary's error screen, which may appear if the database itself fails to
@@ -138,6 +235,7 @@ export const HEADER_FONT_SCALE = 1.2
 type ThemeContextValue = {
   colors: Colors
   scheme: Scheme
+  theme: AppTheme
   preference: ThemePreference
   setPreference: (pref: ThemePreference) => void
 }
@@ -154,18 +252,19 @@ export function ThemeContextProvider({
   children: React.ReactNode
 }) {
   const systemScheme = useColorScheme()
-  const scheme: Scheme = preference === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : preference
+  const theme: AppTheme = preference === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : preference
+  const scheme: Scheme = theme === 'light' || theme === 'warm' ? 'light' : 'dark'
   // Alerts, action sheets and the keyboard follow the window rather than the app, so
   // a theme picked in the app is passed down to it; 'system' gives it back to iOS.
   // react-native-web has no setColorScheme, and the page has no such windows.
   useEffect(() => {
-    Appearance.setColorScheme?.(preference === 'system' ? 'unspecified' : preference)
-  }, [preference])
+    Appearance.setColorScheme?.(preference === 'system' ? 'unspecified' : scheme)
+  }, [preference, scheme])
   // On the web (the desktop app) the scrollbars are drawn by the browser; they are
   // restyled from the palette so they match the theme instead of the OS default.
   useEffect(() => {
     if (!isWeb || typeof document === 'undefined') return
-    const c = palettes[scheme]
+    const c = palettes[theme]
     const thumb = scheme === 'dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.22)'
     const thumbHover = scheme === 'dark' ? 'rgba(255, 255, 255, 0.32)' : 'rgba(0, 0, 0, 0.38)'
     let el = document.getElementById('reverie-scrollbars') as HTMLStyleElement | null
@@ -189,10 +288,10 @@ export function ThemeContextProvider({
       *::-webkit-scrollbar-thumb:active { background-color: ${c.accent}; }
     `
     if (isDesktop) applyDesktopChrome(c)
-  }, [scheme])
+  }, [theme, scheme])
   const value = useMemo(
-    () => ({ colors: palettes[scheme], scheme, preference, setPreference }),
-    [scheme, preference, setPreference]
+    () => ({ colors: palettes[theme], scheme, theme, preference, setPreference }),
+    [theme, scheme, preference, setPreference]
   )
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }

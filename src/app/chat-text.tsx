@@ -7,7 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Pattern } from '@/components/visuals/Pattern'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
-import { ButtonCell, CheckCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
+import { ButtonCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Markdown } from '@/components/chat/Markdown'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
@@ -16,7 +16,7 @@ import { useTranslation } from '@/i18n'
 import { CHAT_METRICS, useChatTextSettings } from '@/lib/chat/chatText'
 import * as Haptics from '@/lib/ui/haptics'
 import { installedFontFamilies } from '../../modules/reverie-fonts'
-import { type Colors, ON_ACCENT, type ThemePreference, useColors, useStyles, useTheme } from '@/theme'
+import { type Colors, ON_ACCENT, paletteOf, type ThemePreference, useColors, useStyles, useTheme } from '@/theme'
 import { isAndroid } from '@/lib/core/platform'
 
 const FIELD_HEIGHT = 48
@@ -37,6 +37,73 @@ function snap(value: number) {
   return Math.abs(value - normal) < 0.025 ? normal : Math.round(value * 100) / 100
 }
 
+const THEME_TILE_WIDTH = 80
+const THEME_TILE_HEIGHT = 104
+
+function ThemePreviewTile({ value, selected }: { value: ThemePreference; selected: boolean }) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+
+  if (value === 'system') {
+    const light = paletteOf('light')
+    const dark = paletteOf('dark')
+    return (
+      <View style={[styles.themeTile, selected && styles.themeTileSelected]}>
+        <View style={styles.splitRow}>
+          <View style={[styles.splitHalf, { backgroundColor: light.bg }]}>
+            <View style={[styles.miniHeader, { backgroundColor: light.surface, borderBottomColor: light.border }]}>
+              <View style={[styles.miniAvatar, { backgroundColor: light.accent }]} />
+              <View style={[styles.miniBar, { backgroundColor: light.textMuted, width: 14 }]} />
+            </View>
+            <View style={styles.miniChatHalf}>
+              <View style={[styles.miniBubbleLeft, { backgroundColor: light.surfaceRaised }]}>
+                <View style={[styles.miniLine, { backgroundColor: light.textMuted, width: 18 }]} />
+              </View>
+            </View>
+          </View>
+          <View style={[styles.splitHalf, { backgroundColor: dark.bg }]}>
+            <View style={[styles.miniHeader, { backgroundColor: dark.surface, borderBottomColor: dark.border }]}>
+              <View style={[styles.miniAvatar, { backgroundColor: dark.accent }]} />
+              <View style={[styles.miniBar, { backgroundColor: dark.textMuted, width: 14 }]} />
+            </View>
+            <View style={styles.miniChatHalf}>
+              <View style={[styles.miniBubbleRight, { backgroundColor: dark.bubble }]}>
+                <View style={[styles.miniLine, { backgroundColor: dark.text, width: 16 }]} />
+              </View>
+            </View>
+          </View>
+        </View>
+        <View style={styles.splitCenterBadge}>
+          <Icon name="contrast" size={12} color={colors.text} />
+        </View>
+      </View>
+    )
+  }
+
+  const p = paletteOf(value)
+  return (
+    <View style={[styles.themeTile, selected && styles.themeTileSelected, { backgroundColor: p.bg }]}>
+      <View style={[styles.miniHeader, { backgroundColor: p.surface, borderBottomColor: p.border }]}>
+        <View style={[styles.miniAvatar, { backgroundColor: p.accent }]} />
+        <View style={[styles.miniBar, { backgroundColor: p.textMuted, width: 22 }]} />
+      </View>
+      <View style={styles.miniChat}>
+        <View style={[styles.miniBubbleLeft, { backgroundColor: p.surfaceRaised }]}>
+          <View style={[styles.miniLine, { backgroundColor: p.textMuted, width: 28 }]} />
+          <View style={[styles.miniLine, { backgroundColor: p.textFaint, width: 16 }]} />
+        </View>
+        <View style={[styles.miniBubbleRight, { backgroundColor: p.bubble }]}>
+          <View style={[styles.miniLine, { backgroundColor: p.text, width: 22 }]} />
+        </View>
+      </View>
+      <View style={[styles.miniComposer, { backgroundColor: p.surface, borderTopColor: p.border }]}>
+        <View style={[styles.miniField, { backgroundColor: p.surfaceRaised }]} />
+        <View style={[styles.miniSend, { backgroundColor: p.accent }]} />
+      </View>
+    </View>
+  )
+}
+
 export default function ChatTextScreen() {
   const padding = useScreenPadding('form')
   const colors = useColors()
@@ -47,7 +114,10 @@ export default function ChatTextScreen() {
   const themeOptions: { value: ThemePreference; label: string }[] = [
     { value: 'system', label: t('theme.system') },
     { value: 'light', label: t('theme.light') },
+    { value: 'warm', label: t('theme.warm') },
     { value: 'dark', label: t('theme.dark') },
+    { value: 'black', label: t('theme.black') },
+    { value: 'grey', label: t('theme.grey') },
   ]
   const { font, userFont, setUserFont, userMarkdown, setUserMarkdown, pattern, setPattern, scale, setFont, setScale, reset } = useChatTextSettings()
   const resetSize = () => {
@@ -102,9 +172,29 @@ export default function ChatTextScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={padding}>
         <ListSection header={t('settings.theme')}>
-          {themeOptions.map((o) => (
-            <CheckCell key={o.value} label={o.label} checked={preference === o.value} onPress={() => setPreference(o.value)} />
-          ))}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeTiles}>
+            {themeOptions.map((o) => {
+              const selected = preference === o.value
+              return (
+                <Pressable
+                  key={o.value}
+                  onPress={() => {
+                    if (!selected) Haptics.selectionAsync()
+                    setPreference(o.value)
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={o.label}
+                  style={styles.themeTileButton}
+                >
+                  <ThemePreviewTile value={o.value} selected={selected} />
+                  <Text style={[styles.themeLabel, selected && styles.themeLabelSelected, selected && { color: colors.text }]} numberOfLines={2}>
+                    {o.label}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
         </ListSection>
 
         {/* A made-up exchange, so a change shows at once as it will look in a chat. */}
@@ -270,4 +360,114 @@ const createStyles = (colors: Colors) =>
     },
     tileSelected: { borderColor: colors.accent },
     tileLabel: { color: colors.textMuted, fontSize: 12 },
+    themeTiles: { gap: 12, padding: 16 },
+    themeTileButton: { width: THEME_TILE_WIDTH, alignItems: 'center', gap: 8 },
+    themeTile: {
+      width: THEME_TILE_WIDTH,
+      height: THEME_TILE_HEIGHT,
+      borderRadius: 14,
+      borderCurve: 'continuous',
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: colors.border,
+    },
+    themeTileSelected: {
+      borderColor: colors.accent,
+    },
+    themeLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      textAlign: 'center',
+      minHeight: 28,
+    },
+    themeLabelSelected: {
+      fontWeight: '600',
+    },
+    miniHeader: {
+      height: 15,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3.5,
+      paddingHorizontal: 5,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    miniAvatar: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+    },
+    miniBar: {
+      height: 2.5,
+      borderRadius: 1.25,
+    },
+    miniChat: {
+      flex: 1,
+      padding: 5,
+      justifyContent: 'center',
+      gap: 5,
+    },
+    miniChatHalf: {
+      flex: 1,
+      padding: 4,
+      justifyContent: 'center',
+    },
+    miniBubbleLeft: {
+      alignSelf: 'flex-start',
+      borderRadius: 5,
+      paddingHorizontal: 4,
+      paddingVertical: 3,
+      gap: 2,
+      maxWidth: 50,
+    },
+    miniBubbleRight: {
+      alignSelf: 'flex-end',
+      borderRadius: 5,
+      paddingHorizontal: 4,
+      paddingVertical: 3,
+      maxWidth: 44,
+    },
+    miniLine: {
+      height: 2,
+      borderRadius: 1,
+    },
+    miniComposer: {
+      height: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: 4,
+      borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    miniField: {
+      flex: 1,
+      height: 7,
+      borderRadius: 3.5,
+    },
+    miniSend: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+    },
+    splitRow: {
+      flex: 1,
+      flexDirection: 'row',
+    },
+    splitHalf: {
+      flex: 1,
+      overflow: 'hidden',
+    },
+    splitCenterBadge: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: [{ translateX: -10 }, { translateY: -10 }],
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
   })
