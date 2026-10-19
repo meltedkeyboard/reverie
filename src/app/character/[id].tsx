@@ -13,7 +13,7 @@ import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell
 import { BackgroundSection, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
 import { ExpandingAvatar, usePhotoNameSpot, useSpreadPush } from '@/components/cast/ExpandingAvatar'
 import { BarButton, DrawnFormScreenHeader, useAvatarHandOff } from '@/components/chrome/FormScreenHeader'
-import { useScreenPadding } from '@/components/chrome/GlassHeader'
+import { useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import {
   DEFAULT_SAMPLING,
   deleteCharacter,
@@ -36,7 +36,7 @@ import type { ImageSource } from '@/lib/images/images'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { countLabel } from '@/lib/core/format'
 import { alertError } from '@/lib/transfer/report'
-import { type Colors, useColors, useStyles } from '@/theme'
+import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 import { isAndroid } from '@/lib/core/platform'
 
 export default function CharacterEditorScreen() {
@@ -339,15 +339,22 @@ export default function CharacterEditorScreen() {
   const nameSpot = usePhotoNameSpot(sideLeft, sideRight)
   // Scrolled past, the profile's avatar goes up into the header in place of the star.
   const handOff = useAvatarHandOff(photoSpread, scrollY)
-  const { width: screenWidth } = useWindowDimensions()
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
+  const headerHeight = useHeaderHeight()
+  const avatarCenterY = contentPadding.paddingTop + AVATAR_SIZE / 2
   const headerAvatar = editing
     ? undefined
     : {
         node: <Avatar name={name} file={avatar} uri={photoUri} size={AVATAR_SIZE} viewable={false} />,
         size: AVATAR_SIZE,
         centerX: sideLeft + (screenWidth - sideLeft - sideRight) / 2,
-        centerY: contentPadding.paddingTop + AVATAR_SIZE / 2,
+        centerY: avatarCenterY,
       }
+  // A short profile (a small prompt, no greeting) would stop scrolling before the avatar
+  // reaches the star and leave it halfway, so the page always has room for the whole way up.
+  const scrollRoom = editing
+    ? contentPadding
+    : { ...contentPadding, minHeight: screenHeight + avatarCenterY - (headerHeight - HEADER_ROW_HEIGHT / 2) }
   // Over the open photo the status bar turns light, whatever the theme.
   const [photoOpen, setPhotoOpen] = useState(false)
   useAnimatedReaction(
@@ -401,7 +408,7 @@ export default function CharacterEditorScreen() {
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
-          contentContainerStyle={contentPadding}
+          contentContainerStyle={scrollRoom}
           onScroll={onScroll}
           // Over the open photo a further pull scrolls under a page that stays put (pinOpen),
           // and the indicator would give it away.
