@@ -2,7 +2,7 @@ import { Stack, useRouter } from 'expo-router'
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { BackHandler, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { Gesture, GestureDetector, type GestureType, type PanGesture } from 'react-native-gesture-handler'
-import Animated, { interpolate, useAnimatedStyle, useFrameCallback, useSharedValue, withSpring } from 'react-native-reanimated'
+import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import ReorderableList, { useReorderableDrag } from 'react-native-reorderable-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
@@ -163,36 +163,6 @@ export function ChatDrawer({ character, chatId, enabled, onStage, flipTo, onSele
   prepareRef.current = prepare
   const runPrepare = useCallback(() => prepareRef.current(), [])
 
-  // In a development build, the frames of each motion: how long the slowest took and how
-  // many were dropped, which is what a hitch is.
-  const meterOn = useSharedValue(false)
-  const meterFrames = useSharedValue(0)
-  const meterTotal = useSharedValue(0)
-  const meterWorst = useSharedValue(0)
-  const meterBest = useSharedValue(1000)
-  useFrameCallback((frame) => {
-    'worklet'
-    const dt = frame.timeSincePreviousFrame
-    if (!meterOn.value || dt === null) return
-    meterFrames.value += 1
-    meterTotal.value += dt
-    meterWorst.value = Math.max(meterWorst.value, dt)
-    meterBest.value = Math.min(meterBest.value, dt)
-  }, __DEV__)
-  const startMeter = () => {
-    'worklet'
-    meterOn.value = true
-    meterFrames.value = 0
-    meterTotal.value = 0
-    meterWorst.value = 0
-    meterBest.value = 1000
-  }
-  const report = (to: number, frames: number, total: number, worst: number, best: number) => {
-    // A frame slower than the screen's own pace stands for the ones it skipped.
-    const dropped = frames ? Math.max(0, Math.round(total / best) - frames) : 0
-    console.log(`[ChatDrawer] ${to ? 'open' : 'close'}: ${frames} frames, worst ${Math.round(worst)} ms, dropped ${dropped}`)
-  }
-
   // The motion is over: the rows may take on their rich views again, and what the screen
   // put off happens now.
   const closedRef = useRef(onClosed)
@@ -206,10 +176,6 @@ export function ChatDrawer({ character, chatId, enabled, onStage, flipTo, onSele
   }, [])
   const finish = (to: number) => {
     'worklet'
-    if (meterOn.value) {
-      meterOn.value = false
-      if (__DEV__) scheduleOnRN(report, to, meterFrames.value, meterTotal.value, meterWorst.value, meterBest.value)
-    }
     scheduleOnRN(settled, to)
   }
   // Every motion of the drawer goes through here, from a gesture or from JavaScript.
@@ -219,7 +185,6 @@ export function ChatDrawer({ character, chatId, enabled, onStage, flipTo, onSele
     target.value = to
     scheduleOnRN(holdHydration, HOLD, true)
     if (to === 1) scheduleOnRN(setOpen, true)
-    startMeter()
     progress.value = withSpring(to, { ...SPRING, velocity }, (done) => {
       if (done) finish(to)
     })

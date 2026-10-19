@@ -232,7 +232,7 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
   const pending = useRef<number | null>(null)
   // The address follows a switch once the drawer is back in place.
   const unannounced = useRef<number | null>(null)
-  const staging = useRef<{ chatId: number; at: number } | null>(null)
+  const staging = useRef<number | null>(null)
   // The chat each thread has laid out. The one behind still holds the chat switched away
   // from, laid out already: going back to it needs no staging, only to be marked ready.
   const laid = useRef([0, 0])
@@ -270,9 +270,9 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
       }
       ready.value = 0
       laid.current[thread] = 0
-      staging.current = { chatId: chat.id, at: performance.now() }
+      staging.current = chat.id
       const messages = await prefetchMessages(db, chat.id).catch(() => [])
-      if (staging.current?.chatId !== chat.id) return
+      if (staging.current !== chat.id) return
       threads[thread].set(aheadOf(chat, messages, bubbleOpacity))
     },
     [db, threads, ready, bubbleOpacity]
@@ -283,10 +283,7 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
     (thread: number, chatId: number) => {
       if (threads[thread].get().chat?.id === chatId) laid.current[thread] = chatId
       if (thread !== behind()) return
-      if (staging.current?.chatId === chatId) {
-        if (__DEV__) console.log(`[ChatThread] staged in ${Math.round(performance.now() - staging.current.at)} ms`)
-        staging.current = null
-      }
+      if (staging.current === chatId) staging.current = null
       ready.value = chatId
       if (pending.current !== chatId) return
       pending.current = null
