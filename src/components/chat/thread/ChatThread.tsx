@@ -15,8 +15,8 @@ import { holdHydration } from './hydration'
 
 // How far above the newest message the list has to be before the jump button shows up.
 const JUMP_THRESHOLD = 240
-// Within this share of the screen from the end, a streaming reply is followed as it grows.
-const FOLLOW_SHARE = 0.15
+// A reader who scrolled up is left there until they come back within this of the end (pt).
+const FOLLOW_BACK = 80
 // How long after a scroll the rows wait before taking on their rich views.
 const SCROLL_REST = 800
 // A chat handed to the thread has landed once its size has not changed for this long.
@@ -66,9 +66,20 @@ export function ChatThread({
   const listRef = useRef<FlashListRef<Item>>(null)
   const inset = useRef(0)
   const away = useRef(false)
+  // Whether a growing reply is followed, done here rather than by the list's own autoscroll:
+  // that one scrolled to the end on every token even under a dragging finger, which left the
+  // list at the end again, near enough for the next token, so the reader could not get away.
+  // A drag lets go of the end; coming back to it, or the jump button, takes it up again.
+  const follow = useRef(true)
+  // A finger is on the list: nothing scrolls it from under the finger, followed or not.
+  const held = useRef(false)
+  // Nor while it glides on after the finger.
+  const gliding = useRef(false)
+  const back = useRef(0)
 
   const scrollToNewest = useCallback(
     (animated = true) => {
+      follow.current = true
       listRef.current?.scrollToEnd({ animated })
       if (away.current) {
         away.current = false
@@ -105,6 +116,7 @@ export function ChatThread({
   if (shownKey.current !== chatKey) {
     shownKey.current = chatKey
     landing.current = true
+    follow.current = true
     if (away.current) {
       away.current = false
       onAwayChange?.(false)
@@ -121,7 +133,10 @@ export function ChatThread({
     []
   )
   const onContentSizeChange = useCallback(() => {
-    if (!landing.current) return
+    if (!landing.current) {
+      if (follow.current && !held.current && !gliding.current) listRef.current?.scrollToEnd({ animated: false })
+      return
+    }
     listRef.current?.scrollToEnd({ animated: false })
     land(shownKey.current)
   }, [land])
@@ -148,9 +163,12 @@ export function ChatThread({
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent
       // A web scroll event FlashList passes on can come without the sizes.
       if (!contentOffset || !contentSize || !layoutMeasurement) return
-      const back = contentSize.height - layoutMeasurement.height - contentOffset.y + inset.current
-      if ((back > JUMP_THRESHOLD) !== away.current) {
-        away.current = back > JUMP_THRESHOLD
+      back.current = contentSize.height - layoutMeasurement.height - contentOffset.y + inset.current
+      // Brought back to the end, by a drag or a fling, the reply takes the reader up again.
+      if (back.current <= FOLLOW_BACK) follow.current = true
+      else if (held.current || gliding.current) follow.current = false
+      if ((back.current > JUMP_THRESHOLD) !== away.current) {
+        away.current = back.current > JUMP_THRESHOLD
         onAwayChange?.(away.current)
       }
     },
@@ -165,10 +183,34 @@ export function ChatThread({
     if (restTimer.current) clearTimeout(restTimer.current)
     holdHydration(reason, true)
   }, [reason])
+  const grabbed = useCallback(() => {
+    held.current = true
+    follow.current = false
+    moving()
+  }, [moving])
   const rested = useCallback(() => {
     if (restTimer.current) clearTimeout(restTimer.current)
     restTimer.current = setTimeout(() => holdHydration(reason, false), SCROLL_REST)
   }, [reason])
+  // Let go near the end, the list snaps onto it, as onto a magnet; after a fling, once it
+  // stops there. Put off a moment, for the fling's start to arrive after the release.
+  const snap = useCallback(() => {
+    if (follow.current && !held.current && !gliding.current) listRef.current?.scrollToEnd({ animated: true })
+  }, [])
+  const released = useCallback(() => {
+    held.current = false
+    setTimeout(snap, 50)
+    rested()
+  }, [rested, snap])
+  const glide = useCallback(() => {
+    gliding.current = true
+    moving()
+  }, [moving])
+  const glided = useCallback(() => {
+    gliding.current = false
+    snap()
+    rested()
+  }, [rested, snap])
   useEffect(
     () => () => {
       if (restTimer.current) clearTimeout(restTimer.current)
@@ -232,13 +274,13 @@ export function ChatThread({
       getItemType={typeOf}
       renderItem={renderItem}
       renderScrollComponent={renderScroll}
-      maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: FOLLOW_SHARE, animateAutoScrollToBottom: false }}
+      maintainVisibleContentPosition={POSITION}
       onScroll={onScroll}
       onContentSizeChange={onContentSizeChange}
-      onScrollBeginDrag={moving}
-      onScrollEndDrag={rested}
-      onMomentumScrollBegin={moving}
-      onMomentumScrollEnd={rested}
+      onScrollBeginDrag={grabbed}
+      onScrollEndDrag={released}
+      onMomentumScrollBegin={glide}
+      onMomentumScrollEnd={glided}
       scrollEventThrottle={isWeb ? 16 : 32}
       ListHeaderComponent={<View style={{ height: headerHeight + 12 }} />}
       ListFooterComponent={
@@ -252,6 +294,9 @@ export function ChatThread({
     />
   )
 }
+
+// No autoscrollToBottomThreshold: the thread follows a reply itself (see `follow`).
+const POSITION = { startRenderingFromBottom: true }
 
 const INTRO = { intro: true } as const
 type Item = RowMessage | typeof INTRO

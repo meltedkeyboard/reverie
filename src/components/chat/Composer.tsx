@@ -267,16 +267,6 @@ export function Composer({
       if (e.translationX > 48) takeSuggestion()
       else if (e.translationX < -48) dismissSuggestion()
     })
-  // A swipe to the right over a suggestion takes it rather than opening the chat's drawer.
-  if (drawer) swipe.blocksExternalGesture(drawer.pan)
-  // Nor does any other swipe across the composer open it, with a suggestion or not: this
-  // never activates, so the field keeps its touches, and fails only as the finger lifts,
-  // which is too late for the drawer's drag to start.
-  const guard = useMemo(() => {
-    const touch = Gesture.Manual().enabled(!menuUp)
-    if (drawer) touch.blocksExternalGesture(drawer.pan)
-    return touch
-  }, [drawer, menuUp])
   const mode = editing
     ? value
       ? 'save'
@@ -525,8 +515,10 @@ export function Composer({
     setFades((prev) => (prev.top || prev.bottom ? NO_FADES : prev))
   }, [expanded, text])
 
-  const rowBody = (
-    <Animated.View style={[styles.row, narrowStyle]}>
+  const row = (
+    // A swipe across the row (one taking a suggestion among them) never opens the chat's
+    // drawer: the drawer's drag looks where a touch lands on this view and lets it be.
+    <Animated.View ref={drawer?.guard} style={[styles.row, narrowStyle]}>
       <Animated.View style={[styles.fieldBox, boxStyle]} collapsable={false}>
         {/* The glass is a sibling of the content, so the box can grow under the text. */}
         <GlassSurface style={[StyleSheet.absoluteFill, styles.glass, hushed && styles.hushed]} fallbackStyle={glass.solid} />
@@ -672,7 +664,6 @@ export function Composer({
       </Animated.View>
     </Animated.View>
   )
-  const row = <GestureDetector gesture={guard}>{rowBody}</GestureDetector>
 
   return (
     // The accessory sits in the dock's own layout: iOS ignores touches on children drawn

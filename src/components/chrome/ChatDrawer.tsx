@@ -1,8 +1,8 @@
 import { Stack, useRouter } from 'expo-router'
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { BackHandler, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import { Gesture, GestureDetector, type GestureType, type PanGesture } from 'react-native-gesture-handler'
-import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler'
+import Animated, { interpolate, measure, useAnimatedRef, useAnimatedStyle, useSharedValue, withSpring, type AnimatedRef } from 'react-native-reanimated'
 import ReorderableList, { useReorderableDrag } from 'react-native-reorderable-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
@@ -57,9 +57,12 @@ type Props = {
 
 type DrawerHandle = {
   open: () => void
-  // The drag that opens it, for a gesture inside the chat that must win over it
-  // (`blocksExternalGesture`), as the composer's swipe of a suggestion does.
-  pan: PanGesture
+  // A view inside the chat whose touches never open it: the composer's row, whose swipe of
+  // a suggestion and whose field keep the finger. Looked up where the touch lands rather
+  // than made to win by `blocksExternalGesture`: waiting on the composer's gestures, the
+  // drag stayed begun whenever one of their touches was lost (a keyboard going down, the
+  // row laid out anew), and neither the drag nor the header's button answered for seconds.
+  guard: AnimatedRef<Animated.View>
   // Off while a sheet is up over the chat. A touch that opens one (the composer's plus)
   // begins this drag too, and with the sheet taking the screen its end never arrives: the
   // drag stays begun and the chat takes no touch for seconds after the sheet is gone.
@@ -250,6 +253,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   // Only a drag to the right that is clearly sideways: one to the left or up and down is
   // left to the chat (its scroll, the swipe that dismisses a suggestion). The text of a
   // reply is selected after a long press without moving, before this can start.
+  const guard = useAnimatedRef<Animated.View>()
   const openPan = useMemo(
     () =>
       Gesture.Pan()
@@ -257,6 +261,13 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
         .activeOffsetX(14)
         .failOffsetX(-10)
         .failOffsetY([-12, 12])
+        .onTouchesDown((e, manager) => {
+          const touch = e.allTouches[0]
+          const box = measure(guard)
+          if (!touch || !box) return
+          const { absoluteX: x, absoluteY: y } = touch
+          if (x >= box.pageX && x <= box.pageX + box.width && y >= box.pageY && y <= box.pageY + box.height) manager.fail()
+        })
         .onStart(() => {
           begin()
           scheduleOnRN(runPrepare)
@@ -265,11 +276,11 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
         .onEnd((e) => release(e.velocityX)),
     // begin, follow and release change only with shift.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enabled, suspended, shift, runPrepare]
+    [enabled, suspended, shift, runPrepare, guard]
   )
   const handle = useMemo(
-    () => (enabled ? { open: show, pan: openPan, suspend: setSuspended } : null),
-    [enabled, openPan, show]
+    () => (enabled ? { open: show, guard, suspend: setSuspended } : null),
+    [enabled, guard, show]
   )
 
   // The strip of the chat still showing: a tap brings it back, a drag carries it.
