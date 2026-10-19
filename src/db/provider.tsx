@@ -12,6 +12,9 @@ type DatabaseContextValue = {
   reload: () => Promise<void>
 }
 
+// How long a database given up stays open for the queries still running on it.
+const RETIRE_DELAY = 3000
+
 const [DatabaseContext, useDatabaseContext] = createRequiredContext<DatabaseContextValue>('useDatabase must be used within a <DatabaseProvider>')
 
 // expo-sqlite hands out one cached connection per path, and closing the old one would close
@@ -60,16 +63,19 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // The old database is closed only once the screens have re-rendered with the new one,
-  // so nothing still holding it gets a "database is closed" error mid-query.
+  // and a little after that: a query a screen started on it just before is still running
+  // then, and closing under it failed its statement ("Access to closed resource").
   useEffect(() => {
     const old = retired.current
     if (!old || old === db) return
     retired.current = null
-    old
-      .closeAsync()
-      .catch(() => {})
-      .then(() => discardInactiveDatabase())
-      .catch((err) => console.warn('Could not remove the old database', err))
+    setTimeout(() => {
+      old
+        .closeAsync()
+        .catch(() => {})
+        .then(() => discardInactiveDatabase())
+        .catch((err) => console.warn('Could not remove the old database', err))
+    }, RETIRE_DELAY)
   }, [db])
 
   const setShownInFiles = useCallback(

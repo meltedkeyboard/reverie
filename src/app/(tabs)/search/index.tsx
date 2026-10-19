@@ -202,7 +202,7 @@ export default function SearchScreen() {
   }, [loaded, needle, messages, settings, scope, t])
 
   const open = (item: Item) => {
-    if (item.kind === 'character') router.push(`/chats/${item.character.id}`)
+    if (item.kind === 'character') router.push(`/chat/latest?character=${item.character.id}`)
     else if (item.kind === 'room') router.push(`/rooms/${item.room.id}`)
     else if (item.kind === 'chat') router.push(`/chat/${item.chat.id}`)
     else if (item.kind === 'message') router.push(`/chat/${item.message.chatId}?message=${item.message.id}`)

@@ -4,6 +4,7 @@ type ReverieSplashNative = {
   isAvailable: () => boolean
   isFinished: () => boolean
   dismiss: () => Promise<boolean>
+  displayCornerRadius: () => number
 }
 
 const ReverieSplash = requireOptionalNativeModule<ReverieSplashNative>('ReverieSplash')
@@ -20,4 +21,9 @@ export async function dismissNativeSplash(): Promise<void> {
   if (ReverieSplash?.dismiss) {
     await ReverieSplash.dismiss()
   }
+}
+
+// 0 where the module is missing (Expo Go, Android, the web) or the screen has square corners.
+export function displayCornerRadius(): number {
+  return ReverieSplash?.displayCornerRadius?.() ?? 0
 }

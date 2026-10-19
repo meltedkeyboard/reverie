@@ -46,10 +46,12 @@ type ChatMenuHandlers = {
   rename: (title: string | null) => Promise<void>
   autoName: () => Promise<string | null>
   discard: () => void
+  // Where to go once the chat is deleted; back by default.
+  onDeleted?: () => void
 }
 
 // The header menu's rename, title suggestion and delete, the same in a chat and in a scene.
-export function useChatMenuActions({ chatId, title, rename, autoName, discard }: ChatMenuHandlers) {
+export function useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted }: ChatMenuHandlers) {
   const db = useDatabase()
   const router = useRouter()
   const { t } = useTranslation()
@@ -58,7 +60,8 @@ export function useChatMenuActions({ chatId, title, rename, autoName, discard }:
     confirmDeleteChat(async () => {
       discard()
       await deleteChat(db, chatId)
-      router.back()
+      if (onDeleted) onDeleted()
+      else router.back()
     })
   }
 

@@ -22,8 +22,10 @@ import { Avatar } from '../visuals/Avatar'
 import { IconButton } from '../controls/IconButton'
 import { ImageLink } from '../visuals/ImageLink'
 import { Markdown, SelectableText } from './Markdown'
-import { NativeMenu } from '../overlays/NativeMenu'
+import { NativeMenu, TapTrigger } from '../overlays/NativeMenu'
 import { Pager } from '../lists/Pager'
+import { PlainSymbol } from '../visuals/PlainSymbol'
+import { useHydrated, type Hydration } from './thread/hydration'
 import { SFIcon } from '../visuals/SFIcon'
 import { ShimmerText } from '../visuals/ShimmerText'
 import { TypingIndicator } from './TypingIndicator'
@@ -53,6 +55,9 @@ type Props = {
   // How much of the user's bubble color shows: below 1 over a chat background.
   bubbleOpacity?: number
   scene?: RowScene
+  // Whether it comes up plain and takes on the selectable text, the native menu and the
+  // animated symbols later, a row a frame while nothing moves (see thread/hydration).
+  hydrate?: Hydration
 }
 
 // The family and scaled size a line of chat text takes from the settings.
@@ -64,13 +69,15 @@ function textSize({ fontFamily, scaled }: ReturnType<typeof useChatText>, metric
 // menu: a long press there selects text, and their actions sit in the bar below.
 const LONG_PRESS_MS = 350
 
-function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1, scene }: Props) {
+function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1, scene, hydrate = 'off' }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
   const chatText = useChatText()
   const narration = message.kind === 'narration'
   const isUser = message.role === 'user' && !narration
+  // A streaming reply stays plain: its text changes with every token.
+  const rich = useHydrated(message.streaming ? 'stream' : `${message.id}:${message.variant}`, hydrate)
   const actions = useMemo(
     () => messageActions(message, { canRegenerate, locked }),
     [message, canRegenerate, locked]
@@ -92,6 +99,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
       onAction={onAction}
       onSelectVariant={onSelectVariant}
       locked={locked}
+      rich={rich}
     />
   )
 
@@ -106,6 +114,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
       }
       emStyle={styles.action}
       streaming={message.streaming}
+      selectable={rich}
     />
   )
 
@@ -234,11 +243,13 @@ type ActionBarProps = {
   locked: boolean
   onAction: (message: RowMessage, action: MessageAction) => void
   onSelectVariant: (id: number, variant: number) => void
+  // Off: the same buttons drawn without SwiftUI, the menu as the action sheet.
+  rich: boolean
 }
 
 // The main action gets its own button next to copy: regenerating for a reply, editing
 // for the user's own message. Everything else goes into the ellipsis menu.
-function ActionBar({ message, actions, locked, onAction, onSelectVariant }: ActionBarProps) {
+function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }: ActionBarProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const [copied, setCopied] = useState(false)
@@ -276,14 +287,24 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant }: Acti
           onPress={copy}
           style={styles.barButton}
         >
-          <SFIcon
-            name={copied ? 'checkmark' : 'square.on.square'}
-            fallback={copied ? 'checkmark' : 'copy-outline'}
-            size={15}
-            color={copied ? colors.success : colors.textFaint}
-            effect={{ effect: 'bounce' }}
-            trigger={copies}
-          />
+          {rich ? (
+            <SFIcon
+              name={copied ? 'checkmark' : 'square.on.square'}
+              fallback={copied ? 'checkmark' : 'copy-outline'}
+              size={15}
+              color={copied ? colors.success : colors.textFaint}
+              effect={{ effect: 'bounce' }}
+              trigger={copies}
+            />
+          ) : (
+            <PlainSymbol
+              name={copied ? 'checkmark' : 'square.on.square'}
+              fallback={copied ? 'checkmark' : 'copy-outline'}
+              size={15}
+              box={SF_BOX}
+              color={copied ? colors.success : colors.textFaint}
+            />
+          )}
         </IconButton>
       ) : null}
       {hasPrimary ? (
@@ -297,21 +318,35 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant }: Acti
           }}
           style={styles.barButton}
         >
-          <SFIcon
-            name={isUser ? 'square.and.pencil' : 'arrow.clockwise'}
-            fallback={isUser ? 'create-outline' : 'refresh'}
-            size={15}
-            color={colors.textFaint}
-            effect={isUser ? { effect: 'bounce' } : { effect: 'rotate', direction: 'clockwise' }}
-            trigger={spins}
-          />
+          {rich ? (
+            <SFIcon
+              name={isUser ? 'square.and.pencil' : 'arrow.clockwise'}
+              fallback={isUser ? 'create-outline' : 'refresh'}
+              size={15}
+              color={colors.textFaint}
+              effect={isUser ? { effect: 'bounce' } : { effect: 'rotate', direction: 'clockwise' }}
+              trigger={spins}
+            />
+          ) : (
+            <PlainSymbol
+              name={isUser ? 'square.and.pencil' : 'arrow.clockwise'}
+              fallback={isUser ? 'create-outline' : 'refresh'}
+              size={15}
+              box={SF_BOX}
+              color={colors.textFaint}
+            />
+          )}
         </IconButton>
       ) : null}
-      {menu.length ? (
+      {menu.length && rich ? (
         <NativeMenu items={menu} style={styles.barButton}>
           {/* A plain glyph: a SwiftUI symbol inside the menu's label gets the accent tint. */}
           <Icon name="ellipsis-horizontal" size={17} color={colors.textFaint} />
         </NativeMenu>
+      ) : menu.length ? (
+        <TapTrigger onPress={() => showSheet(undefined, menu)} style={styles.barButton}>
+          <PlainSymbol name="ellipsis" fallback="ellipsis-horizontal" size={ICON_SYMBOL * 17} box={17} color={colors.textFaint} />
+        </TapTrigger>
       ) : null}
       {count > 1 ? (
         <Pager
@@ -325,6 +360,10 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant }: Acti
     </View>
   )
 }
+
+// The boxes `SFIcon` and `Icon` give their symbols, which the plain ones keep.
+const SF_BOX = Math.round(15 * 1.3)
+const ICON_SYMBOL = 0.85
 
 // Roughly four lines on a phone: enough to see the model is working, not a wall of text.
 const THINKING_TAIL = 220

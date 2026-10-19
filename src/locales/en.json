@@ -419,9 +419,9 @@
   "composer.movingTooBig": "This picture is over {{mb}} MB, so it will be sent as a still",
   "composer.attachFailedTitle": "Couldn't attach photo",
 
-  "chatsList.emptyTitle": "No chats yet",
-  "chatsList.emptyText": "One character can have as many stories as you like",
-  "chatsList.startChat": "Start chat",
+  "chatDrawer.open": "Chats",
+  "chatDrawer.close": "Back to the chat",
+  "chatDrawer.newChat": "New chat",
 
   "attach.choosePhoto": "Choose photo",
   "attach.recent": "Recent picture",

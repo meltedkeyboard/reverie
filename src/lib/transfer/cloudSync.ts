@@ -282,7 +282,16 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
   const db = await openDatabaseAsync('reverie.db', { useNewConnection: true }, databaseDirectory())
   try {
     await db.execAsync('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = OFF;')
-    const [manifest, state] = await Promise.all([readManifest(), getSyncState(db)])
+    // Read side by side, but the state's query must be done before `finally` closes the
+    // connection: with Promise.all a failed manifest read let the close run under it.
+    const manifestRead = readManifest().then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error })
+    )
+    const state = await getSyncState(db)
+    const read = await manifestRead
+    if ('error' in read) throw read.error
+    const manifest = read.value
     // Data from before sync was turned on counts as changed: it has never been anywhere.
     const changedHere = state.dirty || state.rev === null
     const changedThere = manifest !== null && manifest.rev !== state.rev

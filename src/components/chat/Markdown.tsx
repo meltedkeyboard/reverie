@@ -46,6 +46,23 @@ function PlainText({ style, children }: { style: StyleProp<TextStyle>; children:
 
 const blockReset = { padding: 0, paddingTop: 0, paddingBottom: 0 } as const
 
+// Replies already parsed, for a chat shown again or a row recycled onto them: the lexer
+// was a good part of laying out a long chat. Oldest out first past the limit.
+const TOKEN_CACHE = 400
+const tokenCache = new Map<string, Token[]>()
+
+const lex = (text: string, streaming: boolean): Token[] => {
+  // breaks: a model writes dialogue and verse line by line, and a single newline must
+  // stay a line break rather than join the lines as plain Markdown would.
+  if (streaming) return Lexer.lex(closeOpenEmphasis(text), { gfm: true, breaks: true })
+  const known = tokenCache.get(text)
+  if (known) return known
+  const tokens = Lexer.lex(text, { gfm: true, breaks: true })
+  tokenCache.set(text, tokens)
+  if (tokenCache.size > TOKEN_CACHE) tokenCache.delete(tokenCache.keys().next().value!)
+  return tokens
+}
+
 // A piece of the reply: a paragraph, a heading or a list item flows as text, a code
 // block or a table needs a view of its own. tight: a list item after the first one,
 // which follows on the next line with no gap.
@@ -57,12 +74,7 @@ type Piece = { flow: true; node: ReactNode; tight: boolean } | { flow: false; no
 function MarkdownView({ text, style, emStyle, streaming = false, selectable = true }: Props) {
   const Block = selectable ? SelectableText : PlainText
   const styles = useStyles(createStyles)
-  // breaks: a model writes dialogue and verse line by line, and a single newline must
-  // stay a line break rather than join the lines as plain Markdown would.
-  const tokens = useMemo(
-    () => Lexer.lex(streaming ? closeOpenEmphasis(text) : text, { gfm: true, breaks: true }),
-    [text, streaming]
-  )
+  const tokens = useMemo(() => lex(text, streaming), [text, streaming])
   const size = StyleSheet.flatten(style).fontSize ?? 17
   const em = emStyle ?? styles.em
 

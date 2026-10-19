@@ -185,7 +185,7 @@ async function describe(db: ReturnType<typeof useDatabase>, path: string, chats:
     if (chat) return { title: chat.title ?? chat.ownerName, avatar: { name: chat.ownerName, file: chat.ownerAvatar } }
     return { title: t('sidebar.untitled'), icon: 'chatbubble-outline' }
   }
-  if ((kind === 'chats' || kind === 'character') && id) {
+  if (kind === 'character' && id) {
     const character = await getCharacter(db, id)
     if (character) return { title: character.name, avatar: { name: character.name, file: character.avatar } }
   }

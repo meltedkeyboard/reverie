@@ -183,7 +183,7 @@ const SF: Record<string, [string, string]> = {
   refresh: ['arrow.clockwise', 'arrow.clockwise'],
   'remove-circle': ['minus.circle', 'minus.circle.fill'],
   'reorder-three': ['line.3.horizontal', 'line.3.horizontal'],
-  'reorder-two': ['line.2.horizontal', 'line.2.horizontal'],
+  'reorder-two': ['equal', 'equal'],
   repeat: ['repeat', 'repeat'],
   resize: ['arrow.up.left.and.arrow.down.right', 'arrow.up.left.and.arrow.down.right'],
   save: ['square.and.arrow.down', 'square.and.arrow.down.fill'],

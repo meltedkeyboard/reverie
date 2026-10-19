@@ -112,11 +112,12 @@ export async function deleteChat(db: SQLiteDatabase, id: number) {
 
 // A chat the user never interacted with holds at most the initial greeting or opening. Such
 // chats are dropped once the user is back on a list, so opening a new chat and leaving it
-// leaves no clutter.
-export async function pruneUntouchedChats(db: SQLiteDatabase) {
+// leaves no clutter. `keepId` spares the chat still on screen (the list in its sidebar).
+export async function pruneUntouchedChats(db: SQLiteDatabase, keepId: number | null = null) {
   await db.runAsync(`
     DELETE FROM chats
-    WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = chats.id AND m.role = 'user')
+    WHERE chats.id IS NOT ?
+      AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = chats.id AND m.role = 'user')
       AND (
         (SELECT COUNT(*) FROM messages m WHERE m.chat_id = chats.id) = 0
         OR (
@@ -141,7 +142,19 @@ export async function pruneUntouchedChats(db: SQLiteDatabase) {
           )
         )
       )
-  `)
+  `, keepId)
+}
+
+// The chat of a character written in last, which opening the character lands on.
+export async function getLatestChatId(db: SQLiteDatabase, characterId: number) {
+  const row = await db.getFirstAsync<{ id: number }>(
+    `SELECT ch.id FROM chats ch
+     WHERE ch.character_id = ?
+     ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.chat_id = ch.id), ch.created_at) DESC, ch.id DESC
+     LIMIT 1`,
+    characterId
+  )
+  return row?.id ?? null
 }
 
 export type LastChat = {

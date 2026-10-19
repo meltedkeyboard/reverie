@@ -49,6 +49,7 @@ export function useChat(chat: Chat, character: Character) {
     setMessages,
     loaded,
     setLoaded,
+    primed,
     error,
     setError,
     title,
@@ -131,12 +132,15 @@ export function useChat(chat: Chat, character: Character) {
 
   useEffect(() => {
     let alive = true
-    ;(async () => {
-      const rows = await store.list()
-      if (!alive) return
-      setMessages(rows)
-      setLoaded(true)
-    })()
+    // Already there from the first render, read just before the chat opened.
+    if (primed.current) primed.current = false
+    else
+      (async () => {
+        const rows = await store.list()
+        if (!alive) return
+        setMessages(rows)
+        setLoaded(true)
+      })()
     return () => {
       alive = false
       // A reply still streaming finishes into the store it was started for, but the

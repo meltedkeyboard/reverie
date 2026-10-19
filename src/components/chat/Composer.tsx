@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { BlurBar, EdgeFade } from '../chrome/BarChrome'
+import { useChatDrawer } from '../chrome/ChatDrawer'
 import { GlassSurface, useGlassStyles } from '../chrome/Glass'
 import { AttachSheet, loadRecentPictures } from './AttachMenu'
 import { useInputColors } from '../controls/Field'
@@ -74,6 +75,9 @@ type Props = {
   // being swapped for another one.
   initialText?: string
   onTextChange?: (text: string) => void
+  // Which chat the field writes to: a new one sets the field to `initialText` and drops
+  // the pictures, the field itself staying as it is (a chat switched to in place).
+  resetKey?: string | number
   autoFocus?: boolean
   // A guess at the next message, shown in place of the placeholder while the field is
   // empty. A swipe to the right across the field types it in.
@@ -105,6 +109,7 @@ export function Composer({
   placeholder,
   initialText = '',
   onTextChange,
+  resetKey,
   autoFocus = false,
   onContinueLongPress,
   hushed = false,
@@ -175,6 +180,18 @@ export function Composer({
   const [picking, setPicking] = useState(false)
   const imageUris = useMemo(() => images.map(pictureUri), [images])
 
+  const shownKey = useRef(resetKey)
+  useEffect(() => {
+    if (shownKey.current === resetKey) return
+    shownKey.current = resetKey
+    hadText.current = false
+    setText(initialText)
+    setImages([])
+    setOpened(false)
+    // Only another chat sets the field anew; its draft is read as it comes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey])
+
   // A browser scrolls whatever holds a field to show it when it takes focus. The field of a
   // swap starts below its place, so autoFocus there pushed the whole interface down.
   useEffect(() => {
@@ -233,6 +250,7 @@ export function Composer({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onSuggestionDismissed?.()
   }
+  const drawer = useChatDrawer()
   // Stays out of the way of taps, which focus the field, and of vertical scrolling.
   const swipe = Gesture.Pan()
     .runOnJS(true)
@@ -243,6 +261,16 @@ export function Composer({
       if (e.translationX > 48) takeSuggestion()
       else if (e.translationX < -48) dismissSuggestion()
     })
+  // A swipe to the right over a suggestion takes it rather than opening the chat's drawer.
+  if (drawer) swipe.blocksExternalGesture(drawer.pan)
+  // Nor does any other swipe across the composer open it, with a suggestion or not: this
+  // never activates, so the field keeps its touches, and fails only as the finger lifts,
+  // which is too late for the drawer's drag to start.
+  const guard = useMemo(() => {
+    const touch = Gesture.Manual()
+    if (drawer) touch.blocksExternalGesture(drawer.pan)
+    return touch
+  }, [drawer])
   const mode = editing
     ? value
       ? 'save'
@@ -485,7 +513,7 @@ export function Composer({
     setFades((prev) => (prev.top || prev.bottom ? NO_FADES : prev))
   }, [expanded, text])
 
-  const row = (
+  const rowBody = (
     <Animated.View style={[styles.row, narrowStyle]}>
       <Animated.View style={[styles.fieldBox, boxStyle]} collapsable={false}>
         {/* The glass is a sibling of the content, so the box can grow under the text. */}
@@ -536,7 +564,7 @@ export function Composer({
                 value={text}
                 onChangeText={change}
                 onScroll={(e) => {
-                  scrollInfo.current.offset = e.nativeEvent.contentOffset.y
+                  scrollInfo.current.offset = e.nativeEvent.contentOffset?.y ?? 0
                   updateFades()
                 }}
                 onContentSizeChange={(e) => {
@@ -632,6 +660,7 @@ export function Composer({
       </Animated.View>
     </Animated.View>
   )
+  const row = <GestureDetector gesture={guard}>{rowBody}</GestureDetector>
 
   return (
     // The accessory sits in the dock's own layout: iOS ignores touches on children drawn

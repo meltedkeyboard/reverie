@@ -17,6 +17,7 @@ import {
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
 import { useAbortable } from '@/hooks/util/useAbortable'
+import { takeMessages } from '@/lib/chat/messageCache'
 import * as Haptics from '@/lib/ui/haptics'
 import { suggestTitle } from '@/lib/core/titles'
 
@@ -53,13 +54,17 @@ export function useConversation(chat: Chat, speakerOf: (message: Message) => str
   const store = useMemo(() => dbStore(db, chatId), [db, chatId])
   const storeRef = useRef(store)
   storeRef.current = store
-  const [messages, setMessagesState] = useState<Message[]>([])
-  const [loaded, setLoaded] = useState(false)
+  // Messages read ahead (a chat picked in the drawer) make the first render the full one;
+  // the caller then skips its own first read (`primed`).
+  const [primedRows] = useState(() => takeMessages(db, chatId))
+  const primed = useRef(primedRows !== null)
+  const [messages, setMessagesState] = useState<Message[]>(primedRows ?? [])
+  const [loaded, setLoaded] = useState(primedRows !== null)
   const [error, setError] = useState<string | null>(null)
   const [title, setTitleState] = useState(chat.title)
   const [naming, setNaming] = useState(false)
 
-  const messagesRef = useRef<Message[]>([])
+  const messagesRef = useRef<Message[]>(primedRows ?? [])
   const task = useAbortable()
   const discarded = useRef(new WeakSet<AbortController>())
   const titleRef = useRef(chat.title)
@@ -144,6 +149,7 @@ export function useConversation(chat: Chat, speakerOf: (message: Message) => str
     setMessages,
     loaded,
     setLoaded,
+    primed,
     error,
     setError,
     title,

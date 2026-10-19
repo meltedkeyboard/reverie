@@ -419,9 +419,9 @@
   "composer.movingTooBig": "Эта картинка больше {{mb}} МБ, она отправится неподвижной",
   "composer.attachFailedTitle": "Не удалось прикрепить фото",
 
-  "chatsList.emptyTitle": "Чатов пока нет",
-  "chatsList.emptyText": "С одним персонажем можно вести сколько угодно историй",
-  "chatsList.startChat": "Начать чат",
+  "chatDrawer.open": "Чаты",
+  "chatDrawer.close": "Вернуться к чату",
+  "chatDrawer.newChat": "Новый чат",
 
   "attach.choosePhoto": "Выбрать фото",
   "attach.recent": "Недавняя картинка",
