@@ -135,7 +135,7 @@ export default function RoomsScreen() {
         renderItem={({ item: room }) => (
           <RoomCard
             room={room}
-            onOpen={() => router.push(`/rooms/${room.id}`)}
+            onOpen={() => router.push(`/chat/latest?room=${room.id}`)}
             onDelete={() => confirmDelete(room)}
             menu={roomMenu(room)}
             fillHeight={fillHeight}

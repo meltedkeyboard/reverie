@@ -158,7 +158,7 @@ export default function RoomEditorScreen() {
         members
       )
       bgSlot.settle(nextBackground)
-      if (isNew) router.replace(`/rooms/${roomId}`)
+      if (isNew) router.replace(`/chat/latest?room=${roomId}`)
       else router.back()
     } catch (err) {
       setSaving(false)

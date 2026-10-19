@@ -1,7 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -16,8 +16,22 @@ import { GlassButton, GlassSurface } from '@/components/chrome/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { MessageRow, type RowMessage } from '@/components/chat/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
-import { RoomView } from '@/components/cast/RoomView'
+import { AvatarStack } from '@/components/cast/AvatarStack'
+import { RoomController, RoomIntro, useSceneOf } from '@/components/cast/RoomController'
 import { ChatThread } from '@/components/chat/thread/ChatThread'
+import {
+  createChatOf,
+  EMPTY_CONFIG,
+  EMPTY_THREAD,
+  latestChatOf,
+  lookOf,
+  noop,
+  regenerableOf,
+  type ChromeData,
+  type Owner,
+  type RowConfig,
+  type ThreadData,
+} from '@/components/chat/thread/screen'
 import { createStore, useStore, type Store } from '@/components/chat/thread/store'
 import { ShimmerText } from '@/components/visuals/ShimmerText'
 import { getCharacter, type Character } from '@/db/characters'
@@ -25,9 +39,9 @@ import { createChat, getChat, getLatestChatId, type Chat } from '@/db/chats'
 import { setContinueHidden, setLastOpened } from '@/db/prefs/continue'
 import { newMessage, type Message } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
-import { createRoomChat, getRoom, listRoomMembers, type Room, type RoomMember } from '@/db/rooms'
+import { createRoomChat, getLatestRoomChatId, getRoom, listRoomMembers } from '@/db/rooms'
 import { useAside } from '@/hooks/chat/useAside'
-import { regenerateTargetAt, useChat } from '@/hooks/chat/useChat'
+import { useChat } from '@/hooks/chat/useChat'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useChatSwitches } from '@/hooks/util/useStoredFlag'
@@ -35,22 +49,19 @@ import { useSuggestion } from '@/hooks/chat/useSuggestion'
 import { useTranslation } from '@/i18n'
 import { characterScene } from '@/lib/chat/aside'
 import { prefetchMessages } from '@/lib/chat/messageCache'
-import type { MessageAction } from '@/lib/chat/messageActions'
 import { formatWhen } from '@/lib/core/format'
 import * as Haptics from '@/lib/ui/haptics'
 import { showToastOnce } from '@/lib/ui/toast'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { FILL, fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
-type Loaded =
-  | { kind: 'character'; chat: Chat; character: Character }
-  | { kind: 'room'; chat: Chat; room: Room; members: RoomMember[] }
+type Loaded = { chat: Chat; owner: Owner }
 
 export default function ChatScreen() {
   // /chat/new?character=ID (or ?room=ID for a scene) creates the chat on arrival. A
   // button can then be a plain Link with a fixed address, which is what the zoom
   // transition needs. /chat/latest?character=ID is where a character opens: the chat
-  // written in last, or a new one when it has none.
+  // written in last, or a new one when it has none; /chat/latest?room=ID, a room.
   const { id, character: characterParam, room: roomParam, message: messageParam } = useLocalSearchParams<{
     id: string
     character?: string
@@ -70,11 +81,15 @@ export default function ChatScreen() {
     useCallback(() => {
       ;(async () => {
         let chatId = Number(id)
-        if (id === 'new' && roomParam) {
+        if ((id === 'new' || id === 'latest') && roomParam) {
           const room = await getRoom(db, Number(roomParam))
           if (!room) return router.back()
-          created.current ??= createRoomChat(db, room)
-          chatId = await created.current
+          const latest = id === 'latest' ? await getLatestRoomChatId(db, room.id) : null
+          if (latest) chatId = latest
+          else {
+            created.current ??= createRoomChat(db, room)
+            chatId = await created.current
+          }
         } else if (id === 'new' || id === 'latest') {
           const owner = await getCharacter(db, Number(characterParam))
           if (!owner) return router.back()
@@ -90,16 +105,16 @@ export default function ChatScreen() {
           // Re-read on every focus: the room or its cast may have been edited meanwhile.
           const room = await getRoom(db, chat.roomId)
           if (!room) return router.back()
-          setLoaded({ kind: 'room', chat, room, members: await listRoomMembers(db, room.id) })
+          setLoaded({ chat, owner: { kind: 'room', room, members: await listRoomMembers(db, room.id) } })
           setContinueHidden(db, 'room', false)
           setLastOpened(db, 'room', chat.id)
-          if (id === 'new') router.setParams({ id: String(chatId), room: undefined })
+          if (id === 'new' || id === 'latest') router.setParams({ id: String(chatId), room: undefined })
           return
         }
         const character = chat?.characterId ? await getCharacter(db, chat.characterId) : null
         if (chat && character) {
           // Re-read on every focus as well: the character may have been edited.
-          setLoaded({ kind: 'character', chat, character })
+          setLoaded({ chat, owner: { kind: 'character', character } })
           // A continue button swiped away on the home screen comes back once a chat opens.
           setContinueHidden(db, 'character', false)
           setLastOpened(db, 'character', chat.id)
@@ -111,14 +126,12 @@ export default function ChatScreen() {
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: colors.bg }} />
   const focusMessageId = messageParam ? Number(messageParam) : null
-  if (loaded.kind === 'room') {
-    return <RoomView chat={loaded.chat} room={loaded.room} members={loaded.members} focusMessageId={focusMessageId} />
-  }
+  const { owner } = loaded
   return (
-    <CharacterChats
-      key={loaded.character.id}
+    <Chats
+      key={owner.kind === 'character' ? `character:${owner.character.id}` : `room:${owner.room.id}`}
       start={loaded.chat}
-      character={loaded.character}
+      owner={owner}
       focusMessageId={focusMessageId}
       // The address catches up with a switch made on the screen once it is over. A message
       // it asked for belongs to the chat it was opened with, so it goes.
@@ -127,89 +140,56 @@ export default function ChatScreen() {
   )
 }
 
-// What a message row needs beyond its message.
-type RowConfig = {
-  regenerable: ReadonlySet<number>
-  locked: boolean
-  onAction: (message: RowMessage, action: MessageAction) => void
-  onSelectVariant: (id: number, variant: number) => void
-  bubbleOpacity: number
-}
-
-// What one of the two threads shows: a chat's rows, from the chat's controller once it is
-// the one on screen, or straight from the database while it is laid out ahead.
-type ThreadData = {
-  chat: Chat | null
-  rows: RowMessage[]
-  loaded: boolean
-  config: RowConfig
-  error: string | null
-  onRetry: () => void
-  focusId: number | null
-}
-
-// What the controller of the chat on screen hands the header and the composer.
-type ChromeData = {
-  chatId: number
-  title: string | null
-  naming: boolean
-  fresh: boolean
-  chatMenu: MenuItem[]
-  asideOpen: boolean
-  toggleAside: () => void
-  composer: Omit<React.ComponentProps<typeof Composer>, 'height' | 'top' | 'resetKey'>
-}
-
-const noop = () => {}
-
-const EMPTY_CONFIG: RowConfig = {
-  regenerable: new Set(),
-  locked: false,
-  onAction: noop,
-  onSelectVariant: noop,
-  bubbleOpacity: 1,
-}
-
-const EMPTY_THREAD: ThreadData = { chat: null, rows: [], loaded: false, config: EMPTY_CONFIG, error: null, onRetry: noop, focusId: null }
-
-const regenerableOf = (messages: Message[]) =>
-  new Set(messages.filter((_, i) => regenerateTargetAt(messages, i)).map((m) => m.id))
-
 // A chat laid out ahead, as it will look once it is on screen: its actions only answer
 // once its controller has taken over, which is as it comes on screen.
-const aheadOf = (chat: Chat, messages: Message[], bubbleOpacity: number): ThreadData => ({
+const aheadOf = (chat: Chat, messages: Message[], look: Look, owner: Owner): ThreadData => ({
   chat,
   rows: messages,
   loaded: true,
-  config: { ...EMPTY_CONFIG, regenerable: regenerableOf(messages), bubbleOpacity },
+  config: { ...EMPTY_CONFIG, ...look, regenerable: regenerableOf(owner, messages) },
   error: null,
   onRetry: noop,
   focusId: null,
 })
 
+// How the rows of an owner look whatever their chat: the bubbles over its picture, and in
+// a room who said each line.
+type Look = Pick<RowConfig, 'bubbleOpacity' | 'sceneOf'>
+
 // How far aside the thread not on screen waits: moved, not faded, as Liquid Glass does not
 // render under a parent with opacity.
 const PARK = 100_000
 
-type CharacterChatsProps = {
+type ChatsProps = {
   start: Chat
-  character: Character
+  owner: Owner
   focusMessageId: number | null
   // A switch made on the screen is over: the address can follow.
   onShown: (chatId: number) => void
 }
 
-// The chats of one character on one screen. The screen keeps two threads, one on screen
-// and one behind it, and turns from one to the other on the UI thread: a chat picked in
-// the drawer is laid out in the thread behind while the finger is still down, so the tap
-// only swaps the two, and nothing is laid out while the chat slides back. The header and
-// the composer are made once and only take the chat on screen; its logic (`useChat`) lives
-// in `ChatController`, which holds no views, so starting it for another chat is cheap.
-function CharacterChats({ start, character, focusMessageId, onShown }: CharacterChatsProps) {
+// The chats of one character, or the scenes of one room, on one screen. The screen keeps
+// two threads, one on screen and one behind it, and turns from one to the other on the UI
+// thread: a chat picked in the drawer is laid out in the thread behind while the finger is
+// still down, so the tap only swaps the two, and nothing is laid out while the chat slides
+// back. The header and the composer are made once and only take the chat on screen; its
+// logic (`useChat`, `useRoom`) lives in `ChatController` or `RoomController`, which hold no
+// views of the thread, so starting one for another chat is cheap.
+function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
   const db = useDatabase()
   const styles = useStyles(createStyles)
   const wide = useLayoutMode() === 'wide'
-  const bubbleOpacity = bubbleOpacityOf(character)
+  // A room's controller changes it as people walk in and out or the floor is switched;
+  // coming back to the screen reads it afresh.
+  const [owner, setOwner] = useState(given)
+  useEffect(() => setOwner(given), [given])
+  const ownerRef = useRef(owner)
+  ownerRef.current = owner
+  const bubbleOpacity = bubbleOpacityOf(lookOf(owner))
+  const sceneOf = useSceneOf(owner.kind === 'room' ? owner.members : null)
+  const look = useMemo<Look>(() => ({ bubbleOpacity, sceneOf }), [bubbleOpacity, sceneOf])
+  const lookRef = useRef(look)
+  lookRef.current = look
   const composerHeight = useSharedValue(0)
   const composerTop = useSharedValue(0)
 
@@ -241,8 +221,8 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
     (chat: Chat, thread: number) => {
       setActive({ chat, thread })
       // A continue button swiped away on the home screen comes back once a chat opens.
-      setContinueHidden(db, 'character', false)
-      setLastOpened(db, 'character', chat.id)
+      setContinueHidden(db, ownerRef.current.kind, false)
+      setLastOpened(db, ownerRef.current.kind, chat.id)
       unannounced.current = chat.id
     },
     [db]
@@ -273,9 +253,9 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
       staging.current = chat.id
       const messages = await prefetchMessages(db, chat.id).catch(() => [])
       if (staging.current !== chat.id) return
-      threads[thread].set(aheadOf(chat, messages, bubbleOpacity))
+      threads[thread].set(aheadOf(chat, messages, lookRef.current, ownerRef.current))
     },
-    [db, threads, ready, bubbleOpacity]
+    [db, threads, ready]
   )
 
   // A thread has laid its chat out.
@@ -342,18 +322,18 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
   }, [announce])
 
   const startNew = useCallback(async () => {
-    const chat = await getChat(db, await createChat(db, character))
+    const chat = await getChat(db, await createChatOf(db, ownerRef.current))
     if (chat) show(chat)
-  }, [db, character, show])
+  }, [db, show])
   // A deleted chat gives way to the one written in last, or to a new one.
   const replaceDeleted = useCallback(async () => {
-    const next = await getLatestChatId(db, character.id)
+    const next = await latestChatOf(db, ownerRef.current)
     const chat = next ? await getChat(db, next) : null
     if (chat) show(chat)
     else startNew()
-  }, [db, character.id, show, startNew])
+  }, [db, show, startNew])
 
-  // The address may name another chat of the character (the wide layout's sidebar).
+  // The address may name another chat of the owner (the wide layout's sidebar).
   const startId = useRef(start.id)
   useEffect(() => {
     if (startId.current === start.id) return
@@ -371,7 +351,7 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
       const other = threads[1 - activeRef.current.thread]
       if (!shown.loaded || other.get().chat) return
       warmed.current = true
-      other.set({ ...shown, config: EMPTY_CONFIG })
+      other.set({ ...shown, config: { ...EMPTY_CONFIG, ...lookRef.current, regenerable: shown.config.regenerable } })
     }, WARM_DELAY)
     return () => clearTimeout(timer)
   })
@@ -380,7 +360,7 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
 
   return (
     <ChatDrawer
-      character={character}
+      owner={owner}
       chatId={active.chat.id}
       enabled={!wide}
       onStage={stage}
@@ -391,7 +371,7 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
       onClosed={onClosed}
     >
       <View style={styles.screen}>
-        <ChatSurface owner={character} />
+        <ChatSurface owner={lookOf(owner)} />
         {[0, 1].map((thread) => (
           <ThreadSurface
             key={thread}
@@ -401,7 +381,7 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
             onScreen={active.thread === thread}
             frozen={frozen[thread]}
             listRef={lists[thread]}
-            character={character}
+            owner={owner}
             composerHeight={composerHeight}
             onLaidOut={laidOut}
             onAwayChange={(value) => {
@@ -412,24 +392,41 @@ function CharacterChats({ start, character, focusMessageId, onShown }: Character
         <ChatChrome
           store={chrome}
           away={away}
-          character={character}
+          owner={owner}
           composerHeight={composerHeight}
           composerTop={composerTop}
           onJump={() => lists[activeRef.current.thread].current?.jumpToNewest()}
           onNewChat={startNew}
         />
       </View>
-      <ChatController
-        key={active.chat.id}
-        chat={active.chat}
-        character={character}
-        thread={threads[active.thread]}
-        chrome={chrome}
-        focusMessageId={active.chat.id === start.id ? focusMessageId : null}
-        composerHeight={composerHeight}
-        scrollToNewest={scrollToNewest}
-        onDeleted={replaceDeleted}
-      />
+      {owner.kind === 'character' ? (
+        <ChatController
+          key={active.chat.id}
+          chat={active.chat}
+          character={owner.character}
+          thread={threads[active.thread]}
+          chrome={chrome}
+          focusMessageId={active.chat.id === start.id ? focusMessageId : null}
+          composerHeight={composerHeight}
+          scrollToNewest={scrollToNewest}
+          onDeleted={replaceDeleted}
+        />
+      ) : (
+        <RoomController
+          key={active.chat.id}
+          chat={active.chat}
+          room={owner.room}
+          members={owner.members}
+          onRoomChange={(room) => setOwner((o) => (o.kind === 'room' ? { ...o, room } : o))}
+          onMembersChange={(members) => setOwner((o) => (o.kind === 'room' ? { ...o, members } : o))}
+          thread={threads[active.thread]}
+          chrome={chrome}
+          focusMessageId={active.chat.id === start.id ? focusMessageId : null}
+          composerHeight={composerHeight}
+          scrollToNewest={scrollToNewest}
+          onDeleted={replaceDeleted}
+        />
+      )}
     </ChatDrawer>
   )
 }
@@ -444,7 +441,7 @@ type ThreadSurfaceProps = {
   onScreen: boolean
   frozen: SharedValue<boolean>
   listRef: RefObject<ConversationHandle | null>
-  character: Character
+  owner: Owner
   composerHeight: SharedValue<number>
   onLaidOut: (thread: number, chatId: number) => void
   onAwayChange: (away: boolean) => void
@@ -452,7 +449,7 @@ type ThreadSurfaceProps = {
 
 // One of the two threads: the messages of a chat over the screen's background, moved
 // aside while the other one is on screen.
-function ThreadSurface({ index, store, front, onScreen, frozen, listRef, character, composerHeight, onLaidOut, onAwayChange }: ThreadSurfaceProps) {
+function ThreadSurface({ index, store, front, onScreen, frozen, listRef, owner, composerHeight, onLaidOut, onAwayChange }: ThreadSurfaceProps) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
@@ -480,6 +477,7 @@ function ThreadSurface({ index, store, front, onScreen, frozen, listRef, charact
         onAction={config.onAction}
         onSelectVariant={config.onSelectVariant}
         bubbleOpacity={config.bubbleOpacity}
+        scene={config.sceneOf?.(row)}
         hydrate={onScreen ? 'go' : 'wait'}
       />
     ),
@@ -496,8 +494,8 @@ function ThreadSurface({ index, store, front, onScreen, frozen, listRef, charact
   const empty = loaded && rows.length === 0
   // Kept while the chat is the same: a new intro is a new first item of the list.
   const intro = useMemo(
-    () => (chat && loaded && !empty ? <Intro character={character} chat={chat} /> : null),
-    [chat, loaded, empty, character]
+    () => (chat && loaded && !empty ? <Intro owner={owner} chat={chat} /> : null),
+    [chat, loaded, empty, owner]
   )
   return (
     <Animated.View
@@ -521,9 +519,18 @@ function ThreadSurface({ index, store, front, onScreen, frozen, listRef, charact
         onLanded={landed}
       />
       {chat && empty ? (
-        <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="none">
-          <Intro character={character} chat={chat} hint={t('chat.emptyHint')} />
-        </Animated.View>
+        owner.kind === 'character' ? (
+          <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="none">
+            <Intro owner={owner} chat={chat} hint={t('chat.emptyHint')} />
+          </Animated.View>
+        ) : (
+          // A room's scenario can run long, so its intro scrolls.
+          <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="box-none">
+            <ScrollView style={styles.emptyScroll} contentContainerStyle={styles.emptyContent} showsVerticalScrollIndicator={false}>
+              <Intro owner={owner} chat={chat} hint={owner.members.length ? t('room.emptyHint') : t('room.noMembersHint')} />
+            </ScrollView>
+          </Animated.View>
+        )
       ) : null}
     </Animated.View>
   )
@@ -532,7 +539,7 @@ function ThreadSurface({ index, store, front, onScreen, frozen, listRef, charact
 type ChatChromeProps = {
   store: Store<ChromeData | null>
   away: Store<boolean>
-  character: Character
+  owner: Owner
   composerHeight: SharedValue<number>
   composerTop: SharedValue<number>
   onJump: () => void
@@ -541,8 +548,7 @@ type ChatChromeProps = {
 
 // The header and the composer of the screen, made once: another chat only changes what
 // they show, so their glass is never made anew.
-function ChatChrome({ store, away, character, composerHeight, composerTop, onJump, onNewChat }: ChatChromeProps) {
-  const colors = useColors()
+function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, onNewChat }: ChatChromeProps) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   // The way out of a chat is the drawer's list; in a wide window, the sidebar.
@@ -572,34 +578,30 @@ function ChatChrome({ store, away, character, composerHeight, composerTop, onJum
           </View>
         }
       >
-        <View style={styles.headerWho}>
-          {/* The photo is a button of its own, as in Telegram: it opens full screen, and
-              the pill beside it keeps the menu. */}
-          <GlassSurface interactive style={styles.photo}>
-            <Avatar name={character.name} file={character.avatar} size={38} />
-          </GlassSurface>
-          {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
-              of the pill. */}
-          <NativeMenu items={data?.chatMenu ?? []} style={styles.whoPress} glassRadius={22}>
-            <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
-              <View style={styles.whoText}>
-                <View style={styles.nameRow}>
-                  <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
-                    {character.name}
-                  </Text>
-                  <Icon name="chevron-down" size={14} color={colors.textMuted} />
-                </View>
-                {data?.naming ? (
-                  <ShimmerText maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} text={data.title ?? t('chat.namingInProgress')} />
-                ) : data?.title ? (
-                  <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} numberOfLines={1}>
-                    {data.title}
-                  </Text>
-                ) : null}
-              </View>
+        {owner.kind === 'character' ? (
+          <View style={styles.headerWho}>
+            {/* The photo is a button of its own, as in Telegram: it opens full screen, and
+                the pill beside it keeps the menu. */}
+            <GlassSurface interactive style={styles.photo}>
+              <Avatar name={owner.character.name} file={owner.character.avatar} size={38} />
+            </GlassSurface>
+            {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
+                of the pill. */}
+            <NativeMenu items={data?.chatMenu ?? []} style={styles.whoPress} glassRadius={22}>
+              <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
+                <WhoText name={owner.character.name} data={data} />
+              </PillSurface>
+            </NativeMenu>
+          </View>
+        ) : (
+          // The cast is the menu's trigger, so their photos open from the menu.
+          <NativeMenu items={data?.chatMenu ?? []} style={styles.roomPress} glassRadius={22}>
+            <PillSurface style={[styles.roomWho, liquidGlass && styles.roomPill]}>
+              <AvatarStack cast={owner.members.map((m) => ({ name: m.character.name, avatar: m.character.avatar }))} size={28} viewable={false} />
+              <WhoText name={owner.room.name} data={data} />
             </PillSurface>
           </NativeMenu>
-        </View>
+        )}
       </GlassHeader>
 
       {data ? (
@@ -686,7 +688,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   // the context out from under it, so only reading actions stay available then.
   const locked = !idle || editingRow !== null
 
-  const regenerable = useMemo(() => regenerableOf(messages), [messages])
+  const regenerable = useMemo(() => regenerableOf({ kind: 'character', character }, messages), [character, messages])
 
   // A regenerated reply streams in place of the old one; a new reply streams at the end.
   const rows = useMemo(() => {
@@ -801,9 +803,37 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   return null
 }
 
-function Intro({ character, chat, hint }: { character: Character; chat: Chat; hint?: string }) {
+// The name in the header's pill, with the chat's title under it, shimmering while it is named.
+function WhoText({ name, data }: { name: string; data: ChromeData | null }) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  return (
+    <View style={styles.whoText}>
+      <View style={styles.nameRow}>
+        <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
+          {name}
+        </Text>
+        <Icon name="chevron-down" size={14} color={colors.textMuted} />
+      </View>
+      {data?.naming ? (
+        <ShimmerText maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} text={data.title ?? t('chat.namingInProgress')} />
+      ) : data?.title ? (
+        <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.subtitle} numberOfLines={1}>
+          {data.title}
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
+// Above the first message, and in the middle of an empty chat: the character's photo and
+// name, or the room's cast, name and scenario.
+function Intro({ owner, chat, hint }: { owner: Owner; chat: Chat; hint?: string }) {
   const styles = useStyles(createStyles)
   const { locale } = useTranslation()
+  if (owner.kind === 'room') return <RoomIntro room={owner.room} members={owner.members} hint={hint} />
+  const { character } = owner
   return (
     <View style={styles.intro}>
       <Avatar name={character.name} file={character.avatar} size={72} />
@@ -824,6 +854,9 @@ const createStyles = (colors: Colors) =>
   who: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   whoPill: { borderRadius: 22, paddingVertical: 4, paddingHorizontal: 16 },
   whoText: { flexShrink: 1 },
+  roomPress: { alignSelf: 'flex-start', maxWidth: '100%' },
+  roomWho: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  roomPill: { borderRadius: 22, paddingVertical: 4, paddingLeft: 6, paddingRight: 14 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
@@ -832,4 +865,6 @@ const createStyles = (colors: Colors) =>
   introName: { color: colors.text, fontFamily: fonts.prose, fontSize: 22, marginTop: 12 },
   introMeta: { color: colors.textFaint, fontSize: 14, marginTop: 4, textAlign: 'center' },
   empty: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+  emptyScroll: { alignSelf: 'stretch' },
+  emptyContent: { flexGrow: 1, justifyContent: 'center' },
 })

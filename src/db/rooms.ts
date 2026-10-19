@@ -257,6 +257,18 @@ export function listRoomChats(db: SQLiteDatabase, roomId: number) {
   )
 }
 
+// The scene of a room written in last, which opening the room lands on.
+export async function getLatestRoomChatId(db: SQLiteDatabase, roomId: number) {
+  const row = await db.getFirstAsync<{ id: number }>(
+    `SELECT ch.id FROM chats ch
+     WHERE ch.room_id = ?
+     ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.chat_id = ch.id), ch.created_at) DESC, ch.id DESC
+     LIMIT 1`,
+    roomId
+  )
+  return row?.id ?? null
+}
+
 // The opening is stored as the narrator's line on the assistant side, so a scene the
 // user never wrote in still counts as untouched and is pruned like an empty chat.
 export async function createRoomChat(db: SQLiteDatabase, room: Room) {

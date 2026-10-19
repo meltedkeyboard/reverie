@@ -33,7 +33,7 @@ type Props = {
   members: RoomMember[]
   addressees: number[]
   narration: boolean
-  // Picking someone or the whole room turns the narrator off, see RoomView.
+  // Picking someone or the whole room turns the narrator off, see RoomController.
   onChangeAddressees: (ids: number[]) => void
   onNarrate: () => void
   whisper: boolean

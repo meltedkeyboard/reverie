@@ -17,6 +17,7 @@ export type MenuItem = {
 }
 
 type Props = {
+  title?: string
   items: MenuItem[]
   children: ReactNode
   style?: StyleProp<ViewStyle>
@@ -51,13 +52,13 @@ type SymbolName = NonNullable<ComponentProps<NonNullable<typeof swiftUI>['ui']['
 // The trigger is drawn by React Native, so it matches the rest of the screen exactly.
 // On iOS it is hosted inside the label of a SwiftUI menu, which makes the system menu
 // grow out of the trigger itself. Elsewhere the tap opens the action sheet.
-export function NativeMenu({ items, children, style, disabled = false, glassRadius }: Props) {
+export function NativeMenu({ title, items, children, style, disabled = false, glassRadius }: Props) {
   const { scheme } = useTheme()
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
 
   if (!swiftUI) {
     return (
-      <TapTrigger onPress={() => showSheet(undefined, items)} disabled={disabled} style={style}>
+      <TapTrigger onPress={() => showSheet(title, items)} disabled={disabled} style={style}>
         {children}
       </TapTrigger>
     )
@@ -68,7 +69,7 @@ export function NativeMenu({ items, children, style, disabled = false, glassRadi
     setSize((prev) => (prev?.width === width && prev.height === height ? prev : { width, height }))
   }
 
-  const { Host, Menu, Button } = swiftUI.ui
+  const { Host, Menu, Button, Section } = swiftUI.ui
   const m = swiftUI.modifiers
   // Keyed by place, not by label: two items may read the same (rooms with one name).
   const toView = (item: MenuItem, i: number): ReactNode =>
@@ -86,6 +87,7 @@ export function NativeMenu({ items, children, style, disabled = false, glassRadi
       />
     )
   const buttons = items.map(toView)
+  const content = title ? <Section title={title}>{buttons}</Section> : buttons
 
   const { Group, RNHostView } = swiftUI.ui
   const glass = glassRadius !== undefined && liquidGlass
@@ -122,7 +124,7 @@ export function NativeMenu({ items, children, style, disabled = false, glassRadi
               </Group>
             }
           >
-            {buttons}
+            {content}
           </Menu>
         </Host>
       ) : null}
