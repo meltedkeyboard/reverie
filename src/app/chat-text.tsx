@@ -56,11 +56,19 @@ function snap(value: number) {
 }
 
 const THEME_TILE_WIDTH = 80
-const THEME_TILE_HEIGHT = 104
+const THEME_TILE_HEIGHT = 80
 
-function ThemePreviewTile({ value, selected }: { value: ThemePreference; selected: boolean }) {
-  const colors = useColors()
+function ThemePreviewTile({
+  value,
+  selected,
+  font,
+}: {
+  value: ThemePreference
+  selected: boolean
+  font: string
+}) {
   const styles = useStyles(createStyles)
+  const chatFontFamily = font === SYSTEM_FONT ? undefined : font
 
   if (value === 'system') {
     const light = paletteOf('light')
@@ -68,31 +76,18 @@ function ThemePreviewTile({ value, selected }: { value: ThemePreference; selecte
     return (
       <View style={[styles.themeTile, selected && styles.themeTileSelected]}>
         <View style={styles.splitRow}>
-          <View style={[styles.splitHalf, { backgroundColor: light.bg }]}>
-            <View style={[styles.miniHeader, { backgroundColor: light.surface, borderBottomColor: light.border }]}>
-              <View style={[styles.miniAvatar, { backgroundColor: light.accent }]} />
-              <View style={[styles.miniBar, { backgroundColor: light.textMuted, width: 14 }]} />
-            </View>
-            <View style={styles.miniChatHalf}>
-              <View style={[styles.miniBubbleLeft, { backgroundColor: light.surfaceRaised }]}>
-                <View style={[styles.miniLine, { backgroundColor: light.textMuted, width: 18 }]} />
-              </View>
-            </View>
+          <View style={[styles.themeTileHalfLeft, { backgroundColor: light.bg }]}>
+            <Text style={[styles.themeTileFontSample, { color: light.text, fontFamily: chatFontFamily }]}>
+              A
+            </Text>
+            <View style={[styles.themeAccentDotLeft, { backgroundColor: light.accent }]} />
           </View>
-          <View style={[styles.splitHalf, { backgroundColor: dark.bg }]}>
-            <View style={[styles.miniHeader, { backgroundColor: dark.surface, borderBottomColor: dark.border }]}>
-              <View style={[styles.miniAvatar, { backgroundColor: dark.accent }]} />
-              <View style={[styles.miniBar, { backgroundColor: dark.textMuted, width: 14 }]} />
-            </View>
-            <View style={styles.miniChatHalf}>
-              <View style={[styles.miniBubbleRight, { backgroundColor: dark.bubble }]}>
-                <View style={[styles.miniLine, { backgroundColor: dark.text, width: 16 }]} />
-              </View>
-            </View>
+          <View style={[styles.themeTileHalfRight, { backgroundColor: dark.bg }]}>
+            <Text style={[styles.themeTileFontSample, { color: dark.text, fontFamily: chatFontFamily }]}>
+              a
+            </Text>
+            <View style={[styles.themeAccentDotRight, { backgroundColor: dark.accent }]} />
           </View>
-        </View>
-        <View style={styles.splitCenterBadge}>
-          <Icon name="contrast" size={12} color={colors.text} />
         </View>
       </View>
     )
@@ -101,23 +96,10 @@ function ThemePreviewTile({ value, selected }: { value: ThemePreference; selecte
   const p = paletteOf(value)
   return (
     <View style={[styles.themeTile, selected && styles.themeTileSelected, { backgroundColor: p.bg }]}>
-      <View style={[styles.miniHeader, { backgroundColor: p.surface, borderBottomColor: p.border }]}>
-        <View style={[styles.miniAvatar, { backgroundColor: p.accent }]} />
-        <View style={[styles.miniBar, { backgroundColor: p.textMuted, width: 22 }]} />
-      </View>
-      <View style={styles.miniChat}>
-        <View style={[styles.miniBubbleLeft, { backgroundColor: p.surfaceRaised }]}>
-          <View style={[styles.miniLine, { backgroundColor: p.textMuted, width: 28 }]} />
-          <View style={[styles.miniLine, { backgroundColor: p.textFaint, width: 16 }]} />
-        </View>
-        <View style={[styles.miniBubbleRight, { backgroundColor: p.bubble }]}>
-          <View style={[styles.miniLine, { backgroundColor: p.text, width: 22 }]} />
-        </View>
-      </View>
-      <View style={[styles.miniComposer, { backgroundColor: p.surface, borderTopColor: p.border }]}>
-        <View style={[styles.miniField, { backgroundColor: p.surfaceRaised }]} />
-        <View style={[styles.miniSend, { backgroundColor: p.accent }]} />
-      </View>
+      <Text style={[styles.themeTileFontSample, { color: p.text, fontFamily: chatFontFamily }]}>
+        Aa
+      </Text>
+      <View style={[styles.themeAccentDot, { backgroundColor: p.accent }]} />
     </View>
   )
 }
@@ -286,7 +268,7 @@ export default function ChatTextScreen() {
                   accessibilityLabel={o.label}
                   style={styles.themeTileButton}
                 >
-                  <ThemePreviewTile value={o.value} selected={selected} />
+                  <ThemePreviewTile value={o.value} selected={selected} font={font} />
                   <Text style={[styles.themeLabel, selected && styles.themeLabelSelected, selected && { color: colors.text }]} numberOfLines={2}>
                     {o.label}
                   </Text>
@@ -528,11 +510,13 @@ const createStyles = (colors: Colors) =>
     themeTile: {
       width: THEME_TILE_WIDTH,
       height: THEME_TILE_HEIGHT,
-      borderRadius: 14,
+      borderRadius: 16,
       borderCurve: 'continuous',
       overflow: 'hidden',
       borderWidth: 2,
       borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     themeTileSelected: {
       borderColor: colors.accent,
@@ -546,91 +530,48 @@ const createStyles = (colors: Colors) =>
     themeLabelSelected: {
       fontWeight: '600',
     },
-    miniHeader: {
-      height: 15,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3.5,
-      paddingHorizontal: 5,
-      borderBottomWidth: StyleSheet.hairlineWidth,
+    themeTileFontSample: {
+      fontSize: 28,
+      includeFontPadding: false,
     },
-    miniAvatar: {
-      width: 7,
-      height: 7,
-      borderRadius: 3.5,
-    },
-    miniBar: {
-      height: 2.5,
-      borderRadius: 1.25,
-    },
-    miniChat: {
-      flex: 1,
-      padding: 5,
-      justifyContent: 'center',
-      gap: 5,
-    },
-    miniChatHalf: {
-      flex: 1,
-      padding: 4,
-      justifyContent: 'center',
-    },
-    miniBubbleLeft: {
-      alignSelf: 'flex-start',
+    themeAccentDot: {
+      position: 'absolute',
+      bottom: 8,
+      right: 8,
+      width: 10,
+      height: 10,
       borderRadius: 5,
-      paddingHorizontal: 4,
-      paddingVertical: 3,
-      gap: 2,
-      maxWidth: 50,
-    },
-    miniBubbleRight: {
-      alignSelf: 'flex-end',
-      borderRadius: 5,
-      paddingHorizontal: 4,
-      paddingVertical: 3,
-      maxWidth: 44,
-    },
-    miniLine: {
-      height: 2,
-      borderRadius: 1,
-    },
-    miniComposer: {
-      height: 14,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3,
-      paddingHorizontal: 4,
-      borderTopWidth: StyleSheet.hairlineWidth,
-    },
-    miniField: {
-      flex: 1,
-      height: 7,
-      borderRadius: 3.5,
-    },
-    miniSend: {
-      width: 7,
-      height: 7,
-      borderRadius: 3.5,
     },
     splitRow: {
       flex: 1,
       flexDirection: 'row',
     },
-    splitHalf: {
+    themeTileHalfLeft: {
       flex: 1,
-      overflow: 'hidden',
-    },
-    splitCenterBadge: {
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: [{ translateX: -10 }, { translateY: -10 }],
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      alignItems: 'center',
+      alignItems: 'flex-end',
       justifyContent: 'center',
-      backgroundColor: colors.surfaceRaised,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
+      paddingRight: 2,
+    },
+    themeTileHalfRight: {
+      flex: 1,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+      paddingLeft: 2,
+    },
+    themeAccentDotLeft: {
+      position: 'absolute',
+      bottom: 8,
+      left: 8,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    themeAccentDotRight: {
+      position: 'absolute',
+      bottom: 8,
+      right: 8,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
     },
   })
