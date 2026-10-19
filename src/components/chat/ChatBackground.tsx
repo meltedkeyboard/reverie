@@ -2,7 +2,7 @@ import { Image } from 'expo-image'
 import { StyleSheet, View } from 'react-native'
 
 import type { BackgroundEffect } from '@/db/characters'
-import { paletteOf, useColors } from '@/theme'
+import { FILL, paletteOf, useColors } from '@/theme'
 
 // How far each effect goes at full intensity.
 const MAX_BLUR = 40
@@ -17,16 +17,32 @@ export function ChatBackground({ uri, effect, intensity }: Props) {
   const colors = useColors()
   const dim = effect === 'dim-light' ? paletteOf('light').bg : effect === 'dim-dark' ? paletteOf('dark').bg : colors.bg
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={styles.root} pointerEvents="none">
       <Image
         source={{ uri }}
-        style={StyleSheet.absoluteFill}
+        style={styles.bleed}
         contentFit="cover"
         blurRadius={effect === 'blur' ? intensity * MAX_BLUR : 0}
       />
       {effect !== 'blur' ? (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: dim, opacity: intensity * MAX_DIM }]} />
+        <View style={[styles.bleed, { backgroundColor: dim, opacity: intensity * MAX_DIM }]} />
       ) : null}
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  root: {
+    ...FILL,
+    overflow: 'hidden',
+  },
+  // Bleed slightly past the bounds so subpixel rounding on high-DPI retina screens
+  // never leaves a 1px gap along any edge.
+  bleed: {
+    position: 'absolute',
+    top: -2,
+    bottom: -2,
+    left: -2,
+    right: -2,
+  },
+})

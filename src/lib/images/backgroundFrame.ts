@@ -14,7 +14,10 @@ export const IDENTITY: Transform = { k: 1, x: 0, y: 0 }
 // The picture at zoom 1: just large enough to leave no gap on the screen.
 export function coverSize(natural: Size, frame: Size): Size {
   const scale = Math.max(frame.width / natural.width, frame.height / natural.height)
-  return { width: natural.width * scale, height: natural.height * scale }
+  return {
+    width: Math.max(frame.width, Math.ceil(natural.width * scale)),
+    height: Math.max(frame.height, Math.ceil(natural.height * scale)),
+  }
 }
 
 // How far the picture may move each way before an edge comes into the screen.

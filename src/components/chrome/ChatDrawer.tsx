@@ -314,7 +314,10 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   const { scheme } = useTheme()
   const veil = VEIL[scheme]
   const veilStyle = useAnimatedStyle(() => ({ opacity: progress.value * veil }))
-  const outlineStyle = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [0, 0.1], [0, 1], 'clamp') }))
+  const outlineStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.1], [0, 1], 'clamp'),
+    display: progress.value > 0 ? 'flex' : 'none',
+  }))
 
   // What a tap on a row starts in JavaScript, after the UI thread has done its part.
   const pick = (id: number, shown: boolean) => {
