@@ -65,10 +65,18 @@ export function ChatThread({
   const headerHeight = useHeaderHeight()
   const listRef = useRef<FlashListRef<Item>>(null)
   const inset = useRef(0)
+  const away = useRef(false)
 
-  const scrollToNewest = useCallback((animated = true) => {
-    listRef.current?.scrollToEnd({ animated })
-  }, [])
+  const scrollToNewest = useCallback(
+    (animated = true) => {
+      listRef.current?.scrollToEnd({ animated })
+      if (away.current) {
+        away.current = false
+        onAwayChange?.(false)
+      }
+    },
+    [onAwayChange]
+  )
 
   useImperativeHandle(ref, () => ({ scrollToNewest: () => scrollToNewest(), jumpToNewest: () => scrollToNewest() }), [scrollToNewest])
 
@@ -79,17 +87,28 @@ export function ChatThread({
   const landedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const landedRef = useRef(onLanded)
   landedRef.current = onLanded
-  const land = useCallback((key: number) => {
-    if (landedTimer.current) clearTimeout(landedTimer.current)
-    landedTimer.current = setTimeout(() => {
-      landing.current = false
-      landedRef.current?.(key)
-    }, LANDED_AFTER)
-  }, [])
+  const land = useCallback(
+    (key: number) => {
+      if (landedTimer.current) clearTimeout(landedTimer.current)
+      landedTimer.current = setTimeout(() => {
+        landing.current = false
+        if (away.current) {
+          away.current = false
+          onAwayChange?.(false)
+        }
+        landedRef.current?.(key)
+      }, LANDED_AFTER)
+    },
+    [onAwayChange]
+  )
   const shownKey = useRef(chatKey)
   if (shownKey.current !== chatKey) {
     shownKey.current = chatKey
     landing.current = true
+    if (away.current) {
+      away.current = false
+      onAwayChange?.(false)
+    }
   }
   // Lands even if the size does not change, as from one empty chat to another.
   useEffect(() => {
@@ -124,7 +143,6 @@ export function ChatThread({
     return () => cancelAnimationFrame(frame)
   }, [focusId, focusIndex])
 
-  const away = useRef(false)
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent

@@ -14,6 +14,7 @@ import type { ChromeData, RowConfig, ThreadData } from '@/components/chat/thread
 import type { Store } from '@/components/chat/thread/store'
 import { GlassSurface } from '@/components/chrome/Glass'
 import { bubbleOpacityOf } from '@/components/chrome/ChatChrome'
+import { useChatTextSettings } from '@/lib/chat/chatText'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { useOpenViewer } from '@/components/visuals/ImageLink'
 import type { Chat } from '@/db/chats'
@@ -212,7 +213,8 @@ export function RoomController({
   const onAction = useMessageActions({ regenerate, removeMessage, edit: setEditingRow })
   const { confirmDelete, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
-  const bubbleOpacity = bubbleOpacityOf(room)
+  const { pattern, wallpaper } = useChatTextSettings()
+  const bubbleOpacity = bubbleOpacityOf(room, wallpaper, pattern)
   const config = useMemo<RowConfig>(
     () => ({ regenerable, locked, onAction, onSelectVariant: selectVariant, bubbleOpacity, sceneOf }),
     [regenerable, locked, onAction, selectVariant, bubbleOpacity, sceneOf]

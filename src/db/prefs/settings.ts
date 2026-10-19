@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
+import type { BackgroundEffect } from '@/db/characters'
+
 import {
   CHAT_MESSAGES,
   CONTEXT_MODES,
@@ -216,11 +218,78 @@ export const saveChatUserMarkdown = chatUserMarkdown.save
 // The pattern behind a chat that has no picture of its own, from the Penpot page
 // "Background Pattern"; 'none' is the plain theme background.
 export const CHAT_PATTERNS = ['none', 'stars', 'two-stars', 'big-star', 'diagonal', 'scattered', 'rings', 'rings-centered', 'dots'] as const
-export type ChatPatternId = (typeof CHAT_PATTERNS)[number]
+export type ChatPatternId = (typeof CHAT_PATTERNS)[number] | 'custom'
 
-const chatPattern = defineChoice('chat_pattern', CHAT_PATTERNS, 'none')
+const chatPattern = defineChoice('chat_pattern', [...CHAT_PATTERNS, 'custom'] as const, 'none')
 export const loadChatPattern = chatPattern.load
 export const saveChatPattern = chatPattern.save
+
+export type ChatWallpaper = {
+  file: string | null
+  original: string | null
+  crop: string | null
+  effect: BackgroundEffect
+  intensity: number
+  bubbleTransparency: number
+}
+
+export const DEFAULT_CHAT_WALLPAPER: ChatWallpaper = {
+  file: null,
+  original: null,
+  crop: null,
+  effect: 'blur',
+  intensity: 0.5,
+  bubbleTransparency: 0.3,
+}
+
+const CHAT_WALLPAPER_KEYS = {
+  file: 'chat_wallpaper',
+  original: 'chat_wallpaper_original',
+  crop: 'chat_wallpaper_crop',
+  effect: 'chat_wallpaper_effect',
+  intensity: 'chat_wallpaper_intensity',
+  bubbleTransparency: 'chat_wallpaper_bubble_transparency',
+} as const
+
+export async function loadChatWallpaper(db: SQLiteDatabase): Promise<ChatWallpaper | null> {
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    `SELECT key, value FROM app_settings WHERE key IN ('${Object.values(CHAT_WALLPAPER_KEYS).join("', '")}')`
+  )
+  const map = new Map(rows.map((r) => [r.key, r.value]))
+  const file = map.get(CHAT_WALLPAPER_KEYS.file)
+  if (!file) return null
+
+  const original = map.get(CHAT_WALLPAPER_KEYS.original) ?? null
+  const crop = map.get(CHAT_WALLPAPER_KEYS.crop) ?? null
+  const rawEffect = map.get(CHAT_WALLPAPER_KEYS.effect)
+  const effect: BackgroundEffect =
+    rawEffect === 'blur' || rawEffect === 'dim' || rawEffect === 'dim-light' || rawEffect === 'dim-dark'
+      ? rawEffect
+      : 'blur'
+  const rawIntensity = Number(map.get(CHAT_WALLPAPER_KEYS.intensity))
+  const intensity = Number.isFinite(rawIntensity) ? rawIntensity : 0.5
+  const rawTrans = Number(map.get(CHAT_WALLPAPER_KEYS.bubbleTransparency))
+  const bubbleTransparency = Number.isFinite(rawTrans) ? rawTrans : 0.3
+
+  return { file, original, crop, effect, intensity, bubbleTransparency }
+}
+
+export async function saveChatWallpaper(db: SQLiteDatabase, wallpaper: ChatWallpaper | null) {
+  if (!wallpaper || !wallpaper.file) {
+    for (const key of Object.values(CHAT_WALLPAPER_KEYS)) {
+      await db.runAsync('DELETE FROM app_settings WHERE key = ?', key)
+    }
+    return
+  }
+  await setSetting(db, CHAT_WALLPAPER_KEYS.file, wallpaper.file)
+  if (wallpaper.original) await setSetting(db, CHAT_WALLPAPER_KEYS.original, wallpaper.original)
+  else await db.runAsync('DELETE FROM app_settings WHERE key = ?', CHAT_WALLPAPER_KEYS.original)
+  if (wallpaper.crop) await setSetting(db, CHAT_WALLPAPER_KEYS.crop, wallpaper.crop)
+  else await db.runAsync('DELETE FROM app_settings WHERE key = ?', CHAT_WALLPAPER_KEYS.crop)
+  await setSetting(db, CHAT_WALLPAPER_KEYS.effect, wallpaper.effect)
+  await setSetting(db, CHAT_WALLPAPER_KEYS.intensity, String(wallpaper.intensity))
+  await setSetting(db, CHAT_WALLPAPER_KEYS.bubbleTransparency, String(wallpaper.bubbleTransparency))
+}
 
 export async function loadChatTextScale(db: SQLiteDatabase) {
   const value = Number(await getSetting(db, CHAT_TEXT_SCALE_KEY))

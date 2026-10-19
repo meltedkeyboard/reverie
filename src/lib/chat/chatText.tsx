@@ -9,13 +9,16 @@ import {
   loadChatTextScale,
   loadChatUserFont,
   loadChatUserMarkdown,
+  loadChatWallpaper,
   saveChatFont,
   saveChatPattern,
   saveChatTextScale,
   saveChatUserFont,
   saveChatUserMarkdown,
+  saveChatWallpaper,
   type ChatFont,
   type ChatPatternId,
+  type ChatWallpaper,
 } from '@/db/prefs/settings'
 import { createRequiredContext } from '@/lib/core/requiredContext'
 
@@ -37,6 +40,9 @@ type ChatTextValue = {
   // The pattern behind chats that have no picture of their own.
   pattern: ChatPatternId
   setPattern: (pattern: ChatPatternId) => void
+  // The custom wallpaper behind chats that have no picture of their own.
+  wallpaper: ChatWallpaper | null
+  setWallpaper: (wallpaper: ChatWallpaper | null) => void
   // How much the chat text is enlarged: 1 is the regular size.
   scale: number
   setFont: (font: ChatFont) => void
@@ -54,9 +60,11 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   const [userFont, setUserFontState] = useState(false)
   const [userMarkdown, setUserMarkdownState] = useState(false)
   const [pattern, setPatternState] = useState<ChatPatternId>('none')
+  const [wallpaper, setWallpaperState] = useState<ChatWallpaper | null>(null)
 
   useEffect(() => {
     loadChatPattern(db).then(setPatternState)
+    loadChatWallpaper(db).then(setWallpaperState)
     loadChatFont(db).then(setFontState)
     loadChatTextScale(db).then(setScaleState)
     loadChatUserFont(db).then(setUserFontState)
@@ -98,6 +106,13 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     },
     [db]
   )
+  const setWallpaper = useCallback(
+    (next: ChatWallpaper | null) => {
+      setWallpaperState(next)
+      saveChatWallpaper(db, next)
+    },
+    [db]
+  )
   const reset = useCallback(() => {
     setFont(DEFAULT_CHAT_FONT)
     setUserFont(false)
@@ -105,8 +120,36 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   }, [setFont, setScale, setUserFont])
 
   const value = useMemo(
-    () => ({ font, userFont, setUserFont, userMarkdown, setUserMarkdown, pattern, setPattern, scale, setFont, setScale, reset }),
-    [font, userFont, setUserFont, userMarkdown, setUserMarkdown, pattern, setPattern, scale, setFont, setScale, reset]
+    () => ({
+      font,
+      userFont,
+      setUserFont,
+      userMarkdown,
+      setUserMarkdown,
+      pattern,
+      setPattern,
+      wallpaper,
+      setWallpaper,
+      scale,
+      setFont,
+      setScale,
+      reset,
+    }),
+    [
+      font,
+      userFont,
+      setUserFont,
+      userMarkdown,
+      setUserMarkdown,
+      pattern,
+      setPattern,
+      wallpaper,
+      setWallpaper,
+      scale,
+      setFont,
+      setScale,
+      reset,
+    ]
   )
   return <ChatTextContext.Provider value={value}>{children}</ChatTextContext.Provider>
 }

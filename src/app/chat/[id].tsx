@@ -48,6 +48,7 @@ import { useChatSwitches } from '@/hooks/util/useStoredFlag'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
 import { useTranslation } from '@/i18n'
 import { characterScene } from '@/lib/chat/aside'
+import { useChatTextSettings } from '@/lib/chat/chatText'
 import { prefetchMessages } from '@/lib/chat/messageCache'
 import { formatWhen } from '@/lib/core/format'
 import * as Haptics from '@/lib/ui/haptics'
@@ -185,7 +186,8 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
   useEffect(() => setOwner(given), [given])
   const ownerRef = useRef(owner)
   ownerRef.current = owner
-  const bubbleOpacity = bubbleOpacityOf(lookOf(owner))
+  const { pattern, wallpaper } = useChatTextSettings()
+  const bubbleOpacity = bubbleOpacityOf(lookOf(owner), wallpaper, pattern)
   const sceneOf = useSceneOf(owner.kind === 'room' ? owner.members : null)
   const look = useMemo<Look>(() => ({ bubbleOpacity, sceneOf }), [bubbleOpacity, sceneOf])
   const lookRef = useRef(look)
@@ -219,13 +221,14 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
 
   const commit = useCallback(
     (chat: Chat, thread: number) => {
+      away.set(false)
       setActive({ chat, thread })
       // A continue button swiped away on the home screen comes back once a chat opens.
       setContinueHidden(db, ownerRef.current.kind, false)
       setLastOpened(db, ownerRef.current.kind, chat.id)
       unannounced.current = chat.id
     },
-    [db]
+    [db, away]
   )
   const announce = useCallback(() => {
     if (unannounced.current === null) return
@@ -356,7 +359,10 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
     return () => clearTimeout(timer)
   })
 
-  const scrollToNewest = useCallback(() => lists[activeRef.current.thread].current?.scrollToNewest(), [lists])
+  const scrollToNewest = useCallback(() => {
+    away.set(false)
+    lists[activeRef.current.thread].current?.scrollToNewest()
+  }, [lists, away])
 
   return (
     <ChatDrawer
@@ -557,7 +563,8 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
   const data = useStore(store)
   const awayFromEnd = useStore(away)
   const asideOpen = data?.asideOpen ?? false
-  const hasCustomBackground = Boolean(lookOf(owner).background)
+  const { pattern, wallpaper } = useChatTextSettings()
+  const hasCustomBackground = Boolean(lookOf(owner).background) || (pattern === 'custom' && Boolean(wallpaper?.file))
 
   return (
     <>
@@ -717,7 +724,8 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
   // Over a chat background the user's bubbles can be made see-through.
-  const bubbleOpacity = bubbleOpacityOf(character)
+  const { pattern, wallpaper } = useChatTextSettings()
+  const bubbleOpacity = bubbleOpacityOf(character, wallpaper, pattern)
   const config = useMemo<RowConfig>(
     () => ({ regenerable, locked, onAction, onSelectVariant: selectVariant, bubbleOpacity }),
     [regenerable, locked, onAction, selectVariant, bubbleOpacity]

@@ -52,6 +52,7 @@
   "settings.chatFont": "Appearance",
   "settings.chatFontField": "Chat font",
   "settings.chatPattern": "Chat background",
+  "chatPattern.custom": "Custom",
   "chatPattern.none": "No pattern",
   "chatPattern.stars": "Stars",
   "chatPattern.two-stars": "Two stars",

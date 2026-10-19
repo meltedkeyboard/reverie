@@ -200,7 +200,7 @@ export function Pattern({ id, scale = 1, style }: Props) {
   const follow = useAnimatedStyle(() => ({
     transform: [{ translateX: anchored ? SIDEBAR_WIDTH - sidebarWidthAt(sidebarFold.value) : 0 }],
   }))
-  if (id === 'none') return null
+  if (id === 'none' || id === 'custom') return null
   const onLayout = (event: LayoutChangeEvent) => setSize(event.nativeEvent.layout)
   const width = stage / scale
   const height = size.height / scale

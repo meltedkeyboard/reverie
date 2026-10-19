@@ -52,6 +52,7 @@
   "settings.chatFont": "Оформление",
   "settings.chatFontField": "Шрифт чатов",
   "settings.chatPattern": "Фон чатов",
+  "chatPattern.custom": "Свои",
   "chatPattern.none": "Без узора",
   "chatPattern.stars": "Звёзды",
   "chatPattern.two-stars": "Две звезды",

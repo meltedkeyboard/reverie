@@ -13,21 +13,40 @@ import { useColors } from '@/theme'
 // What a character or a room says about the look of its chats.
 type Look = Pick<Character, 'background' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency'>
 
-// What is behind the messages: the owner's own picture, else the pattern chosen in Settings.
+// What is behind the messages: the owner's own picture, else the custom wallpaper or pattern chosen in Settings.
 export function ChatSurface({ owner }: { owner: Look }) {
-  const { pattern } = useChatTextSettings()
-  if (!owner.background) return <Pattern id={pattern} />
-  return (
-    <ChatBackground
-      uri={avatarUri(owner.background, 'backgrounds') ?? ''}
-      effect={owner.backgroundEffect}
-      intensity={owner.backgroundIntensity}
-    />
-  )
+  const { pattern, wallpaper } = useChatTextSettings()
+  if (owner.background) {
+    return (
+      <ChatBackground
+        uri={avatarUri(owner.background, 'backgrounds') ?? ''}
+        effect={owner.backgroundEffect}
+        intensity={owner.backgroundIntensity}
+      />
+    )
+  }
+  if (pattern === 'custom' && wallpaper?.file) {
+    return (
+      <ChatBackground
+        uri={avatarUri(wallpaper.file, 'backgrounds') ?? ''}
+        effect={wallpaper.effect}
+        intensity={wallpaper.intensity}
+      />
+    )
+  }
+  return <Pattern id={pattern} />
 }
 
 // Over a picture the user's bubbles can be made see-through.
-export const bubbleOpacityOf = (owner: Look) => (owner.background ? 1 - owner.backgroundBubbleTransparency : 1)
+export const bubbleOpacityOf = (
+  owner: Look,
+  wallpaper?: { file: string | null; bubbleTransparency: number } | null,
+  pattern?: string
+) => {
+  if (owner.background) return 1 - owner.backgroundBubbleTransparency
+  if (pattern === 'custom' && wallpaper?.file) return 1 - wallpaper.bubbleTransparency
+  return 1
+}
 
 // The eye in the header that opens the private thread with the model. It stays while the
 // thread is open, even if the button is turned off in Settings.

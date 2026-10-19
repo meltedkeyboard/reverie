@@ -1,23 +1,41 @@
 import { Icon } from '@/components/visuals/Icon'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import Slider from '@react-native-community/slider'
+import { useRouter } from 'expo-router'
 import { useMemo, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
+import { ChatBackground } from '@/components/chat/ChatBackground'
 import { Pattern } from '@/components/visuals/Pattern'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { ButtonCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
+import { SourceCell } from '@/components/lists/PictureCells'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Markdown } from '@/components/chat/Markdown'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { CHAT_PATTERNS, CHAT_TEXT_SCALE_RANGE, DEFAULT_CHAT_FONT, SYSTEM_FONT } from '@/db/prefs/settings'
+import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { CHAT_METRICS, useChatTextSettings } from '@/lib/chat/chatText'
+import { withAlpha } from '@/lib/core/color'
+import { isAndroid, isWeb } from '@/lib/core/platform'
+import {
+  avatarUri,
+  cropFromJson,
+  cropToJson,
+  persistAvatar,
+  persistOriginal,
+  pickBackground,
+  removeAvatar,
+  type CropRect,
+} from '@/lib/images/avatars'
+import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
+import type { ImageSource } from '@/lib/images/images'
+import { alertError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { installedFontFamilies } from '../../modules/reverie-fonts'
 import { type Colors, ON_ACCENT, paletteOf, type ThemePreference, useColors, useStyles, useTheme } from '@/theme'
-import { isAndroid } from '@/lib/core/platform'
 
 const FIELD_HEIGHT = 48
 // A tile shows a whole 393 x 852 board, small.
@@ -105,6 +123,8 @@ function ThemePreviewTile({ value, selected }: { value: ThemePreference; selecte
 }
 
 export default function ChatTextScreen() {
+  const router = useRouter()
+  const db = useDatabase()
   const padding = useScreenPadding('form')
   const colors = useColors()
   const glass = useGlassStyles()
@@ -119,7 +139,85 @@ export default function ChatTextScreen() {
     { value: 'black', label: t('theme.black') },
     { value: 'grey', label: t('theme.grey') },
   ]
-  const { font, userFont, setUserFont, userMarkdown, setUserMarkdown, pattern, setPattern, scale, setFont, setScale, reset } = useChatTextSettings()
+  const {
+    font,
+    userFont,
+    setUserFont,
+    userMarkdown,
+    setUserMarkdown,
+    pattern,
+    setPattern,
+    wallpaper,
+    setWallpaper,
+    scale,
+    setFont,
+    setScale,
+    reset,
+  } = useChatTextSettings()
+
+  const wallpaperUri = wallpaper?.file ? avatarUri(wallpaper.file, 'backgrounds') : null
+
+  const openBackground = (uri: string, crop: CropRect | null, original: string | null) => {
+    setBackgroundDraft({
+      uri,
+      crop,
+      characterName: t('settings.chatPattern'),
+      effect: wallpaper?.effect ?? 'blur',
+      intensity: wallpaper?.intensity ?? 0.5,
+      bubbleTransparency: wallpaper?.bubbleTransparency ?? 0.3,
+      onDone: async (result) => {
+        try {
+          const file = await persistAvatar(result.uri, 'backgrounds')
+          const originalFile = original ? await persistOriginal(original, 'backgrounds') : (wallpaper?.original ?? null)
+          const oldFile = wallpaper?.file
+          const oldOriginal = wallpaper?.original
+          const nextWallpaper = {
+            file,
+            original: originalFile,
+            crop: cropToJson(result.crop),
+            effect: result.effect,
+            intensity: result.intensity,
+            bubbleTransparency: result.bubbleTransparency,
+          }
+          setWallpaper(nextWallpaper)
+          setPattern('custom')
+          if (oldFile && oldFile !== file) removeAvatar(oldFile, 'backgrounds')
+          if (oldOriginal && oldOriginal !== originalFile && (!original || oldOriginal !== original)) {
+            removeAvatar(oldOriginal, 'backgrounds')
+          }
+        } catch (err) {
+          alertError(t('background.failedTitle'), err)
+        }
+      },
+    })
+    router.push('/background')
+  }
+
+  const onPickBackground = async (source: ImageSource) => {
+    try {
+      const uri = await pickBackground(source)
+      if (uri) openBackground(uri, null, uri)
+    } catch (err) {
+      alertError(t('background.failedTitle'), err)
+    }
+  }
+
+  const onAdjustBackground = () => {
+    if (!wallpaper?.file) return
+    const originalUri = wallpaper.original ? avatarUri(wallpaper.original, 'backgrounds') : null
+    const fileUri = avatarUri(wallpaper.file, 'backgrounds')
+    const uri = originalUri ?? fileUri
+    if (!uri) return
+    openBackground(uri, cropFromJson(wallpaper.crop), originalUri ? null : uri)
+  }
+
+  const onRemoveBackground = async () => {
+    if (wallpaper?.file) removeAvatar(wallpaper.file, 'backgrounds')
+    if (wallpaper?.original) removeAvatar(wallpaper.original, 'backgrounds')
+    setWallpaper(null)
+    if (pattern === 'custom') setPattern('none')
+  }
+
   const resetSize = () => {
     Haptics.selectionAsync()
     setScale(CHAT_TEXT_SCALE_RANGE.default)
@@ -199,8 +297,26 @@ export default function ChatTextScreen() {
 
         {/* A made-up exchange, so a change shows at once as it will look in a chat. */}
         <View style={styles.card}>
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            {pattern === 'custom' && wallpaperUri ? (
+              <ChatBackground
+                uri={wallpaperUri}
+                effect={wallpaper?.effect ?? 'blur'}
+                intensity={wallpaper?.intensity ?? 0.5}
+              />
+            ) : (
+              <Pattern id={pattern} />
+            )}
+          </View>
           <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
-            <View style={styles.bubble}>
+            <View
+              style={[
+                styles.bubble,
+                pattern === 'custom' && wallpaper?.file
+                  ? { backgroundColor: withAlpha(colors.bubble, 1 - (wallpaper.bubbleTransparency ?? 0.3)) }
+                  : null,
+              ]}
+            >
               {userMarkdown ? (
                 <Markdown text={t('chatPreview.user')} style={user} selectable={false} />
               ) : (
@@ -260,7 +376,45 @@ export default function ChatTextScreen() {
           <MenuCell label={t('settings.chatFontField')} value={font === SYSTEM_FONT ? t('chatFont.system') : font} items={items} />
           <SwitchCell label={t('settings.chatUserFont')} value={userFont} onValueChange={setUserFont} />
           <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
+        </ListSection>
+
+        <ListSection header={t('settings.chatPattern')}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
+            <Pressable
+              onPress={() => {
+                if (wallpaper?.file) {
+                  if (pattern !== 'custom') {
+                    Haptics.selectionAsync()
+                    setPattern('custom')
+                  } else {
+                    onAdjustBackground()
+                  }
+                } else {
+                  onPickBackground(isWeb ? 'files' : 'library')
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: pattern === 'custom' }}
+              accessibilityLabel={t('chatPattern.custom')}
+              style={styles.tileButton}
+            >
+              <View style={[styles.tile, pattern === 'custom' && styles.tileSelected]}>
+                {wallpaperUri ? (
+                  <ChatBackground
+                    uri={wallpaperUri}
+                    effect={wallpaper?.effect ?? 'blur'}
+                    intensity={wallpaper?.intensity ?? 0.5}
+                  />
+                ) : (
+                  <View style={styles.customTileEmpty}>
+                    <Icon name="add" size={24} color={colors.textFaint} />
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.tileLabel, pattern === 'custom' && { color: colors.text }]} numberOfLines={1}>
+                {t('chatPattern.custom')}
+              </Text>
+            </Pressable>
             {CHAT_PATTERNS.map((id) => {
               const selected = id === pattern
               return (
@@ -285,6 +439,9 @@ export default function ChatTextScreen() {
               )
             })}
           </ScrollView>
+          <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
+          {wallpaper?.file ? <ButtonCell label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
+          {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
         </ListSection>
 
         <ListSection>
@@ -359,6 +516,11 @@ const createStyles = (colors: Colors) =>
       borderColor: colors.border,
     },
     tileSelected: { borderColor: colors.accent },
+    customTileEmpty: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     tileLabel: { color: colors.textMuted, fontSize: 12 },
     themeTiles: { gap: 12, padding: 16 },
     themeTileButton: { width: THEME_TILE_WIDTH, alignItems: 'center', gap: 8 },
