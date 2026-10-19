@@ -5,7 +5,7 @@ import { FONTS, isDesktop, isWeb } from '@/lib/core/platform'
 import { createRequiredContext } from '@/lib/core/requiredContext'
 
 export type Scheme = 'light' | 'dark'
-export type AppTheme = 'light' | 'dark' | 'black' | 'grey' | 'warm'
+export type AppTheme = 'light' | 'dark' | 'black' | 'grey' | 'warm' | 'warm-dark'
 export type ThemePreference = AppTheme | 'system'
 
 export type Colors = {
@@ -204,9 +204,48 @@ const desktopWarmColors: Colors = {
   textFaint: '#9E9487',
 }
 
+// Warm dark palette: cozy deep espresso background, warm amber/terracotta accent, soft ivory text.
+const warmDarkColors: Colors = {
+  ...darkColors,
+  bg: '#181512',
+  bgRgb: '24, 21, 18',
+  surface: '#221E1A',
+  surfaceRaised: '#2C2621',
+  bubble: '#373029',
+  border: 'rgba(255, 240, 220, 0.08)',
+  borderStrong: 'rgba(255, 240, 220, 0.15)',
+  pattern: '#120F0D',
+  text: '#F2EBE1',
+  textMuted: 'rgba(242, 235, 225, 0.65)',
+  textFaint: 'rgba(242, 235, 225, 0.40)',
+  accent: '#DE7A3E',
+  accentSoft: 'rgba(222, 122, 62, 0.16)',
+  accentBorder: 'rgba(222, 122, 62, 0.35)',
+  danger: '#EA6354',
+  dangerSoft: 'rgba(234, 99, 84, 0.12)',
+  dangerBorder: 'rgba(234, 99, 84, 0.32)',
+  success: '#5DB87A',
+  cast: ['#DE7A3E', '#4FAABF', '#D9628C', '#68B068', '#A88AE6', '#D6B445'],
+}
+
+const desktopWarmDarkColors: Colors = {
+  ...warmDarkColors,
+  bg: '#1C1916',
+  bgRgb: '28, 25, 22',
+  surface: '#24201C',
+  surfaceRaised: '#2E2823',
+  bubble: '#362F2A',
+  border: '#3D362F',
+  borderStrong: '#4D443B',
+  pattern: '#14110E',
+  text: '#EAE2D8',
+  textMuted: '#ABA295',
+  textFaint: '#7A7266',
+}
+
 const palettes: Record<AppTheme, Colors> = isDesktop
-  ? { dark: desktopDarkColors, light: desktopLightColors, black: desktopBlackColors, grey: desktopGreyColors, warm: desktopWarmColors }
-  : { dark: darkColors, light: lightColors, black: blackColors, grey: greyColors, warm: warmColors }
+  ? { dark: desktopDarkColors, light: desktopLightColors, black: desktopBlackColors, grey: desktopGreyColors, warm: desktopWarmColors, 'warm-dark': desktopWarmDarkColors }
+  : { dark: darkColors, light: lightColors, black: blackColors, grey: greyColors, warm: warmColors, 'warm-dark': warmDarkColors }
 
 // A palette by its theme or scheme, for what keeps one look whatever the theme.
 export const paletteOf = (choice: AppTheme | Scheme): Colors => palettes[choice] ?? (choice === 'light' || choice === 'warm' ? palettes.light : palettes.dark)

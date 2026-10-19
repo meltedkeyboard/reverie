@@ -14,6 +14,7 @@
   "theme.light": "Light",
   "theme.warm": "Warm",
   "theme.dark": "Dark",
+  "theme.warm-dark": "Warm dark",
   "theme.black": "Black (OLED)",
   "theme.grey": "Neutral grey",
   "settings.language": "Language",

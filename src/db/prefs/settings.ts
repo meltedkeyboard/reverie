@@ -166,7 +166,7 @@ export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
   return next
 }
 
-const themePreference = defineChoice('theme_preference', ['system', 'light', 'dark', 'black', 'grey', 'warm'] as const, 'system')
+const themePreference = defineChoice('theme_preference', ['system', 'light', 'dark', 'warm-dark', 'black', 'grey', 'warm'] as const, 'system')
 export const loadThemePreference = themePreference.load
 export const saveThemePreference = themePreference.save
 

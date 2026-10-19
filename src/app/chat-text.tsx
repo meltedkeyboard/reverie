@@ -136,6 +136,7 @@ export default function ChatTextScreen() {
     { value: 'light', label: t('theme.light') },
     { value: 'warm', label: t('theme.warm') },
     { value: 'dark', label: t('theme.dark') },
+    { value: 'warm-dark', label: t('theme.warm-dark') },
     { value: 'black', label: t('theme.black') },
     { value: 'grey', label: t('theme.grey') },
   ]
