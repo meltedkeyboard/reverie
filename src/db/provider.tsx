@@ -2,6 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { convertLegacyAttachments, pruneAttachments } from '@/db/attachments'
+import { loadDrafts } from '@/db/drafts'
 import { migrate } from '@/db/schema'
 import { databaseDirectory, discardInactiveDatabase, moveStorage } from '@/lib/core/storage'
 import { createRequiredContext } from '@/lib/core/requiredContext'
@@ -22,6 +23,7 @@ const [DatabaseContext, useDatabaseContext] = createRequiredContext<DatabaseCont
 async function openReverieDatabase(newConnection = false) {
   const db = await openDatabaseAsync('reverie.db', newConnection ? { useNewConnection: true } : undefined, databaseDirectory())
   await migrate(db)
+  await loadDrafts(db)
   // Housekeeping must never keep the app from opening.
   try {
     await convertLegacyAttachments(db)

@@ -18,6 +18,7 @@ import { useChatTextSettings } from '@/lib/chat/chatText'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { useOpenViewer } from '@/components/visuals/ImageLink'
 import type { Chat } from '@/db/chats'
+import { getDraft, setDraft } from '@/db/drafts'
 import { newMessage, type Message } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
@@ -159,8 +160,9 @@ export function RoomController({
   // The eye in the header opens a private thread with the model about the scene; while it
   // is open the field talks to the model, so who is addressed does not matter.
   const [asideOpen, setAsideOpen] = useState(false)
-  // What was typed to the characters waits here while the field asks the model aside.
-  const sceneDraft = useRef('')
+  // What was typed to the characters waits here while the field asks the model aside, and
+  // stays as the scene's draft until it is sent.
+  const sceneDraft = useRef(getDraft(chatId))
   const toggleAside = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
     if (asideOpen) aside.reset()
@@ -377,7 +379,12 @@ export function RoomController({
       toggleAside,
       composer: {
         initialText: asideOpen ? undefined : sceneDraft.current,
-        onTextChange: asideOpen ? undefined : (text) => (sceneDraft.current = text),
+        onTextChange: asideOpen
+          ? undefined
+          : (text) => {
+              sceneDraft.current = text
+              setDraft(db, chatId, text)
+            },
         autoFocus: asideOpen,
         generating: asideOpen ? aside.phase !== 'idle' : !idle,
         editing: asideOpen ? null : editing,

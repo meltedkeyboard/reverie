@@ -6,6 +6,7 @@ import type { RowMessage, RowScene } from '@/components/chat/MessageRow'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import type { Character } from '@/db/characters'
 import { createChat, getLatestChatId, listChats, type Chat, type ChatPreview } from '@/db/chats'
+import { getDraft } from '@/db/drafts'
 import type { Message } from '@/db/messages'
 import { createRoomChat, getLatestRoomChatId, listRoomChats, type Room, type RoomMember } from '@/db/rooms'
 import { regenerateTargetAt } from '@/hooks/chat/useChat'
@@ -33,11 +34,15 @@ export function latestChatOf(db: SQLiteDatabase, owner: Owner) {
 
 // The chats of the drawer. A scene's last line says who said it.
 export async function listChatsOf(db: SQLiteDatabase, owner: Owner): Promise<ChatPreview[]> {
-  if (owner.kind === 'character') return listChats(db, owner.character.id)
+  if (owner.kind === 'character') {
+    const chats = await listChats(db, owner.character.id)
+    return chats.map((chat) => ({ ...chat, draft: getDraft(chat.id) }))
+  }
   const scenes = await listRoomChats(db, owner.room.id)
   return scenes.map((chat) => ({
     ...chat,
     lastMessage: chat.lastSpeaker && chat.lastMessage ? `${chat.lastSpeaker}: ${chat.lastMessage}` : chat.lastMessage,
+    draft: getDraft(chat.id),
   }))
 }
 

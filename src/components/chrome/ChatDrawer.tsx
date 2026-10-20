@@ -633,9 +633,17 @@ const DrawerRow = memo(function DrawerRow({ chat, active, menuFor, onTouch, onTa
           <Text style={styles.rowMeta} numberOfLines={1}>
             {chat.title ? `${when}, ${messages}` : messages}
           </Text>
-          <Text style={styles.rowPreview} numberOfLines={1}>
-            {plainPreview(chat.lastMessage ?? '') || t('chatCard.emptyChat')}
-          </Text>
+          {/* An unsent message shows in place of the last one, as in Telegram. */}
+          {chat.draft ? (
+            <Text style={styles.rowPreview} numberOfLines={1}>
+              <Text style={styles.rowDraft}>{t('chatDrawer.draft')} </Text>
+              {plainPreview(chat.draft)}
+            </Text>
+          ) : (
+            <Text style={styles.rowPreview} numberOfLines={1}>
+              {plainPreview(chat.lastMessage ?? '') || t('chatCard.emptyChat')}
+            </Text>
+          )}
         </View>
         {swiftUI ? (
           // Claims the touch, so the row does not open under the menu.
@@ -725,6 +733,7 @@ const createStyles = (colors: Colors) =>
     rowTitle: { color: colors.text, fontSize: 16, fontWeight: '500' },
     rowMeta: { color: colors.textFaint, fontSize: 13, marginTop: 2 },
     rowPreview: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
+    rowDraft: { color: colors.danger },
     chat: {
       ...FILL,
       shadowColor: '#000',

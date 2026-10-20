@@ -263,6 +263,14 @@ const MIGRATIONS = [
   `
     ALTER TABLE characters ADD COLUMN notes TEXT NOT NULL DEFAULT '';
   `,
+  // What was typed into a chat and not sent. A table of its own, outside the synced ones,
+  // so typing does not mark the database for folder sync.
+  `
+    CREATE TABLE chat_drafts (
+      chat_id INTEGER PRIMARY KEY REFERENCES chats(id) ON DELETE CASCADE,
+      text TEXT NOT NULL
+    );
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

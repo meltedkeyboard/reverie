@@ -36,6 +36,7 @@ import { createStore, useStore, type Store } from '@/components/chat/thread/stor
 import { ShimmerText } from '@/components/visuals/ShimmerText'
 import { getCharacter, type Character } from '@/db/characters'
 import { createChat, getChat, getLatestChatId, type Chat } from '@/db/chats'
+import { getDraft, setDraft } from '@/db/drafts'
 import { setContinueHidden, setLastOpened } from '@/db/prefs/continue'
 import { newMessage, type Message } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
@@ -645,6 +646,7 @@ type ChatControllerProps = {
 // each chat (keyed by it), which costs no layout.
 function ChatController({ chat, character, thread, chrome, focusMessageId, composerHeight, scrollToNewest, onDeleted }: ChatControllerProps) {
   const chatId = chat.id
+  const db = useDatabase()
   const router = useRouter()
   const { t } = useTranslation()
   const { suggestEnabled } = useChatSwitches()
@@ -682,8 +684,9 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   // The eye in the header opens a private thread with the model about this chat.
   const [asideOpen, setAsideOpen] = useState(false)
-  // What was typed to the character waits here while the field asks the model aside.
-  const sceneDraft = useRef('')
+  // What was typed to the character waits here while the field asks the model aside, and
+  // stays as the chat's draft until it is sent.
+  const sceneDraft = useRef(getDraft(chatId))
   const toggleAside = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
     if (asideOpen) aside.reset()
@@ -773,7 +776,12 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
       toggleAside,
       composer: {
         initialText: asideOpen ? undefined : sceneDraft.current,
-        onTextChange: asideOpen ? undefined : (text) => (sceneDraft.current = text),
+        onTextChange: asideOpen
+          ? undefined
+          : (text) => {
+              sceneDraft.current = text
+              setDraft(db, chatId, text)
+            },
         autoFocus: asideOpen,
         generating: asideOpen ? aside.phase !== 'idle' : !idle,
         editing: asideOpen ? null : editing,

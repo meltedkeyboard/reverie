@@ -437,6 +437,7 @@
   "chatDrawer.open": "Chats",
   "chatDrawer.close": "Back to the chat",
   "chatDrawer.newChat": "New chat",
+  "chatDrawer.draft": "Draft:",
 
   "attach.choosePhoto": "Choose photo",
   "attach.recent": "Recent picture",

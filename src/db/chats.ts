@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import type { Character, ThinkingMode } from '@/db/characters'
+import { dropDraft, saveDrafts } from '@/db/drafts'
 import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
 import { notifyChatsChanged } from '@/lib/chat/chatEvents'
 
@@ -19,6 +20,8 @@ export type ChatPreview = Chat & {
   lastMessage: string | null
   lastActivity: number
   messageCount: number
+  // Filled in by listChatsOf from the drafts held in memory.
+  draft?: string
 }
 
 // A message that is only a picture has empty text, so the list shows a label instead.
@@ -66,6 +69,7 @@ export async function createChat(db: SQLiteDatabase, character: Character) {
       defaultPersona?.id ?? null,
     ])
     chatId = res.lastInsertRowId
+    dropDraft(chatId)
     const greeting = character.greeting.trim()
     if (greeting) await addMessage(db, chatId, 'assistant', greeting)
   })
@@ -107,17 +111,21 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
 
 export async function deleteChat(db: SQLiteDatabase, id: number) {
   await db.runAsync('DELETE FROM chats WHERE id = ?', id)
+  dropDraft(id)
   notifyChatsChanged()
 }
 
 // A chat the user never interacted with holds at most the initial greeting or opening. Such
 // chats are dropped once the user is back on a list, so opening a new chat and leaving it
 // leaves no clutter. `keepId` spares the chat still on screen (the list in its sidebar).
+// A chat with a draft was written in, so the draft just typed is saved first.
 export async function pruneUntouchedChats(db: SQLiteDatabase, keepId: number | null = null) {
+  await saveDrafts()
   await db.runAsync(`
     DELETE FROM chats
     WHERE chats.id IS NOT ?
       AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = chats.id AND m.role = 'user')
+      AND NOT EXISTS (SELECT 1 FROM chat_drafts d WHERE d.chat_id = chats.id)
       AND (
         (SELECT COUNT(*) FROM messages m WHERE m.chat_id = chats.id) = 0
         OR (

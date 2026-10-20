@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { CHARACTER_COLUMNS, type BackgroundEffect, type Character } from '@/db/characters'
 import { CHAT_COLUMNS, PREVIEW, type Chat, type ChatPreview } from '@/db/chats'
+import { dropDraft } from '@/db/drafts'
 import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
 import { notifyChatsChanged } from '@/lib/chat/chatEvents'
 
@@ -281,6 +282,7 @@ export async function createRoomChat(db: SQLiteDatabase, room: Room) {
       defaultPersona?.id ?? null,
     ])
     chatId = res.lastInsertRowId
+    dropDraft(chatId)
     const opening = room.opening.trim()
     if (opening) await addMessage(db, chatId, 'assistant', opening, { kind: 'narration' })
   })
