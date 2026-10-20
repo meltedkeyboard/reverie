@@ -482,7 +482,7 @@ const createStyles = (colors: Colors) =>
       justifyContent: 'center',
     },
     tileLabel: { color: colors.textMuted, fontSize: 12 },
-    themeTiles: { gap: 12, padding: 16, paddingBottom: 8 },
+    themeTiles: { gap: 12, padding: 16 },
     themeTileButton: { width: THEME_TILE_WIDTH, alignItems: 'center', gap: 8 },
     themeTile: {
       width: THEME_TILE_WIDTH,
@@ -508,7 +508,7 @@ const createStyles = (colors: Colors) =>
       color: colors.text,
       fontWeight: '600',
     },
-    themeMode: { paddingHorizontal: 16, paddingBottom: 16 },
+    themeMode: { paddingHorizontal: 16, paddingVertical: 12 },
     themeTileFontSample: {
       fontSize: 28,
       includeFontPadding: false,

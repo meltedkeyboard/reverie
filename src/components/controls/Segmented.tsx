@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import * as Haptics from '@/lib/ui/haptics'
@@ -17,27 +18,43 @@ const HEIGHT = 32
 export function Segmented<T extends string>({ options, value, onChange }: Props<T>) {
   const styles = useStyles(createStyles)
   const { scheme } = useTheme()
+  // The SwiftUI picker misplaces its selection when the value is set from outside right
+  // after it mounts (an editor filling its fields from the database) or when its frame
+  // changes under it, and only puts it right on the next tap. Such changes build it anew;
+  // a tap on it does not, so the selection still slides.
+  const picked = useRef(value)
+  const [width, setWidth] = useState(0)
+  const [generation, setGeneration] = useState(0)
+  if (picked.current !== value) {
+    picked.current = value
+    setGeneration((g) => g + 1)
+  }
 
   if (swiftUI) {
     const { Host, Picker, Text: SwiftText } = swiftUI.ui
     const { pickerStyle, tag } = swiftUI.modifiers
     return (
-      <Host style={styles.host} colorScheme={scheme}>
-        <Picker
-          selection={value}
-          onSelectionChange={(next: T) => {
-            Haptics.selectionAsync()
-            onChange(next)
-          }}
-          modifiers={[pickerStyle('segmented')]}
-        >
-          {options.map((option) => (
-            <SwiftText key={option.value} modifiers={[tag(option.value)]}>
-              {option.label}
-            </SwiftText>
-          ))}
-        </Picker>
-      </Host>
+      <View style={styles.host} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+        {width > 0 ? (
+          <Host key={`${width}:${generation}`} style={styles.host} colorScheme={scheme}>
+            <Picker
+              selection={value}
+              onSelectionChange={(next: T) => {
+                Haptics.selectionAsync()
+                picked.current = next
+                onChange(next)
+              }}
+              modifiers={[pickerStyle('segmented')]}
+            >
+              {options.map((option) => (
+                <SwiftText key={option.value} modifiers={[tag(option.value)]}>
+                  {option.label}
+                </SwiftText>
+              ))}
+            </Picker>
+          </Host>
+        ) : null}
+      </View>
     )
   }
 
