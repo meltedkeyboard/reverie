@@ -106,6 +106,8 @@ export default function ChatTextScreen() {
     setPattern,
     wallpaper,
     setWallpaper,
+    backdrop,
+    setBackdrop,
     scale,
     setFont,
     setScale,
@@ -338,7 +340,7 @@ export default function ChatTextScreen() {
           <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
         </ListSection>
 
-        <ListSection header={t('settings.chatPattern')}>
+        <ListSection header={t('settings.chatPattern')} footer={t('settings.chatBackdropHint')}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
             <Pressable
               onPress={() => {
@@ -402,6 +404,7 @@ export default function ChatTextScreen() {
           <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
           {wallpaper?.file ? <ButtonCell label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
           {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
+          <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} />
         </ListSection>
 
         <ListSection>

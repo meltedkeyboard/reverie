@@ -4,12 +4,14 @@ import { useDatabase } from '@/db/provider'
 import {
   CHAT_TEXT_SCALE_RANGE,
   DEFAULT_CHAT_FONT,
+  loadChatBackdrop,
   loadChatFont,
   loadChatPattern,
   loadChatTextScale,
   loadChatUserFont,
   loadChatUserMarkdown,
   loadChatWallpaper,
+  saveChatBackdrop,
   saveChatFont,
   saveChatPattern,
   saveChatTextScale,
@@ -43,6 +45,9 @@ type ChatTextValue = {
   // The custom wallpaper behind chats that have no picture of their own.
   wallpaper: ChatWallpaper | null
   setWallpaper: (wallpaper: ChatWallpaper | null) => void
+  // Whether the sheets over a chat and the drawer under it show the chat's background too.
+  backdrop: boolean
+  setBackdrop: (on: boolean) => void
   // How much the chat text is enlarged: 1 is the regular size.
   scale: number
   setFont: (font: ChatFont) => void
@@ -61,10 +66,12 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   const [userMarkdown, setUserMarkdownState] = useState(false)
   const [pattern, setPatternState] = useState<ChatPatternId>('none')
   const [wallpaper, setWallpaperState] = useState<ChatWallpaper | null>(null)
+  const [backdrop, setBackdropState] = useState(true)
 
   useEffect(() => {
     loadChatPattern(db).then(setPatternState)
     loadChatWallpaper(db).then(setWallpaperState)
+    loadChatBackdrop(db).then(setBackdropState)
     loadChatFont(db).then(setFontState)
     loadChatTextScale(db).then(setScaleState)
     loadChatUserFont(db).then(setUserFontState)
@@ -113,6 +120,13 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     },
     [db]
   )
+  const setBackdrop = useCallback(
+    (on: boolean) => {
+      setBackdropState(on)
+      saveChatBackdrop(db, on)
+    },
+    [db]
+  )
   const reset = useCallback(() => {
     setFont(DEFAULT_CHAT_FONT)
     setUserFont(false)
@@ -130,6 +144,8 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
       setPattern,
       wallpaper,
       setWallpaper,
+      backdrop,
+      setBackdrop,
       scale,
       setFont,
       setScale,
@@ -145,6 +161,8 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
       setPattern,
       wallpaper,
       setWallpaper,
+      backdrop,
+      setBackdrop,
       scale,
       setFont,
       setScale,

@@ -67,6 +67,8 @@
   "settings.chatTextSize": "Размер текста в чатах",
   "settings.chatUserFont": "Шрифт в моих сообщениях",
   "settings.chatUserMarkdown": "Markdown в моих сообщениях",
+  "settings.chatBackdrop": "Фон в меню",
+  "settings.chatBackdropHint": "Меню вложений, выбор собеседника в комнате и список чатов тоже показывают фон чата.",
   "settings.appIcon": "Иконка приложения",
   "appIcon.default": "Стандартная",
   "appIcon.VioletGradient": "Фиолетовый градиент",

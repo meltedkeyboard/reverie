@@ -3,13 +3,13 @@ import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRe
 import { BackHandler, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler'
 import Animated, { interpolate, measure, useAnimatedRef, useAnimatedStyle, useSharedValue, withSpring, type AnimatedRef } from 'react-native-reanimated'
-import ReorderableList, { useReorderableDrag } from 'react-native-reorderable-list'
+import ReorderableList, { useIsActive, useReorderableDrag } from 'react-native-reorderable-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { AvatarStack } from '@/components/cast/AvatarStack'
 import { holdHydration } from '@/components/chat/thread/hydration'
-import { listChatsOf, ownerKey, type Owner } from '@/components/chat/thread/screen'
+import { listChatsOf, lookOf, ownerKey, type Owner } from '@/components/chat/thread/screen'
 import { deleteChat, listChats, pruneUntouchedChats, setChatOrder, type Chat, type ChatPreview } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { importChatToRoom, listRooms, type RoomPreview } from '@/db/rooms'
@@ -26,6 +26,7 @@ import * as Haptics from '@/lib/ui/haptics'
 import { swiftUI } from '@/lib/ui/nativeUI'
 import { FILL, fonts, HEADER_FONT_SCALE, useColors, useStyles, useTheme, type Colors } from '@/theme'
 
+import { ChatBackdrop, useChatBackdropTone } from './ChatChrome'
 import { GlassButton, GlassSurface, useGlassStyles } from './Glass'
 import { IconButton } from '../controls/IconButton'
 import { NativeMenu, type MenuItem } from '../overlays/NativeMenu'
@@ -118,6 +119,8 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   const styles = useStyles(createStyles)
   const glass = useGlassStyles()
   const { t, locale } = useTranslation()
+  // The list lies on the chat's own background, so the chat slides off it as off its own.
+  const backdrop = useChatBackdropTone(lookOf(owner))
   const { width } = useWindowDimensions()
   const shift = Math.round(width * SHIFT)
   const progress = useSharedValue(0)
@@ -458,6 +461,9 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
       {/* The edge drag takes the place of the swipe back, which the list's back button replaces. */}
       <Stack.Screen options={{ gestureEnabled: !enabled }} />
       <View style={styles.root}>
+        {/* Always fully blurred and a little dimmed in the color of the chat's own dim, whatever
+            its strength: the list's text reads over it, and the chat sliding over it stands out. */}
+        {enabled ? <ChatBackdrop owner={lookOf(owner)} blurred /> : null}
         {enabled ? (
           <GestureDetector gesture={listPan}>
             <View
@@ -527,11 +533,12 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
                 {...reorder}
                 contentContainerStyle={[styles.rows, { paddingBottom: insets.bottom + 16 }]}
                 ItemSeparatorComponent={RowGap}
-                extraData={chatId}
+                extraData={`${chatId}:${backdrop}`}
                 renderItem={({ item: chat }) => (
                   <DrawerRow
                     chat={chat}
                     active={chat.id === chatId}
+                    tone={backdrop}
                     menuFor={menuFor}
                     onTouch={stage}
                     onTap={rowTap}
@@ -578,6 +585,9 @@ const RowGap = () => <View style={{ height: 2 }} />
 type RowProps = {
   chat: ChatPreview
   active: boolean
+  // Over the chat's background a row is see-through, until it is lifted to be moved, and
+  // the current chat is marked by a frosted tint fit for how light the background is.
+  tone: 'light' | 'dark' | null
   menuFor: (chat: ChatPreview) => MenuItem[]
   // The finger is down: the chat can be laid out before it lifts.
   onTouch: (chat: ChatPreview) => void
@@ -592,11 +602,12 @@ const MENU_ZONE = 40
 
 // A chat of the list: its title and last line, the menu behind the ellipsis, and a long
 // press to drag it elsewhere.
-const DrawerRow = memo(function DrawerRow({ chat, active, menuFor, onTouch, onTap, listPan }: RowProps) {
+const DrawerRow = memo(function DrawerRow({ chat, active, tone, menuFor, onTouch, onTap, listPan }: RowProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const drag = useReorderableDrag()
+  const lifted = useIsActive()
   const when = formatWhen(chat.lastActivity, locale)
   const messages = countLabel(chat.messageCount, 'message', locale)
   const menu = menuFor(chat)
@@ -624,7 +635,11 @@ const DrawerRow = memo(function DrawerRow({ chat, active, menuFor, onTouch, onTa
         }}
         onPressIn={active ? undefined : () => onTouch(chat)}
         onLongPress={drag}
-        style={[styles.row, active && styles.rowActive]}
+        style={[
+          styles.row,
+          tone && !lifted && styles.rowClear,
+          active && (tone && !lifted ? (tone === 'light' ? styles.rowActiveLight : styles.rowActiveDark) : styles.rowActive),
+        ]}
         accessibilityRole="button"
         accessibilityState={{ selected: active }}
       >
@@ -732,7 +747,10 @@ const createStyles = (colors: Colors) =>
     },
     rowText: { flex: 1 },
     rowMenu: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+    rowClear: { backgroundColor: 'transparent' },
     rowActive: { backgroundColor: colors.surfaceRaised },
+    rowActiveLight: { backgroundColor: 'rgba(255, 255, 255, 0.55)' },
+    rowActiveDark: { backgroundColor: 'rgba(255, 255, 255, 0.12)' },
     rowTitle: { color: colors.text, fontSize: 16, fontWeight: '500' },
     rowMeta: { color: colors.textFaint, fontSize: 13, marginTop: 2 },
     rowPreview: { color: colors.textMuted, fontSize: 14, marginTop: 2 },

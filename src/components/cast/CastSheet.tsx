@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 
+import { ChatBackdrop, type ChatLook } from '@/components/chrome/ChatChrome'
 import type { RoomMember } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
 import { isDesktop, isIOS } from '@/lib/core/platform'
@@ -44,6 +45,8 @@ type Props = {
   canMove: boolean
   onTogglePresent: (member: RoomMember) => void
   onMemberMenu: (member: RoomMember) => void
+  // The room's look, whose background the sheet carries.
+  look?: ChatLook
 }
 
 const AVATAR = 38
@@ -73,6 +76,7 @@ export function CastSheet({
   canMove,
   onTogglePresent,
   onMemberMenu,
+  look,
 }: Props) {
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
@@ -123,6 +127,7 @@ export function CastSheet({
       title={t('room.castTitle')}
       compactHeader
       noGlass
+      underlay={<ChatBackdrop owner={look} />}
     >
       <ScrollView
         style={styles.scroll}

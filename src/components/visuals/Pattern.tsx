@@ -152,6 +152,8 @@ type Props = {
   id: ChatPatternId
   // 1 is the board's own size; a smaller one shows the whole board in a small tile.
   scale?: number
+  // Off where the pattern is not beside the sidebar but in something over the screen, a sheet.
+  anchor?: boolean
   style?: StyleProp<ViewStyle>
 }
 
@@ -190,11 +192,11 @@ function Tiles({ scheme, patternColor, width, height, scale, lead }: { scheme: '
 // sidebar open, and stays put in the window while the sidebar folds and opens: the drawing
 // reaches left by as much as the sidebar can give up and moves against its width each
 // frame, so the screen only uncovers more of it.
-export function Pattern({ id, scale = 1, style }: Props) {
+export function Pattern({ id, scale = 1, anchor = true, style }: Props) {
   const { colors, scheme } = useTheme()
   const [size, setSize] = useState({ width: 0, height: 0 })
   const screen = useWindowDimensions()
-  const anchored = useSidebarShown() && scale === 1
+  const anchored = useSidebarShown() && scale === 1 && anchor
   const lead = anchored ? SIDEBAR_WIDTH - RAIL_WIDTH : 0
   const stage = anchored ? screen.width - SIDEBAR_WIDTH : size.width
   const follow = useAnimatedStyle(() => ({

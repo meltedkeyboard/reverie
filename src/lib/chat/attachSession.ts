@@ -1,5 +1,6 @@
 import { Dimensions } from 'react-native'
 
+import type { Character } from '@/db/characters'
 import type { MessageImage } from '@/db/messages'
 import type { Persona } from '@/db/personas'
 import type { ImageSource } from '@/lib/images/images'
@@ -17,6 +18,8 @@ const RECENTS_OFF_NOTE = 24
 export type AttachSession = {
   // Tells one opening from the next, so the app's own sheet starts its menu afresh.
   opened: number
+  // The look of the chat the menu opened over, whose background it may carry (ChatBackdrop).
+  look?: Pick<Character, 'background' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency'> | null
   thinking?: boolean
   onToggleThinking?: (thinking: boolean) => void
   persona?: Persona | null

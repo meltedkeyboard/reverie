@@ -2,10 +2,11 @@ import { Icon } from '@/components/visuals/Icon'
 import { Image } from 'expo-image'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
+import { ChatBackdrop, useChatBackdrop } from '@/components/chrome/ChatChrome'
 import { Button } from '@/components/controls/Button'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
@@ -23,7 +24,7 @@ import { pictureUri } from '@/lib/images/attachments'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
-import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { type Colors, FILL, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassButton } from '../chrome/Glass'
 import { BottomSheet, useSheetTones } from '../overlays/BottomSheet'
@@ -409,6 +410,48 @@ export function PersonaPicker({
   )
 }
 
+// The whole stack of the system sheet (iOS, app/attach), which its screens measure the bar against.
+export const AttachStackContext = createContext<RefObject<View | null> | null>(null)
+
+// A screen of the system sheet. Over the chat's background the bar is see-through and the
+// screen draws the background itself, so a screen pushed covers the one under it as it
+// slides in. The system lays the screen out below the bar; the background reaches up under
+// the bar by as far as the screen's top is below the stack's, measured, since the height
+// the stack reports for its bar is not to be trusted inside a sheet.
+export function AttachScreenFrame({ session, children }: { session: AttachSession; children: React.ReactNode }) {
+  const backdrop = useChatBackdrop(session.look)
+  const stack = useContext(AttachStackContext)
+  const self = useRef<View>(null)
+  const [bar, setBar] = useState(0)
+  const measure = () =>
+    stack?.current?.measureInWindow((_x, top) =>
+      self.current?.measureInWindow((_sx, y) => {
+        setBar(Math.max(0, y - top))
+      })
+    )
+  if (!backdrop) return <>{children}</>
+  return (
+    // Kept a view of its own: flattened, the background and the menu's scroll view would be
+    // the screen's own children, and react-native-screens takes a view before a sheet's
+    // scroll view for a header and moves the scroll view down by its height, here the
+    // whole screen, so the menu went out of sight.
+    <View
+      ref={self}
+      collapsable={false}
+      style={fillScreen}
+      onLayout={() => {
+        measure()
+        requestAnimationFrame(measure)
+      }}
+    >
+      <View pointerEvents="none" style={[FILL, { top: -bar }]}>
+        <ChatBackdrop owner={session.look} />
+      </View>
+      {children}
+    </View>
+  )
+}
+
 // The menu in the app's own bottom sheet, where there is no system one (the web, the
 // desktop, Android); the persona picker slides in over it within the same sheet.
 export function AttachSheet({
@@ -431,6 +474,9 @@ export function AttachSheet({
   const [screen, setScreen] = useState<'attach' | 'persona'>('attach')
   const [attachHeight, setAttachHeight] = useState<number | undefined>(undefined)
   const progress = useSharedValue(0)
+  // Over the chat's background the main screen fades out under the picker instead of
+  // being covered by the sheet's color, which would hide the background.
+  const backdrop = useChatBackdrop(session?.look)
 
   const go = (to: 'attach' | 'persona') => {
     setScreen(to)
@@ -466,6 +512,7 @@ export function AttachSheet({
       noGlass
       glassButtons
       contentPaddingBottom={0}
+      underlay={<ChatBackdrop owner={session?.look} />}
       rightItem={
         screen === 'persona' ? (
           liquidGlass ? (
@@ -517,7 +564,7 @@ export function AttachSheet({
               styles.pane,
               screen === 'persona' ? styles.paneActive : styles.paneAbsolute,
               attachHeight ? { minHeight: attachHeight } : null,
-              { backgroundColor: tones.sheet },
+              { backgroundColor: backdrop ? 'transparent' : tones.sheet },
               personaPaneStyle,
             ]}
             pointerEvents={screen === 'persona' ? 'auto' : 'none'}

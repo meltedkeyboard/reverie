@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { BlurBar, EdgeFade } from '../chrome/BarChrome'
+import type { ChatLook } from '../chrome/ChatChrome'
 import { useChatDrawer } from '../chrome/ChatDrawer'
 import { GlassSurface, useGlassStyles } from '../chrome/Glass'
 import { AttachSheet, loadRecentPictures } from './AttachMenu'
@@ -94,12 +95,15 @@ type Props = {
   onSelectPersona?: (personaId: number | null) => void
   // Whether to draw the edge fade behind the floating bar. Defaults to true.
   fade?: boolean
+  // The look of the chat, for the attach menu to carry its background.
+  look?: ChatLook
 }
 
 export function Composer({
   height,
   top,
   fade = true,
+  look,
   generating,
   editing,
   accessory,
@@ -377,6 +381,7 @@ export function Composer({
 
     const next: AttachSession = {
       opened: Date.now(),
+      look,
       recents: await loadRecentPictures(db),
       thinking,
       onToggleThinking,

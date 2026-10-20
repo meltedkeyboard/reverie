@@ -437,6 +437,7 @@ export function RoomController({
 
   return (
     <CastSheet
+      look={room}
       visible={castOpen}
       onClose={() => setCastOpen(false)}
       members={members}

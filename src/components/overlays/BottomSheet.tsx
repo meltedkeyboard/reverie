@@ -9,7 +9,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 import { useTranslation } from '@/i18n'
 import { isIOS } from '@/lib/core/platform'
 import { liquidGlass } from '@/lib/ui/nativeUI'
-import { HEADER_FONT_SCALE, useStyles, useTheme, type Colors } from '@/theme'
+import { FILL, HEADER_FONT_SCALE, useStyles, useTheme, type Colors } from '@/theme'
 
 import { GlassButton, GlassSurface } from '../chrome/Glass'
 
@@ -27,6 +27,9 @@ type Props = {
   height?: number
   minHeight?: number
   contentPaddingBottom?: number
+  // Drawn under the content of a sheet without glass and clipped to its corners: the
+  // background of the chat it opened over (ChatBackdrop).
+  underlay?: React.ReactNode
   children: React.ReactNode
 }
 
@@ -76,6 +79,7 @@ export function BottomSheet({
   minHeight: customMinHeight,
   contentPaddingBottom,
   onBack,
+  underlay,
   children,
 }: Props) {
   const styles = useStyles(createStyles)
@@ -356,6 +360,12 @@ export function BottomSheet({
                   },
                 ]}
               >
+                {/* Clipped on its own: with glass buttons the sheet is not. */}
+                {underlay ? (
+                  <View pointerEvents="none" style={styles.underlay}>
+                    {underlay}
+                  </View>
+                ) : null}
                 {sheetBody}
               </View>
             )}
@@ -374,6 +384,7 @@ const createStyles = (colors: Colors) =>
     backdropGlass: { backgroundColor: 'rgba(0, 0, 0, 0.2)' },
     slot: { width: '100%', maxWidth: 640, alignSelf: 'center', marginBottom: INSET },
     sheet: { flexShrink: 1, borderRadius: 38 },
+    underlay: { ...FILL, borderRadius: 38, overflow: 'hidden' },
     solid: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
     // Like solid but without overflow:'hidden': UIKit renders glass effect layers outside
     // their view bounds, so a clipping ancestor makes the glass material disappear.

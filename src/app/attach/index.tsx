@@ -1,7 +1,7 @@
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router'
 import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from 'react'
 
-import { AttachMenu, fillScreen } from '@/components/chat/AttachMenu'
+import { AttachMenu, AttachScreenFrame, fillScreen } from '@/components/chat/AttachMenu'
 import { useTranslation } from '@/i18n'
 import { attachSession, setAttachAfter } from '@/lib/chat/attachSession'
 
@@ -50,5 +50,9 @@ export default function AttachScreen() {
   }, [navigation, session, t])
 
   if (!session) return null
-  return <AttachMenu session={session} onClose={close} onOpenPersonas={() => router.push('/attach/persona')} scrollStyle={fillScreen} />
+  return (
+    <AttachScreenFrame session={session}>
+      <AttachMenu session={session} onClose={close} onOpenPersonas={() => router.push('/attach/persona')} scrollStyle={fillScreen} />
+    </AttachScreenFrame>
+  )
 }

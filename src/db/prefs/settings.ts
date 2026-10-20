@@ -242,6 +242,12 @@ const chatUserMarkdown = defineFlag('chat_user_markdown', false)
 export const loadChatUserMarkdown = chatUserMarkdown.load
 export const saveChatUserMarkdown = chatUserMarkdown.save
 
+// Whether what opens over a chat or slides out from under it (the attach menu, the cast
+// sheet of a room, the drawer's list of chats) carries the chat's own background.
+const chatBackdrop = defineFlag('chat_backdrop', true)
+export const loadChatBackdrop = chatBackdrop.load
+export const saveChatBackdrop = chatBackdrop.save
+
 // The pattern behind a chat that has no picture of its own, from the Penpot page
 // "Background Pattern"; 'none' is the plain theme background.
 export const CHAT_PATTERNS = ['none', 'stars', 'two-stars', 'big-star', 'diagonal', 'scattered', 'rings', 'rings-centered', 'dots'] as const

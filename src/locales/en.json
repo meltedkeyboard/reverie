@@ -67,6 +67,8 @@
   "settings.chatTextSize": "Text size in chats",
   "settings.chatUserFont": "Font in my messages",
   "settings.chatUserMarkdown": "Markdown in my messages",
+  "settings.chatBackdrop": "Background in menus",
+  "settings.chatBackdropHint": "The attach menu, the choice of whom to address in a room and the list of chats show the chat's background too.",
   "settings.appIcon": "App icon",
   "appIcon.default": "Standard",
   "appIcon.VioletGradient": "Violet gradient",

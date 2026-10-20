@@ -1,7 +1,7 @@
 import { useNavigation, useRouter } from 'expo-router'
 import { useLayoutEffect, useState } from 'react'
 
-import { PersonaPicker, fillScreen } from '@/components/chat/AttachMenu'
+import { AttachScreenFrame, PersonaPicker, fillScreen } from '@/components/chat/AttachMenu'
 import { useTranslation } from '@/i18n'
 import { attachSession, setAttachAfter } from '@/lib/chat/attachSession'
 import * as Haptics from '@/lib/ui/haptics'
@@ -37,5 +37,9 @@ export default function AttachPersonaScreen() {
   }, [navigation, router, t])
 
   if (!session) return null
-  return <PersonaPicker session={session} onClose={close} onChosen={() => router.back()} scrollStyle={fillScreen} />
+  return (
+    <AttachScreenFrame session={session}>
+      <PersonaPicker session={session} onClose={close} onChosen={() => router.back()} scrollStyle={fillScreen} />
+    </AttachScreenFrame>
+  )
 }
