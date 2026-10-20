@@ -5,6 +5,7 @@
   "common.back": "Back",
   "common.expand": "Open full screen",
   "common.save": "Save",
+  "common.done": "Done",
   "common.delete": "Delete",
 
   "settings.title": "Settings",
@@ -289,6 +290,9 @@
   "editor.greetingLabel": "Greeting",
   "editor.greetingHint": "The character's first message in a new chat",
   "editor.greetingPlaceholder": "*looks up from the fire* Come in, traveler",
+  "editor.notesLabel": "Notes",
+  "editor.notesHint": "Only for you: never sent to the model or put in the card",
+  "editor.notesPlaceholder": "Ideas, where the story stopped, what to try next",
   "editor.systemPromptLabel": "System prompt",
   "editor.systemPromptHint": "Personality, role, speech style and setting",
   "editor.systemPromptPlaceholder": "You are Eliara, a wandering herbalist...",

@@ -259,6 +259,10 @@ const MIGRATIONS = [
   `
     ALTER TABLE characters ADD COLUMN reasoning_budget INTEGER NOT NULL DEFAULT 2048;
   `,
+  // The user's own notes on a character. Never sent to the model.
+  `
+    ALTER TABLE characters ADD COLUMN notes TEXT NOT NULL DEFAULT '';
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

@@ -14,6 +14,7 @@ import type { MenuItem } from '../overlays/NativeMenu'
 type Props = {
   greeting: string
   systemPrompt: string
+  notes: string
   // The settings as they read, already put in words by the screen.
   params: { label: string; value: string }[]
   background: { uri: string; effect: BackgroundEffect; intensity: number } | null
@@ -24,7 +25,7 @@ type Props = {
 // A character to look at rather than to edit, as a Telegram profile: under the avatar
 // what the character is, and how it answers, in the grouped look of the editor. The name stays in the header, from where it
 // moves onto the photo when the avatar spreads. Empty parts are left out.
-export function CharacterProfile({ greeting, systemPrompt, params, background, exportItems }: Props) {
+export function CharacterProfile({ greeting, systemPrompt, notes, params, background, exportItems }: Props) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
 
@@ -41,6 +42,13 @@ export function CharacterProfile({ greeting, systemPrompt, params, background, e
         <ListSection header={t('editor.greetingLabel')}>
           <View style={styles.textCell}>
             <ClampedText text={greeting} lines={4} />
+          </View>
+        </ListSection>
+      ) : null}
+      {notes.trim() ? (
+        <ListSection header={t('editor.notesLabel')}>
+          <View style={styles.textCell}>
+            <ClampedText text={notes} lines={4} />
           </View>
         </ListSection>
       ) : null}

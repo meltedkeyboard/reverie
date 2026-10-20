@@ -126,6 +126,7 @@ export async function importCardFile(db: SQLiteDatabase, uri: string, pictureOnl
     avatar,
     avatarOriginal,
     avatarCrop: null,
+    notes: '',
     ...DEFAULT_SAMPLING,
     replyLimit: null,
     thinking: 'auto',

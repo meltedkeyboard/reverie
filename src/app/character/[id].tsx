@@ -65,6 +65,7 @@ export default function CharacterEditorScreen() {
   const [name, setName] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [greeting, setGreeting] = useState('')
+  const [notes, setNotes] = useState('')
   const [avatar, setAvatar] = useState<string | null>(null)
   // The stored copy that is shown, the original beside it and the frame between them. A
   // fresh pick is kept apart as temporary files until Save.
@@ -105,6 +106,7 @@ export default function CharacterEditorScreen() {
       setName(found.name)
       setSystemPrompt(found.systemPrompt)
       setGreeting(found.greeting)
+      setNotes(found.notes)
       setAvatar(found.avatar)
       setAvatarOriginal(found.avatarOriginal)
       setAvatarCrop(found.avatarCrop)
@@ -240,6 +242,7 @@ export default function CharacterEditorScreen() {
         avatarCrop: nextAvatarCrop,
         systemPrompt,
         greeting,
+        notes,
         temperature,
         maxTokens,
         reasoningBudget,
@@ -523,6 +526,15 @@ export default function CharacterEditorScreen() {
                   {beforeGreeting !== null ? <ButtonCell label={t('editor.undoGenerated')} onPress={undoGreeting} /> : null}
                 </ListSection>
 
+                <ListSection header={t('editor.notesLabel')} footer={t('editor.notesHint')}>
+                  <TextCell
+                    title={t('editor.notesLabel')}
+                    value={notes}
+                    placeholder={t('editor.notesPlaceholder')}
+                    onChangeText={setNotes}
+                  />
+                </ListSection>
+
                 <BackgroundSection
                   uri={backgroundUri}
                   effect={bgEffect}
@@ -593,6 +605,7 @@ export default function CharacterEditorScreen() {
               <CharacterProfile
                 greeting={greeting}
                 systemPrompt={systemPrompt}
+                notes={notes}
                 params={[
                   { label: t('editor.temperature'), value: temperature.toFixed(2) },
                   { label: t('editor.topP'), value: topP.toFixed(2) },

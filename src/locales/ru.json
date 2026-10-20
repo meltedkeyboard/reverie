@@ -5,6 +5,7 @@
   "common.back": "Назад",
   "common.expand": "Открыть на весь экран",
   "common.save": "Сохранить",
+  "common.done": "Готово",
   "common.delete": "Удалить",
 
   "settings.title": "Настройки",
@@ -289,6 +290,9 @@
   "editor.greetingLabel": "Приветствие",
   "editor.greetingHint": "Первое сообщение персонажа в новом чате",
   "editor.greetingPlaceholder": "*поднимает взгляд от костра* Проходи, путник",
+  "editor.notesLabel": "Заметки",
+  "editor.notesHint": "Только для вас: модель их не видит, и в карточку они не попадают",
+  "editor.notesPlaceholder": "Идеи, на чём остановилась история, что попробовать дальше",
   "editor.systemPromptLabel": "Системный промпт",
   "editor.systemPromptHint": "Характер, роль, манера речи и сеттинг",
   "editor.systemPromptPlaceholder": "Ты Элиара, странствующая травница...",

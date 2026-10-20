@@ -17,9 +17,9 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
+// 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 10
+const BACKUP_VERSION = 11
 
 type BackupCharacter = {
   id: number
@@ -30,6 +30,8 @@ type BackupCharacter = {
   avatarCrop?: string | null
   systemPrompt: string
   greeting: string
+  // Backups from before notes leave them out.
+  notes?: string
   temperature: number
   maxTokens: number
   // Backups from before the thinking budget leave it out.
@@ -440,6 +442,7 @@ export async function importBackup(
           avatar: await importImage(character.avatar),
           avatarOriginal: await importImage(character.avatarOriginal),
           avatarCrop: character.avatarCrop ?? null,
+          notes: character.notes ?? '',
           replyLimit: character.replyLimit ?? null,
           thinking: character.thinking ?? 'auto',
           reasoningBudget: character.reasoningBudget ?? DEFAULT_SAMPLING.reasoningBudget,

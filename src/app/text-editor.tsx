@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useInputColors } from '@/components/controls/Field'
-import { DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
+import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { useHeaderHeight } from '@/components/chrome/GlassHeader'
+import { useTranslation } from '@/i18n'
 import { textDraft } from '@/lib/chat/textDraft'
 import { useColors, useStyles, type Colors } from '@/theme'
 
@@ -19,9 +20,12 @@ export default function TextEditorScreen() {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const inputColors = useInputColors()
+  const { t } = useTranslation()
+  const input = useRef<TextInput>(null)
   // Read once: the draft may be replaced under a screen still closing.
   const [draft] = useState(textDraft)
   const [text, setText] = useState(draft?.value ?? '')
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     if (!draft) router.back()
@@ -36,7 +40,10 @@ export default function TextEditorScreen() {
       <View style={styles.screen} onStartShouldSetResponderCapture={() => true}>
         <TextInput
           {...inputColors}
+          ref={input}
           value={text}
+          onFocus={() => setEditing(true)}
+          onBlur={() => setEditing(false)}
           onChangeText={(value) => {
             setText(value)
             draft.onChange(value)
@@ -57,7 +64,22 @@ export default function TextEditorScreen() {
       </View>
       {/* Opened with a zoom from the field, so the header is drawn here rather than by the
           native bar; see DrawnFormScreenHeader. */}
-      <DrawnFormScreenHeader title={draft.title} />
+      {/* Done, as in Notes, while typing. The text is already back in the form, so all it
+          does is put the keyboard away; the form saves it the way it saves everything else. */}
+      <DrawnFormScreenHeader
+        title={draft.title}
+        right={
+          editing ? (
+            <BarButton
+              symbol="checkmark"
+              fallback="checkmark"
+              onPress={() => input.current?.blur()}
+              accessibilityLabel={t('common.done')}
+              prominent
+            />
+          ) : null
+        }
+      />
     </KeyboardAvoidingView>
   )
 }
