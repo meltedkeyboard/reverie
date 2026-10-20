@@ -325,6 +325,8 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   const { scheme } = useTheme()
   const veil = VEIL[scheme]
   const veilStyle = useAnimatedStyle(() => ({ opacity: progress.value * veil }))
+  // The list darkens the same way as the chat comes back over it.
+  const listVeilStyle = useAnimatedStyle(() => ({ opacity: (1 - progress.value) * veil }))
   const outlineStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.1], [0, 1], 'clamp'),
     display: progress.value > 0 ? 'flex' : 'none',
@@ -537,6 +539,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
                   />
                 )}
               />
+              <Animated.View pointerEvents="none" style={[styles.veil, listVeilStyle]} />
             </View>
           </GestureDetector>
         ) : null}
@@ -741,7 +744,8 @@ const createStyles = (colors: Colors) =>
       shadowRadius: 24,
     },
     clip: { flex: 1, overflow: 'hidden', borderCurve: 'continuous', backgroundColor: colors.bg },
-    // Over the chat's own floating header and composer, which stand above its content.
+    // Over the chat's own floating header and composer, which stand above its content, and
+    // over the list's glass head the same way.
     veil: { ...FILL, zIndex: 100, backgroundColor: '#000' },
     outline: {
       ...FILL,
