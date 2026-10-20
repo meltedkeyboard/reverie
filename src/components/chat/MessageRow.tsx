@@ -269,9 +269,6 @@ function RefineNote({ text, live, locked, canRegenerate, rich, onAction }: Refin
 
   const body = (
     <View style={styles.refine}>
-      <View style={styles.refineIcon}>
-        <Icon name="chatbubble-ellipses-outline" size={12} color={colors.textFaint} />
-      </View>
       {live ? (
         <ShimmerText text={text} style={styles.refineText} from={colors.textFaint} to={colors.text} wrap />
       ) : (
@@ -580,7 +577,6 @@ const createStyles = (colors: Colors) =>
   thoughtText: { color: colors.textFaint, fontSize: 13.5, lineHeight: 19, marginTop: 6 },
   refineTrigger: { alignSelf: 'flex-start', maxWidth: '100%', marginBottom: 8 },
   refine: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
-  refineIcon: { height: 17, justifyContent: 'center' },
   refineText: { color: colors.textFaint, fontSize: 13, lineHeight: 17, flexShrink: 1 },
   bar: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginLeft: -10 },
   barUser: { marginLeft: 0, marginRight: -8 },

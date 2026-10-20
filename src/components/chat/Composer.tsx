@@ -285,7 +285,8 @@ export function Composer({
 
   const armed = useSharedValue(0)
   useEffect(() => {
-    // Continuing is a secondary action, so the button stays gray instead of turning accent.
+    // Continuing is a secondary action, so the button stays gray instead of turning accent;
+    // only its symbol takes the accent, to show it does something.
     armed.value = withTiming(mode === 'idle' || mode === 'continue' ? 0 : 1, { duration: 160 })
   }, [mode, armed])
 
@@ -325,6 +326,16 @@ export function Composer({
     }
   }
 
+  const accented = mode === 'send' || mode === 'save' || mode === 'stop'
+  const sendIcon = (
+    <SFIcon
+      name={ICONS[mode].sf}
+      fallback={ICONS[mode].fallback}
+      size={mode === 'stop' ? 15 : 20}
+      color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.accent : ON_ACCENT}
+      onAccent={accented}
+    />
+  )
   const sendButton = (
     <Pressable
       onPress={onPress}
@@ -333,19 +344,16 @@ export function Composer({
       hitSlop={6}
       accessibilityLabel={mode === 'continue' ? t('chat.continueAccessibility') : undefined}
     >
-      <Animated.View style={[styles.send, buttonStyle]}>
-        {/* The symbol bounces when the button changes its meaning (send, stop, save),
-            but not when it merely lights up as the user starts typing. */}
-        <SFIcon
-          name={ICONS[mode].sf}
-          fallback={ICONS[mode].fallback}
-          size={mode === 'stop' ? 13 : 17}
-          color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.text : ON_ACCENT}
-          effect={{ effect: 'bounce' }}
-          trigger={mode === 'idle' ? 'send' : mode}
-          onAccent={mode === 'send' || mode === 'save' || mode === 'stop'}
-        />
-      </Animated.View>
+      {liquidGlass ? (
+        // Glass of its own on the field's glass, tinted with the accent while it sends. Not
+        // interactive: the field clips its corners, and the glass swelling under the finger
+        // was cut off at the field's edge.
+        <GlassSurface tintColor={accented ? colors.accent : undefined} style={styles.send}>
+          {sendIcon}
+        </GlassSurface>
+      ) : (
+        <Animated.View style={[styles.send, buttonStyle]}>{sendIcon}</Animated.View>
+      )}
     </Pressable>
   )
 
@@ -452,7 +460,7 @@ export function Composer({
       accessibilityLabel={t('attach.title')}
       style={[styles.plus, picking && { opacity: 0.55 }]}
     >
-      <Icon name="add" size={24} color={colors.text} />
+      <Icon name="add" size={27} color={colors.text} />
     </Pressable>
   )
 
@@ -807,7 +815,7 @@ const swapStyle = { zIndex: 1 }
 
 // The plus and the send button are SIDE wide; the text of a one-line field keeps clear of
 // them by SIDE_PAD. NARROW_INSET is how much narrower the field is at rest.
-const SIDE = 34
+const SIDE = 40
 // The mask that fades the scrolling text out at its edges (only the alpha counts).
 const SOLID = '#000000'
 const CLEAR = 'rgba(0,0,0,0)'
@@ -823,8 +831,8 @@ const BAR_PAD_SIDE = 10
 // The recent pictures of the attach menu: one row that scrolls sideways.
 
 // Absolute children are placed from the field's outer edge, not inside its padding.
-const EDGE = 7
-const FIELD_PAD = 5
+const EDGE = 6
+const FIELD_PAD = 7
 const SIDE_PAD = EDGE + SIDE + 8 - FIELD_PAD
 const NARROW_INSET = 16
 
