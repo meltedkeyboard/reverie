@@ -10,6 +10,7 @@ import { Pattern } from '@/components/visuals/Pattern'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { ButtonCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
+import { Segmented } from '@/components/controls/Segmented'
 import { SourceCell } from '@/components/lists/PictureCells'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Markdown } from '@/components/chat/Markdown'
@@ -35,7 +36,7 @@ import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { installedFontFamilies } from '../../modules/reverie-fonts'
-import { type Colors, ON_ACCENT, paletteOf, type ThemePreference, useColors, useStyles, useTheme } from '@/theme'
+import { type Colors, FILL, ON_ACCENT, paletteOf, THEMES, type ThemeMode, type ThemeName, useColors, useStyles, useTheme } from '@/theme'
 
 const FIELD_HEIGHT = 48
 // A tile shows a whole 393 x 852 board, small.
@@ -58,48 +59,25 @@ function snap(value: number) {
 const THEME_TILE_WIDTH = 80
 const THEME_TILE_HEIGHT = 80
 
-function ThemePreviewTile({
-  value,
-  selected,
-  font,
-}: {
-  value: ThemePreference
-  selected: boolean
-  font: string
-}) {
+// A theme is shown as its two halves, light and dark, with "Aa" in the chat font.
+function ThemePreviewTile({ theme, selected, font }: { theme: ThemeName; selected: boolean; font: string }) {
   const styles = useStyles(createStyles)
-  const chatFontFamily = font === SYSTEM_FONT ? undefined : font
-
-  if (value === 'system') {
-    const light = paletteOf('light')
-    const dark = paletteOf('dark')
-    return (
-      <View style={[styles.themeTile, selected && styles.themeTileSelected]}>
-        <View style={styles.splitRow}>
-          <View style={[styles.themeTileHalfLeft, { backgroundColor: light.bg }]}>
-            <Text style={[styles.themeTileFontSample, { color: light.text, fontFamily: chatFontFamily }]}>
-              A
-            </Text>
-            <View style={[styles.themeAccentDotLeft, { backgroundColor: light.accent }]} />
-          </View>
-          <View style={[styles.themeTileHalfRight, { backgroundColor: dark.bg }]}>
-            <Text style={[styles.themeTileFontSample, { color: dark.text, fontFamily: chatFontFamily }]}>
-              a
-            </Text>
-            <View style={[styles.themeAccentDotRight, { backgroundColor: dark.accent }]} />
-          </View>
-        </View>
-      </View>
-    )
-  }
-
-  const p = paletteOf(value)
+  const fontFamily = font === SYSTEM_FONT ? undefined : font
+  const light = paletteOf(theme, 'light')
+  const dark = paletteOf(theme, 'dark')
   return (
-    <View style={[styles.themeTile, selected && styles.themeTileSelected, { backgroundColor: p.bg }]}>
-      <Text style={[styles.themeTileFontSample, { color: p.text, fontFamily: chatFontFamily }]}>
-        Aa
-      </Text>
-      <View style={[styles.themeAccentDot, { backgroundColor: p.accent }]} />
+    <View style={styles.themeTile}>
+      <View style={[styles.themeTileHalfLeft, { backgroundColor: light.bg }]}>
+        <Text style={[styles.themeTileFontSample, { color: light.text, fontFamily }]}>A</Text>
+        <View style={[styles.themeAccentDotLeft, { backgroundColor: light.accent }]} />
+      </View>
+      <View style={[styles.themeTileHalfRight, { backgroundColor: dark.bg }]}>
+        <Text style={[styles.themeTileFontSample, { color: dark.text, fontFamily }]}>a</Text>
+        <View style={[styles.themeAccentDotRight, { backgroundColor: dark.accent }]} />
+      </View>
+      {/* Drawn over the halves rather than as the tile's border, so an unselected tile has
+          no ring at all and does not shrink when it gains one. */}
+      {selected ? <View style={styles.themeTileRing} pointerEvents="none" /> : null}
     </View>
   )
 }
@@ -112,15 +90,11 @@ export default function ChatTextScreen() {
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const { preference, setPreference } = useTheme()
-  const themeOptions: { value: ThemePreference; label: string }[] = [
+  const { theme, setTheme, mode, setMode } = useTheme()
+  const modeOptions: { value: ThemeMode; label: string }[] = [
     { value: 'system', label: t('theme.system') },
     { value: 'light', label: t('theme.light') },
-    { value: 'warm', label: t('theme.warm') },
     { value: 'dark', label: t('theme.dark') },
-    { value: 'warm-dark', label: t('theme.warm-dark') },
-    { value: 'black', label: t('theme.black') },
-    { value: 'grey', label: t('theme.grey') },
   ]
   const {
     font,
@@ -254,28 +228,31 @@ export default function ChatTextScreen() {
       <ScrollView contentContainerStyle={padding}>
         <ListSection header={t('settings.theme')}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeTiles}>
-            {themeOptions.map((o) => {
-              const selected = preference === o.value
+            {THEMES.map((name) => {
+              const selected = theme === name
               return (
                 <Pressable
-                  key={o.value}
+                  key={name}
                   onPress={() => {
                     if (!selected) Haptics.selectionAsync()
-                    setPreference(o.value)
+                    setTheme(name)
                   }}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
-                  accessibilityLabel={o.label}
+                  accessibilityLabel={t(`theme.${name}`)}
                   style={styles.themeTileButton}
                 >
-                  <ThemePreviewTile value={o.value} selected={selected} font={font} />
-                  <Text style={[styles.themeLabel, selected && styles.themeLabelSelected, selected && { color: colors.text }]} numberOfLines={2}>
-                    {o.label}
+                  <ThemePreviewTile theme={name} selected={selected} font={font} />
+                  <Text style={[styles.themeLabel, selected && styles.themeLabelSelected]} numberOfLines={2}>
+                    {t(`theme.${name}`)}
                   </Text>
                 </Pressable>
               )
             })}
           </ScrollView>
+          <View style={styles.themeMode}>
+            <Segmented options={modeOptions} value={mode} onChange={setMode} />
+          </View>
         </ListSection>
 
         {/* A made-up exchange, so a change shows at once as it will look in a chat. */}
@@ -505,7 +482,7 @@ const createStyles = (colors: Colors) =>
       justifyContent: 'center',
     },
     tileLabel: { color: colors.textMuted, fontSize: 12 },
-    themeTiles: { gap: 12, padding: 16 },
+    themeTiles: { gap: 12, padding: 16, paddingBottom: 8 },
     themeTileButton: { width: THEME_TILE_WIDTH, alignItems: 'center', gap: 8 },
     themeTile: {
       width: THEME_TILE_WIDTH,
@@ -513,38 +490,28 @@ const createStyles = (colors: Colors) =>
       borderRadius: 16,
       borderCurve: 'continuous',
       overflow: 'hidden',
-      borderWidth: 2,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
+      flexDirection: 'row',
     },
-    themeTileSelected: {
+    themeTileRing: {
+      ...FILL,
+      borderRadius: 16,
+      borderCurve: 'continuous',
+      borderWidth: 2,
       borderColor: colors.accent,
     },
     themeLabel: {
       color: colors.textMuted,
       fontSize: 12,
       textAlign: 'center',
-      minHeight: 28,
     },
     themeLabelSelected: {
+      color: colors.text,
       fontWeight: '600',
     },
+    themeMode: { paddingHorizontal: 16, paddingBottom: 16 },
     themeTileFontSample: {
       fontSize: 28,
       includeFontPadding: false,
-    },
-    themeAccentDot: {
-      position: 'absolute',
-      bottom: 8,
-      right: 8,
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-    },
-    splitRow: {
-      flex: 1,
-      flexDirection: 'row',
     },
     themeTileHalfLeft: {
       flex: 1,

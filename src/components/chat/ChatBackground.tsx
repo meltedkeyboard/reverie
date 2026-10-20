@@ -2,7 +2,7 @@ import { Image } from 'expo-image'
 import { StyleSheet, View } from 'react-native'
 
 import type { BackgroundEffect } from '@/db/characters'
-import { FILL, paletteOf, useColors } from '@/theme'
+import { FILL, paletteOf, useTheme } from '@/theme'
 
 // How far each effect goes at full intensity.
 const MAX_BLUR = 40
@@ -12,10 +12,10 @@ type Props = { uri: string; effect: BackgroundEffect; intensity: number }
 
 // The picture behind a chat. Blur softens it; dim lays a background color over it: the
 // theme's own by default, which darkens it in the dark theme and washes it out in the light
-// one, so the text on top keeps its contrast either way, or the light or the dark one always.
+// one, so the text on top keeps its contrast either way, or the theme's light or dark one always.
 export function ChatBackground({ uri, effect, intensity }: Props) {
-  const colors = useColors()
-  const dim = effect === 'dim-light' ? paletteOf('light').bg : effect === 'dim-dark' ? paletteOf('dark').bg : colors.bg
+  const { colors, theme } = useTheme()
+  const dim = effect === 'dim-light' ? paletteOf(theme, 'light').bg : effect === 'dim-dark' ? paletteOf(theme, 'dark').bg : colors.bg
   return (
     <View style={styles.root} pointerEvents="none">
       <Image

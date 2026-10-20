@@ -18,7 +18,7 @@ import { isConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { loadFileLimits } from '@/db/prefs/fileLimits'
 import { isHapticsEnabled } from '@/db/prefs/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
-import { loadLocalePreference, loadThemePreference, saveLocalePreference, saveThemePreference } from '@/db/prefs/settings'
+import { loadLocalePreference, loadThemeMode, loadThemeName, saveLocalePreference, saveThemeMode, saveThemeName } from '@/db/prefs/settings'
 import { CloudSyncProvider } from '@/hooks/features/useCloudSync'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
@@ -26,7 +26,7 @@ import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
 import { ChatTextProvider } from '@/lib/chat/chatText'
 import { isElectron, isWeb } from '@/lib/core/platform'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
-import { colors as darkColors, ThemeContextProvider, useTheme, type ThemePreference } from '@/theme'
+import { colors as darkColors, ThemeContextProvider, useTheme, type ThemeMode, type ThemeName } from '@/theme'
 
 export default function RootLayout() {
   return (
@@ -47,7 +47,8 @@ export default function RootLayout() {
 function ThemedApp() {
   const db = useDatabase()
   const { fontScale } = useWindowDimensions()
-  const [preference, setPreference] = useStoredValue<ThemePreference>(loadThemePreference, saveThemePreference, 'system')
+  const [theme, setTheme] = useStoredValue<ThemeName>(loadThemeName, saveThemeName, 'default')
+  const [themeMode, setThemeMode] = useStoredValue<ThemeMode>(loadThemeMode, saveThemeMode, 'system')
   const [localePreference, setLocalePreference] = useStoredValue<LocalePreference>(loadLocalePreference, saveLocalePreference, 'system')
 
   useEffect(() => {
@@ -58,7 +59,7 @@ function ThemedApp() {
 
   return (
     <LocaleContextProvider preference={localePreference} setPreference={setLocalePreference}>
-      <ThemeContextProvider preference={preference} setPreference={setPreference}>
+      <ThemeContextProvider theme={theme} setTheme={setTheme} mode={themeMode} setMode={setThemeMode}>
         <CloudSyncProvider>
           <ChatTextProvider>
             <AppLock>

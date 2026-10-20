@@ -13,6 +13,7 @@ import {
   type ContextMode,
 } from '@/lib/core/context'
 import { FONTS } from '@/lib/core/platform'
+import { THEMES, type Scheme, type ThemeMode, type ThemeName } from '@/theme'
 
 export type ServerSettings = {
   baseUrl: string
@@ -166,9 +167,35 @@ export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
   return next
 }
 
-const themePreference = defineChoice('theme_preference', ['system', 'light', 'dark', 'warm-dark', 'black', 'grey', 'warm'] as const, 'system')
-export const loadThemePreference = themePreference.load
-export const saveThemePreference = themePreference.save
+// theme_preference once held the whole look ('warm', 'black', ...); it now holds only the
+// mode, and the palette has a key of its own. A value from before is read as both.
+const THEME_KEY = 'theme_name'
+const THEME_MODE_KEY = 'theme_preference'
+const LEGACY_THEMES: Record<string, { name: ThemeName; mode: Scheme }> = {
+  warm: { name: 'warm', mode: 'light' },
+  'warm-dark': { name: 'warm', mode: 'dark' },
+  black: { name: 'oled', mode: 'dark' },
+  grey: { name: 'neutral', mode: 'dark' },
+}
+
+export async function loadThemeName(db: SQLiteDatabase) {
+  const value = await getSetting(db, THEME_KEY)
+  const stored = THEMES.find((v) => v === value)
+  if (stored) return stored
+  const name = LEGACY_THEMES[(await getSetting(db, THEME_MODE_KEY)) ?? '']?.name ?? 'default'
+  // Written at once, so a mode picked later does not lose the palette it was read from.
+  await setSetting(db, THEME_KEY, name)
+  return name
+}
+
+export const saveThemeName = (db: SQLiteDatabase, name: ThemeName) => setSetting(db, THEME_KEY, name)
+
+export async function loadThemeMode(db: SQLiteDatabase): Promise<ThemeMode> {
+  const value = (await getSetting(db, THEME_MODE_KEY)) ?? ''
+  return LEGACY_THEMES[value]?.mode ?? (value === 'light' || value === 'dark' ? value : 'system')
+}
+
+export const saveThemeMode = (db: SQLiteDatabase, mode: ThemeMode) => setSetting(db, THEME_MODE_KEY, mode)
 
 const localePreference = defineChoice('locale_preference', ['system', 'ru', 'en'] as const, 'system')
 export const loadLocalePreference = localePreference.load

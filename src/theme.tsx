@@ -5,8 +5,10 @@ import { FONTS, isDesktop, isWeb } from '@/lib/core/platform'
 import { createRequiredContext } from '@/lib/core/requiredContext'
 
 export type Scheme = 'light' | 'dark'
-export type AppTheme = 'light' | 'dark' | 'black' | 'grey' | 'warm' | 'warm-dark'
-export type ThemePreference = AppTheme | 'system'
+// A theme is a pair of palettes, a light and a dark one; the mode picks which is shown.
+export const THEMES = ['default', 'warm', 'neutral', 'oled'] as const
+export type ThemeName = (typeof THEMES)[number]
+export type ThemeMode = Scheme | 'system'
 
 export type Colors = {
   bg: string
@@ -111,6 +113,34 @@ const lightColors: Colors = {
   borderStrong: 'rgba(0, 0, 0, 0.14)',
   pattern: '#ECECEF',
   cast: ['#C26A12', '#1F86B5', '#C0407F', '#2F8F3A', '#6D4FD1', '#9A7A00'],
+}
+
+// The light half of the neutral grey theme: the same balanced greys, no violet in them.
+const neutralLightColors: Colors = {
+  ...lightColors,
+  bg: '#F4F4F4',
+  bgRgb: '244, 244, 244',
+  surface: '#FFFFFF',
+  surfaceRaised: '#EBEBEB',
+  bubble: '#E6E6E6',
+  border: 'rgba(0, 0, 0, 0.08)',
+  borderStrong: 'rgba(0, 0, 0, 0.14)',
+  pattern: '#EBEBEB',
+  text: '#171717',
+}
+
+// The light half of OLED: pure white with black ink, as stark as the black one.
+const oledLightColors: Colors = {
+  ...lightColors,
+  bg: '#FFFFFF',
+  bgRgb: '255, 255, 255',
+  surface: '#F2F2F2',
+  surfaceRaised: '#E8E8E8',
+  bubble: '#EDEDED',
+  border: 'rgba(0, 0, 0, 0.10)',
+  borderStrong: 'rgba(0, 0, 0, 0.18)',
+  pattern: '#F4F4F4',
+  text: '#000000',
 }
 
 // Warm paper / linen palette for comfortable reading: soft parchment background, warm dark ink, terracotta accent.
@@ -243,12 +273,27 @@ const desktopWarmDarkColors: Colors = {
   textFaint: '#7A7266',
 }
 
-const palettes: Record<AppTheme, Colors> = isDesktop
-  ? { dark: desktopDarkColors, light: desktopLightColors, black: desktopBlackColors, grey: desktopGreyColors, warm: desktopWarmColors, 'warm-dark': desktopWarmDarkColors }
-  : { dark: darkColors, light: lightColors, black: blackColors, grey: greyColors, warm: warmColors, 'warm-dark': warmDarkColors }
+const desktopOledLightColors: Colors = {
+  ...desktopLightColors,
+  text: '#000000',
+  textMuted: '#4A4A4A',
+}
 
-// A palette by its theme or scheme, for what keeps one look whatever the theme.
-export const paletteOf = (choice: AppTheme | Scheme): Colors => palettes[choice] ?? (choice === 'light' || choice === 'warm' ? palettes.light : palettes.dark)
+const palettes: Record<ThemeName, Record<Scheme, Colors>> = isDesktop
+  ? {
+      default: { light: desktopLightColors, dark: desktopDarkColors },
+      warm: { light: desktopWarmColors, dark: desktopWarmDarkColors },
+      neutral: { light: desktopLightColors, dark: desktopGreyColors },
+      oled: { light: desktopOledLightColors, dark: desktopBlackColors },
+    }
+  : {
+      default: { light: lightColors, dark: darkColors },
+      warm: { light: warmColors, dark: warmDarkColors },
+      neutral: { light: neutralLightColors, dark: greyColors },
+      oled: { light: oledLightColors, dark: blackColors },
+    }
+
+export const paletteOf = (theme: ThemeName, scheme: Scheme): Colors => palettes[theme][scheme]
 
 // Exported for the handful of places that render before ThemeContextProvider can mount
 // (StartupBoundary's error screen, which may appear if the database itself fails to
@@ -274,36 +319,40 @@ export const HEADER_FONT_SCALE = 1.2
 type ThemeContextValue = {
   colors: Colors
   scheme: Scheme
-  theme: AppTheme
-  preference: ThemePreference
-  setPreference: (pref: ThemePreference) => void
+  theme: ThemeName
+  setTheme: (theme: ThemeName) => void
+  mode: ThemeMode
+  setMode: (mode: ThemeMode) => void
 }
 
 const [ThemeContext, useThemeContext] = createRequiredContext<ThemeContextValue>('useColors/useTheme must be used within ThemeContextProvider')
 
 export function ThemeContextProvider({
-  preference,
-  setPreference,
+  theme,
+  setTheme,
+  mode,
+  setMode,
   children,
 }: {
-  preference: ThemePreference
-  setPreference: (pref: ThemePreference) => void
+  theme: ThemeName
+  setTheme: (theme: ThemeName) => void
+  mode: ThemeMode
+  setMode: (mode: ThemeMode) => void
   children: React.ReactNode
 }) {
   const systemScheme = useColorScheme()
-  const theme: AppTheme = preference === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : preference
-  const scheme: Scheme = theme === 'light' || theme === 'warm' ? 'light' : 'dark'
+  const scheme: Scheme = mode === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : mode
+  const colors = palettes[theme][scheme]
   // Alerts, action sheets and the keyboard follow the window rather than the app, so
   // a theme picked in the app is passed down to it; 'system' gives it back to iOS.
   // react-native-web has no setColorScheme, and the page has no such windows.
   useEffect(() => {
-    Appearance.setColorScheme?.(preference === 'system' ? 'unspecified' : scheme)
-  }, [preference, scheme])
+    Appearance.setColorScheme?.(mode === 'system' ? 'unspecified' : scheme)
+  }, [mode, scheme])
   // On the web (the desktop app) the scrollbars are drawn by the browser; they are
   // restyled from the palette so they match the theme instead of the OS default.
   useEffect(() => {
     if (!isWeb || typeof document === 'undefined') return
-    const c = palettes[theme]
     const thumb = scheme === 'dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.22)'
     const thumbHover = scheme === 'dark' ? 'rgba(255, 255, 255, 0.32)' : 'rgba(0, 0, 0, 0.38)'
     let el = document.getElementById('reverie-scrollbars') as HTMLStyleElement | null
@@ -324,13 +373,13 @@ export function ThemeContextProvider({
         border-radius: 999px;
       }
       *::-webkit-scrollbar-thumb:hover { background-color: ${thumbHover}; }
-      *::-webkit-scrollbar-thumb:active { background-color: ${c.accent}; }
+      *::-webkit-scrollbar-thumb:active { background-color: ${colors.accent}; }
     `
-    if (isDesktop) applyDesktopChrome(c)
-  }, [theme, scheme])
+    if (isDesktop) applyDesktopChrome(colors)
+  }, [colors, scheme])
   const value = useMemo(
-    () => ({ colors: palettes[theme], scheme, theme, preference, setPreference }),
-    [theme, scheme, preference, setPreference]
+    () => ({ colors, scheme, theme, setTheme, mode, setMode }),
+    [colors, scheme, theme, setTheme, mode, setMode]
   )
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
@@ -344,7 +393,7 @@ export function useTheme() {
 }
 
 // StyleSheet.create bakes in the colors it is given, so styles are built per palette.
-// There are only two palettes, so each factory's result is kept for each of them and
+// There are only a few palettes, so each factory's result is kept for each of them and
 // every instance of a component shares it instead of building its own.
 const styleCache = new WeakMap<object, WeakMap<Colors, unknown>>()
 
