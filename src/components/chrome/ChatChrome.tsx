@@ -66,14 +66,16 @@ export function useChatBackdropTone(owner: ChatLook | null | undefined): 'light'
 }
 
 // The chat's background under a sheet or the drawer's list, on the chat's own color, which
-// covers the sheet's; nothing when `useChatBackdrop` says no. `blurred` as in ChatSurface.
-export function ChatBackdrop({ owner, blurred }: { owner: ChatLook | null | undefined; blurred?: boolean }) {
+// covers the sheet's; nothing when `useChatBackdrop` says no. A picture is always fully
+// blurred and dimmed the same (`blurred` of ChatSurface), whatever the chat's own effect:
+// what is laid over it reads at any strength chosen for the chat.
+export function ChatBackdrop({ owner }: { owner: ChatLook | null | undefined }) {
   const colors = useColors()
   const shown = useChatBackdrop(owner)
   if (!shown || !owner) return null
   return (
     <View pointerEvents="none" style={[styles.backdrop, { backgroundColor: colors.bg }]}>
-      <ChatSurface owner={owner} anchor={false} blurred={blurred} />
+      <ChatSurface owner={owner} anchor={false} blurred />
     </View>
   )
 }

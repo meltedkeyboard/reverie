@@ -65,7 +65,7 @@ export function CharacterProfile({ greeting, systemPrompt, notes, params, backgr
         <ListSection header={t('background.title')}>
           <View style={styles.backgroundCell}>
             <View style={styles.backgroundThumb}>
-              <ChatBackground uri={background.uri} crop={background.crop} effect={background.effect} intensity={background.intensity} still />
+              <ChatBackground uri={background.uri} crop={background.crop} effect={background.effect} intensity={background.intensity} />
             </View>
           </View>
         </ListSection>

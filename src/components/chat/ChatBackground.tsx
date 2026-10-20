@@ -22,23 +22,21 @@ const BLURRED_DIM = 0.38
 const BLEED = 2
 
 // `blurred` sets the effect aside for a full blur and a fixed dim in the effect's color
-// (the theme's for a blur), as under the drawer's list. `crop` is the frame of a moving
-// background, which is drawn from its whole file; a still one is already cut to it. `still`
-// holds a moving one on its first frame, for a thumbnail.
+// (the theme's for a blur), as under the drawer's list and the menus. `crop` is the frame of
+// a moving background, which is drawn from its whole file; a still one is already cut to it.
 type Props = {
   uri: string
   effect: BackgroundEffect
   intensity: number
   blurred?: boolean
   crop?: CropRect | null
-  still?: boolean
   onVideoSize?: (size: { width: number; height: number }) => void
 }
 
 // The picture behind a chat. Blur softens it; dim lays a background color over it: the
 // theme's own by default, which darkens it in the dark theme and washes it out in the light
 // one, so the text on top keeps its contrast either way, or the theme's light or dark one always.
-export function ChatBackground({ uri, effect, intensity, blurred = false, crop = null, still = false, onVideoSize }: Props) {
+export function ChatBackground({ uri, effect, intensity, blurred = false, crop = null, onVideoSize }: Props) {
   const { colors, theme, scheme } = useTheme()
   const dim = effect === 'dim-light' ? paletteOf(theme, 'light').bg : effect === 'dim-dark' ? paletteOf(theme, 'dark').bg : colors.bg
   const blur = blurred ? 1 : effect === 'blur' ? intensity : 0
@@ -50,7 +48,7 @@ export function ChatBackground({ uri, effect, intensity, blurred = false, crop =
   const focused = useIsFocused()
   const [view, setView] = useState<{ width: number; height: number } | null>(null)
   const target = useRef<ViewRef>(null)
-  const paused = still || reduceMotion || (moving === 'video' && !focused)
+  const paused = reduceMotion || (moving === 'video' && !focused)
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout

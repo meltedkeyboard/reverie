@@ -42,21 +42,29 @@ function LoopingVideo({ uri, style, contentFit, paused, onVideoSize }: Required<
     // A silent avatar must not pause the user's music.
     p.audioMixingMode = 'mixWithOthers'
   })
-  // A player that was never started may show no frame at all, so a paused one still plays
-  // up to its first frame and stops there.
-  const shown = useRef(false)
-  const pausedNow = useRef(paused)
-  pausedNow.current = paused
   useEffect(() => {
-    if (paused && shown.current) {
+    if (!paused) {
+      player.play()
+      // The system stops the player while the app is away and need not start it again.
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') player.play()
+      })
+      return () => sub.remove()
+    }
+    if (player.currentTime > 0) {
       player.pause()
       return
     }
+    // A player never started draws nothing, and a frame of the file cannot always be taken
+    // as a picture (iOS fails some files with "Cannot Open"), so a paused one plays until its
+    // time moves, a frame then being on screen, and stops there.
+    player.timeUpdateEventInterval = 0.1
     player.play()
-    if (paused) return
-    // The system stops the player while the app is away and need not start it again.
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') player.play()
+    const sub = player.addListener('timeUpdate', ({ currentTime }) => {
+      if (currentTime <= 0) return
+      player.pause()
+      player.timeUpdateEventInterval = 0
+      sub.remove()
     })
     return () => sub.remove()
   }, [player, paused])
@@ -85,10 +93,6 @@ function LoopingVideo({ uri, style, contentFit, paused, onVideoSize }: Required<
       contentFit={contentFit}
       nativeControls={false}
       allowsPictureInPicture={false}
-      onFirstFrameRender={() => {
-        shown.current = true
-        if (pausedNow.current) player.pause()
-      }}
     />
   )
 }

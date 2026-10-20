@@ -372,7 +372,6 @@ export default function ChatTextScreen() {
                     crop={cropFromJson(wallpaper?.crop ?? null)}
                     effect={wallpaper?.effect ?? 'blur'}
                     intensity={wallpaper?.intensity ?? 0.5}
-                    still
                   />
                 ) : (
                   <View style={styles.customTileEmpty}>

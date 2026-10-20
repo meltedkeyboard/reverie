@@ -463,7 +463,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
       <View style={styles.root}>
         {/* Always fully blurred and a little dimmed in the color of the chat's own dim, whatever
             its strength: the list's text reads over it, and the chat sliding over it stands out. */}
-        {enabled ? <ChatBackdrop owner={lookOf(owner)} blurred /> : null}
+        {enabled ? <ChatBackdrop owner={lookOf(owner)} /> : null}
         {enabled ? (
           <GestureDetector gesture={listPan}>
             <View

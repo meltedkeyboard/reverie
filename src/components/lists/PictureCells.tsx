@@ -108,7 +108,7 @@ export function BackgroundSection({
       {uri ? (
         <View style={styles.thumbCell}>
           <View style={styles.thumb}>
-            <ChatBackground uri={uri} crop={crop} effect={effect} intensity={intensity} still />
+            <ChatBackground uri={uri} crop={crop} effect={effect} intensity={intensity} />
           </View>
         </View>
       ) : null}
