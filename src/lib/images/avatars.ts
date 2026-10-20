@@ -3,7 +3,7 @@ import { File } from 'expo-file-system'
 
 import { t } from '@/i18n'
 import { newAvatarName, pickUris, type ImageSource } from '@/lib/images/images'
-import { avatarLimitBytes } from '@/lib/settings/fileLimits'
+import { avatarLimitBytes, backgroundLimitBytes } from '@/lib/settings/fileLimits'
 import { extensionOf, movingKind } from '@/lib/images/media'
 import { readAvatarBase64, removeAvatar, writeAvatarBase64, type ImageKind } from './avatarStore'
 
@@ -15,8 +15,10 @@ export { avatarUri, persistAvatar, persistOriginal, removeAvatar, readAvatarBase
 const SIDE = 512
 
 // The frame cut out of an original, in its pixels (as drawn, with its orientation applied).
-// Stored as JSON beside the original; null means the default frame.
-export type CropRect = { originX: number; originY: number; width: number; height: number }
+// Stored as JSON beside the original; null means the default frame. A moving background,
+// which no cut can be made of, also keeps the size of its file, so the chat can lay it out
+// at its frame before a single frame is decoded.
+export type CropRect = { originX: number; originY: number; width: number; height: number; sourceWidth?: number; sourceHeight?: number }
 
 export const cropToJson = (crop: CropRect | null) => (crop ? JSON.stringify(crop) : null)
 
@@ -64,11 +66,18 @@ export async function squareAvatar(uri: string, rect?: CropRect) {
 
 const BACKGROUND_SIDE = 1600
 
-// A picture for behind the chat, as picked: it is framed on /background, which makes the
-// copy the chat shows. Null when nothing was chosen.
+// A picture, GIF or video for behind the chat, as picked: it is framed on /background, which
+// makes the copy the chat shows of a still one. Null when nothing was chosen. Throws for a
+// moving file the chat cannot play or one over the background limit.
 export async function pickBackground(source: ImageSource) {
-  const [uri] = await pickUris(source, false)
-  return uri ?? null
+  const [uri] = await pickUris(source, false, true)
+  if (!uri) return null
+  if (extensionOf(uri) === 'webm') throw new Error(t('background.webm'))
+  const limit = backgroundLimitBytes()
+  if (movingKind(uri) && (new File(uri).size ?? 0) > limit) {
+    throw new Error(t('background.tooBig', { mb: Math.round(limit / 1024 / 1024) }))
+  }
+  return uri
 }
 
 // The part of the original the chat shows (all of it without a frame), shrunk to a size a

@@ -22,7 +22,7 @@ import { isAppLockEnabled, setAppLockEnabled } from '@/db/prefs/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/prefs/continue'
 import { getFileLimits } from '@/lib/settings/fileLimits'
-import { loadFileLimits, setAttachmentLimitMb, setAvatarLimitMb, setLimitsOff } from '@/db/prefs/fileLimits'
+import { loadFileLimits, setAttachmentLimitMb, setAvatarLimitMb, setBackgroundLimitMb, setLimitsOff } from '@/db/prefs/fileLimits'
 import { isHapticsEnabled, setHapticsEnabled } from '@/db/prefs/haptics'
 import {
   isRecentAttachmentsEnabled,
@@ -214,16 +214,17 @@ export default function SettingsScreen() {
   }
   // The size limits: the numbers may be empty while being retyped, a number below 1 is not kept.
   const [limits, setLimits] = useState(getFileLimits)
-  const [limitDrafts, setLimitDrafts] = useState<{ avatarMb?: string; attachmentMb?: string }>({})
+  const [limitDrafts, setLimitDrafts] = useState<{ avatarMb?: string; backgroundMb?: string; attachmentMb?: string }>({})
   useEffect(() => {
     loadFileLimits(db).then(setLimits)
   }, [db])
-  const typeLimit = (field: 'avatarMb' | 'attachmentMb', text: string) => {
+  const typeLimit = (field: 'avatarMb' | 'backgroundMb' | 'attachmentMb', text: string) => {
     const { digits, count } = typedCount(text)
     setLimitDrafts((d) => ({ ...d, [field]: digits }))
     if (!count) return
     setLimits((l) => ({ ...l, [field]: count }))
     if (field === 'avatarMb') setAvatarLimitMb(db, count)
+    else if (field === 'backgroundMb') setBackgroundLimitMb(db, count)
     else setAttachmentLimitMb(db, count)
   }
   const [exporting, setExporting] = useState(false)
@@ -1047,6 +1048,13 @@ export default function SettingsScreen() {
         label={t('settings.limitAvatar')}
         value={limitDrafts.avatarMb ?? String(limits.avatarMb)}
         onChangeText={(text) => typeLimit('avatarMb', text)}
+        keyboardType="number-pad"
+        disabled={limits.off}
+      />
+      <InputCell
+        label={t('settings.limitBackground')}
+        value={limitDrafts.backgroundMb ?? String(limits.backgroundMb)}
+        onChangeText={(text) => typeLimit('backgroundMb', text)}
         keyboardType="number-pad"
         disabled={limits.off}
       />

@@ -7,6 +7,7 @@ import { GlassMerge } from '@/components/chrome/Glass'
 import { Chip } from '@/components/controls/Chip'
 import type { BackgroundEffect } from '@/db/characters'
 import { useTranslation } from '@/i18n'
+import type { CropRect } from '@/lib/images/avatars'
 import type { ImageSource } from '@/lib/images/images'
 import { isWeb } from '@/lib/core/platform'
 import { type Colors, useStyles } from '@/theme'
@@ -85,6 +86,7 @@ export function SourceCell({ label, onPick }: { label: string; onPick: (source: 
 // one comes from, and reframing or removing the one there is.
 export function BackgroundSection({
   uri,
+  crop,
   effect,
   intensity,
   onPick,
@@ -92,6 +94,7 @@ export function BackgroundSection({
   onClear,
 }: {
   uri: string | null
+  crop: CropRect | null
   effect: BackgroundEffect
   intensity: number
   onPick: (source: ImageSource) => void
@@ -105,7 +108,7 @@ export function BackgroundSection({
       {uri ? (
         <View style={styles.thumbCell}>
           <View style={styles.thumb}>
-            <ChatBackground uri={uri} effect={effect} intensity={intensity} />
+            <ChatBackground uri={uri} crop={crop} effect={effect} intensity={intensity} still />
           </View>
         </View>
       ) : null}

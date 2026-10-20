@@ -19,7 +19,7 @@ export type AttachSession = {
   // Tells one opening from the next, so the app's own sheet starts its menu afresh.
   opened: number
   // The look of the chat the menu opened over, whose background it may carry (ChatBackdrop).
-  look?: Pick<Character, 'background' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency'> | null
+  look?: Pick<Character, 'background' | 'backgroundCrop' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency'> | null
   thinking?: boolean
   onToggleThinking?: (thinking: boolean) => void
   persona?: Persona | null

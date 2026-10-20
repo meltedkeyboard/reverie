@@ -5,6 +5,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTim
 
 import type { BackgroundEffect } from '@/db/characters'
 import { useTranslation } from '@/i18n'
+import type { CropRect } from '@/lib/images/avatars'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 import { ChatBackground } from '../chat/ChatBackground'
@@ -17,7 +18,7 @@ type Props = {
   notes: string
   // The settings as they read, already put in words by the screen.
   params: { label: string; value: string }[]
-  background: { uri: string; effect: BackgroundEffect; intensity: number } | null
+  background: { uri: string; crop: CropRect | null; effect: BackgroundEffect; intensity: number } | null
   // The choices of the export button at the bottom; without them there is no button.
   exportItems?: MenuItem[]
 }
@@ -64,7 +65,7 @@ export function CharacterProfile({ greeting, systemPrompt, notes, params, backgr
         <ListSection header={t('background.title')}>
           <View style={styles.backgroundCell}>
             <View style={styles.backgroundThumb}>
-              <ChatBackground uri={background.uri} effect={background.effect} intensity={background.intensity} />
+              <ChatBackground uri={background.uri} crop={background.crop} effect={background.effect} intensity={background.intensity} still />
             </View>
           </View>
         </ListSection>

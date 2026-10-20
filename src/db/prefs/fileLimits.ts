@@ -1,10 +1,11 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { getFlag, getSetting, positiveInt, setFlag, setSetting } from '@/db/prefs/settings'
-import { DEFAULT_ATTACHMENT_MB, DEFAULT_AVATAR_MB, getFileLimits, setFileLimits } from '@/lib/settings/fileLimits'
+import { DEFAULT_ATTACHMENT_MB, DEFAULT_AVATAR_MB, DEFAULT_BACKGROUND_MB, getFileLimits, setFileLimits } from '@/lib/settings/fileLimits'
 
 const OFF_KEY = 'limits_off'
 const AVATAR_KEY = 'limit_avatar_mb'
+const BACKGROUND_KEY = 'limit_background_mb'
 const ATTACHMENT_KEY = 'limit_attachment_mb'
 
 // Read at startup and by the Settings screen; also fills the in-memory copy.
@@ -12,6 +13,7 @@ export async function loadFileLimits(db: SQLiteDatabase) {
   const limits = {
     off: await getFlag(db, OFF_KEY, false),
     avatarMb: positiveInt(await getSetting(db, AVATAR_KEY), DEFAULT_AVATAR_MB),
+    backgroundMb: positiveInt(await getSetting(db, BACKGROUND_KEY), DEFAULT_BACKGROUND_MB),
     attachmentMb: positiveInt(await getSetting(db, ATTACHMENT_KEY), DEFAULT_ATTACHMENT_MB),
   }
   setFileLimits(limits)
@@ -26,6 +28,11 @@ export async function setLimitsOff(db: SQLiteDatabase, off: boolean) {
 export async function setAvatarLimitMb(db: SQLiteDatabase, mb: number) {
   setFileLimits({ ...getFileLimits(), avatarMb: mb })
   await setSetting(db, AVATAR_KEY, String(mb))
+}
+
+export async function setBackgroundLimitMb(db: SQLiteDatabase, mb: number) {
+  setFileLimits({ ...getFileLimits(), backgroundMb: mb })
+  await setSetting(db, BACKGROUND_KEY, String(mb))
 }
 
 export async function setAttachmentLimitMb(db: SQLiteDatabase, mb: number) {

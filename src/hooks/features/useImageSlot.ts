@@ -10,6 +10,7 @@ import {
   type CropRect,
   type ImageKind,
 } from '@/lib/images/avatars'
+import { movingKind } from '@/lib/images/media'
 
 // What a picture is made of once stored: the shown copy, the original beside it and the
 // frame between them, as JSON.
@@ -32,12 +33,17 @@ export function useImageSlot(kind: ImageKind) {
   // The picture now shown: a fresh pick, else the one already stored.
   const shown = (file: string | null) => uri ?? (file ? avatarUri(file, kind) : null)
 
+  // Its frame, which a moving picture is drawn at, as it is not cut to it.
+  const shownCrop = (json: string | null) => (uri ? crop : cropFromJson(json))
+
   // A framed copy came back from its own screen. `original` is the temporary file to store
-  // beside it, or null when the stored original was reframed.
+  // beside it, or null when the stored original was reframed. A moving picture comes back
+  // as it went, the frame beside it, and is its own original.
   const setFramed = (framed: string, rect: CropRect | null, original: string | null) => {
     setUri(framed)
     setCrop(rect)
-    if (original) setOriginalUri(original)
+    if (movingKind(framed)) setOriginalUri(null)
+    else if (original) setOriginalUri(original)
   }
 
   // A picture that is shown as it is, without a frame and without an original.
@@ -64,17 +70,20 @@ export function useImageSlot(kind: ImageKind) {
   }
 
   // What the frame is redone on: the original, and an image saved before originals were
-  // kept has only its shown copy, which then becomes the original.
+  // kept has only its shown copy, which then becomes the original. A moving picture is
+  // reframed from itself, at the frame it has.
   const adjustSource = (value: SlotValue) => {
     if (originalUri) return { uri: originalUri, crop, original: null }
-    if (value.original) return { uri: avatarUri(value.original, kind)!, crop: cropFromJson(value.crop), original: null }
     const current = shown(value.file)
+    if (current && movingKind(current)) return { uri: current, crop: shownCrop(value.crop), original: null }
+    if (value.original) return { uri: avatarUri(value.original, kind)!, crop: cropFromJson(value.crop), original: null }
     return current ? { uri: current, crop: null, original: current } : null
   }
 
   // The files to write to the database: the fresh pick moved into the store, else what is stored.
+  // A stored moving picture given a new frame is the same file, which is not copied again.
   const persist = async (value: SlotValue): Promise<SlotValue> => ({
-    file: uri ? await persistAvatar(uri, kind) : value.file,
+    file: uri && uri !== (value.file ? avatarUri(value.file, kind) : null) ? await persistAvatar(uri, kind) : value.file,
     original: originalUri ? await persistOriginal(originalUri, kind) : value.original,
     crop: uri ? cropToJson(crop) : value.crop,
   })
@@ -94,5 +103,5 @@ export function useImageSlot(kind: ImageKind) {
     if (original) removeAvatar(original, kind)
   }
 
-  return { uri, shown, remember, setFramed, setUnframed, clearPicked, snapshot, restore, adjustSource, persist, settle, removeStored }
+  return { uri, shown, shownCrop, remember, setFramed, setUnframed, clearPicked, snapshot, restore, adjustSource, persist, settle, removeStored }
 }

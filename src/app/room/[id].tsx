@@ -342,6 +342,7 @@ export default function RoomEditorScreen() {
 
           <BackgroundSection
             uri={backgroundUri}
+            crop={bgSlot.shownCrop(fields.backgroundCrop)}
             effect={fields.backgroundEffect}
             intensity={fields.backgroundIntensity}
             onPick={onPickBackground}

@@ -60,6 +60,21 @@ export function cropFromTransform(natural: Size, frame: Size, t: Transform): Cro
   return { originX, originY, width, height }
 }
 
+// Where a moving background is drawn so its frame covers a view, in the view's points: the
+// frame scaled to cover it as a framed still copy would be, kept centered, and pushed back
+// wherever that would leave a gap past the picture's edge.
+export function placeCrop(natural: Size, crop: CropRect, view: Size) {
+  const scale = Math.max(view.width / crop.width, view.height / crop.height)
+  const width = natural.width * scale
+  const height = natural.height * scale
+  return {
+    width,
+    height,
+    left: clamp(view.width / 2 - (crop.originX + crop.width / 2) * scale, view.width - width, 0),
+    top: clamp(view.height / 2 - (crop.originY + crop.height / 2) * scale, view.height - height, 0),
+  }
+}
+
 // The inverse, to reopen a stored frame where it was left.
 export function transformFromCrop(natural: Size, frame: Size, crop: CropRect): Transform {
   const cover = coverSize(natural, frame)

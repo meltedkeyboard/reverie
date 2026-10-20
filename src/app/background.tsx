@@ -26,6 +26,7 @@ import type { BackgroundEffect } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { frameBackground } from '@/lib/images/avatars'
 import { backgroundDraft } from '@/lib/images/backgroundDraft'
+import { movingKind } from '@/lib/images/media'
 import {
   clamp,
   coverSize,
@@ -65,6 +66,8 @@ export default function BackgroundScreen() {
   const { t } = useTranslation()
   // Read once: the draft may be replaced under a screen still closing.
   const [draft] = useState(backgroundDraft)
+  // A moving picture or a video is kept whole and drawn at its frame, so nothing is cut here.
+  const [moving] = useState(() => (draft ? movingKind(draft.uri) : null))
   const [effect, setEffect] = useState<BackgroundEffect>(draft?.effect ?? 'blur')
   const [intensity, setIntensity] = useState(draft?.intensity ?? 0.5)
   const [previewUri, setPreviewUri] = useState<string | null>(null)
@@ -92,7 +95,8 @@ export default function BackgroundScreen() {
   const hint = useSharedValue(1)
 
   useEffect(() => {
-    if (!draft) return
+    // A video's size comes from the player of the preview itself, once it has loaded.
+    if (!draft || moving === 'video') return
     ImageManipulator.manipulate(draft.uri)
       .renderAsync()
       .then(async (picture) => {
@@ -100,14 +104,15 @@ export default function BackgroundScreen() {
         // A blur is worked out over every pixel of the picture, and an original from the
         // camera is several times the size the chat shows; the preview is drawn from a
         // copy that size, which blurs as the chat will and keeps up with the slider.
+        // A moving one is shown whole, every frame of it, as the chat will.
         const side = Math.max(picture.width, picture.height)
-        if (side <= PREVIEW_SIDE) return
+        if (moving || side <= PREVIEW_SIDE) return
         const resize = picture.width >= picture.height ? { width: PREVIEW_SIDE } : { height: PREVIEW_SIDE }
         const small = await ImageManipulator.manipulate(picture).resize(resize).renderAsync()
         setPreviewUri((await small.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 })).uri)
       })
       .catch(() => {})
-  }, [draft])
+  }, [draft, moving])
 
   // The picture shows only once it is laid out and put where it was framed last, so it
   // never jumps from the screen's size to its own.
@@ -297,7 +302,12 @@ export default function BackgroundScreen() {
         const zoom = clamp(k.value, 1, MAX_ZOOM)
         const limit = limits(size, frame, zoom)
         const crop = natural ? cropFromTransform(natural, frame, { k: zoom, x: clamp(x.value, -limit.x, limit.x), y: clamp(y.value, -limit.y, limit.y) }) : null
-        draft.onDone({ effect, intensity, bubbleTransparency, uri: await frameBackground(draft.uri, crop), crop })
+        if (moving) {
+          const framed = crop && natural ? { ...crop, sourceWidth: natural.width, sourceHeight: natural.height } : null
+          draft.onDone({ effect, intensity, bubbleTransparency, uri: draft.uri, crop: framed })
+        } else {
+          draft.onDone({ effect, intensity, bubbleTransparency, uri: await frameBackground(draft.uri, crop), crop })
+        }
       }
       close()
     } catch {
@@ -332,15 +342,16 @@ export default function BackgroundScreen() {
           {/* Laid out at its covering size, not the screen's: an image view clips to its
               own bounds, so a screen-sized one moved over shows empty space instead of
               the rest of the picture. */}
-          {cover ? (
+          {/* A video is laid out at the screen's size until its own is known, still unseen. */}
+          {cover || moving === 'video' ? (
             <Animated.View
               style={[
                 styles.picture,
-                { width: cover.width, height: cover.height, left: (width - cover.width) / 2, top: (height - cover.height) / 2 },
+                { width: size.width, height: size.height, left: (width - size.width) / 2, top: (height - size.height) / 2 },
                 pictureStyle,
               ]}
             >
-              <ChatBackground uri={previewUri ?? draft.uri} effect={effect} intensity={intensity} />
+              <ChatBackground uri={previewUri ?? draft.uri} effect={effect} intensity={intensity} onVideoSize={moving === 'video' ? setNatural : undefined} />
             </Animated.View>
           ) : null}
 

@@ -8,12 +8,12 @@ import { Pattern } from '@/components/visuals/Pattern'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import type { Character } from '@/db/characters'
 import { useTranslation } from '@/i18n'
-import { avatarUri } from '@/lib/images/avatars'
+import { avatarUri, cropFromJson } from '@/lib/images/avatars'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import { FILL, useColors, useTheme } from '@/theme'
 
 // What a character or a room says about the look of its chats.
-export type ChatLook = Pick<Character, 'background' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency'>
+export type ChatLook = Pick<Character, 'background' | 'backgroundCrop' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency'>
 
 // What is behind the messages: the owner's own picture, else the custom wallpaper or pattern chosen in Settings.
 // `anchor` is the pattern's, off in a sheet. `blurred` is ChatBackground's.
@@ -23,6 +23,7 @@ export function ChatSurface({ owner, anchor, blurred }: { owner: ChatLook; ancho
     return (
       <ChatBackground
         uri={avatarUri(owner.background, 'backgrounds') ?? ''}
+        crop={cropFromJson(owner.backgroundCrop)}
         effect={owner.backgroundEffect}
         intensity={owner.backgroundIntensity}
         blurred={blurred}
@@ -33,6 +34,7 @@ export function ChatSurface({ owner, anchor, blurred }: { owner: ChatLook; ancho
     return (
       <ChatBackground
         uri={avatarUri(wallpaper.file, 'backgrounds') ?? ''}
+        crop={cropFromJson(wallpaper.crop)}
         effect={wallpaper.effect}
         intensity={wallpaper.intensity}
         blurred={blurred}

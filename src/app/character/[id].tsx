@@ -537,6 +537,7 @@ export default function CharacterEditorScreen() {
 
                 <BackgroundSection
                   uri={backgroundUri}
+                  crop={bgSlot.shownCrop(backgroundCrop)}
                   effect={bgEffect}
                   intensity={bgIntensity}
                   onPick={onPickBackground}
@@ -614,7 +615,7 @@ export default function CharacterEditorScreen() {
                   { label: t('editor.reasoningBudget'), value: String(reasoningBudget) },
                   { label: t('editor.paragraphLimit'), value: replyLengthLabel },
                 ]}
-                background={backgroundUri ? { uri: backgroundUri, effect: bgEffect, intensity: bgIntensity } : null}
+                background={backgroundUri ? { uri: backgroundUri, crop: bgSlot.shownCrop(backgroundCrop), effect: bgEffect, intensity: bgIntensity } : null}
                 // Saves the card as it is stored, so edits not yet saved are not in it.
                 exportItems={isNew ? undefined : exportTargets(() => getCharacter(db, Number(id)))}
               />

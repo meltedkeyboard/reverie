@@ -32,6 +32,7 @@ import {
   type CropRect,
 } from '@/lib/images/avatars'
 import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
+import { movingKind } from '@/lib/images/media'
 import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
@@ -126,8 +127,11 @@ export default function ChatTextScreen() {
       bubbleTransparency: wallpaper?.bubbleTransparency ?? 0.3,
       onDone: async (result) => {
         try {
-          const file = await persistAvatar(result.uri, 'backgrounds')
-          const originalFile = original ? await persistOriginal(original, 'backgrounds') : (wallpaper?.original ?? null)
+          // A moving picture comes back as it went and is its own original; given only a
+          // new frame, it is the stored file itself, not copied again.
+          const moving = movingKind(result.uri) !== null
+          const file = moving && wallpaper?.file && result.uri === wallpaperUri ? wallpaper.file : await persistAvatar(result.uri, 'backgrounds')
+          const originalFile = moving ? null : original ? await persistOriginal(original, 'backgrounds') : (wallpaper?.original ?? null)
           const oldFile = wallpaper?.file
           const oldOriginal = wallpaper?.original
           const nextWallpaper = {
@@ -263,6 +267,7 @@ export default function ChatTextScreen() {
             {pattern === 'custom' && wallpaperUri ? (
               <ChatBackground
                 uri={wallpaperUri}
+                crop={cropFromJson(wallpaper?.crop ?? null)}
                 effect={wallpaper?.effect ?? 'blur'}
                 intensity={wallpaper?.intensity ?? 0.5}
               />
@@ -364,8 +369,10 @@ export default function ChatTextScreen() {
                 {wallpaperUri ? (
                   <ChatBackground
                     uri={wallpaperUri}
+                    crop={cropFromJson(wallpaper?.crop ?? null)}
                     effect={wallpaper?.effect ?? 'blur'}
                     intensity={wallpaper?.intensity ?? 0.5}
+                    still
                   />
                 ) : (
                   <View style={styles.customTileEmpty}>
