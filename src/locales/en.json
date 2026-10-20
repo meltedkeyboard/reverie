@@ -484,6 +484,8 @@
   "action.refine": "Refine...",
   "action.edit": "Edit",
   "action.delete": "Delete",
+  "action.deleteVariant": "Delete version",
+  "action.deleteMessage": "Delete message",
 
   "images.cameraPermission": "No camera access. Enable it in iOS settings",
   "images.readFailed": "Couldn't read the image",

@@ -27,6 +27,8 @@ export type Message = {
   variant: number
   // Parallel to variants: the reasoning behind each version, null where there was none.
   thoughts: (Thought | null)[]
+  // Parallel to variants: the wish a version was refined with ("sadder"), null for the rest.
+  refines: (string | null)[]
   createdAt: number
   // The rest only means something in a room. speakerId is the character who said an
   // assistant line (null in a one-on-one chat, or once that character is deleted).
@@ -42,26 +44,28 @@ export type Message = {
   absent: number[]
 }
 
-type Row = Omit<Message, 'variants' | 'thoughts' | 'images' | 'addressees' | 'audience' | 'overheard' | 'absent'> & {
+type Row = Omit<Message, 'variants' | 'thoughts' | 'refines' | 'images' | 'addressees' | 'audience' | 'overheard' | 'absent'> & {
   images: string | null
   variants: string | null
   thoughts: string | null
+  refines: string | null
   addressees: string | null
   audience: string | null
   overheard: string | null
   absent: string | null
 }
 
-export const MESSAGE_COLUMNS = `id, chat_id AS chatId, role, content, images, variants, variant, thoughts, created_at AS createdAt,
+export const MESSAGE_COLUMNS = `id, chat_id AS chatId, role, content, images, variants, variant, thoughts, refines, created_at AS createdAt,
   speaker_id AS speakerId, kind, addressees, audience, overheard, absent`
 
 // The columns copied as they are when a chat is duplicated or moved.
 export const MESSAGE_COPY_COLUMNS =
-  'role, content, images, variants, variant, thoughts, created_at, speaker_id, kind, addressees, audience, overheard, absent'
+  'role, content, images, variants, variant, thoughts, refines, created_at, speaker_id, kind, addressees, audience, overheard, absent'
 
 export type NewMessageExtra = {
   images?: MessageImage[]
   thought?: Thought | null
+  refine?: string | null
   speakerId?: number | null
   kind?: MessageKind
   addressees?: number[] | null
@@ -80,6 +84,7 @@ export function newMessage(
   {
     images = [],
     thought = null,
+    refine = null,
     speakerId = null,
     kind = 'say',
     addressees = null,
@@ -98,6 +103,7 @@ export function newMessage(
     variants: [content],
     variant: 0,
     thoughts: [thought],
+    refines: [refine],
     createdAt,
     speakerId,
     kind,
@@ -114,13 +120,19 @@ export function withContent(message: Message, content: string): Message {
 }
 
 // Adds a version and selects it.
-export function withNewVariant(message: Message, content: string, thought: Thought | null = null): Message {
+export function withNewVariant(
+  message: Message,
+  content: string,
+  thought: Thought | null = null,
+  refine: string | null = null
+): Message {
   return {
     ...message,
     content,
     variants: [...message.variants, content],
     variant: message.variants.length,
     thoughts: [...message.thoughts, thought],
+    refines: [...message.refines, refine],
   }
 }
 
@@ -131,12 +143,14 @@ export function withVariant(message: Message, variant: number): Message {
 function fromRow(row: Row): Message {
   const variants: string[] = row.variants ? JSON.parse(row.variants) : [row.content]
   const thoughts: (Thought | null)[] = row.thoughts ? JSON.parse(row.thoughts) : []
+  const refines: (string | null)[] = row.refines ? JSON.parse(row.refines) : []
   const images: MessageImage[] = row.images ? JSON.parse(row.images) : []
   return {
     ...row,
     images,
     variants,
     thoughts: variants.map((_, i) => thoughts[i] ?? null),
+    refines: variants.map((_, i) => refines[i] ?? null),
     addressees: row.addressees ? JSON.parse(row.addressees) : null,
     audience: row.audience ? JSON.parse(row.audience) : null,
     overheard: row.overheard ? JSON.parse(row.overheard) : [],
@@ -167,6 +181,10 @@ function packThoughts(thoughts: (Thought | null)[]) {
   return thoughts.some(Boolean) ? JSON.stringify(thoughts) : null
 }
 
+function packRefines(refines: (string | null)[]) {
+  return refines.some(Boolean) ? JSON.stringify(refines) : null
+}
+
 export async function listMessages(db: SQLiteDatabase, chatId: number) {
   const rows = await db.getAllAsync<Row>(`SELECT ${MESSAGE_COLUMNS} FROM messages WHERE chat_id = ? ORDER BY id ASC`, chatId)
   return rows.map(fromRow)
@@ -175,14 +193,15 @@ export async function listMessages(db: SQLiteDatabase, chatId: number) {
 export async function addMessage(db: SQLiteDatabase, chatId: number, role: Role, content: string, extra?: NewMessageExtra) {
   const message = newMessage(0, chatId, role, content, extra)
   const res = await db.runAsync(
-    `INSERT INTO messages (chat_id, role, content, images, thoughts, created_at, speaker_id, kind, addressees, audience, overheard, absent)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO messages (chat_id, role, content, images, thoughts, refines, created_at, speaker_id, kind, addressees, audience, overheard, absent)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       chatId,
       role,
       content,
       packImages(message.images),
       packThoughts(message.thoughts),
+      packRefines(message.refines),
       message.createdAt,
       message.speakerId,
       message.kind,
@@ -206,15 +225,57 @@ export async function updateMessage(db: SQLiteDatabase, message: Message, conten
   return next
 }
 
-export async function addVariant(db: SQLiteDatabase, message: Message, content: string, thought: Thought | null = null) {
-  const next = withNewVariant(message, content, thought)
-  await db.runAsync('UPDATE messages SET content = ?, variants = ?, variant = ?, thoughts = ? WHERE id = ?', [
+export async function addVariant(
+  db: SQLiteDatabase,
+  message: Message,
+  content: string,
+  thought: Thought | null = null,
+  refine: string | null = null
+) {
+  const next = withNewVariant(message, content, thought, refine)
+  await db.runAsync('UPDATE messages SET content = ?, variants = ?, variant = ?, thoughts = ?, refines = ? WHERE id = ?', [
     content,
     packVariants(next.variants),
     next.variant,
     packThoughts(next.thoughts),
+    packRefines(next.refines),
     message.id,
   ])
+  return next
+}
+
+// Removes the selected version; the one before it is shown, or the next one if it was the first.
+export function withoutVariant(message: Message): Message {
+  const keep = (_: unknown, i: number) => i !== message.variant
+  const variants = message.variants.filter(keep)
+  const variant = Math.max(0, message.variant - 1)
+  return {
+    ...message,
+    content: variants[variant],
+    variants,
+    variant,
+    thoughts: message.thoughts.filter(keep),
+    refines: message.refines.filter(keep),
+  }
+}
+
+export async function deleteVariant(db: SQLiteDatabase, message: Message) {
+  const next = withoutVariant(message)
+  await db.runAsync('UPDATE messages SET content = ?, variants = ?, variant = ?, thoughts = ?, refines = ? WHERE id = ?', [
+    next.content,
+    packVariants(next.variants),
+    next.variant,
+    packThoughts(next.thoughts),
+    packRefines(next.refines),
+    message.id,
+  ])
+  return next
+}
+
+// Forgets the wish the selected version was refined with; the version itself stays.
+export async function dropRefine(db: SQLiteDatabase, message: Message) {
+  const next = { ...message, refines: message.refines.map((refine, i) => (i === message.variant ? null : refine)) }
+  await db.runAsync('UPDATE messages SET refines = ? WHERE id = ?', [packRefines(next.refines), message.id])
   return next
 }
 

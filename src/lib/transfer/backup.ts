@@ -17,9 +17,9 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
+// 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 11
+const BACKUP_VERSION = 12
 
 type BackupCharacter = {
   id: number
@@ -121,6 +121,8 @@ type BackupMessage = {
   variants: string | null
   variant: number
   thoughts: string | null
+  // Version 12: the wishes the versions were refined with.
+  refines?: string | null
   createdAt: number
   // Room fields; character ids inside them are remapped on import.
   speakerId?: number | null
@@ -549,9 +551,9 @@ export async function importBackup(
       const chatId = chatIds.get(message.chatId)
       if (!chatId) continue
       await db.runAsync(
-        `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, created_at,
+        `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, refines, created_at,
            speaker_id, kind, addressees, audience, overheard, absent)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           chatId,
           message.role,
@@ -560,6 +562,7 @@ export async function importBackup(
           message.variants ?? null,
           message.variant ?? 0,
           message.thoughts ?? null,
+          message.refines ?? null,
           message.createdAt,
           message.speakerId ? (characterIds.get(message.speakerId) ?? null) : null,
           message.kind ?? 'say',

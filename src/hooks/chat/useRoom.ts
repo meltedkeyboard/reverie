@@ -39,6 +39,8 @@ export type RoomDraft = {
   text: string
   reasoning: string | null
   reasoningMs: number | null
+  // The wish a regenerated line was asked for with, shown above it as it streams.
+  refine: string | null
 }
 
 export type SendOptions = {
@@ -81,6 +83,8 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     discarded,
     selectVariant,
     editMessage,
+    removeRefine,
+    removeVariant,
     removeMessage,
     discard,
   } = useConversation(chat, (m) => (m.kind === 'narration' ? t('room.narrator') : nameOf(m.speakerId)))
@@ -243,7 +247,8 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       ]
       setReplacingId(replacing?.id ?? null)
       setPhase('waiting')
-      setDraft({ ...planned, speakerId: planned.characterId, text: '', reasoning: null, reasoningMs: null })
+      const refine = guidance?.trim() || null
+      setDraft({ ...planned, speakerId: planned.characterId, text: '', reasoning: null, reasoningMs: null, refine })
 
       let reply = ''
       let failed: unknown = null
@@ -289,7 +294,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       const ok = Boolean(reply) && !failed && !aborted
 
       if (reply && replacing) {
-        const updated = await addVariant(db, replacing, reply, thought)
+        const updated = await addVariant(db, replacing, reply, thought, refine)
         setMessages(messagesRef.current.map((m) => (m.id === updated.id ? updated : m)))
         return { line: updated, ok }
       }
@@ -559,6 +564,8 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     retry,
     selectVariant,
     editMessage,
+    removeRefine,
+    removeVariant,
     removeMessage,
     discard,
     rename,

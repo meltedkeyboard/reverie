@@ -15,7 +15,7 @@ import { PRESS_ANYWHERE } from '@/lib/ui/press'
 import * as Haptics from '@/lib/ui/haptics'
 import { pictureUri } from '@/lib/images/attachments'
 import { CHAT_METRICS, useChatText } from '@/lib/chat/chatText'
-import { messageActions, type MessageAction } from '@/lib/chat/messageActions'
+import { menuItems, messageActions, type MessageAction } from '@/lib/chat/messageActions'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
@@ -31,8 +31,9 @@ import { ShimmerText } from '../visuals/ShimmerText'
 import { TypingIndicator } from './TypingIndicator'
 
 // The live draft also carries what a reasoning model is thinking; reasoningMs is set
-// once the thinking is over and the reply has started.
-export type RowMessage = Message & { streaming?: boolean; reasoning?: string; reasoningMs?: number | null }
+// once the thinking is over and the reply has started. `refine` is the wish it is being
+// written with.
+export type RowMessage = Message & { streaming?: boolean; reasoning?: string; reasoningMs?: number | null; refine?: string }
 
 // How a line sits in a room's scene, already turned into names. Absent in a one-on-one
 // chat, where the row looks as it always did.
@@ -88,7 +89,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     showSheet(
       undefined,
-      actions.map((item) => ({ ...item, onSelect: () => onAction(message, item.action) }))
+      menuItems(actions, (action) => onAction(message, action))
     )
   }
 
@@ -176,9 +177,20 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
       ? { text: message.reasoning, ms: message.reasoningMs ?? null }
       : null
     : message.thoughts[message.variant]
+  const refine = message.streaming ? message.refine : message.refines[message.variant]
   const speaker = scene?.speaker
   return (
     <View style={[styles.botRow, message.kind === 'reaction' && styles.reactionRow]}>
+      {refine ? (
+        <RefineNote
+          text={refine}
+          live={Boolean(message.streaming)}
+          locked={locked}
+          canRegenerate={canRegenerate}
+          rich={rich}
+          onAction={(action) => onAction(message, action)}
+        />
+      ) : null}
       {scene ? (
         <View style={styles.speaker}>
           {speaker ? <Avatar name={speaker.name} file={speaker.avatar} size={22} /> : null}
@@ -237,6 +249,69 @@ function Overheard({ names, end = false }: { names: string; end?: boolean }) {
 
 export const MessageRow = memo(MessageRowView)
 
+type RefineNoteProps = {
+  text: string
+  // The reply is still being written with it: the wish shimmers and has no menu yet.
+  live: boolean
+  locked: boolean
+  canRegenerate: boolean
+  rich: boolean
+  onAction: (action: MessageAction) => void
+}
+
+// The wish a reply was refined with, small and grey above it, so the user can see why this
+// version reads as it does. It is the user's own words, so a tap offers what their message
+// has: copy, ask again with it, change it and ask again, or forget it (the reply stays).
+function RefineNote({ text, live, locked, canRegenerate, rich, onAction }: RefineNoteProps) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+
+  const body = (
+    <View style={styles.refine}>
+      <View style={styles.refineIcon}>
+        <Icon name="chatbubble-ellipses-outline" size={12} color={colors.textFaint} />
+      </View>
+      {live ? (
+        <ShimmerText text={text} style={styles.refineText} from={colors.textFaint} to={colors.text} wrap />
+      ) : (
+        <Text style={styles.refineText}>{text}</Text>
+      )}
+    </View>
+  )
+  if (live) return <View style={styles.refineTrigger}>{body}</View>
+
+  const items = [
+    {
+      label: t('action.copy'),
+      systemImage: 'doc.on.doc',
+      onSelect: () => {
+        Clipboard.setStringAsync(text)
+        Haptics.selectionAsync()
+      },
+    },
+    // The rest change the message, which waits while a reply is being written.
+    ...(locked || !canRegenerate
+      ? []
+      : [
+          { label: t('action.replyAgain'), systemImage: 'arrow.clockwise', onSelect: () => onAction('refineAgain') },
+          { label: t('action.edit'), systemImage: 'pencil', onSelect: () => onAction('editRefine') },
+        ]),
+    ...(locked
+      ? []
+      : [{ label: t('action.delete'), systemImage: 'trash', destructive: true, separated: true, onSelect: () => onAction('dropRefine') }]),
+  ]
+  return rich ? (
+    <NativeMenu items={items} style={styles.refineTrigger}>
+      {body}
+    </NativeMenu>
+  ) : (
+    <TapTrigger onPress={() => showSheet(undefined, items)} style={styles.refineTrigger}>
+      {body}
+    </TapTrigger>
+  )
+}
+
 type ActionBarProps = {
   message: RowMessage
   actions: ReturnType<typeof messageActions>
@@ -259,9 +334,10 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }
   const isUser = message.role === 'user'
   const primary = isUser ? 'edit' : 'regenerate'
   const hasPrimary = actions.some((item) => item.action === primary)
-  const menu = actions
-    .filter((item) => item.action !== 'copy' && item.action !== primary)
-    .map((item) => ({ ...item, onSelect: () => onAction(message, item.action) }))
+  const menu = menuItems(
+    actions.filter((item) => item.action !== 'copy' && item.action !== primary),
+    (action) => onAction(message, action)
+  )
   const count = message.variants.length
 
   useEffect(() => {
@@ -502,6 +578,10 @@ const createStyles = (colors: Colors) =>
   thoughtLabel: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
   thoughtTime: { color: colors.textFaint, fontSize: 13, fontVariant: ['tabular-nums'] },
   thoughtText: { color: colors.textFaint, fontSize: 13.5, lineHeight: 19, marginTop: 6 },
+  refineTrigger: { alignSelf: 'flex-start', maxWidth: '100%', marginBottom: 8 },
+  refine: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
+  refineIcon: { height: 17, justifyContent: 'center' },
+  refineText: { color: colors.textFaint, fontSize: 13, lineHeight: 17, flexShrink: 1 },
   bar: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginLeft: -10 },
   barUser: { marginLeft: 0, marginRight: -8 },
   barButton: { width: 36, height: 32, alignItems: 'center', justifyContent: 'center' },

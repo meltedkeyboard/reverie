@@ -1,4 +1,4 @@
-import { useState, type ComponentProps, type ReactNode } from 'react'
+import { Fragment, useState, type ComponentProps, type ReactNode } from 'react'
 import { Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
 
 import { showSheet } from '@/lib/ui/dialogs'
@@ -11,6 +11,9 @@ export type MenuItem = {
   // SF Symbol shown next to the label in the native menu.
   systemImage?: string
   destructive?: boolean
+  // A line above it in the native menu, setting it apart from the items before; the action
+  // sheet has none.
+  separated?: boolean
   onSelect?: () => void
   // A submenu that unfolds from this item.
   children?: MenuItem[]
@@ -69,11 +72,16 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
     setSize((prev) => (prev?.width === width && prev.height === height ? prev : { width, height }))
   }
 
-  const { Host, Menu, Button, Section } = swiftUI.ui
+  const { Host, Menu, Button, Section, Divider } = swiftUI.ui
   const m = swiftUI.modifiers
   // Keyed by place, not by label: two items may read the same (rooms with one name).
   const toView = (item: MenuItem, i: number): ReactNode =>
-    item.children ? (
+    item.separated ? (
+      <Fragment key={i}>
+        <Divider />
+        {toView({ ...item, separated: false }, i)}
+      </Fragment>
+    ) : item.children ? (
       <Menu key={i} label={item.label} systemImage={item.systemImage}>
         {item.children.map(toView)}
       </Menu>

@@ -136,6 +136,8 @@ export function RoomController({
     retry,
     selectVariant,
     editMessage,
+    removeRefine,
+    removeVariant,
     removeMessage,
     discard,
     rename,
@@ -195,6 +197,7 @@ export function RoomController({
           streaming: true,
           reasoning: draft.reasoning ?? undefined,
           reasoningMs: draft.reasoningMs,
+          refine: draft.refine ?? undefined,
         }
       : null
     const list: RowMessage[] = messages.map((m) => (m.id === replacingId && streaming ? streaming : m))
@@ -212,7 +215,7 @@ export function RoomController({
     [messages, byId]
   )
 
-  const onAction = useMessageActions({ regenerate, removeMessage, edit: setEditingRow })
+  const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow })
   const { confirmDelete, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
   const { pattern, wallpaper } = useChatTextSettings()
@@ -336,7 +339,7 @@ export function RoomController({
     },
     { label: t('room.menuAutoplay'), systemImage: 'bubble.left.and.bubble.right', onSelect: chooseAutoplay },
     { label: t('room.menuEditRoom'), systemImage: 'slider.horizontal.3', onSelect: () => router.push(`/room/${room.id}`) },
-    { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: confirmDelete },
+    { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 
   const editing = useMemo(() => (editingRow ? { id: editingRow.id, text: editingRow.content } : null), [editingRow])

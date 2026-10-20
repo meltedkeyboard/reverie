@@ -663,6 +663,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     replacingId,
     reasoning,
     reasoningMs,
+    refine,
     thinking,
     toggleThinking,
     persona,
@@ -675,6 +676,8 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     proceed,
     selectVariant,
     editMessage,
+    removeRefine,
+    removeVariant,
     removeMessage,
     discard,
     rename,
@@ -714,18 +717,19 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
             streaming: true,
             reasoning: reasoning ?? undefined,
             reasoningMs,
+            refine: refine ?? undefined,
           }
     const list: RowMessage[] = messages.map((m) => (m.id === replacingId && streaming ? streaming : m))
     if (streaming && replacingId === null) list.push(streaming)
     return list
-  }, [messages, replacingId, draft, reasoning, reasoningMs, chatId])
+  }, [messages, replacingId, draft, reasoning, reasoningMs, refine, chatId])
 
   const editing = useMemo(
     () => (editingRow ? { id: editingRow.id, text: editingRow.content } : null),
     [editingRow]
   )
 
-  const onAction = useMessageActions({ regenerate, removeMessage, edit: setEditingRow })
+  const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow })
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
   // Over a chat background the user's bubbles can be made see-through.
@@ -751,7 +755,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) },
-    { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: confirmDelete },
+    { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 
   const asidePanel = asideOpen ? (

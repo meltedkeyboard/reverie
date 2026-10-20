@@ -75,7 +75,12 @@ export function ChatThread({
   const held = useRef(false)
   // Nor while it glides on after the finger.
   const gliding = useRef(false)
+  // A finger is down on the list, told by its touches rather than by its scroll: the drag's
+  // events can be lost when the drawer's pan takes the touch, which left the list followed
+  // under the finger.
+  const touching = useRef(false)
   const back = useRef(0)
+  const viewport = useRef(0)
 
   const scrollToNewest = useCallback(
     (animated = true) => {
@@ -133,11 +138,16 @@ export function ChatThread({
     []
   )
   const onContentSizeChange = useCallback(() => {
+    const free = !held.current && !gliding.current && !touching.current
     if (!landing.current) {
-      if (follow.current && !held.current && !gliding.current) listRef.current?.scrollToEnd({ animated: false })
+      // Following keeps up with a reply growing at the end; a list a screen or more away
+      // from it was left by the reader. FlashList's scrollToEnd from there is not a jump but
+      // a scroll in steps over several frames, which fought the finger until it got there.
+      if (follow.current && viewport.current && back.current > viewport.current) follow.current = false
+      if (follow.current && free) listRef.current?.scrollToEnd({ animated: false })
       return
     }
-    listRef.current?.scrollToEnd({ animated: false })
+    if (free) listRef.current?.scrollToEnd({ animated: false })
     land(shownKey.current)
   }, [land])
 
@@ -163,6 +173,7 @@ export function ChatThread({
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent
       // A web scroll event FlashList passes on can come without the sizes.
       if (!contentOffset || !contentSize || !layoutMeasurement) return
+      viewport.current = layoutMeasurement.height
       back.current = contentSize.height - layoutMeasurement.height - contentOffset.y + inset.current
       // Brought back to the end, by a drag or a fling, the reply takes the reader up again.
       if (back.current <= FOLLOW_BACK) follow.current = true
@@ -195,10 +206,11 @@ export function ChatThread({
   // Let go near the end, the list snaps onto it, as onto a magnet; after a fling, once it
   // stops there. Put off a moment, for the fling's start to arrive after the release.
   const snap = useCallback(() => {
-    if (follow.current && !held.current && !gliding.current) listRef.current?.scrollToEnd({ animated: true })
+    if (follow.current && !held.current && !gliding.current && !touching.current) listRef.current?.scrollToEnd({ animated: true })
   }, [])
   const released = useCallback(() => {
     held.current = false
+    touching.current = false
     setTimeout(snap, 50)
     rested()
   }, [rested, snap])
@@ -211,6 +223,12 @@ export function ChatThread({
     snap()
     rested()
   }, [rested, snap])
+  const touched = useCallback(() => {
+    touching.current = true
+  }, [])
+  const untouched = useCallback(() => {
+    touching.current = false
+  }, [])
   useEffect(
     () => () => {
       if (restTimer.current) clearTimeout(restTimer.current)
@@ -281,6 +299,9 @@ export function ChatThread({
       onScrollEndDrag={released}
       onMomentumScrollBegin={glide}
       onMomentumScrollEnd={glided}
+      onTouchStart={touched}
+      onTouchEnd={untouched}
+      onTouchCancel={untouched}
       scrollEventThrottle={isWeb ? 16 : 32}
       ListHeaderComponent={<View style={{ height: headerHeight + 12 }} />}
       ListFooterComponent={

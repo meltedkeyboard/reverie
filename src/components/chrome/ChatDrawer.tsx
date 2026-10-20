@@ -440,7 +440,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
     { label: t('chat.menuDuplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(chat) },
     // A scene is in its room already.
     ...(owner.kind === 'room' ? [] : [moveItem(chat)]),
-    { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, onSelect: () => remove(chat) },
+    { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: () => remove(chat) },
   ]
 
   const cast = useMemo(

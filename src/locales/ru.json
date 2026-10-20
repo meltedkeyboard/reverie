@@ -484,6 +484,8 @@
   "action.refine": "Уточнить...",
   "action.edit": "Изменить",
   "action.delete": "Удалить",
+  "action.deleteVariant": "Удалить вариант",
+  "action.deleteMessage": "Удалить сообщение",
 
   "images.cameraPermission": "Нет доступа к камере. Включите его в настройках iOS",
   "images.readFailed": "Не удалось прочитать изображение",

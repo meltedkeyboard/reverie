@@ -26,12 +26,15 @@ export function ShimmerText({
   from,
   to,
   maxFontSizeMultiplier,
+  wrap = false,
 }: {
   text: string
   style?: StyleProp<TextStyle>
   from?: string
   to?: string
   maxFontSizeMultiplier?: number
+  // Breaks onto more lines between words instead of cutting the text off at the edge.
+  wrap?: boolean
 }) {
   const colors = useColors()
   const glint = useSharedValue(0)
@@ -49,20 +52,41 @@ export function ShimmerText({
     )
   }, [glint])
 
+  const letter = (index: number) => (
+    <Letter
+      key={index}
+      letter={letters[index] === ' ' ? '\u00a0' : letters[index]}
+      index={index}
+      count={letters.length}
+      glint={glint}
+      from={from ?? colors.textMuted}
+      to={to ?? colors.text}
+      style={flatStyle}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
+    />
+  )
+
+  if (!wrap) {
+    return (
+      <View style={styles.row} accessible accessibilityLabel={text}>
+        {letters.map((_, index) => letter(index))}
+      </View>
+    )
+  }
+  // Each word keeps its letters together in a row of its own, so the lines break between
+  // words; the glint still runs over the letters of the whole text.
+  const words: number[][] = []
+  letters.forEach((char, index) => {
+    const last = words[words.length - 1]
+    if (!last || char === ' ' || letters[index - 1] === ' ') words.push([index])
+    else last.push(index)
+  })
   return (
-    <View style={styles.row} accessible accessibilityLabel={text}>
-      {letters.map((letter, index) => (
-        <Letter
-          key={index}
-          letter={letter === ' ' ? '\u00a0' : letter}
-          index={index}
-          count={letters.length}
-          glint={glint}
-          from={from ?? colors.textMuted}
-          to={to ?? colors.text}
-          style={flatStyle}
-          maxFontSizeMultiplier={maxFontSizeMultiplier}
-        />
+    <View style={styles.wrap} accessible accessibilityLabel={text}>
+      {words.map((word) => (
+        <View key={word[0]} style={styles.word}>
+          {word.map(letter)}
+        </View>
       ))}
     </View>
   )
@@ -95,4 +119,6 @@ function Letter({ letter, index, count, glint, from, to, style, maxFontSizeMulti
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', overflow: 'hidden' },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', flexShrink: 1 },
+  word: { flexDirection: 'row' },
 })

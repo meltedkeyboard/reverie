@@ -271,6 +271,10 @@ const MIGRATIONS = [
       text TEXT NOT NULL
     );
   `,
+  // The wish a reply was refined with, a JSON array parallel to variants; null when none was.
+  `
+    ALTER TABLE messages ADD COLUMN refines TEXT;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

@@ -6,6 +6,8 @@ import {
   addMessage,
   addVariant,
   deleteMessage,
+  deleteVariant,
+  dropRefine,
   listMessages,
   selectVariant as storeVariant,
   updateMessage,
@@ -28,7 +30,9 @@ export type MessageStore = {
   list(): Promise<Message[]>
   add(role: Role, content: string, extra?: NewMessageExtra): Promise<Message>
   update(message: Message, content: string): Promise<Message>
-  addVariant(message: Message, content: string, thought: Thought | null): Promise<Message>
+  addVariant(message: Message, content: string, thought: Thought | null, refine?: string | null): Promise<Message>
+  dropRefine(message: Message): Promise<Message>
+  removeVariant(message: Message): Promise<Message>
   select(message: Message, variant: number): Promise<Message>
   remove(id: number): Promise<void>
 }
@@ -38,7 +42,9 @@ function dbStore(db: SQLiteDatabase, chatId: number): MessageStore {
     list: () => listMessages(db, chatId),
     add: (role, content, extra) => addMessage(db, chatId, role, content, extra),
     update: (message, content) => updateMessage(db, message, content),
-    addVariant: (message, content, thought) => addVariant(db, message, content, thought),
+    addVariant: (message, content, thought, refine) => addVariant(db, message, content, thought, refine),
+    dropRefine: (message) => dropRefine(db, message),
+    removeVariant: (message) => deleteVariant(db, message),
     select: (message, variant) => storeVariant(db, message, variant),
     remove: (id) => deleteMessage(db, id),
   }
@@ -124,6 +130,25 @@ export function useConversation(chat: Chat, speakerOf: (message: Message) => str
     [store, replaceMessage]
   )
 
+  const removeRefine = useCallback(
+    async (id: number) => {
+      const target = messagesRef.current.find((m) => m.id === id)
+      if (target) replaceMessage(await store.dropRefine(target))
+    },
+    [store, replaceMessage]
+  )
+
+  // The last version left is the message itself, deleted as a whole instead.
+  const removeVariant = useCallback(
+    async (id: number) => {
+      const target = messagesRef.current.find((m) => m.id === id)
+      if (!target || target.variants.length < 2) return
+      Haptics.selectionAsync()
+      replaceMessage(await store.removeVariant(target))
+    },
+    [store, replaceMessage]
+  )
+
   const removeMessage = useCallback(
     async (id: number) => {
       await store.remove(id)
@@ -162,6 +187,8 @@ export function useConversation(chat: Chat, speakerOf: (message: Message) => str
     replaceMessage,
     selectVariant,
     editMessage,
+    removeRefine,
+    removeVariant,
     removeMessage,
     discard,
   }

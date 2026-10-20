@@ -61,6 +61,8 @@ export function useChat(chat: Chat, character: Character) {
     discarded,
     selectVariant,
     editMessage,
+    removeRefine,
+    removeVariant,
     removeMessage,
     discard,
   } = useConversation(chat, () => characterRef.current.name)
@@ -72,6 +74,8 @@ export function useChat(chat: Chat, character: Character) {
   // set once the reply itself starts, which is when the thinking is over.
   const [reasoning, setReasoning] = useState<string | null>(null)
   const [reasoningMs, setReasoningMs] = useState<number | null>(null)
+  // The wish the reply being written was asked for with, shown above it as it streams.
+  const [refine, setRefine] = useState<string | null>(null)
 
   const [chatThinking, setChatThinkingState] = useState<ThinkingMode | null>(chat.thinking ?? null)
   const chatThinkingRef = useRef(chatThinking)
@@ -152,6 +156,7 @@ export function useChat(chat: Chat, character: Character) {
       setDraft(null)
       setReasoning(null)
       setReasoningMs(null)
+      setRefine(null)
       setPhase('idle')
       setReplacingId(null)
       setError(null)
@@ -161,7 +166,10 @@ export function useChat(chat: Chat, character: Character) {
   const generate = useCallback(
     async (history: Message[], replacing: Message | null = null, guidance?: string) => {
       const ctrl = task.start()
+      // The note "continue" sends is the app's own, not a wish of the user's to keep.
+      const wish = guidance && guidance !== CONTINUE_NOTE ? guidance.trim() || null : null
       setReplacingId(replacing?.id ?? null)
+      setRefine(wish)
       setError(null)
       setPhase('waiting')
       setDraft('')
@@ -220,10 +228,10 @@ export function useChat(chat: Chat, character: Character) {
         if (discarded.current.has(ctrl)) reply = ''
         const current = () => storeRef.current === store
         if (reply && replacing) {
-          const updated = await store.addVariant(replacing, reply, keptThought)
+          const updated = await store.addVariant(replacing, reply, keptThought, wish)
           if (current()) setMessages(messagesRef.current.map((m) => (m.id === updated.id ? updated : m)))
         } else if (reply) {
-          const added = await store.add('assistant', reply, { thought: keptThought })
+          const added = await store.add('assistant', reply, { thought: keptThought, refine: wish })
           if (!current()) return
           const next = [...messagesRef.current, added]
           setMessages(next)
@@ -238,6 +246,7 @@ export function useChat(chat: Chat, character: Character) {
           setDraft(null)
           setReasoning(null)
           setReasoningMs(null)
+          setRefine(null)
           setPhase('idle')
           setReplacingId(null)
         }
@@ -301,6 +310,7 @@ export function useChat(chat: Chat, character: Character) {
     replacingId,
     reasoning,
     reasoningMs,
+    refine,
     thinking,
     toggleThinking,
     persona,
@@ -313,6 +323,8 @@ export function useChat(chat: Chat, character: Character) {
     proceed,
     selectVariant,
     editMessage,
+    removeRefine,
+    removeVariant,
     removeMessage,
     discard,
     rename,

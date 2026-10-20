@@ -13,30 +13,38 @@ import { alertError } from '@/lib/transfer/report'
 
 type MessageActionHandlers = {
   regenerate: (id: number, guidance?: string) => void
+  removeRefine: (id: number) => void
+  removeVariant: (id: number) => void
   removeMessage: (id: number) => void
   edit: (message: RowMessage) => void
 }
 
 // What the menu on a message does, the same in a chat and in a scene.
-export function useMessageActions({ regenerate, removeMessage, edit }: MessageActionHandlers) {
+export function useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit }: MessageActionHandlers) {
   const { t } = useTranslation()
   return useCallback(
     (message: RowMessage, action: MessageAction) => {
+      const wish = message.refines[message.variant] ?? undefined
       if (action === 'copy') Clipboard.setStringAsync(message.content)
       else if (action === 'regenerate') regenerate(message.id)
-      else if (action === 'refine') {
+      else if (action === 'refine' || action === 'editRefine') {
         promptText({
           title: t('chat.refineTitle'),
           message: t('chat.refineMessage'),
+          initial: action === 'editRefine' ? wish : undefined,
           confirmLabel: t('chat.refineConfirm'),
           onSubmit: (text) => {
             if (text.trim()) regenerate(message.id, text)
           },
         })
-      } else if (action === 'edit') edit(message)
+      } else if (action === 'refineAgain') {
+        if (wish) regenerate(message.id, wish)
+      } else if (action === 'dropRefine') removeRefine(message.id)
+      else if (action === 'deleteVariant') removeVariant(message.id)
+      else if (action === 'edit') edit(message)
       else removeMessage(message.id)
     },
-    [regenerate, removeMessage, edit, t]
+    [regenerate, removeRefine, removeVariant, removeMessage, edit, t]
   )
 }
 
