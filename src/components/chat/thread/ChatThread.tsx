@@ -2,8 +2,9 @@ import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, type ReactElement, type Ref } from 'react'
 import { StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
-import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated'
+import Animated, { scrollTo, useAnimatedRef, useAnimatedStyle, useScrollOffset, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { scheduleOnUI } from 'react-native-worklets'
 
 import type { ConversationHandle } from '@/components/chat/ConversationList'
 import type { RowMessage } from '@/components/chat/MessageRow'
@@ -21,6 +22,9 @@ const FOLLOW_BACK = 80
 const SCROLL_REST = 800
 // A chat handed to the thread has landed once its size has not changed for this long.
 const LANDED_AFTER = 40
+// How long a scroll the thread makes itself may take: a finger that comes down meanwhile
+// stops it where it is.
+const OWN_SCROLL = 600
 
 type Props = {
   ref?: Ref<ConversationHandle>
@@ -81,17 +85,52 @@ export function ChatThread({
   const touching = useRef(false)
   const back = useRef(0)
   const viewport = useRef(0)
+  const lastY = useRef(0)
+  // The scroll view itself, whose offset is known on the UI thread: a scroll the thread made
+  // is stopped where it is at that moment, not where the JS last heard it was, which would
+  // pull the list back.
+  const scrollRef = useAnimatedRef<Animated.ScrollView>()
+  const offset = useScrollOffset(isWeb ? null : scrollRef)
+  // FlashList hands its own ref to the scroll component, which gets both.
+  const listScroll = useRef<Ref<unknown>>(null)
+  const scrollRefs = useCallback(
+    (node: Animated.ScrollView | null) => {
+      scrollRef(node)
+      const theirs = listScroll.current
+      if (typeof theirs === 'function') theirs(node)
+      else if (theirs) (theirs as { current: unknown }).current = node
+    },
+    [scrollRef]
+  )
+  // Until when a scroll the thread made itself may still be on its way (ms since the epoch).
+  const ownUntil = useRef(0)
+
+  // Scrolls to the newest message with the scroll view's own animation, which a finger can
+  // stop. FlashList's scrollToEnd from far away went in steps over several renders that
+  // nothing could stop, and pulled the list on from under the finger.
+  const glideToEnd = useCallback(() => {
+    const scroller = listRef.current?.getNativeScrollRef()
+    if (!scroller) return
+    // From further than two screens it starts two screens short, as FlashList did, so the
+    // list does not draw every row on the way.
+    if (viewport.current && back.current > viewport.current * 2) {
+      scroller.scrollTo({ y: lastY.current + back.current - viewport.current * 2, animated: false })
+    }
+    ownUntil.current = Date.now() + OWN_SCROLL
+    scroller.scrollToEnd({ animated: true })
+  }, [])
 
   const scrollToNewest = useCallback(
     (animated = true) => {
       follow.current = true
-      listRef.current?.scrollToEnd({ animated })
+      if (animated) glideToEnd()
+      else listRef.current?.scrollToEnd({ animated })
       if (away.current) {
         away.current = false
         onAwayChange?.(false)
       }
     },
-    [onAwayChange]
+    [onAwayChange, glideToEnd]
   )
 
   useImperativeHandle(ref, () => ({ scrollToNewest: () => scrollToNewest(), jumpToNewest: () => scrollToNewest() }), [scrollToNewest])
@@ -174,6 +213,7 @@ export function ChatThread({
       // A web scroll event FlashList passes on can come without the sizes.
       if (!contentOffset || !contentSize || !layoutMeasurement) return
       viewport.current = layoutMeasurement.height
+      lastY.current = contentOffset.y
       back.current = contentSize.height - layoutMeasurement.height - contentOffset.y + inset.current
       // Brought back to the end, by a drag or a fling, the reply takes the reader up again.
       if (back.current <= FOLLOW_BACK) follow.current = true
@@ -206,8 +246,8 @@ export function ChatThread({
   // Let go near the end, the list snaps onto it, as onto a magnet; after a fling, once it
   // stops there. Put off a moment, for the fling's start to arrive after the release.
   const snap = useCallback(() => {
-    if (follow.current && !held.current && !gliding.current && !touching.current) listRef.current?.scrollToEnd({ animated: true })
-  }, [])
+    if (follow.current && !held.current && !gliding.current && !touching.current) glideToEnd()
+  }, [glideToEnd])
   const released = useCallback(() => {
     held.current = false
     touching.current = false
@@ -218,14 +258,26 @@ export function ChatThread({
     gliding.current = true
     moving()
   }, [moving])
+  // The list reports the end of its own scrolls here too, a jump included: only a fling the
+  // finger started snaps, or every step of following a reply set off a glide to where it was.
   const glided = useCallback(() => {
+    const flung = gliding.current
     gliding.current = false
-    snap()
+    if (flung) snap()
     rested()
   }, [rested, snap])
   const touched = useCallback(() => {
     touching.current = true
-  }, [])
+    // A finger on the list stops a scroll the thread is making where it is, and the thread
+    // no longer follows the reply: back within FOLLOW_BACK of the end, onScroll takes it up.
+    if (isWeb || Date.now() >= ownUntil.current) return
+    ownUntil.current = 0
+    follow.current = false
+    scheduleOnUI(() => {
+      'worklet'
+      scrollTo(scrollRef, 0, offset.value, false)
+    })
+  }, [scrollRef, offset])
   const untouched = useCallback(() => {
     touching.current = false
   }, [])
@@ -246,10 +298,12 @@ export function ChatThread({
     () =>
       isWeb
         ? undefined
-        : function ThreadScroll(props: ScrollViewProps) {
+        : function ThreadScroll({ ref, ...props }: ScrollViewProps & { ref?: Ref<unknown> }) {
+            listScroll.current = ref ?? null
             return (
               <KeyboardChatScrollView
                 {...props}
+                ref={scrollRefs}
                 keyboardLiftBehavior="always"
                 offset={insets.bottom}
                 freeze={frozen}

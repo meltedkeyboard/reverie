@@ -38,6 +38,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | The shimmering "Thinking..." label | `src/components/visuals/ShimmerText.tsx`, used by `ThoughtBlock` in `MessageRow.tsx` and by `GenSheet.tsx` for live generator thoughts |
 | Tab bar: tabs, icons | `src/app/(tabs)/_layout.tsx` |
 | What search finds and in which order | `src/app/(tabs)/search/index.tsx` (`ORDER`, settings entries), queries in `src/db/search.ts` |
+| When the chat scrolls itself (landing on a chat, following a reply, the snap to the end, send and the jump button) and how a finger stops it | `src/components/chat/thread/ChatThread.tsx`: `follow`, `landing`, `snap`, `glideToEnd` (the scroll view's own animation, stopped on the UI thread where it is by `touched`) |
 | Opening a chat at a message / Settings at a section | `?message=ID` in `chat/[id].tsx` → `focusId` in `ChatThread`; `?section=` in `(tabs)/settings.tsx` |
 | Folder sync (iCloud Drive, Google Drive, a local folder): when it runs, what goes up, conflicts | `src/lib/transfer/cloudSync.ts`, the provider in `src/hooks/features/useCloudSync.tsx`, the native folder in `modules/reverie-cloud-folder` (Swift for iOS, Kotlin for Android) |
 | Where the data lives, the "show in Files" toggle | `src/lib/core/storage.ts` (folders, startup settling) and `src/db/provider.tsx` (live switch) |
