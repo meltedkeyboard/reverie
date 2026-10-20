@@ -79,13 +79,24 @@ export function emptyReplyReason(streamed: { thought: Thought | null; cutoff: bo
   return streamed?.cutoff && streamed.thought ? 'chat.thinkingOutOfTokens' : 'chat.emptyReply'
 }
 
+function replyLimitRule(limit: number) {
+  return `Keep your reply to at most ${limit} ${limit === 1 ? 'paragraph' : 'paragraphs'}.`
+}
+
 // Without a cap the system prompt goes out exactly as written. With one, an instruction
 // is appended asking the model to keep the reply within that many paragraphs; nothing
 // after the fact trims what comes back; a model that ignores it just writes long.
 export function withReplyLimit(system: string, limit: number | null): string {
   if (!limit) return system
-  const rule = `Keep your reply to at most ${limit} ${limit === 1 ? 'paragraph' : 'paragraphs'}.`
+  const rule = replyLimitRule(limit)
   return system ? `${system}\n\n${rule}` : rule
+}
+
+// The same cap again as a note at the end of the last user turn. Deep into a chat the
+// rule in the system prompt is thousands of tokens back, and the model follows the length
+// of its own latest replies instead; a note right before the reply keeps it in hand.
+export function replyLimitNote(limit: number | null) {
+  return limit ? `(OOC: ${replyLimitRule(limit)})` : ''
 }
 
 export const CONTINUE_NOTE =

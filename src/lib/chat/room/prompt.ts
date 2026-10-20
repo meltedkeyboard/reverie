@@ -3,7 +3,7 @@ import type { ThinkingMode } from '@/db/characters'
 import type { Message } from '@/db/messages'
 import type { Room, RoomMember } from '@/db/rooms'
 import { selectHistory, turnTokens } from '@/lib/core/context'
-import { toTurn, withReplyLimit } from '@/lib/chat/replyStream'
+import { replyLimitNote, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
 import type { Persona } from '@/db/personas'
 import { formatPersonaPrompt } from '@/lib/chat/persona'
 
@@ -125,7 +125,15 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
       : planned.cue === 'turn'
         ? `(OOC: It is ${name}'s turn. Continue the scene as ${name}${toWhom}.${whisper})`
         : `(OOC: ${name} now answers${toWhom}.${whisper})`
-  const note = guidance?.trim() ? `${direction}\n(OOC: ${guidance.trim()})` : direction
+  // A reaction is held to its sentences by the direction itself; any other line gets the
+  // reply limit again here, where the model reads it last.
+  const note = [
+    direction,
+    guidance?.trim() ? `(OOC: ${guidance.trim()})` : '',
+    planned.kind === 'reaction' ? '' : replyLimitNote(limit),
+  ]
+    .filter(Boolean)
+    .join('\n')
   push({ role: 'user', content: note })
 
   const character = speaker.character

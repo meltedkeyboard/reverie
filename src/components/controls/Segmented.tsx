@@ -21,7 +21,9 @@ export function Segmented<T extends string>({ options, value, onChange }: Props<
   // The SwiftUI picker misplaces its selection when the value is set from outside right
   // after it mounts (an editor filling its fields from the database) or when its frame
   // changes under it, and only puts it right on the next tap. Such changes build it anew;
-  // a tap on it does not, so the selection still slides.
+  // a tap on it does not, so the selection still slides. The host ignores the safe area:
+  // one mounted over the home indicator, as at the foot of a sheet sliding up, took its
+  // inset and drew the picker half of it higher, over the label, until the next tap.
   const picked = useRef(value)
   const [width, setWidth] = useState(0)
   const [generation, setGeneration] = useState(0)
@@ -36,7 +38,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Props<
     return (
       <View style={styles.host} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
         {width > 0 ? (
-          <Host key={`${width}:${generation}`} style={styles.host} colorScheme={scheme}>
+          <Host key={`${width}:${generation}`} style={styles.host} ignoreSafeArea="all" colorScheme={scheme}>
             <Picker
               selection={value}
               onSelectionChange={(next: T) => {

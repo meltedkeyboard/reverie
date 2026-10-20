@@ -4,8 +4,8 @@ import type { Message } from '@/db/messages'
 import type { ServerSettings } from '@/db/prefs/settings'
 
 const PROMPT =
-  'Придумай короткое название для ролевой переписки ниже: от двух до пяти слов, на языке переписки. ' +
-  'Ответь только названием, без кавычек, пояснений и точки в конце.'
+  'Come up with a short title for the roleplay chat below: two to five words, in the language of the chat. ' +
+  'Reply with the title only, with no quotes, no explanations and no period at the end.'
 
 // Models like to wrap the title in straight or guillemet quotes, or in markdown bold.
 const QUOTES_AROUND = new RegExp('^["\'\\u00ab*]+|["\'\\u00bb*.]+$', 'g')
@@ -15,8 +15,8 @@ export async function suggestTitle(cfg: ServerSettings, nameOf: (m: Message) => 
   const transcript = messages
     .slice(-8)
     .map((m) => {
-      const text = m.content.trim().slice(0, 600) || (m.images.length ? '[фото]' : '')
-      return `${m.role === 'user' ? 'Пользователь' : nameOf(m)}: ${text}`
+      const text = m.content.trim().slice(0, 600) || (m.images.length ? '[photo]' : '')
+      return `${m.role === 'user' ? 'User' : nameOf(m)}: ${text}`
     })
     .join('\n\n')
 

@@ -11,7 +11,7 @@ import { t } from '@/i18n'
 import { selectHistory, turnTokens } from '@/lib/core/context'
 import { errorMessage } from '@/lib/core/errors'
 import * as Haptics from '@/lib/ui/haptics'
-import { CONTINUE_NOTE, emptyReplyReason, runReplyStream, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
+import { CONTINUE_NOTE, emptyReplyReason, replyLimitNote, runReplyStream, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
 import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
 import { formatPersonaPrompt } from '@/lib/chat/persona'
 
@@ -200,7 +200,7 @@ export function useChat(chat: Chat, character: Character) {
         })
         const streamed = await runReplyStream(
           cfg,
-          { messages: requestTurns(system, turns, guidance), ...sampling },
+          { messages: requestTurns(system, turns, guidance, target.replyLimit), ...sampling },
           ctrl.signal,
           {
             onStart: () => setPhase('streaming'),
@@ -335,8 +335,11 @@ export function useChat(chat: Chat, character: Character) {
 // A wish for the regenerated reply goes into the last user turn as an out-of-character
 // note, a convention roleplay models know; it is sent once and never saved. It is not a
 // trailing system message because many chat templates accept the system role only first.
-function requestTurns(system: string, turns: ChatTurn[], guidance: string | undefined): ChatTurn[] {
-  const note = guidance?.trim() ? `(OOC: ${guidance.trim()})` : ''
+// The reply limit rides along the same way on every request.
+function requestTurns(system: string, turns: ChatTurn[], guidance: string | undefined, replyLimit: number | null): ChatTurn[] {
+  const limit = replyLimitNote(replyLimit)
+  const wish = guidance?.trim() ? `(OOC: ${guidance.trim()})` : ''
+  const note = [wish, limit].filter(Boolean).join('\n')
   const last = turns[turns.length - 1]
   const header = system
   if (last?.role === 'user') {
@@ -352,7 +355,7 @@ function requestTurns(system: string, turns: ChatTurn[], guidance: string | unde
     // "continue"), so nothing ends in a user turn. Many chat templates then treat the
     // request as a prefill of that reply and close it at once, returning nothing. A
     // trailing user turn asks for a fresh reply instead of extending the old one.
-    turns = [...turns, { role: 'user', content: note || CONTINUE_NOTE }]
+    turns = [...turns, { role: 'user', content: (wish || CONTINUE_NOTE) + (limit ? `\n${limit}` : '') }]
   }
   return header ? [{ role: 'system', content: header }, ...turns] : turns
 }

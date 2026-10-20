@@ -6,65 +6,72 @@ import { fitOutput } from '@/lib/core/context'
 import { attachmentUri, withInlinedImages } from '@/lib/images/attachments'
 
 export type PromptLength = 'short' | 'medium' | 'long'
-export type PromptFormat = 'prose' | 'sections'
-
-export type PromptGenOptions = {
-  length: PromptLength
-  format: PromptFormat
-}
 
 export type PromptGenInput = {
-  // In 'improve' mode this is the list of requested changes and may be empty.
+  // In 'improve' mode this is the list of requested changes and may be empty. From the
+  // questionnaire it is lines of "Field: value".
   description: string
   name: string
   // The prompt already in the editor; set only in 'improve' mode.
   base: string | null
-  options: PromptGenOptions
+  length: PromptLength
   locale: Locale
   images?: MessageImage[]
 }
 
 const LENGTH_RULES: Record<PromptLength, string> = {
-  short: 'Keep it compact: about 120-200 words.',
-  medium: 'Aim for about 300-450 words.',
-  long: 'Be thorough: about 600-900 words, with concrete details and a few sample lines of dialogue.',
+  short: 'Keep it compact: about 150-250 words, with two or three sample lines.',
+  medium: 'Aim for about 350-550 words, with three or four sample lines.',
+  long: 'Be thorough: about 700-1000 words, with more facts about the past and the world, more rules and five to eight sample lines.',
 }
 
-const FORMAT_RULES: Record<PromptFormat, string> = {
-  prose: 'Write flowing prose paragraphs without headings or lists.',
-  sections:
-    'Structure it with short Markdown headings (for example: personality, background, speech style, behavior, relationship with the user) and concise text or bullet points under each.',
-}
-
-function languageRule(locale: Locale) {
-  const fallback = locale === 'en' ? 'English' : 'Russian'
-  return `Write in the same language as the user's text. If that is unclear, write in ${fallback}.`
-}
+// The prompt is an instruction sheet for the model, not a story about the character: a
+// model given literary prose writes literary prose back, and an epithet gives it nothing
+// to act on. So the rules ask for a dossier of plain facts and behaviors, laid out as a
+// hand-written preset is.
+const DOSSIER_RULES = [
+  'Write it as a dossier the model can act on: short declarative sentences, one fact per line. No metaphors, no epithets, no atmosphere, no adjectives piled up, no narration about the character.',
+  'State every trait as behavior. Not "a soul tempered by storms" but "You get angry fast and calm down just as fast. You never apologize first."',
+  'Follow this order. The first four parts are plain lines without labels; the last three each get a plain label ending in a colon and a dash list under it. No Markdown headings.',
+  '1. Identity: "You are <name>, a <age>-year-old <who>." Occupation, where they live, their situation now.',
+  '2. Appearance: a few plain facts (build, hair, eyes, what they usually wear, distinctive marks).',
+  '3. Personality: the main traits, each with how it shows; what excites them, what annoys them, their habits.',
+  '4. The user: who the user is to the character, their shared history, how the character treats the user, what they do and never do with them. Call the user "the user".',
+  '5. "Speech:" register, sentence length, slang, swearing or its absence, verbal habits, and sample lines in quotes, each on its own dash line.',
+  '6. "Roleplay formatting:" actions, narration and thoughts in *asterisks*, spoken dialogue in plain text without asterisks; mix actions and dialogue instead of grouping them into blocks; show emotions through actions rather than naming them; no Markdown or lists in replies. End it with a short example reply that alternates *actions* and dialogue.',
+  '7. "Rules:" short imperative lines on how to behave in the chat, fitting this character (for example: react before answering, vary sentence length, never speak or act for the user).',
+].join('\n')
 
 function systemRules(input: PromptGenInput) {
   const hasImages = (input.images?.length ?? 0) > 0
   return [
     'You write system prompts for roleplay AI characters in a chat app.',
-    'The prompt is addressed to the model in the second person ("You are ...") and defines the character: personality, background, speech style, habits, how they treat the user, and what they never do.',
-    'Make the character specific and alive: concrete details beat generic adjectives. Do not add rules about being an AI, safety disclaimers or instructions about formatting replies.',
+    'The prompt is addressed to the model in the second person ("You are ...") and defines the character the model plays.',
+    DOSSIER_RULES,
+    'Do not add rules about being an AI or safety disclaimers.',
     input.name.trim()
       ? `The character's name is ${input.name.trim()}.`
       : 'If no name is given, invent one that fits the character.',
+    'Every fact the user gives is fixed: keep it exactly. Fill whatever is left out with plausible facts that fit.',
     hasImages
       ? [
           'Reference images are attached to guide the character creation.',
-          'Carefully analyze the visual details in the images: physical appearance (hair, eyes, face, build, distinctive features), clothing, aesthetic, expressions, posture, setting, mood, and any situational context.',
-          'Incorporate these visual elements into the character definition (appearance, persona, demeanor, and background).',
-          'If the image contains multiple characters, follow the user instructions on which character is the subject of this prompt and who the other character(s) are, describing their relationship, dynamic, and interactions accordingly.',
+          'Take the visual facts from them: hair, eyes, face, build, distinctive features, clothing, expression, posture, setting and situation.',
+          'Put them into the appearance and, where they tell something, into the identity and personality as plain facts.',
+          'If the image contains multiple characters, follow the user instructions on which character is the subject of this prompt and who the other character(s) are, and state their relationship plainly.',
         ].join(' ')
       : '',
-    LENGTH_RULES[input.options.length],
-    FORMAT_RULES[input.options.format],
+    LENGTH_RULES[input.length],
     languageRule(input.locale),
     'Reply with the prompt text only: no preface, no comments after it, no quotes or code fences around it.',
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+function languageRule(locale: Locale) {
+  const fallback = locale === 'en' ? 'English' : 'Russian'
+  return `Write in the same language as the user's text. If that is unclear, write in ${fallback}.`
 }
 
 type TextKind = 'prompt' | 'greeting' | 'persona'
@@ -113,7 +120,7 @@ function buildEditMessages(kind: TextKind, text: string, change: string, images?
 
 // Improving the prompt there is, with no requests, adds and fixes rather than starts over.
 const IMPROVE_DEFAULT =
-  'fill the gaps and remove contradictions, making the character more vivid by adding concrete details; keep what is written'
+  'fill the gaps and remove contradictions by adding concrete facts about how the character behaves and speaks, as plain lines in the style of the text; keep what is written'
 
 // From scratch, a description becomes a prompt by the rules of length and format. Improving
 // the current prompt and revising a version are edits of the text given. A revision only
