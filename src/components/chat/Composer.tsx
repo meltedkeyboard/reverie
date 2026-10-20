@@ -43,7 +43,7 @@ import * as Haptics from '@/lib/ui/haptics'
 import { showToast } from '@/lib/ui/toast'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { alertError } from '@/lib/transfer/report'
-import { isDesktop, isIOS, isWeb } from '@/lib/core/platform'
+import { isAndroid, isDesktop, isIOS, isWeb } from '@/lib/core/platform'
 import { type Colors, ON_ACCENT, useColors, useStyles, useTheme } from '@/theme'
 import { useRouter } from 'expo-router'
 import type { Persona } from '@/db/personas'
@@ -705,9 +705,10 @@ export function Composer({
         >
           {row}
         </View>
-      ) : liquidGlass ? (
+      ) : liquidGlass || isAndroid ? (
         // Glass controls float over the messages; the fade keeps text scrolling
-        // underneath from clashing with them.
+        // underneath from clashing with them. Android has no glass but floats the same
+        // solid field, since a bar there was a slab of tint under it.
         <View
           style={[
             styles.floatingBar,

@@ -12,7 +12,7 @@ import { ChatDrawer, useChatDrawer } from '@/components/chrome/ChatDrawer'
 import { Avatar } from '@/components/visuals/Avatar'
 import { Composer, ComposerFloat, ComposerSwap } from '@/components/chat/Composer'
 import { ErrorCard, JumpButton, type ConversationHandle } from '@/components/chat/ConversationList'
-import { GlassButton, GlassSurface } from '@/components/chrome/Glass'
+import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { MessageRow, type RowMessage } from '@/components/chat/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
@@ -52,6 +52,7 @@ import { characterScene } from '@/lib/chat/aside'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import { prefetchMessages } from '@/lib/chat/messageCache'
 import { formatWhen } from '@/lib/core/format'
+import { isAndroid } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
 import { showToastOnce } from '@/lib/ui/toast'
 import { liquidGlass } from '@/lib/ui/nativeUI'
@@ -557,6 +558,7 @@ type ChatChromeProps = {
 // they show, so their glass is never made anew.
 function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, onNewChat }: ChatChromeProps) {
   const styles = useStyles(createStyles)
+  const glass = useGlassStyles()
   const { t } = useTranslation()
   // The way out of a chat is the drawer's list; in a wide window, the sidebar.
   const drawer = useChatDrawer()
@@ -592,13 +594,13 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
           <View style={styles.headerWho}>
             {/* The photo is a button of its own, as in Telegram: it opens full screen, and
                 the pill beside it keeps the menu. */}
-            <GlassSurface interactive style={styles.photo}>
+            <GlassSurface interactive style={[styles.photo, isAndroid && glass.solid]}>
               <Avatar name={owner.character.name} file={owner.character.avatar} size={38} />
             </GlassSurface>
             {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
                 of the pill. */}
             <NativeMenu items={data?.chatMenu ?? []} style={styles.whoPress} glassRadius={22}>
-              <PillSurface style={[styles.who, liquidGlass && styles.whoPill]}>
+              <PillSurface style={[styles.who, pilled && styles.whoPill, isAndroid && glass.solid]}>
                 <WhoText name={owner.character.name} data={data} />
               </PillSurface>
             </NativeMenu>
@@ -606,7 +608,7 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
         ) : (
           // The cast is the menu's trigger, so their photos open from the menu.
           <NativeMenu items={data?.chatMenu ?? []} style={styles.roomPress} glassRadius={22}>
-            <PillSurface style={[styles.roomWho, liquidGlass && styles.roomPill]}>
+            <PillSurface style={[styles.roomWho, pilled && styles.roomPill, isAndroid && glass.solid]}>
               <AvatarStack cast={owner.members.map((m) => ({ name: m.character.name, avatar: m.character.avatar }))} size={28} viewable={false} />
               <WhoText name={owner.room.name} data={data} />
             </PillSurface>
@@ -862,6 +864,9 @@ function Intro({ owner, chat, hint }: { owner: Owner; chat: Chat; hint?: string 
 }
 
 const PillSurface = nativeMenuGlass ? View : GlassSurface
+// The name sits in a pill where the header floats: in glass on iOS 26, and on Android in the
+// same solid fill as its round header buttons.
+const pilled = liquidGlass || isAndroid
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
