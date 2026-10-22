@@ -90,6 +90,7 @@
   "chatFont.system": "System",
   "settings.continueButton":"Continue button",
   "settings.continueButtonNote": "The latest chat or scene on the home tabs. Swipe left to hide it",
+  "settings.continueBy": "Which chat",
   "settings.continueByVisit": "Last visited",
   "settings.continueByMessage": "Last message",
   "continue.accessibility": "Continue the last chat",

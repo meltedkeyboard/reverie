@@ -90,6 +90,7 @@
   "chatFont.system": "Системный",
   "settings.continueButton": "Кнопка «Продолжить»",
   "settings.continueButtonNote": "Последний чат или сцена на главных вкладках. Смахните влево, чтобы скрыть",
+  "settings.continueBy": "Какой чат",
   "settings.continueByVisit": "Последний визит",
   "settings.continueByMessage": "Последнее сообщение",
   "continue.accessibility": "Продолжить последний чат",

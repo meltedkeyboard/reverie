@@ -4,7 +4,7 @@ import * as LocalAuthentication from 'expo-local-authentication'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
-import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, MenuCell, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
+import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, MenuCell, SegmentCell, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import {
   inspectLoadedModel,
@@ -704,12 +704,11 @@ export default function SettingsScreen() {
     <ListSection header={t('settings.homeScreen')} footer={t('settings.continueButtonNote')}>
       <SwitchCell label={t('settings.continueButton')} value={continueButton} onValueChange={toggleContinueButton} />
       {continueButton ? (
-        <ChipRowCell
-          actions={CONTINUE_OPTIONS.map((o) => ({
-            label: o.label,
-            active: (continueByVisit ? 'visit' : 'message') === o.value,
-            onPress: () => setContinueByVisitValue(o.value === 'visit'),
-          }))}
+        <SegmentCell
+          label={t('settings.continueBy')}
+          options={CONTINUE_OPTIONS}
+          value={continueByVisit ? 'visit' : 'message'}
+          onChange={(value) => setContinueByVisitValue(value === 'visit')}
         />
       ) : null}
     </ListSection>
