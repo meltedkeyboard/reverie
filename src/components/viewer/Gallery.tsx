@@ -433,8 +433,8 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
     }
 
     // What a drag does, from where it first went: a zoomed picture moves; otherwise sideways
-    // turns the pictures and up or down pulls the picture away. Whatever was moving is caught
-    // where it is.
+    // turns the pictures and up or down pulls the picture away. With one picture there is
+    // nothing to turn to, so any drag pulls it. Whatever was moving is caught where it is.
     const begin = (dx: number, dy: number) => {
       'worklet'
       claimZoom()
@@ -444,7 +444,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
         cancelAnimation(pager)
         mode.value = PAN
         start.value = { pager: pager.value, x: x.value, y: y.value }
-      } else if (Math.abs(dx) > Math.abs(dy)) {
+      } else if (lastPage > 0 && Math.abs(dx) > Math.abs(dy)) {
         cancelAnimation(pager)
         mode.value = PAGE
         start.value = { pager: unresist(pager.value, 0, lastPage * stride, width), x: 0, y: 0 }
