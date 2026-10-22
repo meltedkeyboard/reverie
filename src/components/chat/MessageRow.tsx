@@ -450,6 +450,9 @@ const THINKING_TAIL = 220
 const LINES_TAP_MS = 300
 // How long after a selection is cleared a tap is still the one that cleared it.
 const SELECTION_CLEAR_MS = 400
+// How long after the finger lifts from a thought being written its text is still held, for
+// the selection of a long press to be told.
+const HOLD_RELEASE_MS = 150
 
 type ThoughtProps = {
   text: string
@@ -534,11 +537,40 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
   // is left to the text, which selects; a tap that only clears a selection keeps the
   // thought as it is. In a browser the unfolded text is selected with clicks, so it is
   // left alone there.
-  const selection = useRef({ selected: false, clearedAt: 0 })
-  const onSelect = useCallback((selected: boolean) => {
-    if (selection.current.selected && !selected) selection.current.clearedAt = Date.now()
-    selection.current.selected = selected
+  const selection = useRef({ selected: false, clearedAt: 0, touching: false })
+  // While the model thinks, the text is replaced with every frame, and each replacement
+  // dropped a selection under way. A finger on the unfolded text holds it as it was until
+  // the finger lets go with nothing selected, or the selection is cleared.
+  const [held, setHeld] = useState<string | null>(null)
+  const letGo = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const release = useCallback(() => {
+    if (!selection.current.selected && !selection.current.touching) setHeld(null)
   }, [])
+  const onSelect = useCallback(
+    (selected: boolean) => {
+      if (selection.current.selected && !selected) selection.current.clearedAt = Date.now()
+      selection.current.selected = selected
+      if (!selected) release()
+    },
+    [release]
+  )
+  const onTouchStart = useCallback(() => {
+    selection.current.touching = true
+    if (letGo.current) clearTimeout(letGo.current)
+    if (live && open) setHeld((prev) => prev ?? text)
+  }, [live, open, text])
+  // Put off a moment: the selection a long press makes can be told after the finger lifts.
+  const onTouchEnd = useCallback(() => {
+    selection.current.touching = false
+    if (letGo.current) clearTimeout(letGo.current)
+    letGo.current = setTimeout(release, HOLD_RELEASE_MS)
+  }, [release])
+  useEffect(
+    () => () => {
+      if (letGo.current) clearTimeout(letGo.current)
+    },
+    []
+  )
   const tapLines = useCallback(() => {
     const { selected, clearedAt } = selection.current
     if (selected || Date.now() - clearedAt < SELECTION_CLEAR_MS) return
@@ -589,10 +621,10 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
       </GestureDetector>
       {open || live ? (
         <GestureDetector gesture={linesTap}>
-          <View>
+          <View onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
             {open ? (
               <SelectableText style={styles.thoughtText} onSelect={onSelect}>
-                {text}
+                {held ?? text}
               </SelectableText>
             ) : (
               <Text style={styles.thoughtText} numberOfLines={4}>
