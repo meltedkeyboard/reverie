@@ -193,7 +193,15 @@ export async function characterSelection(db: SQLiteDatabase, id: number): Promis
 // Everything when `selection` is left out.
 export async function exportBackup(db: SQLiteDatabase, selection?: Selection) {
   const zip = await buildBackupArchive(db, selection)
-  return saveFile(`reverie-backup-${new Date().toISOString().slice(0, 10)}.zip`, zip, 'application/zip')
+  return saveFile(`reverie-backup-${fileStamp(new Date())}.zip`, zip, 'application/zip')
+}
+
+// The local date and time down to the second, so backups made the same day do not take
+// each other's name. Dashes rather than colons, which Windows does not allow in a name.
+function fileStamp(date: Date) {
+  const two = (n: number) => String(n).padStart(2, '0')
+  const day = `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`
+  return `${day}_${two(date.getHours())}-${two(date.getMinutes())}-${two(date.getSeconds())}`
 }
 
 export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selection) {
