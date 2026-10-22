@@ -14,6 +14,8 @@ type Props = {
   // false draws plain Text, which leaves a long press to the parent: the user's bubble
   // opens its menu on one, where a reply selects text.
   selectable?: boolean
+  // Told whether some of the text is selected now.
+  onSelect?: (selected: boolean) => void
 }
 
 const HEADING_SCALE = [1.35, 1.2, 1.1, 1, 1, 1]
@@ -50,7 +52,7 @@ export function SelectableText({
   )
 }
 
-function PlainText({ style, children }: { style: StyleProp<TextStyle>; children: ReactNode }) {
+function PlainText({ style, children }: { style: StyleProp<TextStyle>; children: ReactNode; onSelect?: (selected: boolean) => void }) {
   return <Text style={style}>{children}</Text>
 }
 
@@ -81,7 +83,7 @@ type Piece = { flow: true; node: ReactNode; tight: boolean } | { flow: false; no
 // Pieces that flow are joined into one UITextView, so a selection runs through the
 // whole reply and only stops at a code block or a table, as in ChatGPT. Lists and
 // quotes are drawn with characters for the same reason: a view would split the text.
-function MarkdownView({ text, style, emStyle, streaming = false, selectable = true }: Props) {
+function MarkdownView({ text, style, emStyle, streaming = false, selectable = true, onSelect }: Props) {
   const Block = selectable ? SelectableText : PlainText
   const styles = useStyles(createStyles)
   const tokens = useMemo(() => lex(text, streaming), [text, streaming])
@@ -230,6 +232,7 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
       <Block
         key={streaming ? views.length : `${views.length}:${text}`}
         style={style}
+        onSelect={onSelect}
       >
         {run}
       </Block>

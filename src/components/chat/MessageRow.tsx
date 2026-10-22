@@ -83,6 +83,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   const isUser = message.role === 'user' && !narration
   // A streaming reply stays plain: its text changes with every token.
   const rich = useHydrated(message.streaming ? 'stream' : `${message.id}:${message.variant}`, hydrate)
+  const held = useHeldText(Boolean(message.streaming), message.content)
   const actions = useMemo(
     () => messageActions(message, { canRegenerate, locked }),
     [message, canRegenerate, locked]
@@ -108,10 +109,10 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
     />
   )
 
-  const text = (
+  const markdown = (
     <Markdown
       key={message.streaming ? 'stream' : `${message.variant}:${message.content}`}
-      text={message.content}
+      text={held.shown}
       style={
         narration
           ? [styles.botText, styles.narrationText, textSize(chatText, CHAT_METRICS.narration)]
@@ -120,8 +121,10 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
       emStyle={styles.action}
       streaming={message.streaming}
       selectable={rich}
+      onSelect={message.streaming ? held.onSelect : undefined}
     />
   )
+  const text = message.streaming ? <View {...held.touch}>{markdown}</View> : markdown
 
   if (narration) {
     return (
@@ -450,8 +453,8 @@ const THINKING_TAIL = 220
 const LINES_TAP_MS = 300
 // How long after a selection is cleared a tap is still the one that cleared it.
 const SELECTION_CLEAR_MS = 400
-// How long after the finger lifts from a thought being written its text is still held, for
-// the selection of a long press to be told.
+// How long after the finger lifts from text being written it is still held, for the
+// selection of a long press to be told.
 const HOLD_RELEASE_MS = 150
 
 type ThoughtProps = {
@@ -482,6 +485,45 @@ function wasUnfolded(memory: string | undefined, chatId: number | undefined, tex
   if (unfolded.has(memory)) return { open: true, carried: false }
   const carried = unfolded.has(live) && liveTexts.get(live) === text
   return { open: carried, carried }
+}
+
+// Text being written is replaced with every frame, and each replacement dropped a
+// selection under way. A finger on it holds the text as it was until the finger lets go
+// with nothing selected, or the selection is cleared; then it catches up.
+function useHeldText(active: boolean, text: string) {
+  const selection = useRef({ selected: false, clearedAt: 0, touching: false })
+  const [held, setHeld] = useState<string | null>(null)
+  const letGo = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const release = useCallback(() => {
+    if (!selection.current.selected && !selection.current.touching) setHeld(null)
+  }, [])
+  const onSelect = useCallback(
+    (selected: boolean) => {
+      if (selection.current.selected && !selected) selection.current.clearedAt = Date.now()
+      selection.current.selected = selected
+      if (!selected) release()
+    },
+    [release]
+  )
+  const onTouchStart = useCallback(() => {
+    selection.current.touching = true
+    if (letGo.current) clearTimeout(letGo.current)
+    if (active) setHeld((prev) => prev ?? text)
+  }, [active, text])
+  // Put off a moment: the selection a long press makes can be told after the finger lifts.
+  const onTouchEnd = useCallback(() => {
+    selection.current.touching = false
+    if (letGo.current) clearTimeout(letGo.current)
+    letGo.current = setTimeout(release, HOLD_RELEASE_MS)
+  }, [release])
+  useEffect(
+    () => () => {
+      if (letGo.current) clearTimeout(letGo.current)
+    },
+    []
+  )
+  const touch = useMemo(() => ({ onTouchStart, onTouchEnd, onTouchCancel: onTouchEnd }), [onTouchStart, onTouchEnd])
+  return { shown: held ?? text, selection, onSelect, touch }
 }
 
 // Folded by default like in ChatGPT. While the model thinks, the folded block
@@ -537,40 +579,7 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
   // is left to the text, which selects; a tap that only clears a selection keeps the
   // thought as it is. In a browser the unfolded text is selected with clicks, so it is
   // left alone there.
-  const selection = useRef({ selected: false, clearedAt: 0, touching: false })
-  // While the model thinks, the text is replaced with every frame, and each replacement
-  // dropped a selection under way. A finger on the unfolded text holds it as it was until
-  // the finger lets go with nothing selected, or the selection is cleared.
-  const [held, setHeld] = useState<string | null>(null)
-  const letGo = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const release = useCallback(() => {
-    if (!selection.current.selected && !selection.current.touching) setHeld(null)
-  }, [])
-  const onSelect = useCallback(
-    (selected: boolean) => {
-      if (selection.current.selected && !selected) selection.current.clearedAt = Date.now()
-      selection.current.selected = selected
-      if (!selected) release()
-    },
-    [release]
-  )
-  const onTouchStart = useCallback(() => {
-    selection.current.touching = true
-    if (letGo.current) clearTimeout(letGo.current)
-    if (live && open) setHeld((prev) => prev ?? text)
-  }, [live, open, text])
-  // Put off a moment: the selection a long press makes can be told after the finger lifts.
-  const onTouchEnd = useCallback(() => {
-    selection.current.touching = false
-    if (letGo.current) clearTimeout(letGo.current)
-    letGo.current = setTimeout(release, HOLD_RELEASE_MS)
-  }, [release])
-  useEffect(
-    () => () => {
-      if (letGo.current) clearTimeout(letGo.current)
-    },
-    []
-  )
+  const { shown: shownText, selection, onSelect, touch } = useHeldText(live && open, text)
   const tapLines = useCallback(() => {
     const { selected, clearedAt } = selection.current
     if (selected || Date.now() - clearedAt < SELECTION_CLEAR_MS) return
@@ -621,10 +630,10 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
       </GestureDetector>
       {open || live ? (
         <GestureDetector gesture={linesTap}>
-          <View onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+          <View {...touch}>
             {open ? (
               <SelectableText style={styles.thoughtText} onSelect={onSelect}>
-                {held ?? text}
+                {shownText}
               </SelectableText>
             ) : (
               <Text style={styles.thoughtText} numberOfLines={4}>
