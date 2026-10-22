@@ -598,8 +598,8 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
               <Avatar name={owner.character.name} file={owner.character.avatar} size={38} />
             </GlassSurface>
             {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
-                of the pill. */}
-            <NativeMenu items={data?.chatMenu ?? []} style={styles.whoPress} glassRadius={22}>
+                of the pill. The chat's title heads the menu, as on a row of the drawer. */}
+            <NativeMenu items={data?.chatMenu ?? []} title={data?.title ?? undefined} style={styles.whoPress} glassRadius={22}>
               <PillSurface style={[styles.who, pilled && styles.whoPill, isAndroid && glass.solid]}>
                 <WhoText name={owner.character.name} data={data} />
               </PillSurface>
@@ -607,7 +607,7 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
           </View>
         ) : (
           // The cast is the menu's trigger, so their photos open from the menu.
-          <NativeMenu items={data?.chatMenu ?? []} style={styles.roomPress} glassRadius={22}>
+          <NativeMenu items={data?.chatMenu ?? []} title={data?.title ?? undefined} style={styles.roomPress} glassRadius={22}>
             <PillSurface style={[styles.roomWho, pilled && styles.roomPill, isAndroid && glass.solid]}>
               <AvatarStack cast={owner.members.map((m) => ({ name: m.character.name, avatar: m.character.avatar }))} size={28} viewable={false} />
               <WhoText name={owner.room.name} data={data} />
