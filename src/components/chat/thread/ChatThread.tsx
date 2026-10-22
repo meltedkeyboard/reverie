@@ -366,6 +366,9 @@ export function ChatThread({
       }
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
+      // A tap on the status bar would fling a chat up to its first message, far from where
+      // it is read and written, laying out every row on the way.
+      scrollsToTop={false}
     />
   )
 }
