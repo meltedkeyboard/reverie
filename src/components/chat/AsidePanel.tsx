@@ -164,7 +164,7 @@ function Question({ text }: { text: AsideQuestion }) {
           {text.images.map((image, i) => {
             const uri = pictureUri(image)
             return (
-              <ImageLink key={i} uri={uri} aspect={image.width && image.height ? image.width / image.height : 1}>
+              <ImageLink key={i} uri={uri} aspect={image.width && image.height ? image.width / image.height : 1} corners={10}>
                 <Image source={{ uri }} style={styles.picture} contentFit="cover" />
               </ImageLink>
             )

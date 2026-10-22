@@ -498,6 +498,7 @@ export function ThoughtBlock({ text, ms }: ThoughtProps) {
 }
 
 const PICTURE_MAX = { width: 240, height: 300 }
+const PICTURE_RADIUS = 18
 
 type PictureProps = { image: MessageImage; onLongPress: () => void }
 
@@ -508,7 +509,7 @@ function Picture({ image, onLongPress }: PictureProps) {
   const height = image.height || PICTURE_MAX.width
   const scale = Math.min(PICTURE_MAX.width / width, PICTURE_MAX.height / height)
   return (
-    <ImageLink uri={uri} aspect={width / height} onLongPress={onLongPress} delayLongPress={LONG_PRESS_MS}>
+    <ImageLink uri={uri} aspect={width / height} corners={PICTURE_RADIUS} onLongPress={onLongPress} delayLongPress={LONG_PRESS_MS}>
       <Image
         source={{ uri }}
         style={[styles.picture, { width: width * scale, height: height * scale }]}
@@ -527,7 +528,7 @@ const createStyles = (colors: Colors) =>
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
-  picture: { borderRadius: 18, marginBottom: 4, backgroundColor: colors.surface },
+  picture: { borderRadius: PICTURE_RADIUS, marginBottom: 4, backgroundColor: colors.surface },
   userText: { color: colors.text },
   botRow: { alignItems: 'flex-start', paddingHorizontal: 20, marginVertical: 12, width: '100%', maxWidth: CHAT_COLUMN, alignSelf: 'center' },
   botText: { color: colors.text, letterSpacing: 0.1 },

@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 
 import { avatarUri } from '@/lib/images/avatars'
+import { originOf } from '@/lib/images/viewer'
 import { useStyles, type Colors } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
@@ -55,8 +56,17 @@ export function AvatarStack({ cast, size, max = 3, viewable = true }: Props) {
 
   const gallery = viewable ? castGallery(cast) : []
   if (!gallery.length) return stack
+  // Where each photo of the gallery sits in the stack, for the viewer to grow it out of and
+  // put it back: the faces in a row overlapping by `overlap`, each inside its ring. Those
+  // folded into the "+N" have no place.
+  const spots = (box: { x: number; y: number }) =>
+    cast.flatMap((member, i) => {
+      if (!member.avatar || !avatarUri(member.avatar)) return []
+      if (i >= count) return [null]
+      return [originOf({ x: box.x + i * (size + ring * 2 - overlap) + ring, y: box.y + ring, width: size, height: size }, size / 2)]
+    })
   return (
-    <ImageLink gallery={gallery} accessibilityLabel={cast.map((m) => m.name).join(', ')}>
+    <ImageLink gallery={gallery} spots={spots} accessibilityLabel={cast.map((m) => m.name).join(', ')}>
       {stack}
     </ImageLink>
   )

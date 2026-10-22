@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, type Theme } from 'expo-router'
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { Suspense, useEffect, useMemo } from 'react'
 import { StyleSheet, useWindowDimensions, View } from 'react-native'
@@ -21,6 +21,7 @@ import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemeMode, loadThemeName, saveLocalePreference, saveThemeMode, saveThemeName } from '@/db/prefs/settings'
 import { CloudSyncProvider } from '@/hooks/features/useCloudSync'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
+import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
 import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
 import { ChatTextProvider } from '@/lib/chat/chatText'
@@ -75,14 +76,15 @@ function ThemedApp() {
   )
 }
 
-// Full-screen routes that go over the sidebar rather than beside it.
-const WITHOUT_SIDEBAR = ['/onboarding', '/viewer', '/background', '/avatar-crop']
+// Full-screen routes that go over the sidebar rather than beside it. The viewer goes over it
+// see-through instead, the screen under it keeping its sidebar.
+const WITHOUT_SIDEBAR = ['/onboarding', '/background', '/avatar-crop']
 
 function AppShell() {
   const { colors, scheme } = useTheme()
   const sheetTones = useSheetTones({ noGlass: true })
   const wide = useLayoutMode() === 'wide'
-  const pathname = usePathname()
+  const pathname = useScreenPathname()
   const sidebar = wide && !WITHOUT_SIDEBAR.includes(pathname)
   const navigationTheme: Theme = useMemo(
     () => ({
@@ -110,8 +112,18 @@ function AppShell() {
             {/* Tabs only where there is a pointer to drive them; the desktop app has them in its title bar. */}
             {sidebar && isWeb && !isElectron ? <TabBar pathname={pathname} /> : null}
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-              {/* Opens in a blink; closed by the button or a tap, so no swipe-back either. */}
-              <Stack.Screen name="viewer" options={{ animation: 'fade', animationDuration: 120, gestureEnabled: false }} />
+              {/* Over the screen it opens from, which shows through as a picture is pulled away.
+                  The picture grows out of its thumbnail and goes back by itself, so the route
+                  has no animation of its own, nor the swipe back. */}
+              <Stack.Screen
+                name="viewer"
+                options={{
+                  presentation: 'transparentModal',
+                  animation: 'none',
+                  gestureEnabled: false,
+                  contentStyle: { backgroundColor: 'transparent' },
+                }}
+              />
               <Stack.Screen name="background" options={{ animation: 'fade' }} />
               <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
               {/* The system sheet with a grabber, pulled down to close; its bar is set by the screen. */}

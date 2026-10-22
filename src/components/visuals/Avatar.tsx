@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native'
 
 import { avatarUri } from '@/lib/images/avatars'
+import type { Corners } from '@/lib/images/viewer'
 import { avatarInitial, avatarTint } from '@/lib/images/initial'
 import { fonts } from '@/theme'
 
@@ -14,6 +15,9 @@ type Props = {
   size: number
   // Square corners, for an avatar that fills the edge of a card clipping it.
   square?: boolean
+  // The corners that card cuts a square avatar to, which the viewer grows the photo out of
+  // and puts it back into.
+  corners?: Corners
   // Fills the box it is put in instead of a size × size square; `size` still sets the
   // initial's size.
   fill?: boolean
@@ -22,7 +26,7 @@ type Props = {
   viewable?: boolean
 }
 
-export function Avatar({ name, file, uri, size, square = false, fill = false, viewable = true }: Props) {
+export function Avatar({ name, file, uri, size, square = false, corners = 0, fill = false, viewable = true }: Props) {
   const source = uri ?? (file ? avatarUri(file) : null)
   const box = fill
     ? { flex: 1, borderRadius: square ? 0 : size / 2, overflow: 'hidden' as const }
@@ -32,7 +36,7 @@ export function Avatar({ name, file, uri, size, square = false, fill = false, vi
     const image = <Picture uri={source} style={box} transition={150} />
     if (!viewable) return image
     return (
-      <ImageLink uri={source} accessibilityLabel={name} style={fill ? { flex: 1 } : undefined}>
+      <ImageLink uri={source} corners={square ? corners : size / 2} accessibilityLabel={name} style={fill ? { flex: 1 } : undefined}>
         {image}
       </ImageLink>
     )

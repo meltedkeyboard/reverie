@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient'
-import { useEffect } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import Animated, {
   interpolate,
@@ -11,8 +11,9 @@ import Animated, {
 } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 
+import { originOf } from '@/lib/images/viewer'
 import * as Haptics from '@/lib/ui/haptics'
-import { useOpenViewer } from '../visuals/ImageLink'
+import { useLifted, useOpenViewer } from '../visuals/ImageLink'
 import { Picture } from '../visuals/Picture'
 
 type Props = {
@@ -132,11 +133,33 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: 
   // Centered on the block, which already starts leftInset in from the edge of the screen
   const photoLeft = (width - leftInset - rightInset - photoSize) / 2
 
+  // The viewer grows the photo out of where it is, round or spread, and puts it back there.
+  // The photo moves by transforms on the UI thread, so its place is worked out from its
+  // block's by the same sums as its style.
+  const block = useRef<View>(null)
+  const id = useId()
+  const lifted = useLifted(id)
+  const openPhoto = () => {
+    const node = block.current
+    if (!node) return openViewer([{ uri, aspect: 1 }])
+    node.measureInWindow((blockX, blockY) => {
+      const k = progress.value
+      const pull = Math.max(0, -scrollY.value / PULL_TO_OPEN, (androidPull?.value ?? 0) / ANDROID_PULL_TO_OPEN)
+      const swell = 1 + Math.min(pull, 1) * 0.12 * (1 - k)
+      const closedScale = SIZE / photoSize
+      const side = photoSize * (closedScale + (1 - closedScale) * k) * swell
+      const middleX = blockX + photoLeft + photoSize / 2
+      const middleY = blockY + SIZE / 2 + (photoSize / 2 - top - SIZE / 2) * k + pinOpen(scrollY.value, k)
+      const origin = originOf({ x: middleX - side / 2, y: middleY - side / 2, width: side, height: side }, (side / 2) * (1 - k))
+      openViewer([{ uri, aspect: 1 }], 0, [origin], id)
+    })
+  }
+
   return (
-    <View style={styles.block}>
-      <Animated.View style={[styles.photo, { width: photoSize, height: photoSize, left: photoLeft, top: -top }, photo]}>
+    <View ref={block} style={styles.block}>
+      <Animated.View style={[styles.photo, { width: photoSize, height: photoSize, left: photoLeft, top: -top }, photo, lifted && styles.lifted]}>
         <Pressable
-          onPress={() => openViewer([{ uri, aspect: 1 }])}
+          onPress={openPhoto}
           accessibilityRole="imagebutton"
           accessibilityLabel={name}
           style={StyleSheet.absoluteFill}
@@ -192,6 +215,8 @@ const BOTTOM_SHADE = ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.55)'] as const
 const styles = StyleSheet.create({
   block: { alignSelf: 'stretch', height: SIZE },
   photo: { position: 'absolute', overflow: 'hidden' },
+  // Up in the viewer.
+  lifted: { opacity: 0 },
   topShade: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 110 },
 })

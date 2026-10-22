@@ -1,0 +1,902 @@
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
+import { StyleSheet, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  interpolate,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated'
+import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets'
+
+import { Picture } from '@/components/visuals/Picture'
+import { isWeb } from '@/lib/core/platform'
+import type { ViewerImage, ViewerOrigin } from '@/lib/images/viewer'
+import { FILL, useColors } from '@/theme'
+
+import { clamp, glide, project, resist, rubberband, spring, unresist, unrubberband } from './motion'
+
+// Between two pictures side by side.
+const GAP = 20
+// How far a touch goes before it is a drag rather than a tap.
+const SLOP = 10
+// A double tap zooms to where the picture fills the screen, and at least this far; a pinch
+// goes half as far again, and never less far than MAX_ZOOM.
+const TAP_ZOOM = 2
+const MAX_ZOOM = 4
+// A picture pinched below this and let go closes, as in Photos.
+const PINCH_CLOSE = 0.75
+// How far a picture pulled away must be headed, of the screen's height, to close.
+const THROW = 0.2
+// Responses of the springs, in seconds: the strip of pictures, a zoom settling, the picture
+// growing out of its thumbnail and going back, a pull flung back into the thumbnail, and one
+// let go short of closing.
+const PAGE_RESPONSE = 0.32
+const ZOOM_RESPONSE = 0.35
+const MORPH_RESPONSE = 0.36
+const FLING_RESPONSE = 0.42
+const RETURN_RESPONSE = 0.32
+// Off by less than this many points, a picture flying back is in its thumbnail.
+const LANDED = 0.4
+const FADE = { duration: 200, easing: Easing.out(Easing.quad) }
+
+// What a drag does, settled as it starts.
+const NONE = 0
+const PAGE = 1 // turns to the picture beside
+const PAN = 2 // moves a zoomed picture, and past its edge the strip
+const PULL = 3 // pulls the picture away to close it
+const HOLD = 4 // two fingers have the picture and the pinch moves it
+
+type Fit = { width: number; height: number; tap: number; max: number }
+
+// The picture's frame on its page, fitted into the screen, and how far it zooms.
+function fitIn(aspect: number, width: number, height: number): Fit {
+  const ratio = aspect > 0 && Number.isFinite(aspect) ? aspect : 1
+  const w = Math.min(width, height * ratio)
+  const h = w / ratio
+  const tap = Math.max(TAP_ZOOM, width / w, height / h)
+  return { width: w, height: h, tap, max: Math.max(MAX_ZOOM, tap * 1.5) }
+}
+
+type Frame = { x: number; y: number; width: number; height: number }
+
+// How the picture lies on its thumbnail: its middle's offset from the middle of the screen, the
+// scale at which it covers the thumbnail, the thumbnail's corners (each of its own, as a card cuts
+// only those on its edge) and, for a thumbnail of another shape, the part of the picture it
+// shows, the last two in the picture's own size.
+type Morph = {
+  x: number
+  y: number
+  scale: number
+  radii: [number, number, number, number]
+  continuous: boolean
+  crop: { width: number; height: number } | null
+}
+
+function morphFrom(origin: ViewerOrigin | null, fit: Fit, frame: Frame): Morph | null {
+  if (!origin || origin.width <= 0 || origin.height <= 0) return null
+  const scale = Math.max(origin.width / fit.width, origin.height / fit.height)
+  const sameShape = Math.abs(origin.width / origin.height / (fit.width / fit.height) - 1) < 0.01
+  const [topLeft, topRight, bottomRight, bottomLeft] = origin.radii
+  return {
+    x: origin.x - frame.x + origin.width / 2 - frame.width / 2,
+    y: origin.y - frame.y + origin.height / 2 - frame.height / 2,
+    scale,
+    radii: [topLeft / scale, topRight / scale, bottomRight / scale, bottomLeft / scale],
+    continuous: origin.continuous,
+    crop: sameShape ? null : { width: origin.width / scale, height: origin.height / scale },
+  }
+}
+
+// The zoom past its limits gives like a rubber band, in steps of the zoom itself, so a pinch
+// past the largest feels like one below the smallest; below, it gives more readily, toward
+// the pinch that closes.
+function resistZoom(raw: number, max: number) {
+  'worklet'
+  if (raw > max) return max * Math.exp(rubberband(Math.log(raw / max), 0.5))
+  if (raw < 1) return Math.exp(rubberband(Math.log(raw), 2))
+  return raw
+}
+
+// The pinch that resistZoom() turned into `scale`, for one that catches the picture while
+// it springs back into range.
+function unresistZoom(scale: number, max: number) {
+  'worklet'
+  if (scale > max) return max * Math.exp(unrubberband(Math.log(scale / max), 0.5))
+  if (scale < 1) return Math.exp(unrubberband(Math.log(scale), 2))
+  return scale
+}
+
+type Motion = {
+  progress: SharedValue<number>
+  page: SharedValue<number>
+  zoomPage: SharedValue<number>
+  scale: SharedValue<number>
+  x: SharedValue<number>
+  y: SharedValue<number>
+  pullX: SharedValue<number>
+  pullY: SharedValue<number>
+  kickX: SharedValue<number>
+  kickY: SharedValue<number>
+}
+
+export type GalleryHandle = {
+  // Closes as the button does: back into the thumbnail, or fading.
+  close: () => void
+  // Turns to the picture beside, -1 or 1.
+  go: (step: number) => void
+}
+
+type Props = {
+  images: ViewerImage[]
+  initialIndex: number
+  // Where each picture sits on the screen under the viewer (null for one not there), to grow
+  // out of and go back into.
+  origins: (ViewerOrigin | null)[]
+  // The viewer's place in the window and its size, the size of a page.
+  frame: Frame
+  // The bars over the pictures, brought in and out with them and by a tap. The top one moves
+  // out of sight by `topTravel` (it may be glass, which never fades); the bottom one fades.
+  top: ReactNode
+  bottom: ReactNode
+  topTravel: number
+  onIndexChange: (index: number) => void
+  onChromeChange: (shown: boolean) => void
+  // The picture has gone: the viewer can.
+  onClosed: () => void
+  ref?: Ref<GalleryHandle>
+}
+
+// Full-screen pictures to swipe through, zoom and pull away, the way the viewers of Photos
+// and Twitter go. One set of gestures on the UI thread drives it all: a drag turns to the
+// picture beside, pulls the picture away to close, or moves a zoomed one, whose edge hands
+// the drag on to the strip; pinches zoom around the fingers and give past the limits, a
+// double tap zooms to the point, a tap shows or hides the bars. Let go, everything carries
+// the finger's speed on (see motion.ts). A picture grows out of its place on the screen and
+// goes back into it, cut to the thumbnail's shape on the way.
+export function Gallery({ images, initialIndex, origins, frame, top, bottom, topTravel, onIndexChange, onChromeChange, onClosed, ref }: Props) {
+  const colors = useColors()
+  const { width, height } = frame
+  const stride = width + GAP
+  const lastPage = images.length - 1
+  const fits = useMemo(() => images.map((image) => fitIn(image.aspect, width, height)), [images, width, height])
+  // The thumbnails are where they were only while the screen keeps the size it was tapped at.
+  const opened = useRef({ width, height })
+  const sameSize = opened.current.width === width && opened.current.height === height
+  const morphs = useMemo(
+    () => images.map((_, i) => (sameSize ? morphFrom(origins[i] ?? null, fits[i], frame) : null)),
+    [images, sameSize, origins, fits, frame]
+  )
+  const [current, setCurrent] = useState(initialIndex)
+
+  // 0 on the thumbnail (or not in yet), 1 open.
+  const progress = useSharedValue(0)
+  // The backdrop, which goes with a picture thrown off the screen.
+  const shade = useSharedValue(1)
+  const closing = useSharedValue(false)
+  // On its way back into its thumbnail.
+  const landing = useSharedValue(false)
+  // The picture the gestures act on, and how far the strip of pictures has moved.
+  const page = useSharedValue(initialIndex)
+  const pager = useSharedValue(initialIndex * stride)
+  // The zoom, and the picture it belongs to: it is let go once another one has come in.
+  const zoomPage = useSharedValue(initialIndex)
+  const scale = useSharedValue(1)
+  const x = useSharedValue(0)
+  const y = useSharedValue(0)
+  // A picture pulled away to close, and the throw of one let go. A spring Reanimated starts
+  // with a speed away from its target sets off without it, so a picture let go is two springs
+  // added up, as a spring's motion is: one from where it is, at rest, and one from nothing with
+  // the finger's speed, whose target is where it starts.
+  const pullX = useSharedValue(0)
+  const pullY = useSharedValue(0)
+  const kickX = useSharedValue(0)
+  const kickY = useSharedValue(0)
+  // The bars: how far in, and what the last tap asked for.
+  const bars = useSharedValue(0)
+  const barsWanted = useSharedValue(true)
+  // A touch caught the picture flying back: the tap it makes is no tap on the picture.
+  const caught = useSharedValue(false)
+  // The gestures' own bookkeeping: what the drag does, where it set off from, how far the
+  // fingers have gone since (without the jumps of a finger put down or lifted), and where
+  // they last were, from the middle of the page, for a zoom to settle around.
+  const mode = useSharedValue(NONE)
+  const panning = useSharedValue(false)
+  const pinching = useSharedValue(false)
+  const start = useSharedValue({ pager: 0, x: 0, y: 0 })
+  const moved = useSharedValue({ x: 0, y: 0 })
+  const panLast = useSharedValue({ x: 0, y: 0, pointers: 0 })
+  const pinchLast = useSharedValue({ scale: 1, x: 0, y: 0, pointers: 0 })
+  const rawScale = useSharedValue(1)
+  const focal = useSharedValue({ x: 0, y: 0 })
+
+  const turned = useCallback(
+    (to: number) => {
+      setCurrent(to)
+      onIndexChange(to)
+    },
+    [onIndexChange]
+  )
+
+  const motion = useMemo(() => {
+    // The middle of the page shown, in the gallery: off the screen's middle while the strip moves.
+    const middleX = () => {
+      'worklet'
+      return page.value * stride - pager.value + width / 2
+    }
+
+    // How far a picture zoomed to `s` may move each way before an edge comes off the screen's.
+    const bounds = (p: number, s: number) => {
+      'worklet'
+      const fit = fits[p]
+      return { x: Math.max(0, (fit.width * s - width) / 2), y: Math.max(0, (fit.height * s - height) / 2) }
+    }
+
+    // The zoom goes with the picture now shown; the one left behind is off the screen.
+    const claimZoom = () => {
+      'worklet'
+      if (zoomPage.value === page.value) return
+      scale.value = 1
+      x.value = 0
+      y.value = 0
+      zoomPage.value = page.value
+    }
+
+    const showBars = (shown: boolean) => {
+      'worklet'
+      bars.value = withTiming(shown ? 1 : 0, FADE)
+    }
+
+    // The strip goes to picture `to` at the speed it was flung, though never so fast that it
+    // swings past and shows the gap beside: a spring that doesn't overshoot sets off no faster
+    // than its frequency times the way to go.
+    const turnTo = (to: number, velocity: number) => {
+      'worklet'
+      const distance = to * stride - pager.value
+      const reach = ((2 * Math.PI) / PAGE_RESPONSE) * Math.abs(distance)
+      const speed =
+        Math.abs(distance) < 0.5
+          ? 0
+          : Math.sign(velocity) === Math.sign(distance)
+            ? Math.sign(velocity) * Math.min(Math.abs(velocity), reach)
+            : velocity
+      pager.value = withSpring(to * stride, spring(PAGE_RESPONSE, 1, speed), (finished) => {
+        if (finished) claimZoom()
+      })
+      if (to !== page.value) {
+        page.value = to
+        scheduleOnRN(turned, to)
+      }
+    }
+
+    // A swipe let go: to the picture nearest where the flick would carry the strip, one at most.
+    const settlePager = (velocity: number) => {
+      'worklet'
+      const from = page.value
+      const rest = pager.value - project(velocity)
+      turnTo(clamp(Math.round(rest / stride), Math.max(from - 1, 0), Math.min(from + 1, lastPage)), -velocity)
+    }
+
+    // The pull goes back to nothing, carrying on first the way it was flung (see kickX).
+    const throwBack = (response: number, vx: number, vy: number) => {
+      'worklet'
+      const settle = spring(response, 0.85)
+      pullX.value = withSpring(0, settle)
+      pullY.value = withSpring(0, settle)
+      kickX.value = withSpring(0, spring(response, 0.85, vx))
+      kickY.value = withSpring(0, spring(response, 0.85, vy))
+    }
+
+    // Closes by the button, the back key, a pinch or a pull let go: back into its place on the
+    // screen, with whatever was done to it undone on the way. A pull's speed carries on, so the
+    // picture runs on the way it was flung, swings round and lands in its thumbnail; the viewer
+    // goes as it lands (see `landing`). With no place to go back to it fades where it is.
+    const close = (vx = 0, vy = 0) => {
+      'worklet'
+      if (closing.value) return
+      closing.value = true
+      showBars(false)
+      if (!morphs[page.value]) {
+        progress.value = withTiming(0, FADE, (finished) => {
+          if (finished) scheduleOnRN(onClosed)
+        })
+        return
+      }
+      const back = spring(MORPH_RESPONSE)
+      scale.value = withSpring(1, back)
+      x.value = withSpring(0, back)
+      y.value = withSpring(0, back)
+      // Softer than the rest and a little bouncy, being thrown: the fling shows before it turns.
+      throwBack(FLING_RESPONSE, vx, vy)
+      progress.value = withSpring(0, back)
+      landing.value = true
+    }
+
+    // Where the picture is on the screen now, as a box around its middle: a touch inside it
+    // catches it on its way back.
+    const onPicture = (px: number, py: number) => {
+      'worklet'
+      const p = page.value
+      const morph = morphs[p]
+      if (!morph) return false
+      const own = zoomPage.value === p
+      const fit = fits[p]
+      const k = 1 - progress.value
+      const s = (1 + (morph.scale - 1) * k) * (own ? scale.value : 1)
+      const w = (morph.crop ? fit.width + (morph.crop.width - fit.width) * k : fit.width) * s
+      const h = (morph.crop ? fit.height + (morph.crop.height - fit.height) * k : fit.height) * s
+      const cx = middleX() + morph.x * k + pullX.value + kickX.value + (own ? x.value : 0)
+      const cy = height / 2 + morph.y * k + pullY.value + kickY.value + (own ? y.value : 0)
+      return Math.abs(px - cx) <= w / 2 + SLOP && Math.abs(py - cy) <= h / 2 + SLOP
+    }
+
+    // Caught on its way back into the thumbnail: it opens again from wherever it was, and a drag
+    // that follows takes it up as any pull.
+    const catchBack = () => {
+      'worklet'
+      landing.value = false
+      closing.value = false
+      caught.value = true
+      progress.value = withSpring(1, spring(MORPH_RESPONSE))
+      showBars(barsWanted.value)
+    }
+
+    // Thrown away up or down with no place to go back to: it flies on off the screen at the
+    // finger's speed, or briskly if that was slow, and the backdrop goes with it.
+    const throwAway = (vx: number, vy: number, direction: number) => {
+      'worklet'
+      closing.value = true
+      showBars(false)
+      const p = page.value
+      const tall = fits[p].height * (zoomPage.value === p ? scale.value : 1)
+      const target = direction * (height / 2 + tall / 2 + 40)
+      const speed = Math.max(Math.abs(vy), 1400)
+      const duration = clamp((Math.abs(target - pullY.value) / speed) * 1000, 120, 320)
+      const flight = { duration, easing: Easing.linear }
+      pullY.value = withTiming(target, flight)
+      pullX.value = withTiming(pullX.value + (vx * duration) / 1000, flight)
+      shade.value = withTiming(0, flight, (finished) => {
+        if (finished) scheduleOnRN(onClosed)
+      })
+    }
+
+    // A pulled picture let go: headed far enough off, and not flicked back, it closes, into its
+    // thumbnail or else off the screen; otherwise it springs back into place with the speed it
+    // was let go at.
+    const letGo = (vx: number, vy: number) => {
+      'worklet'
+      const rest = pullY.value + project(vy)
+      const flickedBack = Math.abs(vy) > 100 && Math.sign(vy) !== Math.sign(pullY.value)
+      if (Math.abs(rest) > height * THROW && !flickedBack) {
+        if (morphs[page.value]) close(vx, vy)
+        else throwAway(vx, vy, Math.sign(rest))
+        return
+      }
+      throwBack(RETURN_RESPONSE, vx, vy)
+      showBars(barsWanted.value)
+    }
+
+    // A zoomed picture let go. Pinched well below its size, it closes; a strip pulled past the
+    // picture's edge goes on to the picture beside or back; a zoom out of range springs back
+    // into it around where the fingers were; and a picture moved within it coasts on and
+    // bounces off its edges.
+    const settleZoom = (vx: number, vy: number) => {
+      'worklet'
+      const p = page.value
+      const s = scale.value
+      if (s < PINCH_CLOSE) {
+        close()
+        return
+      }
+      const pulledStrip = Math.abs(pager.value - p * stride) > 0.5
+      if (pulledStrip) settlePager(vx)
+      const target = clamp(s, 1, fits[p].max)
+      if (target !== s) {
+        const f = focal.value
+        const k = target / s
+        const b = bounds(p, target)
+        const settle = spring(ZOOM_RESPONSE)
+        scale.value = withSpring(target, settle)
+        x.value = withSpring(clamp(f.x + (x.value - f.x) * k, -b.x, b.x), settle)
+        y.value = withSpring(clamp(f.y + (y.value - f.y) * k, -b.y, b.y), settle)
+        return
+      }
+      const b = bounds(p, s)
+      if (!pulledStrip) glide(x, vx, -b.x, b.x)
+      glide(y, vy, -b.y, b.y)
+    }
+
+    // The zoomed picture follows the finger and gives past its edges. Sideways, a pull past its
+    // edge moves the strip instead, toward the picture beside, as in Photos; past the first
+    // or the last picture it gives like the other way.
+    const panZoomed = (mx: number, my: number) => {
+      'worklet'
+      const p = page.value
+      const b = bounds(p, scale.value)
+      y.value = resist(start.value.y + my, -b.y, b.y, height)
+      const want = start.value.x + mx
+      const over = want > b.x ? want - b.x : want < -b.x ? want + b.x : 0
+      const beside = over > 0 ? p > 0 : over < 0 ? p < lastPage : false
+      if (beside) {
+        x.value = want - over
+        pager.value = start.value.pager - over
+      } else {
+        x.value = resist(want, -b.x, b.x, width)
+        pager.value = start.value.pager
+      }
+    }
+
+    // What a drag does, from where it first went: a zoomed picture moves; otherwise sideways
+    // turns the pictures and up or down pulls the picture away. Whatever was moving is caught
+    // where it is.
+    const begin = (dx: number, dy: number) => {
+      'worklet'
+      claimZoom()
+      if (scale.value > 1.01) {
+        cancelAnimation(x)
+        cancelAnimation(y)
+        cancelAnimation(pager)
+        mode.value = PAN
+        start.value = { pager: pager.value, x: x.value, y: y.value }
+      } else if (Math.abs(dx) > Math.abs(dy)) {
+        cancelAnimation(pager)
+        mode.value = PAGE
+        start.value = { pager: unresist(pager.value, 0, lastPage * stride, width), x: 0, y: 0 }
+      } else {
+        cancelAnimation(pullX)
+        cancelAnimation(pullY)
+        cancelAnimation(kickX)
+        cancelAnimation(kickY)
+        mode.value = PULL
+        start.value = { pager: pager.value, x: pullX.value + kickX.value, y: pullY.value + kickY.value }
+        pullX.value = start.value.x
+        pullY.value = start.value.y
+        kickX.value = 0
+        kickY.value = 0
+        showBars(false)
+      }
+    }
+
+    const pan = Gesture.Pan()
+      .minDistance(SLOP)
+      // Android follows the first finger otherwise; iOS always takes the middle of them.
+      .averageTouches(true)
+      // A touch on the picture flying back into its thumbnail catches it, as it comes down.
+      .onTouchesDown((e) => {
+        const touch = e.changedTouches[0]
+        if (landing.value && touch && onPicture(touch.x, touch.y)) catchBack()
+      })
+      .onStart((e) => {
+        // A drag, so the touch that caught the picture won't end in a tap.
+        caught.value = false
+        panning.value = true
+        panLast.value = { x: e.translationX, y: e.translationY, pointers: e.numberOfPointers }
+        moved.value = { x: 0, y: 0 }
+        if (closing.value) mode.value = NONE
+        else if (pinching.value) mode.value = HOLD
+        else begin(e.translationX, e.translationY)
+      })
+      .onUpdate((e) => {
+        // A finger put down or lifted moves the middle of the touches the translation follows,
+        // which is no movement of the hand.
+        const before = panLast.value
+        const same = e.numberOfPointers === before.pointers
+        const dx = same ? e.translationX - before.x : 0
+        const dy = same ? e.translationY - before.y : 0
+        panLast.value = { x: e.translationX, y: e.translationY, pointers: e.numberOfPointers }
+        if (closing.value || mode.value === NONE) return
+        if (mode.value === HOLD) {
+          if (pinching.value) return
+          // The pinch is over and a finger stays on: it goes on moving the picture from here.
+          claimZoom()
+          mode.value = PAN
+          start.value = { pager: pager.value, x: x.value, y: y.value }
+          moved.value = { x: 0, y: 0 }
+          return
+        }
+        const m = { x: moved.value.x + dx, y: moved.value.y + dy }
+        moved.value = m
+        if (mode.value === PAGE) {
+          pager.value = resist(start.value.pager - m.x, 0, lastPage * stride, width)
+        } else if (mode.value === PULL) {
+          pullX.value = start.value.x + m.x
+          pullY.value = start.value.y + m.y
+        } else {
+          focal.value = { x: e.x - middleX(), y: e.y - height / 2 }
+          panZoomed(m.x, m.y)
+        }
+      })
+      .onEnd((e) => {
+        const was = mode.value
+        mode.value = NONE
+        panning.value = false
+        if (closing.value) return
+        if (was === PAGE) settlePager(e.velocityX)
+        else if (was === PULL) letGo(e.velocityX, e.velocityY)
+        // Holding, it settles only if the pinch has ended first and left that to the drag.
+        else if (was === PAN || (was === HOLD && !pinching.value)) settleZoom(e.velocityX, e.velocityY)
+      })
+      .onFinalize(() => {
+        panning.value = false
+        mode.value = NONE
+      })
+
+    const pinch = Gesture.Pinch()
+      .onStart((e) => {
+        // A swipe to the picture beside or a pull to close goes on; a second finger doesn't
+        // turn it into a zoom.
+        if (closing.value || mode.value === PAGE || mode.value === PULL) return
+        pinching.value = true
+        if (mode.value === PAN) mode.value = HOLD
+        claimZoom()
+        cancelAnimation(scale)
+        cancelAnimation(x)
+        cancelAnimation(y)
+        rawScale.value = unresistZoom(scale.value, fits[page.value].max)
+        pinchLast.value = { scale: e.scale, x: e.focalX, y: e.focalY, pointers: e.numberOfPointers }
+        focal.value = { x: e.focalX - middleX(), y: e.focalY - height / 2 }
+      })
+      .onUpdate((e) => {
+        if (!pinching.value) return
+        const before = pinchLast.value
+        pinchLast.value = { scale: e.scale, x: e.focalX, y: e.focalY, pointers: e.numberOfPointers }
+        // With a finger more or fewer the middle of the fingers jumps, and the pinch with it.
+        if (e.numberOfPointers !== before.pointers) return
+        rawScale.value *= e.scale / before.scale
+        const next = resistZoom(rawScale.value, fits[page.value].max)
+        const k = next / scale.value
+        const middle = middleX()
+        const fx = e.focalX - middle
+        const fy = e.focalY - height / 2
+        // The point under the fingers stays under them as they move and spread.
+        x.value = fx + (x.value - (before.x - middle)) * k
+        y.value = fy + (y.value - (before.y - height / 2)) * k
+        scale.value = next
+        focal.value = { x: fx, y: fy }
+      })
+      .onEnd(() => {
+        if (!pinching.value) return
+        pinching.value = false
+        // The last fingers to come off settle the picture: one still down goes on moving it.
+        if (!closing.value && !panning.value) settleZoom(0, 0)
+      })
+      .onFinalize(() => {
+        pinching.value = false
+      })
+
+    // Zoomed out, a double tap zooms in to fill the screen with the point tapped staying under
+    // the finger as far as the edges let it; zoomed in, back out.
+    const doubleTap = Gesture.Tap()
+      .numberOfTaps(2)
+      .maxDistance(SLOP)
+      .maxDelay(250)
+      .onEnd((e, success) => {
+        if (!success || closing.value) return
+        if (caught.value) {
+          caught.value = false
+          return
+        }
+        claimZoom()
+        const settle = spring(ZOOM_RESPONSE)
+        if (scale.value > 1.01) {
+          scale.value = withSpring(1, settle)
+          x.value = withSpring(0, settle)
+          y.value = withSpring(0, settle)
+          return
+        }
+        const p = page.value
+        const s = fits[p].tap
+        const b = bounds(p, s)
+        scale.value = withSpring(s, settle)
+        x.value = withSpring(clamp((e.x - middleX()) * (1 - s), -b.x, b.x), settle)
+        y.value = withSpring(clamp((e.y - height / 2) * (1 - s), -b.y, b.y), settle)
+      })
+
+    const singleTap = Gesture.Tap()
+      .maxDistance(SLOP)
+      .onEnd((_e, success) => {
+        if (!success || closing.value) return
+        if (caught.value) {
+          caught.value = false
+          return
+        }
+        barsWanted.value = !barsWanted.value
+        showBars(barsWanted.value)
+        scheduleOnRN(onChromeChange, barsWanted.value)
+      })
+
+    // The arrows on the desktop.
+    const go = (step: number) => {
+      'worklet'
+      if (closing.value || mode.value !== NONE) return
+      const to = clamp(page.value + step, 0, lastPage)
+      if (to !== page.value) turnTo(to, 0)
+    }
+
+    // A wheel or a touchpad on the desktop: with Ctrl (as a touchpad pinch comes) it zooms
+    // around the pointer, otherwise it moves a zoomed picture. True when it was taken.
+    const wheel = (dx: number, dy: number, zoom: boolean, px: number, py: number) => {
+      'worklet'
+      if (closing.value) return true
+      claimZoom()
+      const p = page.value
+      if (zoom) {
+        const s = scale.value
+        const next = clamp(s * Math.exp(-clamp(dy, -40, 40) * 0.01), 1, fits[p].max)
+        const k = next / s
+        const fx = px - middleX()
+        const fy = py - height / 2
+        const b = bounds(p, next)
+        x.value = clamp(fx + (x.value - fx) * k, -b.x, b.x)
+        y.value = clamp(fy + (y.value - fy) * k, -b.y, b.y)
+        scale.value = next
+        return true
+      }
+      if (scale.value <= 1.01) return false
+      const b = bounds(p, scale.value)
+      x.value = clamp(x.value - dx, -b.x, b.x)
+      y.value = clamp(y.value - dy, -b.y, b.y)
+      return true
+    }
+
+    // After a turn of the screen the pages are laid out again at the picture shown, unzoomed.
+    // One closing has nowhere to land any more, and goes at once.
+    const relayout = () => {
+      'worklet'
+      if (closing.value) {
+        landing.value = false
+        scheduleOnRN(onClosed)
+        return
+      }
+      cancelAnimation(pager)
+      pager.value = page.value * stride
+      scale.value = 1
+      x.value = 0
+      y.value = 0
+      pullX.value = 0
+      pullY.value = 0
+      kickX.value = 0
+      kickY.value = 0
+      zoomPage.value = page.value
+    }
+
+    return {
+      gesture: Gesture.Simultaneous(pinch, pan, Gesture.Exclusive(doubleTap, singleTap)),
+      close,
+      go,
+      wheel,
+      relayout,
+    }
+  }, [width, height, stride, lastPage, fits, morphs, turned, onChromeChange, onClosed])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      close: () => scheduleOnUI(motion.close),
+      go: (step: number) => scheduleOnUI(motion.go, step),
+    }),
+    [motion]
+  )
+
+  // Opens: out of the thumbnail, or fading in where there is none to come from.
+  useEffect(() => {
+    progress.value = morphs[initialIndex] ? withSpring(1, spring(MORPH_RESPONSE)) : withTiming(1, FADE)
+    bars.value = withTiming(1, FADE)
+    // Only as it first comes up.
+  }, [])
+
+  // The flight back has landed once nothing of the picture is off by more than a fraction of a
+  // point: its place, its size, and the cut and corners that come in with `progress`. The
+  // springs would run on for most of a second more to come to rest by the book, and all that
+  // while the viewer, still over the screen, would take the next tap.
+  useAnimatedReaction(
+    () => {
+      if (!landing.value) return false
+      const p = page.value
+      const morph = morphs[p]
+      if (!morph) return false
+      const own = zoomPage.value === p
+      const left = progress.value
+      const side = Math.max(fits[p].width, fits[p].height)
+      const offX = Math.abs(pullX.value + kickX.value + (own ? x.value : 0) - morph.x * left)
+      const offY = Math.abs(pullY.value + kickY.value + (own ? y.value : 0) - morph.y * left)
+      const size = Math.abs((1 + (morph.scale - 1) * (1 - left)) * (own ? scale.value : 1) - morph.scale) * side
+      return Math.max(offX, offY) + size + left * side * morph.scale < LANDED
+    },
+    (landed) => {
+      if (!landed || !landing.value) return
+      landing.value = false
+      scheduleOnRN(onClosed)
+    },
+    [morphs, fits, onClosed]
+  )
+
+  const laidOut = useRef({ width, height })
+  useEffect(() => {
+    if (laidOut.current.width === width && laidOut.current.height === height) return
+    laidOut.current = { width, height }
+    scheduleOnUI(motion.relayout)
+  }, [width, height, motion])
+
+  // The wheel and the touchpad on the desktop. A sideways swipe of the touchpad, unzoomed,
+  // turns to the picture beside, once a swipe.
+  const surface = useRef<View>(null)
+  useEffect(() => {
+    if (!isWeb) return
+    const node = surface.current as unknown as HTMLElement | null
+    if (!node) return
+    let swiped = 0
+    let quiet: ReturnType<typeof setTimeout> | undefined
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const box = node.getBoundingClientRect()
+      if (motion.wheel(e.deltaX, e.deltaY, e.ctrlKey, e.clientX - box.left, e.clientY - box.top)) return
+      clearTimeout(quiet)
+      quiet = setTimeout(() => (swiped = 0), 200)
+      if (swiped === Infinity) return
+      swiped += e.deltaX
+      if (Math.abs(swiped) > 60) {
+        motion.go(Math.sign(swiped))
+        swiped = Infinity
+      }
+    }
+    node.addEventListener('wheel', onWheel, { passive: false })
+    return () => {
+      node.removeEventListener('wheel', onWheel)
+      clearTimeout(quiet)
+    }
+  }, [motion])
+
+  const motionValues = { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY }
+
+  // The backdrop, in the theme's background, clears as the picture is pulled away or pinched
+  // small, which shows the screen underneath, and goes with the picture when it closes.
+  const backdrop = useAnimatedStyle(() => {
+    const pulled = 1 - Math.min(1, Math.abs(pullY.value + kickY.value) / (height * 0.4))
+    const own = zoomPage.value === page.value
+    const shrunk = own && scale.value < 1 ? interpolate(scale.value, [PINCH_CLOSE, 1], [0.35, 1], 'clamp') : 1
+    return { opacity: progress.value * shade.value * pulled * shrunk }
+  })
+  const strip = useAnimatedStyle(() => ({ transform: [{ translateX: -pager.value }] }))
+  const topBar = useAnimatedStyle(() => ({ transform: [{ translateY: -(1 - bars.value) * topTravel }] }))
+  const bottomBar = useAnimatedStyle(() => ({ opacity: bars.value }))
+
+  return (
+    <View style={styles.root}>
+      <Animated.View style={[styles.backdrop, { backgroundColor: colors.bg }, backdrop]} pointerEvents="none" />
+      <GestureDetector gesture={motion.gesture}>
+        <View ref={surface} style={StyleSheet.absoluteFill} collapsable={false}>
+          <Animated.View style={[styles.strip, { width: stride * images.length, height }, strip]}>
+            {images.map((image, i) =>
+              Math.abs(i - current) <= 2 ? (
+                <Page
+                  key={i}
+                  index={i}
+                  image={image}
+                  fit={fits[i]}
+                  left={i * stride}
+                  width={width}
+                  height={height}
+                  morph={morphs[i]}
+                  motion={motionValues}
+                />
+              ) : null
+            )}
+          </Animated.View>
+        </View>
+      </GestureDetector>
+      <Animated.View style={[styles.top, topBar]} pointerEvents="box-none">
+        {top}
+      </Animated.View>
+      {bottom ? (
+        <Animated.View style={[styles.bottom, bottomBar]} pointerEvents="none">
+          {bottom}
+        </Animated.View>
+      ) : null}
+    </View>
+  )
+}
+
+type PageProps = {
+  index: number
+  image: ViewerImage
+  fit: Fit
+  left: number
+  width: number
+  height: number
+  morph: Morph | null
+  motion: Motion
+}
+
+// One picture on the strip. Its frame carries the zoom, the pull and the flight between the
+// thumbnail and the page; inside it the clip shows the whole picture, or on that flight the part
+// a thumbnail of another shape shows, with the thumbnail's corners.
+function Page({ index, image, fit, left, width, height, morph, motion }: PageProps) {
+  const { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY } = motion
+  const crop = morph?.crop ?? null
+  // How far toward the thumbnail the picture is: 1 on it, 0 open.
+  const flight = useDerivedValue(() => (morph && page.value === index ? 1 - progress.value : 0))
+  const frame = useAnimatedStyle(() => {
+    const own = zoomPage.value === index
+    const s = own ? scale.value : 1
+    const zx = own ? x.value : 0
+    const zy = own ? y.value : 0
+    const shown = page.value === index
+    const dx = shown ? pullX.value + kickX.value : 0
+    const dy = shown ? pullY.value + kickY.value : 0
+    if (morph && shown) {
+      const k = flight.value
+      return {
+        opacity: 1,
+        transform: [
+          { translateX: morph.x * k + dx + zx },
+          { translateY: morph.y * k + dy + zy },
+          { scale: (1 + (morph.scale - 1) * k) * s },
+        ],
+      }
+    }
+    const p = progress.value
+    return {
+      opacity: p,
+      transform: [{ translateX: dx + zx }, { translateY: dy + zy }, { scale: (0.94 + 0.06 * p) * s }],
+    }
+  })
+  // The thumbnail's corners come in as the picture lands, and the cut shrinks around the middle
+  // of the picture, which stays where it is.
+  const clip = useAnimatedStyle(() => {
+    if (!morph) return {}
+    const k = flight.value
+    const corners = {
+      borderTopLeftRadius: morph.radii[0] * k,
+      borderTopRightRadius: morph.radii[1] * k,
+      borderBottomRightRadius: morph.radii[2] * k,
+      borderBottomLeftRadius: morph.radii[3] * k,
+    }
+    if (!crop) return corners
+    const w = fit.width + (crop.width - fit.width) * k
+    const h = fit.height + (crop.height - fit.height) * k
+    return {
+      ...corners,
+      width: w,
+      height: h,
+      transform: [{ translateX: (fit.width - w) / 2 }, { translateY: (fit.height - h) / 2 }],
+    }
+  })
+  const picture = useAnimatedStyle(() => {
+    if (!crop) return {}
+    const k = flight.value
+    const w = fit.width + (crop.width - fit.width) * k
+    const h = fit.height + (crop.height - fit.height) * k
+    return { transform: [{ translateX: -(fit.width - w) / 2 }, { translateY: -(fit.height - h) / 2 }] }
+  })
+  const box = { width: fit.width, height: fit.height }
+  return (
+    <View style={[styles.page, { left, width, height }]}>
+      <Animated.View style={[styles.frame, box, { left: (width - fit.width) / 2, top: (height - fit.height) / 2 }, frame]}>
+        <Animated.View style={[styles.clip, box, morph?.continuous && styles.continuous, clip]}>
+          <Animated.View style={[box, picture]}>
+            <Picture uri={image.uri} style={StyleSheet.absoluteFill} contentFit="contain" />
+          </Animated.View>
+        </Animated.View>
+      </Animated.View>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  root: { ...FILL, overflow: 'hidden' },
+  backdrop: { ...FILL },
+  strip: { position: 'absolute', top: 0, left: 0 },
+  page: { position: 'absolute', top: 0 },
+  frame: { position: 'absolute' },
+  clip: { overflow: 'hidden' },
+  continuous: { borderCurve: 'continuous' },
+  top: { position: 'absolute', top: 0, left: 0, right: 0 },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },
+})

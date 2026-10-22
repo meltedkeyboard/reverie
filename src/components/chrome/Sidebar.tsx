@@ -1,7 +1,7 @@
 import { Image } from 'expo-image'
 
 import { Icon } from '@/components/visuals/Icon'
-import { usePathname, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated'
@@ -13,6 +13,7 @@ import { deleteChat, setChatTitle } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { listSearchChats, type SearchChat } from '@/db/search'
 import { RAIL_WIDTH, SIDEBAR_WIDTH, sidebarFold, sidebarWidthAt, useMarkSidebarShown } from '@/hooks/util/sidebarMotion'
+import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useWindowKey } from '@/hooks/util/useWindowKey'
 import { t, useTranslation } from '@/i18n'
 import { onChatsChanged } from '@/lib/chat/chatEvents'
@@ -122,7 +123,7 @@ function groupChats(chats: SearchChat[]): Group[] {
 export function Sidebar() {
   const db = useDatabase()
   const router = useRouter()
-  const pathname = usePathname()
+  const pathname = useScreenPathname()
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useStyles(createStyles)

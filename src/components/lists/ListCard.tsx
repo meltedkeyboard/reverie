@@ -181,6 +181,12 @@ export function setEditMotion({ progress, settled }: EditMotion, on: boolean) {
 }
 
 const RADIUS = 20
+// The desktop's flat rows are less round.
+const DESKTOP_RADIUS = 8
+// The corners a card cuts what fills its edge to, like a character card's avatar; on iOS the
+// continuous curve of Liquid Glass.
+export const CARD_RADIUS = isDesktop ? DESKTOP_RADIUS : RADIUS
+export const CARD_CORNERS_CONTINUOUS = !isDesktop
 
 const LAYER = {
   position: 'absolute',
@@ -228,7 +234,7 @@ const createStyles = (colors: Colors) =>
             alignItems: 'center',
             gap: 8,
             backgroundColor: colors.surface,
-            borderRadius: 8,
+            borderRadius: DESKTOP_RADIUS,
             paddingVertical: 10,
             paddingLeft: 14,
             paddingRight: 6,
