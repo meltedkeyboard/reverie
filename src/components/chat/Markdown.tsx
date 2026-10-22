@@ -22,7 +22,16 @@ const INDENT = '    '
 
 // A selectable Text on iOS only offers to copy all of it. A read-only UITextView gives
 // the system selection with handles, and RN exposes one as a TextInput.
-export function SelectableText({ style, children }: { style: StyleProp<TextStyle>; children: ReactNode }) {
+export function SelectableText({
+  style,
+  children,
+  onSelect,
+}: {
+  style: StyleProp<TextStyle>
+  children: ReactNode
+  // Told whether some of the text is selected now.
+  onSelect?: (selected: boolean) => void
+}) {
   const colors = useColors()
   // A browser selects ordinary text by itself, and a <textarea> cannot hold nested Text.
   if (isWeb) return <Text style={style}>{children}</Text>
@@ -33,6 +42,7 @@ export function SelectableText({ style, children }: { style: StyleProp<TextStyle
       scrollEnabled={false}
       dataDetectorTypes="link"
       selectionColor={colors.accent}
+      onSelectionChange={onSelect && ((e) => onSelect(e.nativeEvent.selection.start !== e.nativeEvent.selection.end))}
       style={[blockReset, style]}
     >
       <Text>{children}</Text>

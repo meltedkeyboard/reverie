@@ -1,7 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Image } from 'expo-image'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
@@ -13,6 +13,7 @@ import { CHAT_COLUMN } from '@/hooks/util/useLayoutMode'
 import { useTranslation } from '@/i18n'
 import type { MessageImage } from '@/db/messages'
 import { withAlpha } from '@/lib/core/color'
+import { isWeb } from '@/lib/core/platform'
 import { showSheet } from '@/lib/ui/dialogs'
 import { PRESS_ANYWHERE } from '@/lib/ui/press'
 import * as Haptics from '@/lib/ui/haptics'
@@ -445,6 +446,10 @@ const ICON_SYMBOL = 0.85
 
 // Roughly four lines on a phone: enough to see the model is working, not a wall of text.
 const THINKING_TAIL = 220
+// Longer than this a press on the thought's lines is the start of a selection, not a tap.
+const LINES_TAP_MS = 300
+// How long after a selection is cleared a tap is still the one that cleared it.
+const SELECTION_CLEAR_MS = 400
 
 type ThoughtProps = {
   text: string
@@ -525,6 +530,32 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
   )
   const headStyle = useAnimatedStyle(() => ({ opacity: pressed.value ? 0.6 : 1 }))
 
+  // The lines under the header fold and unfold it too. A press held longer is no tap and
+  // is left to the text, which selects; a tap that only clears a selection keeps the
+  // thought as it is. In a browser the unfolded text is selected with clicks, so it is
+  // left alone there.
+  const selection = useRef({ selected: false, clearedAt: 0 })
+  const onSelect = useCallback((selected: boolean) => {
+    if (selection.current.selected && !selected) selection.current.clearedAt = Date.now()
+    selection.current.selected = selected
+  }, [])
+  const tapLines = useCallback(() => {
+    const { selected, clearedAt } = selection.current
+    if (selected || Date.now() - clearedAt < SELECTION_CLEAR_MS) return
+    setOpen((prev) => !prev)
+  }, [])
+  const linesTap = useMemo(
+    () =>
+      Gesture.Tap()
+        .maxDistance(10)
+        .maxDuration(LINES_TAP_MS)
+        .enabled(!(isWeb && open))
+        .onEnd((_e, success) => {
+          if (success) scheduleOnRN(tapLines)
+        }),
+    [tapLines, open]
+  )
+
   const shown = live ? seconds : Math.max(1, Math.round(ms / 1000))
   const tail = text.length > THINKING_TAIL ? `...${text.slice(-THINKING_TAIL).trimStart()}` : text
 
@@ -556,12 +587,20 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
           <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
         </Animated.View>
       </GestureDetector>
-      {open ? (
-        <SelectableText style={styles.thoughtText}>{text}</SelectableText>
-      ) : live ? (
-        <Text style={styles.thoughtText} numberOfLines={4}>
-          {tail}
-        </Text>
+      {open || live ? (
+        <GestureDetector gesture={linesTap}>
+          <View>
+            {open ? (
+              <SelectableText style={styles.thoughtText} onSelect={onSelect}>
+                {text}
+              </SelectableText>
+            ) : (
+              <Text style={styles.thoughtText} numberOfLines={4}>
+                {tail}
+              </Text>
+            )}
+          </View>
+        </GestureDetector>
       ) : null}
     </View>
   )
