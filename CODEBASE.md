@@ -36,7 +36,7 @@ Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict)
 | UI strings | `src/locales/en.json`, `src/locales/ru.json`; lookup in `src/i18n.tsx` |
 | iOS permission texts | `app.json` plugins (English) and `src/locales/permissions/ru.json` (Russian) |
 | A short message over the screen (done, failed, push/pull answers) | `showToast` in `src/lib/ui/toast.ts`, drawn by `ToastHost` (mounted in `src/app/_layout.tsx`) |
-| The shimmering "Thinking..." label | `src/components/visuals/ShimmerText.tsx`, used by `ThoughtBlock` in `MessageRow.tsx` and by `GenSheet.tsx` for live generator thoughts |
+| The shimmering "Thinking..." label | `src/components/visuals/ShimmerText.tsx`, a glint placed by where each letter is laid out (so wrapped lines, as in the wish over a refined reply, light up together), used by `ThoughtBlock` in `MessageRow.tsx` and by `GenSheet.tsx` for live generator thoughts |
 | Tab bar: tabs, icons | `src/app/(tabs)/_layout.tsx` |
 | What search finds and in which order | `src/app/(tabs)/search/index.tsx` (`ORDER`, settings entries), queries in `src/db/search.ts` |
 | When the chat scrolls itself (landing on a chat, following a reply, the snap to the end, send and the jump button) and how a finger stops it | `src/components/chat/thread/ChatThread.tsx`: `follow`, `landing`, `snap`, `glideToEnd` (the scroll view's own animation, stopped on the UI thread where it is by `touched`) |
