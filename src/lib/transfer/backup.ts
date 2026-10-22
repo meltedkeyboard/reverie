@@ -214,7 +214,15 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       backgroundOriginal: string | null
       groupId: number | null
       sortOrder: number
-    }>(`SELECT ${CHARACTER_COLUMNS}, group_id AS groupId, sort_order AS sortOrder FROM characters ORDER BY sort_order, id`),
+    }>(
+      // Bottom up like the home list, a group's members together where the group stands: an
+      // import puts each character it adds on top, and a group where its top member landed.
+      // Ordered by their own sort_order alone, which in a group is only the place within it,
+      // the members came in first and their groups sank to the bottom.
+      `SELECT ${CHARACTER_COLUMNS}, group_id AS groupId, sort_order AS sortOrder FROM characters c
+       ORDER BY COALESCE((SELECT g.sort_order FROM character_groups g WHERE g.id = c.group_id), c.sort_order),
+         c.group_id IS NULL DESC, c.sort_order, c.id`
+    ),
     rooms: await db.getAllAsync<{ id: number; background: string | null; backgroundOriginal: string | null }>(
       `SELECT ${ROOM_COLUMNS} FROM rooms ORDER BY sort_order, id`
     ),
