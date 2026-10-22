@@ -1,8 +1,11 @@
 import { Icon } from '@/components/visuals/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Image } from 'expo-image'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import type { Message } from '@/db/messages'
 import { useElapsedSeconds } from '@/hooks/util/useElapsedSeconds'
@@ -217,9 +220,11 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
       ) : null}
       {thought ? (
         <ThoughtBlock
-          key={message.streaming ? 'stream' : `${message.variant}:${thought.text}`}
+          key={message.streaming ? 'thought' : `thought:${message.id}:${message.variant}:${thought.text}`}
           text={thought.text}
           ms={thought.ms}
+          memory={message.streaming ? liveThought(message.chatId) : `${message.id}:${message.variant}`}
+          chatId={message.chatId}
         />
       ) : null}
       {waiting && thought ? null : waiting ? (
@@ -445,47 +450,112 @@ type ThoughtProps = {
   text: string
   // Null while the model is still thinking.
   ms: number | null
+  // What it is remembered as unfolded by: the message and its version, or the chat whose
+  // reply is being written. Without it the block forgets once it is gone.
+  memory?: string
+  chatId?: number
+}
+
+// The thoughts the reader unfolded, kept outside the rows: a cell of the list is handed
+// another message once its own scrolls away (sending a message scrolls to the new reply),
+// and a thought kept open in the cell folded up with it.
+const unfolded = new Set<string>()
+// The latest text of the thought of the reply being written in each chat. The saved reply
+// with the same thought opens as that one was left, and a new reply whose thought does not
+// go on from it starts folded.
+const liveTexts = new Map<string, string>()
+const liveThought = (chatId: number) => `live:${chatId}`
+
+// Whether a block comes up unfolded, and whether that is taken over from the reply written.
+function wasUnfolded(memory: string | undefined, chatId: number | undefined, text: string) {
+  if (!memory || chatId === undefined) return { open: false, carried: false }
+  const live = liveThought(chatId)
+  if (memory === live) return { open: unfolded.has(live) && text.startsWith(liveTexts.get(live) ?? ''), carried: false }
+  if (unfolded.has(memory)) return { open: true, carried: false }
+  const carried = unfolded.has(live) && liveTexts.get(live) === text
+  return { open: carried, carried }
 }
 
 // Folded by default like in ChatGPT. While the model thinks, the folded block
 // shows the latest lines so it is clear something is happening; afterwards only the
 // header stays, and a tap unfolds the whole reasoning either way.
-export function ThoughtBlock({ text, ms }: ThoughtProps) {
+export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  const [initial] = useState(() => wasUnfolded(memory, chatId, text))
+  const [open, setOpen] = useState(initial.open)
   const live = ms === null
   const seconds = useElapsedSeconds(live)
+  const writing = memory !== undefined && chatId !== undefined && memory === liveThought(chatId)
+
+  useEffect(() => {
+    if (writing && memory) liveTexts.set(memory, text)
+  }, [writing, memory, text])
+  useEffect(() => {
+    if (!memory) return
+    if (open) unfolded.add(memory)
+    else unfolded.delete(memory)
+  }, [memory, open])
+  // The saved reply took the open thought over from the one written.
+  useEffect(() => {
+    if (initial.carried && chatId !== undefined) unfolded.delete(liveThought(chatId))
+  }, [initial, chatId])
+
+  // The tap is a gesture of the UI thread. A Pressable lost it while a reply streams: the
+  // list follows the reply, and a scroll event during the touch hands the touch to the
+  // scroll view, which cancels the press.
+  const toggle = useCallback(() => setOpen((prev) => !prev), [])
+  const pressed = useSharedValue(false)
+  const tap = useMemo(
+    () =>
+      Gesture.Tap()
+        .hitSlop(8)
+        .maxDistance(10)
+        .onBegin(() => {
+          pressed.value = true
+        })
+        .onFinalize(() => {
+          pressed.value = false
+        })
+        .onEnd((_e, success) => {
+          if (success) scheduleOnRN(toggle)
+        }),
+    [pressed, toggle]
+  )
+  const headStyle = useAnimatedStyle(() => ({ opacity: pressed.value ? 0.6 : 1 }))
 
   const shown = live ? seconds : Math.max(1, Math.round(ms / 1000))
   const tail = text.length > THINKING_TAIL ? `...${text.slice(-THINKING_TAIL).trimStart()}` : text
 
   return (
     <View style={[styles.thought, !live && !open && styles.thoughtFolded]}>
-      <Pressable
-        onPress={() => setOpen((prev) => !prev)}
-        hitSlop={8}
-        pressRetentionOffset={PRESS_ANYWHERE}
-        style={({ pressed }) => [styles.thoughtHead, pressed && { opacity: 0.6 }]}
-      >
-        {/* The symbol breathes while the model thinks and settles once the reply starts. */}
-        <SFIcon
-          name="brain"
-          fallback="sparkles-outline"
-          size={13}
-          color={colors.textMuted}
-          effect={{ effect: 'breathe' }}
-          active={live}
-        />
-        {live ? (
-          <ShimmerText text={t('message.thinking')} style={styles.thoughtLabel} />
-        ) : (
-          <Text style={styles.thoughtLabel}>{t('message.reasoning')}</Text>
-        )}
-        {shown > 0 ? <Text style={styles.thoughtTime}>{shown} {t('message.secondsShort')}</Text> : null}
-        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
-      </Pressable>
+      <GestureDetector gesture={tap}>
+        <Animated.View
+          style={[styles.thoughtHead, headStyle]}
+          accessible
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          onAccessibilityTap={toggle}
+        >
+          {/* The symbol breathes while the model thinks and settles once the reply starts. */}
+          <SFIcon
+            name="brain"
+            fallback="sparkles-outline"
+            size={13}
+            color={colors.textMuted}
+            effect={{ effect: 'breathe' }}
+            active={live}
+          />
+          {live ? (
+            <ShimmerText text={t('message.thinking')} style={styles.thoughtLabel} />
+          ) : (
+            <Text style={styles.thoughtLabel}>{t('message.reasoning')}</Text>
+          )}
+          {shown > 0 ? <Text style={styles.thoughtTime}>{shown} {t('message.secondsShort')}</Text> : null}
+          <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
+        </Animated.View>
+      </GestureDetector>
       {open ? (
         <SelectableText style={styles.thoughtText}>{text}</SelectableText>
       ) : live ? (
