@@ -459,6 +459,7 @@ export default function CharacterEditorScreen() {
                 <ExpandingAvatar
                   name={name}
                   uri={photoUri}
+                  file={avatar}
                   scrollY={scrollY}
                   dragging={dragging}
                   progress={photoSpread}

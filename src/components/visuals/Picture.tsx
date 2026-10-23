@@ -15,11 +15,13 @@ type Props = {
   paused?: boolean
   // The size of a video as shown, its rotation applied, once its file has loaded.
   onVideoSize?: (size: { width: number; height: number }) => void
+  // A picture that isn't a video has loaded and is about to show.
+  onLoad?: () => void
 }
 
 // A picture by its file: expo-image for stills and the GIF, WebP and APNG that move, a
 // looping muted player for MP4, MOV and M4V.
-export function Picture({ uri, style, contentFit = 'cover', transition, paused = false, onVideoSize }: Props) {
+export function Picture({ uri, style, contentFit = 'cover', transition, paused = false, onVideoSize, onLoad }: Props) {
   const image = useRef<Image>(null)
   const wasPaused = useRef(paused)
   // `autoplay` is only read as a picture is set, so a later change goes through the view,
@@ -32,7 +34,7 @@ export function Picture({ uri, style, contentFit = 'cover', transition, paused =
     change?.catch(() => {})
   }, [paused])
   if (isVideo(uri)) return <LoopingVideo uri={uri} style={style} contentFit={contentFit} paused={paused} onVideoSize={onVideoSize} />
-  return <Image ref={image} source={{ uri }} style={style} contentFit={contentFit} transition={transition} autoplay={!paused} />
+  return <Image ref={image} source={{ uri }} style={style} contentFit={contentFit} transition={transition} autoplay={!paused} onLoad={onLoad} />
 }
 
 function LoopingVideo({ uri, style, contentFit, paused, onVideoSize }: Required<Pick<Props, 'uri' | 'contentFit' | 'paused'>> & Pick<Props, 'style' | 'onVideoSize'>) {

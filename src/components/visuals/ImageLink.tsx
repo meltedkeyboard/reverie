@@ -20,12 +20,14 @@ type Props = (
       uri: string
       // Width over height, so the picture lands exactly where the viewer shows it.
       aspect?: number
+      // The file of a stored avatar, whose original the viewer offers in its place.
+      avatar?: string | null
       gallery?: never
       spots?: never
     }
   // Several pictures to swipe through, e.g. a room's cast, and where each of them sits given
   // the link's own place on the screen (null for one not shown), to grow out of and go back to.
-  | { gallery: ViewerImage[]; spots?: (box: Box) => (ViewerOrigin | null)[]; uri?: never; aspect?: never }
+  | { gallery: ViewerImage[]; spots?: (box: Box) => (ViewerOrigin | null)[]; uri?: never; aspect?: never; avatar?: never }
 ) & {
   // The corners of the picture as shown (half the side of a round avatar), which the viewer
   // grows it out of and puts it back into.
@@ -38,7 +40,7 @@ type Props = (
 }
 
 // A picture that opens full screen in the viewer, growing out of its place.
-export function ImageLink({ uri, aspect = 1, gallery, spots, corners = 0, onLongPress, delayLongPress, accessibilityLabel, style, children }: Props) {
+export function ImageLink({ uri, aspect = 1, avatar, gallery, spots, corners = 0, onLongPress, delayLongPress, accessibilityLabel, style, children }: Props) {
   const openViewer = useOpenViewer()
   const self = useRef<View>(null)
   const id = useId()
@@ -50,7 +52,7 @@ export function ImageLink({ uri, aspect = 1, gallery, spots, corners = 0, onLong
       if (!spots || !node) return openViewer(gallery)
       return node.measureInWindow((x, y, width, height) => openViewer(gallery, 0, spots({ x, y, width, height })))
     }
-    const image = { uri: uri!, aspect }
+    const image = { uri: uri!, aspect, avatar }
     if (!node) return openViewer([image])
     // Measured as it is tapped, so the picture grows out of where it is now.
     node.measureInWindow((x, y, width, height) => {

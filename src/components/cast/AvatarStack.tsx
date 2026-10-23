@@ -76,7 +76,7 @@ export function AvatarStack({ cast, size, max = 3, viewable = true }: Props) {
 export function castGallery(cast: { avatar: string | null }[]) {
   return cast.flatMap((m) => {
     const uri = m.avatar ? avatarUri(m.avatar) : null
-    return uri ? [{ uri, aspect: 1 }] : []
+    return uri ? [{ uri, aspect: 1, avatar: m.avatar }] : []
   })
 }
 

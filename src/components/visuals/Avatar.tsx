@@ -36,7 +36,14 @@ export function Avatar({ name, file, uri, size, square = false, corners = 0, fil
     const image = <Picture uri={source} style={box} transition={150} />
     if (!viewable) return image
     return (
-      <ImageLink uri={source} corners={square ? corners : size / 2} accessibilityLabel={name} style={fill ? { flex: 1 } : undefined}>
+      <ImageLink
+        uri={source}
+        // A picture given by its uri is a fresh pick, not the stored avatar.
+        avatar={uri ? null : file}
+        corners={square ? corners : size / 2}
+        accessibilityLabel={name}
+        style={fill ? { flex: 1 } : undefined}
+      >
         {image}
       </ImageLink>
     )

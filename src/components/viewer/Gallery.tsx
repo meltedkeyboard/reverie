@@ -17,7 +17,7 @@ import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets'
 
 import { Picture } from '@/components/visuals/Picture'
 import { isWeb } from '@/lib/core/platform'
-import type { ViewerImage, ViewerOrigin } from '@/lib/images/viewer'
+import type { ViewerImage, ViewerOrigin, ViewerOriginal } from '@/lib/images/viewer'
 import { FILL, useColors } from '@/theme'
 
 import { clamp, glide, project, resist, rubberband, spring, unresist, unrubberband } from './motion'
@@ -35,13 +35,14 @@ const PINCH_CLOSE = 0.75
 // How far a picture pulled away must be headed, of the screen's height, to close.
 const THROW = 0.2
 // Responses of the springs, in seconds: the strip of pictures, a zoom settling, the picture
-// growing out of its thumbnail and going back, a pull flung back into the thumbnail, and one
-// let go short of closing.
+// growing out of its thumbnail and going back, a pull flung back into the thumbnail, one let
+// go short of closing, and the original of an avatar opening out of it or closing back in.
 const PAGE_RESPONSE = 0.32
 const ZOOM_RESPONSE = 0.35
 const MORPH_RESPONSE = 0.36
 const FLING_RESPONSE = 0.42
 const RETURN_RESPONSE = 0.32
+const SWAP_RESPONSE = 0.4
 // Off by less than this many points, a picture flying back is in its thumbnail.
 const LANDED = 0.4
 const FADE = { duration: 200, easing: Easing.out(Easing.quad) }
@@ -53,7 +54,8 @@ const PAN = 2 // moves a zoomed picture, and past its edge the strip
 const PULL = 3 // pulls the picture away to close it
 const HOLD = 4 // two fingers have the picture and the pinch moves it
 
-type Fit = { width: number; height: number; tap: number; max: number }
+type Size = { width: number; height: number }
+type Fit = Size & { tap: number; max: number }
 
 // The picture's frame on its page, fitted into the screen, and how far it zooms.
 function fitIn(aspect: number, width: number, height: number): Fit {
@@ -76,7 +78,7 @@ type Morph = {
   scale: number
   radii: [number, number, number, number]
   continuous: boolean
-  crop: { width: number; height: number } | null
+  crop: Size | null
 }
 
 function morphFrom(origin: ViewerOrigin | null, fit: Fit, frame: Frame): Morph | null {
@@ -91,6 +93,72 @@ function morphFrom(origin: ViewerOrigin | null, fit: Fit, frame: Frame): Morph |
     radii: [topLeft / scale, topRight / scale, bottomRight / scale, bottomLeft / scale],
     continuous: origin.continuous,
     crop: sameShape ? null : { width: origin.width / scale, height: origin.height / scale },
+  }
+}
+
+// How the whole original an avatar was cut from lies on its page: on a frame of its own,
+// fitted into the screen, or around the avatar's frame with the cut covering it (its size,
+// and its middle's offset from the frame's middle); and where the cut is in it, in fractions
+// of its size.
+type Whole = {
+  uri: string
+  fit: Fit
+  around: Size & { x: number; y: number }
+  crop: ViewerOriginal['crop']
+}
+
+function wholeFrom(original: ViewerOriginal, fit: Fit, width: number, height: number): Whole {
+  const { crop } = original
+  // Sized by the width alone, so a cut a hair off the avatar's own shape doesn't stretch it.
+  const aroundWidth = fit.width / crop.width
+  const aroundHeight = aroundWidth / original.aspect
+  return {
+    uri: original.uri,
+    fit: fitIn(original.aspect, width, height),
+    around: {
+      width: aroundWidth,
+      height: aroundHeight,
+      x: (0.5 - crop.x - crop.width / 2) * aroundWidth,
+      y: (0.5 - crop.y - crop.height / 2) * aroundHeight,
+    },
+    crop,
+  }
+}
+
+// What of a page shows and where, in its frame's own size and from the middle of the page:
+// the window the picture shows through, the avatar in it and the whole original under the
+// avatar. As `u` goes to 1 the original opens out of the avatar: the window widens from the
+// avatar's frame to the original's while the original settles into it, the cut keeping to
+// the avatar. As `k` goes to 1 everything heads for the thumbnail: the window closes to the
+// part of the avatar the thumbnail shows (`cut`), and the original folds back into the
+// avatar, which is what the thumbnail shows. Each goes in a straight line between those
+// places, and so the window never leaves the original.
+function shapeOf(fit: Fit, whole: Whole | null, cut: Size | null, u: number, k: number) {
+  'worklet'
+  const openWidth = whole ? fit.width + (whole.fit.width - fit.width) * u : fit.width
+  const openHeight = whole ? fit.height + (whole.fit.height - fit.height) * u : fit.height
+  const window = {
+    width: openWidth + ((cut ? cut.width : fit.width) - openWidth) * k,
+    height: openHeight + ((cut ? cut.height : fit.height) - openHeight) * k,
+  }
+  if (!whole) return { window, avatar: { x: 0, y: 0, scale: 1, opacity: 1 }, original: null }
+  const out = u * (1 - k)
+  const { around, crop } = whole
+  const width = around.width + (whole.fit.width - around.width) * out
+  const height = around.height + (whole.fit.height - around.height) * out
+  const x = around.x * (1 - out)
+  const y = around.y * (1 - out)
+  return {
+    window,
+    // The avatar lies on its cut of the original and gives way to it as it comes out: the two
+    // are the same picture there, the avatar only a smaller copy.
+    avatar: {
+      x: x + (crop.x + crop.width / 2 - 0.5) * width,
+      y: y + (crop.y + crop.height / 2 - 0.5) * height,
+      scale: (crop.width * width) / fit.width,
+      opacity: 1 - out,
+    },
+    original: { x, y, scale: width / whole.fit.width },
   }
 }
 
@@ -124,6 +192,7 @@ type Motion = {
   pullY: SharedValue<number>
   kickX: SharedValue<number>
   kickY: SharedValue<number>
+  uncrop: SharedValue<number>
 }
 
 export type GalleryHandle = {
@@ -131,6 +200,8 @@ export type GalleryHandle = {
   close: () => void
   // Turns to the picture beside, -1 or 1.
   go: (step: number) => void
+  // Opens the original of the avatar shown out of it, or closes it back in.
+  toggleOriginal: () => void
 }
 
 type Props = {
@@ -139,6 +210,9 @@ type Props = {
   // Where each picture sits on the screen under the viewer (null for one not there), to grow
   // out of and go back into.
   origins: (ViewerOrigin | null)[]
+  // The whole original each avatar was cut from, as the viewer finds them (none for a picture
+  // without one), which the avatar can be swapped for in place.
+  originals: (ViewerOriginal | null | undefined)[]
   // The viewer's place in the window and its size, the size of a page.
   frame: Frame
   // The bars over the pictures, brought in and out with them and by a tap. The top one moves
@@ -148,6 +222,10 @@ type Props = {
   topTravel: number
   onIndexChange: (index: number) => void
   onChromeChange: (shown: boolean) => void
+  // The original of picture `index` has loaded and can be swapped in, or has gone with its page.
+  onOriginalLoad: (index: number, loaded: boolean) => void
+  // The picture shown is the original of its avatar now, or the avatar again.
+  onOriginalChange: (shown: boolean) => void
   // The picture has gone: the viewer can.
   onClosed: () => void
   ref?: Ref<GalleryHandle>
@@ -159,13 +237,39 @@ type Props = {
 // the drag on to the strip; pinches zoom around the fingers and give past the limits, a
 // double tap zooms to the point, a tap shows or hides the bars. Let go, everything carries
 // the finger's speed on (see motion.ts). A picture grows out of its place on the screen and
-// goes back into it, cut to the thumbnail's shape on the way.
-export function Gallery({ images, initialIndex, origins, frame, top, bottom, topTravel, onIndexChange, onChromeChange, onClosed, ref }: Props) {
+// goes back into it, cut to the thumbnail's shape on the way. An avatar can be swapped in
+// place for the whole original it was cut from, which opens out of it, and which folds back
+// into it on the way to the thumbnail.
+export function Gallery({
+  images,
+  initialIndex,
+  origins,
+  originals,
+  frame,
+  top,
+  bottom,
+  topTravel,
+  onIndexChange,
+  onChromeChange,
+  onOriginalLoad,
+  onOriginalChange,
+  onClosed,
+  ref,
+}: Props) {
   const colors = useColors()
   const { width, height } = frame
   const stride = width + GAP
   const lastPage = images.length - 1
   const fits = useMemo(() => images.map((image) => fitIn(image.aspect, width, height)), [images, width, height])
+  // The originals of avatars on their pages, as the viewer finds them.
+  const wholes = useMemo(
+    () =>
+      images.map((_, i) => {
+        const original = originals[i]
+        return original ? wholeFrom(original, fits[i], width, height) : null
+      }),
+    [images, originals, fits, width, height]
+  )
   // The thumbnails are where they were only while the screen keeps the size it was tapped at.
   const opened = useRef({ width, height })
   const sameSize = opened.current.width === width && opened.current.height === height
@@ -190,6 +294,10 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
   const scale = useSharedValue(1)
   const x = useSharedValue(0)
   const y = useSharedValue(0)
+  // How far the original of the avatar the zoom is on has opened out of it, and whether it is
+  // to be out. It goes back in with the zoom.
+  const uncrop = useSharedValue(0)
+  const showsOriginal = useSharedValue(false)
   // A picture pulled away to close, and the throw of one let go. A spring Reanimated starts
   // with a speed away from its target sets off without it, so a picture let go is two springs
   // added up, as a spring's motion is: one from where it is, at rest, and one from nothing with
@@ -217,11 +325,12 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
   const focal = useSharedValue({ x: 0, y: 0 })
 
   const turned = useCallback(
-    (to: number) => {
+    (to: number, original: boolean) => {
       setCurrent(to)
       onIndexChange(to)
+      onOriginalChange(original)
     },
-    [onIndexChange]
+    [onIndexChange, onOriginalChange]
   )
 
   const motion = useMemo(() => {
@@ -231,20 +340,31 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       return page.value * stride - pager.value + width / 2
     }
 
+    // The frame a picture zooms and is pulled by: an avatar's, or its original's once that is
+    // to be out.
+    const fitOf = (p: number) => {
+      'worklet'
+      const whole = wholes[p]
+      return whole && showsOriginal.value && zoomPage.value === p ? whole.fit : fits[p]
+    }
+
     // How far a picture zoomed to `s` may move each way before an edge comes off the screen's.
     const bounds = (p: number, s: number) => {
       'worklet'
-      const fit = fits[p]
+      const fit = fitOf(p)
       return { x: Math.max(0, (fit.width * s - width) / 2), y: Math.max(0, (fit.height * s - height) / 2) }
     }
 
-    // The zoom goes with the picture now shown; the one left behind is off the screen.
+    // The zoom goes with the picture now shown, and so does an original out of its avatar; the
+    // picture left behind is off the screen.
     const claimZoom = () => {
       'worklet'
       if (zoomPage.value === page.value) return
       scale.value = 1
       x.value = 0
       y.value = 0
+      uncrop.value = 0
+      showsOriginal.value = false
       zoomPage.value = page.value
     }
 
@@ -271,7 +391,8 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       })
       if (to !== page.value) {
         page.value = to
-        scheduleOnRN(turned, to)
+        // Back on the picture before the strip has come to rest, its original is still out.
+        scheduleOnRN(turned, to, showsOriginal.value && zoomPage.value === to)
       }
     }
 
@@ -326,11 +447,11 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       const morph = morphs[p]
       if (!morph) return false
       const own = zoomPage.value === p
-      const fit = fits[p]
       const k = 1 - progress.value
       const s = (1 + (morph.scale - 1) * k) * (own ? scale.value : 1)
-      const w = (morph.crop ? fit.width + (morph.crop.width - fit.width) * k : fit.width) * s
-      const h = (morph.crop ? fit.height + (morph.crop.height - fit.height) * k : fit.height) * s
+      const { window } = shapeOf(fits[p], wholes[p], morph.crop, own ? clamp(uncrop.value, 0, 1) : 0, k)
+      const w = window.width * s
+      const h = window.height * s
       const cx = middleX() + morph.x * k + pullX.value + kickX.value + (own ? x.value : 0)
       const cy = height / 2 + morph.y * k + pullY.value + kickY.value + (own ? y.value : 0)
       return Math.abs(px - cx) <= w / 2 + SLOP && Math.abs(py - cy) <= h / 2 + SLOP
@@ -354,7 +475,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       closing.value = true
       showBars(false)
       const p = page.value
-      const tall = fits[p].height * (zoomPage.value === p ? scale.value : 1)
+      const tall = fitOf(p).height * (zoomPage.value === p ? scale.value : 1)
       const target = direction * (height / 2 + tall / 2 + 40)
       const speed = Math.max(Math.abs(vy), 1400)
       const duration = clamp((Math.abs(target - pullY.value) / speed) * 1000, 120, 320)
@@ -396,7 +517,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       }
       const pulledStrip = Math.abs(pager.value - p * stride) > 0.5
       if (pulledStrip) settlePager(vx)
-      const target = clamp(s, 1, fits[p].max)
+      const target = clamp(s, 1, fitOf(p).max)
       if (target !== s) {
         const f = focal.value
         const k = target / s
@@ -538,7 +659,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
         cancelAnimation(scale)
         cancelAnimation(x)
         cancelAnimation(y)
-        rawScale.value = unresistZoom(scale.value, fits[page.value].max)
+        rawScale.value = unresistZoom(scale.value, fitOf(page.value).max)
         pinchLast.value = { scale: e.scale, x: e.focalX, y: e.focalY, pointers: e.numberOfPointers }
         focal.value = { x: e.focalX - middleX(), y: e.focalY - height / 2 }
       })
@@ -549,7 +670,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
         // With a finger more or fewer the middle of the fingers jumps, and the pinch with it.
         if (e.numberOfPointers !== before.pointers) return
         rawScale.value *= e.scale / before.scale
-        const next = resistZoom(rawScale.value, fits[page.value].max)
+        const next = resistZoom(rawScale.value, fitOf(page.value).max)
         const k = next / scale.value
         const middle = middleX()
         const fx = e.focalX - middle
@@ -591,7 +712,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
           return
         }
         const p = page.value
-        const s = fits[p].tap
+        const s = fitOf(p).tap
         const b = bounds(p, s)
         scale.value = withSpring(s, settle)
         x.value = withSpring(clamp((e.x - middleX()) * (1 - s), -b.x, b.x), settle)
@@ -619,6 +740,23 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       if (to !== page.value) turnTo(to, 0)
     }
 
+    // The button over an avatar: the whole original it was cut from opens out of it where it
+    // is, or closes back into it, and any zoom is let go on the way. Not while a finger is
+    // moving a picture.
+    const toggleOriginal = () => {
+      'worklet'
+      if (closing.value || mode.value !== NONE || !wholes[page.value]) return
+      claimZoom()
+      const shown = !showsOriginal.value
+      showsOriginal.value = shown
+      const settle = spring(SWAP_RESPONSE)
+      uncrop.value = withSpring(shown ? 1 : 0, settle)
+      scale.value = withSpring(1, settle)
+      x.value = withSpring(0, settle)
+      y.value = withSpring(0, settle)
+      scheduleOnRN(onOriginalChange, shown)
+    }
+
     // A wheel or a touchpad on the desktop: with Ctrl (as a touchpad pinch comes) it zooms
     // around the pointer, otherwise it moves a zoomed picture. True when it was taken.
     const wheel = (dx: number, dy: number, zoom: boolean, px: number, py: number) => {
@@ -628,7 +766,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       const p = page.value
       if (zoom) {
         const s = scale.value
-        const next = clamp(s * Math.exp(-clamp(dy, -40, 40) * 0.01), 1, fits[p].max)
+        const next = clamp(s * Math.exp(-clamp(dy, -40, 40) * 0.01), 1, fitOf(p).max)
         const k = next / s
         const fx = px - middleX()
         const fy = py - height / 2
@@ -656,6 +794,9 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       }
       cancelAnimation(pager)
       pager.value = page.value * stride
+      // The zoom comes to the picture shown, and an original out of another goes back in; one
+      // out of this picture stays out, laid out again with the rest.
+      claimZoom()
       scale.value = 1
       x.value = 0
       y.value = 0
@@ -663,7 +804,6 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       pullY.value = 0
       kickX.value = 0
       kickY.value = 0
-      zoomPage.value = page.value
     }
 
     return {
@@ -672,14 +812,16 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       go,
       wheel,
       relayout,
+      toggleOriginal,
     }
-  }, [width, height, stride, lastPage, fits, morphs, turned, onChromeChange, onClosed])
+  }, [width, height, stride, lastPage, fits, morphs, wholes, turned, onChromeChange, onOriginalChange, onClosed])
 
   useImperativeHandle(
     ref,
     () => ({
       close: () => scheduleOnUI(motion.close),
       go: (step: number) => scheduleOnUI(motion.go, step),
+      toggleOriginal: () => scheduleOnUI(motion.toggleOriginal),
     }),
     [motion]
   )
@@ -703,7 +845,10 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       if (!morph) return false
       const own = zoomPage.value === p
       const left = progress.value
-      const side = Math.max(fits[p].width, fits[p].height)
+      // An original out of its avatar folds back into it with `progress` too, from a frame
+      // of its own.
+      const whole = own && uncrop.value > 0 ? wholes[p] : null
+      const side = Math.max(fits[p].width, fits[p].height, whole ? Math.max(whole.fit.width, whole.fit.height) : 0)
       const offX = Math.abs(pullX.value + kickX.value + (own ? x.value : 0) - morph.x * left)
       const offY = Math.abs(pullY.value + kickY.value + (own ? y.value : 0) - morph.y * left)
       const size = Math.abs((1 + (morph.scale - 1) * (1 - left)) * (own ? scale.value : 1) - morph.scale) * side
@@ -714,7 +859,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
       landing.value = false
       scheduleOnRN(onClosed)
     },
-    [morphs, fits, onClosed]
+    [morphs, fits, wholes, onClosed]
   )
 
   const laidOut = useRef({ width, height })
@@ -753,7 +898,7 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
     }
   }, [motion])
 
-  const motionValues = { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY }
+  const motionValues = { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY, uncrop }
 
   // The backdrop, in the theme's background, clears as the picture is pulled away or pinched
   // small, which shows the screen underneath, and goes with the picture when it closes.
@@ -784,7 +929,9 @@ export function Gallery({ images, initialIndex, origins, frame, top, bottom, top
                   width={width}
                   height={height}
                   morph={morphs[i]}
+                  whole={wholes[i]}
                   motion={motionValues}
+                  onOriginalLoad={onOriginalLoad}
                 />
               ) : null
             )}
@@ -811,17 +958,31 @@ type PageProps = {
   width: number
   height: number
   morph: Morph | null
+  whole: Whole | null
   motion: Motion
+  onOriginalLoad: (index: number, loaded: boolean) => void
 }
 
 // One picture on the strip. Its frame carries the zoom, the pull and the flight between the
 // thumbnail and the page; inside it the clip shows the whole picture, or on that flight the part
-// a thumbnail of another shape shows, with the thumbnail's corners.
-function Page({ index, image, fit, left, width, height, morph, motion }: PageProps) {
-  const { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY } = motion
-  const crop = morph?.crop ?? null
+// a thumbnail of another shape shows, with the thumbnail's corners. An avatar cut from an
+// original has the original under it in the clip, to open out of it (see shapeOf).
+function Page({ index, image, fit, left, width, height, morph, whole, motion, onOriginalLoad }: PageProps) {
+  const { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY, uncrop } = motion
+  const cut = morph?.crop ?? null
+  // Until the original has loaded, the avatar stays over it whatever the swap.
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    if (!loaded) return
+    onOriginalLoad(index, true)
+    return () => onOriginalLoad(index, false)
+  }, [loaded, index, onOriginalLoad])
   // How far toward the thumbnail the picture is: 1 on it, 0 open.
   const flight = useDerivedValue(() => (morph && page.value === index ? 1 - progress.value : 0))
+  // How far the original is out of the avatar, which only the picture the zoom is on has. A
+  // spring cut short may carry it a little past either end.
+  const unfold = useDerivedValue(() => (whole && zoomPage.value === index ? clamp(uncrop.value, 0, 1) : 0))
+  const shape = useDerivedValue(() => (cut || whole ? shapeOf(fit, whole, cut, unfold.value, flight.value) : null))
   const frame = useAnimatedStyle(() => {
     const own = zoomPage.value === index
     const s = own ? scale.value : 1
@@ -847,20 +1008,21 @@ function Page({ index, image, fit, left, width, height, morph, motion }: PagePro
       transform: [{ translateX: dx + zx }, { translateY: dy + zy }, { scale: (0.94 + 0.06 * p) * s }],
     }
   })
-  // The thumbnail's corners come in as the picture lands, and the cut shrinks around the middle
-  // of the picture, which stays where it is.
+  // The thumbnail's corners come in as the picture lands, and the window changes its size
+  // around the middle of the avatar's frame, which stays where it is.
   const clip = useAnimatedStyle(() => {
-    if (!morph) return {}
     const k = flight.value
-    const corners = {
-      borderTopLeftRadius: morph.radii[0] * k,
-      borderTopRightRadius: morph.radii[1] * k,
-      borderBottomRightRadius: morph.radii[2] * k,
-      borderBottomLeftRadius: morph.radii[3] * k,
-    }
-    if (!crop) return corners
-    const w = fit.width + (crop.width - fit.width) * k
-    const h = fit.height + (crop.height - fit.height) * k
+    const corners = morph
+      ? {
+          borderTopLeftRadius: morph.radii[0] * k,
+          borderTopRightRadius: morph.radii[1] * k,
+          borderBottomRightRadius: morph.radii[2] * k,
+          borderBottomLeftRadius: morph.radii[3] * k,
+        }
+      : {}
+    const s = shape.value
+    if (!s) return corners
+    const { width: w, height: h } = s.window
     return {
       ...corners,
       width: w,
@@ -868,19 +1030,50 @@ function Page({ index, image, fit, left, width, height, morph, motion }: PagePro
       transform: [{ translateX: (fit.width - w) / 2 }, { translateY: (fit.height - h) / 2 }],
     }
   })
-  const picture = useAnimatedStyle(() => {
-    if (!crop) return {}
-    const k = flight.value
-    const w = fit.width + (crop.width - fit.width) * k
-    const h = fit.height + (crop.height - fit.height) * k
-    return { transform: [{ translateX: -(fit.width - w) / 2 }, { translateY: -(fit.height - h) / 2 }] }
+  // Each picture is laid out at its own frame from the window's corner and moved to its
+  // place from the window's middle.
+  const avatar = useAnimatedStyle(() => {
+    const s = shape.value
+    if (!s) return {}
+    return {
+      opacity: loaded ? s.avatar.opacity : 1,
+      transform: [
+        { translateX: (s.window.width - fit.width) / 2 + s.avatar.x },
+        { translateY: (s.window.height - fit.height) / 2 + s.avatar.y },
+        { scale: s.avatar.scale },
+      ],
+    }
+  })
+  const original = useAnimatedStyle(() => {
+    const s = shape.value
+    if (!whole || !s?.original) return {}
+    return {
+      transform: [
+        { translateX: (s.window.width - whole.fit.width) / 2 + s.original.x },
+        { translateY: (s.window.height - whole.fit.height) / 2 + s.original.y },
+        { scale: s.original.scale },
+      ],
+    }
   })
   const box = { width: fit.width, height: fit.height }
   return (
     <View style={[styles.page, { left, width, height }]}>
-      <Animated.View style={[styles.frame, box, { left: (width - fit.width) / 2, top: (height - fit.height) / 2 }, frame]}>
-        <Animated.View style={[styles.clip, box, morph?.continuous && styles.continuous, clip]}>
-          <Animated.View style={[box, picture]}>
+      <Animated.View style={[styles.frame, frame]}>
+        <Animated.View
+          style={[
+            styles.clip,
+            box,
+            { left: (width - fit.width) / 2, top: (height - fit.height) / 2 },
+            morph?.continuous && styles.continuous,
+            clip,
+          ]}
+        >
+          {whole ? (
+            <Animated.View style={[styles.layer, { width: whole.fit.width, height: whole.fit.height }, original]}>
+              <Picture uri={whole.uri} style={StyleSheet.absoluteFill} contentFit="contain" onLoad={() => setLoaded(true)} />
+            </Animated.View>
+          ) : null}
+          <Animated.View style={[styles.layer, box, avatar]}>
             <Picture uri={image.uri} style={StyleSheet.absoluteFill} contentFit="contain" />
           </Animated.View>
         </Animated.View>
@@ -894,8 +1087,12 @@ const styles = StyleSheet.create({
   backdrop: { ...FILL },
   strip: { position: 'absolute', top: 0, left: 0 },
   page: { position: 'absolute', top: 0 },
-  frame: { position: 'absolute' },
-  clip: { overflow: 'hidden' },
+  // As large as the page, so the original's frame, taller or wider than the avatar's, never
+  // reaches past it; it moves and scales about the page's middle.
+  frame: { ...FILL },
+  clip: { position: 'absolute', overflow: 'hidden' },
+  // The avatar and the original under it, placed in the window by their transforms.
+  layer: { position: 'absolute', left: 0, top: 0 },
   continuous: { borderCurve: 'continuous' },
   top: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },

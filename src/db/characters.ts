@@ -113,6 +113,20 @@ export function getCharacter(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Character>(`SELECT ${CHARACTER_COLUMNS} FROM characters c WHERE c.id = ?`, id)
 }
 
+// The original a stored avatar was cut from and the frame it was cut with, whether the avatar
+// is a character's or a persona's. Null for one without an original: a moving avatar, or one
+// saved before originals were kept.
+export function getAvatarOriginal(db: SQLiteDatabase, avatar: string) {
+  return db.getFirstAsync<{ original: string; crop: string | null }>(
+    `SELECT avatar_original AS original, avatar_crop AS crop FROM characters WHERE avatar = ? AND avatar_original IS NOT NULL
+     UNION ALL
+     SELECT avatar_original, avatar_crop FROM personas WHERE avatar = ? AND avatar_original IS NOT NULL
+     LIMIT 1`,
+    avatar,
+    avatar
+  )
+}
+
 const FIELD_COLUMNS =
   'name, avatar, avatar_original, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget, notes'
 

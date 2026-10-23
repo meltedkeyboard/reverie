@@ -535,6 +535,8 @@
   "images.saved": "Saved to Photos",
   "images.saveFailed": "Couldn't save the photo",
   "images.savePermission": "No permission to add photos. Enable it in iOS settings",
+  "images.showOriginal": "Show original",
+  "images.showCropped": "Show cropped",
 
 
   "backup.corrupted": "The file is corrupted or isn't a Reverie backup",

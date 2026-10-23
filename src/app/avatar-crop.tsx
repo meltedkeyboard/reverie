@@ -178,7 +178,8 @@ export default function AvatarCropScreen() {
         width: side,
         height: side,
       }
-      draft.onDone(await squareAvatar(draft.uri, crop), crop)
+      // The frame keeps the size of the original it lies in, for the viewer.
+      draft.onDone(await squareAvatar(draft.uri, crop), { ...crop, sourceWidth: natural.width, sourceHeight: natural.height })
       close()
     } catch (err) {
       setSaving(false)

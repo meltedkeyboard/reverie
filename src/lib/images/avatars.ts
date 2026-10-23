@@ -17,7 +17,8 @@ const SIDE = 512
 // The frame cut out of an original, in its pixels (as drawn, with its orientation applied).
 // Stored as JSON beside the original; null means the default frame. A moving background,
 // which no cut can be made of, also keeps the size of its file, so the chat can lay it out
-// at its frame before a single frame is decoded.
+// at its frame before a single frame is decoded; so does an avatar's frame, so the viewer
+// can open the original out of the avatar without decoding it to measure it.
 export type CropRect = { originX: number; originY: number; width: number; height: number; sourceWidth?: number; sourceHeight?: number }
 
 export const cropToJson = (crop: CropRect | null) => (crop ? JSON.stringify(crop) : null)
@@ -62,6 +63,27 @@ export async function squareAvatar(uri: string, rect?: CropRect) {
   const cropped = await ImageManipulator.manipulate(original).crop(square).resize({ width: SIDE }).renderAsync()
   const saved = await cropped.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 })
   return saved.uri
+}
+
+const sizes = new Map<string, Promise<{ width: number; height: number }>>()
+
+// The size of a picture as drawn, its orientation applied: the pixels a frame of it is given
+// in. It is decoded for that, so the answer is kept; a failure is not, as the file may yet
+// turn up with a sync.
+export function pictureSize(uri: string) {
+  let size = sizes.get(uri)
+  if (!size) {
+    const context = ImageManipulator.manipulate(uri)
+    size = context.renderAsync().then((picture) => {
+      const measured = { width: picture.width, height: picture.height }
+      picture.release()
+      context.release()
+      return measured
+    })
+    sizes.set(uri, size)
+    size.catch(() => sizes.delete(uri))
+  }
+  return size
 }
 
 const BACKGROUND_SIDE = 1600

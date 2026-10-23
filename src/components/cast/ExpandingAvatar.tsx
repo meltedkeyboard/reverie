@@ -19,6 +19,8 @@ import { Picture } from '../visuals/Picture'
 type Props = {
   name: string
   uri: string
+  // The stored avatar's file, whose original the viewer offers in its place.
+  file?: string | null
   // Offset of the scroll view the avatar sits at the top of, and whether a finger is on it.
   scrollY: SharedValue<number>
   dragging: SharedValue<boolean>
@@ -60,7 +62,7 @@ const NAME_INSET_BOTTOM = 18
 // Everything moves by transforms: the photo is always laid out at its full size and scaled
 // down into the circle. Animating its size, or the height of its block, laid out the form
 // and its glass fields again on every frame, and the spread stuttered.
-export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: androidPull, top, side = 0, sideLeft, sideRight }: Props) {
+export function ExpandingAvatar({ name, uri, file, scrollY, dragging, progress, pull: androidPull, top, side = 0, sideLeft, sideRight }: Props) {
   const { width } = useWindowDimensions()
   const openViewer = useOpenViewer()
   const open = useSharedValue(false)
@@ -141,7 +143,8 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: 
   const lifted = useLifted(id)
   const openPhoto = () => {
     const node = block.current
-    if (!node) return openViewer([{ uri, aspect: 1 }])
+    const image = { uri, aspect: 1, avatar: file }
+    if (!node) return openViewer([image])
     node.measureInWindow((blockX, blockY) => {
       const k = progress.value
       const pull = Math.max(0, -scrollY.value / PULL_TO_OPEN, (androidPull?.value ?? 0) / ANDROID_PULL_TO_OPEN)
@@ -151,7 +154,7 @@ export function ExpandingAvatar({ name, uri, scrollY, dragging, progress, pull: 
       const middleX = blockX + photoLeft + photoSize / 2
       const middleY = blockY + SIZE / 2 + (photoSize / 2 - top - SIZE / 2) * k + pinOpen(scrollY.value, k)
       const origin = originOf({ x: middleX - side / 2, y: middleY - side / 2, width: side, height: side }, (side / 2) * (1 - k))
-      openViewer([{ uri, aspect: 1 }], 0, [origin], id)
+      openViewer([image], 0, [origin], id)
     })
   }
 

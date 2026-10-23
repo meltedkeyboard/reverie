@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import {
   Archive, ArrowDown, ArrowRight, ArrowUp, BookOpen, Brain, Camera, Check, ChevronDown, ChevronLeft,
   ChevronRight, ChevronUp, ChevronsUpDown, Circle, CircleCheck, CircleMinus, CirclePlay, Cloud, Code,
-  Copy, Diamond, Download, Ear, Ellipsis, Expand, ExternalLink, Eye, EyeOff, FastForward, Files, Folder,
+  Copy, Crop, Diamond, Download, Ear, Ellipsis, Expand, ExternalLink, Eye, EyeOff, FastForward, Files, Folder,
   Globe, GripHorizontal, Image, Images, Info, Languages, LayoutGrid, Library, Link, List, Lock, LogIn,
   LogOut, Menu, MessagesSquare, Mic, Palette, Pencil, Plus, Radio, RefreshCw, Repeat, Save, Scan,
   Search, Send, Server, Settings, Share, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Square,
@@ -46,6 +46,7 @@ const LUCIDE: Record<string, LucideIcon> = {
   code: Code,
   'color-palette': Palette,
   copy: Copy,
+  crop: Crop,
   create: SquarePen,
   diamond: Diamond,
   documents: Files,

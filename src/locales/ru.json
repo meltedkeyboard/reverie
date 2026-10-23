@@ -535,6 +535,8 @@
   "images.saved": "Сохранено в «Фото»",
   "images.saveFailed": "Не удалось сохранить фото",
   "images.savePermission": "Нет разрешения добавлять фото. Включите его в настройках iOS",
+  "images.showOriginal": "Показать оригинал",
+  "images.showCropped": "Показать кадр",
 
 
   "backup.corrupted": "Файл повреждён или это не копия Reverie",
