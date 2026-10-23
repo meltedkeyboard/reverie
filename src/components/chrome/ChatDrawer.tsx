@@ -12,7 +12,7 @@ import { holdHydration } from '@/components/chat/thread/hydration'
 import { listChatsOf, lookOf, ownerKey, type Owner } from '@/components/chat/thread/screen'
 import { deleteChat, listChats, pruneUntouchedChats, setChatOrder, type Chat, type ChatPreview } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
-import { importChatToRoom, listRooms, type RoomPreview } from '@/db/rooms'
+import { importChatToRoom, listRooms } from '@/db/rooms'
 import { useChatListActions } from '@/hooks/chat/useChatListActions'
 import { useReorder } from '@/hooks/features/useReorder'
 import { useTranslation } from '@/i18n'
@@ -99,6 +99,21 @@ const HOLD = 'drawer'
 // go), as iOS does: waiting for the spring to arrive made it come late after the motion.
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
 
+// Of the rooms, only what "Move to room" shows.
+type RoomChoice = { id: number; name: string }
+
+// A list read again keeps the rows that read the same, so only the changed ones render
+// again: a row's native menu is costly to remake, and the list is read again as the drawer
+// opens, in the middle of its motion.
+function keepSame(prev: ChatPreview[], next: ChatPreview[]) {
+  const before = new Map(prev.map((chat) => [chat.id, chat]))
+  const list = next.map((chat) => {
+    const was = before.get(chat.id)
+    return was && (Object.keys(chat) as (keyof ChatPreview)[]).every((field) => chat[field] === was[field]) ? was : chat
+  })
+  return list.length === prev.length && list.every((chat, i) => chat === prev[i]) ? prev : list
+}
+
 // The chats of one character, or the scenes of one room, under the chat, as in the Claude
 // app: the chat is a card over the list and slides to the right to uncover it, by the button
 // in its header or a drag to the right from anywhere on it. The list only switches between
@@ -130,19 +145,33 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   const [open, setOpen] = useState(false)
   const [suspended, setSuspended] = useState(false)
   const [chats, setChats] = useState<ChatPreview[]>([])
-  const [rooms, setRooms] = useState<RoomPreview[]>([])
+  const [rooms, setRooms] = useState<RoomChoice[]>([])
 
   const reload = useCallback(async () => {
-    setChats(await listChatsOf(db, ownerRef.current))
+    const list = await listChatsOf(db, ownerRef.current)
+    setChats((prev) => keepSame(prev, list))
     // The list belongs to the owner, which only the key tells apart.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, key])
 
+  // Read with the list rather than as it opens, so the rooms are in before then and their
+  // coming does not render every row's menu again under the motion.
+  const loadRooms = useCallback(async () => {
+    if (ownerRef.current.kind !== 'character') return
+    const list = await listRooms(db)
+    setRooms((prev) =>
+      prev.length === list.length && prev.every((room, i) => room.id === list[i].id && room.name === list[i].name)
+        ? prev
+        : list.map(({ id, name }) => ({ id, name }))
+    )
+  }, [db])
+
   useEffect(() => {
     if (!enabled) return
-    reload()
+    // The rooms first, so the rows come up with them rather than render again for them.
+    loadRooms().then(reload)
     return onChatsChanged(reload)
-  }, [enabled, reload])
+  }, [enabled, reload, loadRooms])
 
   const { duplicate, rename } = useChatListActions(reload)
   // A long press picks a row up to drag it to another place, as on the list of chats before.
@@ -152,19 +181,20 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   // Taken out on their own: a worklet that reached them through listReorder would have to
   // copy its pan gesture to the UI thread, which it cannot.
   const { onDragStart: pickUp, onDragEnd: drop } = listReorder
-  const reorder = {
-    ...listReorder,
-    onDragStart: () => {
-      'worklet'
-      reordering.value = true
-      pickUp()
-    },
-    onDragEnd: () => {
-      'worklet'
-      reordering.value = false
-      drop()
-    },
-  }
+  // The same from render to render: the list hands what starts a drag, built from
+  // onDragStart, to every cell, and a new one rendered every row again, native menu and
+  // all, with each render of the drawer, the one as it starts to open among them.
+  const onDragStart = useCallback(() => {
+    'worklet'
+    reordering.value = true
+    pickUp()
+  }, [reordering, pickUp])
+  const onDragEnd = useCallback(() => {
+    'worklet'
+    reordering.value = false
+    drop()
+  }, [reordering, drop])
+  const reorder = { ...listReorder, onDragStart, onDragEnd }
 
   // Chats opened and left untouched are dropped once the list shows, as on any list; the
   // one on screen stays.
@@ -175,10 +205,10 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
     pruneUntouchedChats(db, chatId)
       .then(() => listChatsOf(db, ownerRef.current))
       .then((list) => {
-        setChats(list)
+        setChats((prev) => keepSame(prev, list))
         for (const chat of list.filter((c) => c.id !== chatId).slice(0, READ_AHEAD)) prefetchMessages(db, chat.id).catch(() => {})
       })
-    if (ownerRef.current.kind === 'character') listRooms(db).then(setRooms)
+    loadRooms()
   }
 
   // The gesture is made once per state, so what it schedules is read through a ref.
@@ -449,17 +479,23 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   )
 
   // Made once, so the rows are memoized and a switch renders only the two whose state changed.
+  // The menus are made anew only when the rooms they offer do.
   const menuRef = useRef(menuItems)
   menuRef.current = menuItems
-  const menuFor = useCallback((chat: ChatPreview) => menuRef.current(chat), [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const menuFor = useCallback((chat: ChatPreview) => menuRef.current(chat), [rooms])
   const stageRef = useRef(onStage)
   stageRef.current = onStage
   const stage = useCallback((chat: ChatPreview) => stageRef.current(chat), [])
 
+  // The same object from render to render: each new one is set on the navigator again,
+  // which renders the stack again.
+  const screenOptions = useMemo(() => ({ gestureEnabled: !enabled }), [enabled])
+
   return (
     <DrawerContext.Provider value={handle}>
       {/* The edge drag takes the place of the swipe back, which the list's back button replaces. */}
-      <Stack.Screen options={{ gestureEnabled: !enabled }} />
+      <Stack.Screen options={screenOptions} />
       <View style={styles.root}>
         {/* Always fully blurred and a little dimmed in the color of the chat's own dim, whatever
             its strength: the list's text reads over it, and the chat sliding over it stands out. */}

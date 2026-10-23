@@ -10,6 +10,22 @@ const pickUp = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
 const swap = () => Haptics.selectionAsync()
 const drop = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
 
+// Made once, not on every render: the list builds what starts a drag from onDragStart and
+// hands it to every cell, so a new one rendered all the rows again with each render of
+// the screen, memoized or not.
+const onDragStart = () => {
+  'worklet'
+  scheduleOnRN(pickUp)
+}
+const onIndexChange = () => {
+  'worklet'
+  scheduleOnRN(swap)
+}
+const onDragEnd = () => {
+  'worklet'
+  scheduleOnRN(drop)
+}
+
 // The props that make a ReorderableList draggable: shows the new order at once, saves it,
 // and taps on picking up, on every place swapped on the way, and on dropping.
 export function useReorder<T extends { id: number }>(
@@ -36,17 +52,8 @@ export function useReorder<T extends { id: number }>(
       setItems(next)
       save(next.map((item) => item.id))
     },
-    onDragStart: () => {
-      'worklet'
-      scheduleOnRN(pickUp)
-    },
-    onIndexChange: () => {
-      'worklet'
-      scheduleOnRN(swap)
-    },
-    onDragEnd: () => {
-      'worklet'
-      scheduleOnRN(drop)
-    },
+    onDragStart,
+    onIndexChange,
+    onDragEnd,
   }
 }
