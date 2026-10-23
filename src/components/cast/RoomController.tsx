@@ -159,8 +159,8 @@ export function RoomController({
 
   const scene = useMemo(() => roomScene(room, members), [room, members])
   const aside = useAside(scene, messages)
-  // The eye in the header opens a private thread with the model about the scene; while it
-  // is open the field talks to the model, so who is addressed does not matter.
+  // Private, in the header's menu, opens a private thread with the model about the scene;
+  // while it is open the field talks to the model, so who is addressed does not matter.
   const [asideOpen, setAsideOpen] = useState(false)
   // What was typed to the characters waits here while the field asks the model aside, and
   // stays as the scene's draft until it is sent.
@@ -352,10 +352,6 @@ export function RoomController({
         ? t('room.placeholderWhisper', { names: addressees.map(nameOf).join(', ') })
         : t('room.placeholderTo', { names: addressees.map(nameOf).join(', ') })
 
-  const initialCount = room.opening.trim() ? 1 : 0
-  // Nothing written yet: a new scene from here would be the same as this one.
-  const fresh = loaded && !rows.some((r) => r.role === 'user') && rows.length <= initialCount
-
   const asidePanel = asideOpen ? (
     <AsidePanel
       turns={aside.turns}
@@ -376,7 +372,6 @@ export function RoomController({
       chatId,
       title,
       naming,
-      fresh,
       chatMenu,
       asideOpen,
       toggleAside,

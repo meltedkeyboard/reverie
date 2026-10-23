@@ -6,7 +6,7 @@ import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { AsideToggleButton, ChatSurface, bubbleOpacityOf } from '@/components/chrome/ChatChrome'
+import { ChatSurface, bubbleOpacityOf } from '@/components/chrome/ChatChrome'
 import { AsidePanel } from '@/components/chat/AsidePanel'
 import { ChatDrawer, useChatDrawer } from '@/components/chrome/ChatDrawer'
 import { Avatar } from '@/components/visuals/Avatar'
@@ -54,7 +54,6 @@ import { prefetchMessages } from '@/lib/chat/messageCache'
 import { formatWhen } from '@/lib/core/format'
 import { isAndroid } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
-import { showToastOnce } from '@/lib/ui/toast'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { FILL, fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
@@ -404,7 +403,6 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
           composerHeight={composerHeight}
           composerTop={composerTop}
           onJump={() => lists[activeRef.current.thread].current?.jumpToNewest()}
-          onNewChat={startNew}
         />
       </View>
       {owner.kind === 'character' ? (
@@ -551,12 +549,11 @@ type ChatChromeProps = {
   composerHeight: SharedValue<number>
   composerTop: SharedValue<number>
   onJump: () => void
-  onNewChat: () => void
 }
 
 // The header and the composer of the screen, made once: another chat only changes what
 // they show, so their glass is never made anew.
-function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, onNewChat }: ChatChromeProps) {
+function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump }: ChatChromeProps) {
   const styles = useStyles(createStyles)
   const glass = useGlassStyles()
   const { t } = useTranslation()
@@ -568,11 +565,19 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
   const asideOpen = data?.asideOpen ?? false
   const { pattern, wallpaper } = useChatTextSettings()
   const hasCustomBackground = Boolean(lookOf(owner).background) || (pattern === 'custom' && Boolean(wallpaper?.file))
+  // Private is asked from the menu under the name. It stays while the thread is open, even
+  // if it is turned off in Settings, so the thread can always be closed from there too.
+  const chatMenu: MenuItem[] = data?.chatMenu ?? []
+  const menu: MenuItem[] =
+    data && (privateEnabled || asideOpen)
+      ? [{ label: t(asideOpen ? 'chat.menuClosePrivate' : 'chat.menuPrivate'), systemImage: asideOpen ? 'eye' : 'eye.slash', onSelect: data.toggleAside }, ...chatMenu]
+      : chatMenu
 
   return (
     <>
       <GlassHeader
         floating
+        centerTitle
         fade={!hasCustomBackground}
         left={
           drawer ? (
@@ -580,34 +585,26 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
           ) : undefined
         }
         right={
-          <View style={styles.headerActions}>
-            <AsideToggleButton open={asideOpen} enabled={privateEnabled} onPress={data?.toggleAside ?? noop} />
-            {data?.fresh ? (
-              <GlassButton icon="create-outline" onPress={() => showToastOnce({ title: t('chat.alreadyNew'), tone: 'info' })} />
-            ) : (
-              <GlassButton icon="create-outline" onPress={onNewChat} />
-            )}
-          </View>
-        }
-      >
-        {owner.kind === 'character' ? (
-          <View style={styles.headerWho}>
-            {/* The photo is a button of its own, as in Telegram: it opens full screen, and
-                the pill beside it keeps the menu. */}
+          // The photo is a button of its own at the right end, as in Telegram: it opens full
+          // screen, and the pill keeps the menu.
+          owner.kind === 'character' ? (
             <GlassSurface interactive style={[styles.photo, isAndroid && glass.solid]}>
               <Avatar name={owner.character.name} file={owner.character.avatar} size={38} />
             </GlassSurface>
-            {/* When the menu can, it draws the pill's glass itself, so the menu morphs out
-                of the pill. The chat's title heads the menu, as on a row of the drawer. */}
-            <NativeMenu items={data?.chatMenu ?? []} title={data?.title ?? undefined} style={styles.whoPress} glassRadius={22}>
-              <PillSurface style={[styles.who, pilled && styles.whoPill, isAndroid && glass.solid]}>
-                <WhoText name={owner.character.name} data={data} />
-              </PillSurface>
-            </NativeMenu>
-          </View>
+          ) : undefined
+        }
+      >
+        {owner.kind === 'character' ? (
+          // When the menu can, it draws the pill's glass itself, so the menu morphs out of
+          // the pill. The chat's title heads the menu, as on a row of the drawer.
+          <NativeMenu items={menu} title={data?.title ?? undefined} style={styles.whoPress} glassRadius={22}>
+            <PillSurface style={[styles.who, pilled && styles.whoPill, isAndroid && glass.solid]}>
+              <WhoText name={owner.character.name} data={data} />
+            </PillSurface>
+          </NativeMenu>
         ) : (
           // The cast is the menu's trigger, so their photos open from the menu.
-          <NativeMenu items={data?.chatMenu ?? []} title={data?.title ?? undefined} style={styles.roomPress} glassRadius={22}>
+          <NativeMenu items={menu} title={data?.title ?? undefined} style={styles.roomPress} glassRadius={22}>
             <PillSurface style={[styles.roomWho, pilled && styles.roomPill, isAndroid && glass.solid]}>
               <AvatarStack cast={owner.members.map((m) => ({ name: m.character.name, avatar: m.character.avatar }))} size={28} viewable={false} />
               <WhoText name={owner.room.name} data={data} />
@@ -687,7 +684,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const aside = useAside(scene, messages)
 
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
-  // The eye in the header opens a private thread with the model about this chat.
+  // Private, in the header's menu, opens a private thread with the model about this chat.
   const [asideOpen, setAsideOpen] = useState(false)
   // What was typed to the character waits here while the field asks the model aside, and
   // stays as the chat's draft until it is sent.
@@ -740,10 +737,6 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     [regenerable, locked, onAction, selectVariant, bubbleOpacity]
   )
 
-  const initialCount = character.greeting.trim() ? 1 : 0
-  // Nothing written yet: a new chat from here would be the same as this one.
-  const fresh = loaded && !rows.some((r) => r.role === 'user') && rows.length <= initialCount
-
   // Until its messages are in, the thread keeps what it shows: the chat as it was laid out
   // ahead, the same messages.
   useLayoutEffect(() => {
@@ -776,7 +769,6 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
       chatId,
       title,
       naming,
-      fresh,
       chatMenu,
       asideOpen,
       toggleAside,
@@ -875,19 +867,17 @@ const pilled = liquidGlass || isAndroid
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  headerWho: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   photo: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  whoPress: { flexShrink: 1 },
+  whoPress: { maxWidth: '100%' },
   who: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   whoPill: { borderRadius: 22, paddingVertical: 4, paddingHorizontal: 16 },
-  whoText: { flexShrink: 1 },
-  roomPress: { alignSelf: 'flex-start', maxWidth: '100%' },
+  whoText: { flexShrink: 1, alignItems: 'center' },
+  roomPress: { maxWidth: '100%' },
   roomWho: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   roomPill: { borderRadius: 22, paddingVertical: 4, paddingLeft: 6, paddingRight: 14 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%' },
   name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 1 },
+  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 1, textAlign: 'center' },
   intro: { alignItems: 'center', paddingTop: 24, paddingBottom: 20, paddingHorizontal: 32 },
   introName: { color: colors.text, fontFamily: fonts.prose, fontSize: 22, marginTop: 12 },
   introMeta: { color: colors.textFaint, fontSize: 14, marginTop: 4, textAlign: 'center' },

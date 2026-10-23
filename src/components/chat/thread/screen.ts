@@ -85,7 +85,6 @@ export type ChromeData = {
   chatId: number
   title: string | null
   naming: boolean
-  fresh: boolean
   chatMenu: MenuItem[]
   asideOpen: boolean
   toggleAside: () => void

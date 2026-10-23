@@ -1,13 +1,8 @@
 import { StyleSheet, View } from 'react-native'
 
-import { Icon } from '@/components/visuals/Icon'
-
 import { ChatBackground } from '@/components/chat/ChatBackground'
-import { GlassButton } from '@/components/chrome/Glass'
 import { Pattern } from '@/components/visuals/Pattern'
-import { SFIcon } from '@/components/visuals/SFIcon'
 import type { Character } from '@/db/characters'
-import { useTranslation } from '@/i18n'
 import { avatarUri, cropFromJson } from '@/lib/images/avatars'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import { FILL, useColors, useTheme } from '@/theme'
@@ -89,20 +84,6 @@ export const bubbleOpacityOf = (
   if (owner.background) return 1 - owner.backgroundBubbleTransparency
   if (pattern === 'custom' && wallpaper?.file) return 1 - wallpaper.bubbleTransparency
   return 1
-}
-
-// The eye in the header that opens the private thread with the model. It stays while the
-// thread is open, even if the button is turned off in Settings.
-export function AsideToggleButton({ open, enabled, onPress }: { open: boolean; enabled: boolean; onPress: () => void }) {
-  const colors = useColors()
-  const { t } = useTranslation()
-  if (!enabled && !open) return null
-  const fallback: React.ComponentProps<typeof Icon>['name'] = open ? 'eye-off' : 'eye-off-outline'
-  return (
-    <GlassButton icon={fallback} onPress={onPress} accessibilityLabel={t('chat.privateTitle')}>
-      <SFIcon name={open ? 'eye.slash.fill' : 'eye.slash'} fallback={fallback} size={20} color={colors.text} animateChange={open} />
-    </GlassButton>
-  )
 }
 
 const styles = StyleSheet.create({
