@@ -154,7 +154,7 @@ export function ExpandingAvatar({ name, uri, file, scrollY, dragging, progress, 
       const middleX = blockX + photoLeft + photoSize / 2
       const middleY = blockY + SIZE / 2 + (photoSize / 2 - top - SIZE / 2) * k + pinOpen(scrollY.value, k)
       const origin = originOf({ x: middleX - side / 2, y: middleY - side / 2, width: side, height: side }, (side / 2) * (1 - k))
-      openViewer([image], 0, [origin], id)
+      openViewer([image], 0, [origin], [id])
     })
   }
 

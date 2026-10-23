@@ -23,7 +23,7 @@ import { useColors, useStyles, type Colors } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
 import { IconButton } from '../controls/IconButton'
-import { ImageLink } from '../visuals/ImageLink'
+import { ImageLink, useImageGroup, type ImageGroup } from '../visuals/ImageLink'
 import { Markdown, SelectableText } from './Markdown'
 import { NativeMenu, TapTrigger } from '../overlays/NativeMenu'
 import { Pager } from '../lists/Pager'
@@ -84,6 +84,8 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   // A streaming reply stays plain: its text changes with every token.
   const rich = useHydrated(message.streaming ? 'stream' : `${message.id}:${message.variant}`, hydrate)
   const held = useHeldText(Boolean(message.streaming), message.content)
+  // The pictures of the message, swiped through together in the viewer.
+  const pictures = useImageGroup()
   const actions = useMemo(
     () => messageActions(message, { canRegenerate, locked }),
     [message, canRegenerate, locked]
@@ -149,7 +151,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           </View>
         ) : null}
         {message.images.map((image, index) => (
-          <Picture key={index} image={image} onLongPress={openSheet} />
+          <Picture key={index} image={image} group={pictures} index={index} onLongPress={openSheet} />
         ))}
         {message.content ? (
           <View
@@ -658,16 +660,24 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
 const PICTURE_MAX = { width: 240, height: 300 }
 const PICTURE_RADIUS = 18
 
-type PictureProps = { image: MessageImage; onLongPress: () => void }
+type PictureProps = { image: MessageImage; group: ImageGroup; index: number; onLongPress: () => void }
 
-function Picture({ image, onLongPress }: PictureProps) {
+function Picture({ image, group, index, onLongPress }: PictureProps) {
   const styles = useStyles(createStyles)
   const uri = useMemo(() => pictureUri(image), [image.file, image.moving])
   const width = image.width || PICTURE_MAX.width
   const height = image.height || PICTURE_MAX.width
   const scale = Math.min(PICTURE_MAX.width / width, PICTURE_MAX.height / height)
   return (
-    <ImageLink uri={uri} aspect={width / height} corners={PICTURE_RADIUS} onLongPress={onLongPress} delayLongPress={LONG_PRESS_MS}>
+    <ImageLink
+      uri={uri}
+      aspect={width / height}
+      group={group}
+      index={index}
+      corners={PICTURE_RADIUS}
+      onLongPress={onLongPress}
+      delayLongPress={LONG_PRESS_MS}
+    >
       <Image
         source={{ uri }}
         style={[styles.picture, { width: width * scale, height: height * scale }]}

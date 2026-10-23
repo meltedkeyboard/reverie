@@ -64,15 +64,17 @@ type Pending = {
   index: number
   // The place of each picture, or null for one not on the screen.
   origins: (ViewerOrigin | null)[]
-  // The thumbnail that hides while its picture is up, see setLifted.
-  source: string | null
+  // The thumbnail of each picture, which hides while that picture is up (see setLifted), or
+  // null for one that stays.
+  sources: (string | null)[]
 }
 
 let pending: Pending | null = null
 
-// Several pictures are swiped through, starting from `index`: a room's cast, say.
-export function setViewerImages(images: ViewerImage[], index = 0, origins: (ViewerOrigin | null)[] = [], source: string | null = null) {
-  pending = images.length ? { images, index: Math.min(Math.max(index, 0), images.length - 1), origins, source } : null
+// Several pictures are swiped through, starting from `index`: a room's cast, say, or the
+// pictures of one message.
+export function setViewerImages(images: ViewerImage[], index = 0, origins: (ViewerOrigin | null)[] = [], sources: (string | null)[] = []) {
+  pending = images.length ? { images, index: Math.min(Math.max(index, 0), images.length - 1), origins, sources } : null
 }
 
 export function viewerImages() {

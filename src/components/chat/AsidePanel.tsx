@@ -23,7 +23,7 @@ import { type Colors, FILL, useColors, useStyles } from '@/theme'
 import { ErrorCard } from './ConversationList'
 import { GlassSurface } from '../chrome/Glass'
 import { useHeaderHeight } from '../chrome/GlassHeader'
-import { ImageLink } from '../visuals/ImageLink'
+import { ImageLink, useImageGroup } from '../visuals/ImageLink'
 import { Markdown } from './Markdown'
 import { ThoughtBlock } from './MessageRow'
 import { TypingIndicator } from './TypingIndicator'
@@ -157,6 +157,7 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
 
 function Question({ text }: { text: AsideQuestion }) {
   const styles = useStyles(createStyles)
+  const pictures = useImageGroup()
   return (
     <View style={styles.question}>
       {text.images.length ? (
@@ -164,7 +165,14 @@ function Question({ text }: { text: AsideQuestion }) {
           {text.images.map((image, i) => {
             const uri = pictureUri(image)
             return (
-              <ImageLink key={i} uri={uri} aspect={image.width && image.height ? image.width / image.height : 1} corners={10}>
+              <ImageLink
+                key={i}
+                uri={uri}
+                aspect={image.width && image.height ? image.width / image.height : 1}
+                group={pictures}
+                index={i}
+                corners={10}
+              >
                 <Image source={{ uri }} style={styles.picture} contentFit="cover" />
               </ImageLink>
             )

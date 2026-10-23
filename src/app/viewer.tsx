@@ -35,9 +35,10 @@ export default function ViewerScreen() {
   const [pending] = useState(viewerImages)
   const images = pending?.images ?? []
   const origins = pending?.origins ?? NO_ORIGINS
-  const source = pending?.source ?? null
   const [initialIndex] = useState(pending?.index ?? 0)
   const [index, setIndex] = useState(initialIndex)
+  // The thumbnail of the picture shown, which is where it goes back to on closing.
+  const source = pending?.sources[index] ?? null
   const [chrome, setChrome] = useState(true)
   const [frame, setFrame] = useState<Frame | null>(null)
   const root = useRef<View>(null)
@@ -50,7 +51,8 @@ export default function ViewerScreen() {
     if (!images.length) leave()
   }, [images.length, leave])
 
-  // The thumbnail hides as the picture leaves it, and shows again once it is back.
+  // The thumbnail hides as the picture leaves it, and shows again once it is back or another
+  // picture is swiped in, whose own thumbnail hides instead.
   const measured = frame !== null
   useEffect(() => {
     if (!measured || !source) return
