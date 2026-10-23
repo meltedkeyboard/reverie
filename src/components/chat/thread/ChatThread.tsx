@@ -12,14 +12,19 @@ import { useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { Flash } from '@/components/overlays/Flash'
 import { isWeb } from '@/lib/core/platform'
 
-import { holdHydration } from './hydration'
+import { slowHydration } from './hydration'
 
 // How far above the newest message the list has to be before the jump button shows up.
 const JUMP_THRESHOLD = 240
 // A reader who scrolled up is left there until they come back within this of the end (pt).
 const FOLLOW_BACK = 80
-// How long after a scroll the rows wait before taking on their rich views.
-const SCROLL_REST = 800
+// How long after a scroll the rows go back to taking on their rich views at full pace.
+const SCROLL_REST = 300
+// How far past the screen the list keeps rows laid out (pt). Rows take on their rich views
+// there, as they come in during a scroll, so the reader comes onto rows already selectable
+// instead of ones that switch in front of them. FlashList's own 250 left about a message
+// on either side, too little to upgrade one before it showed.
+const DRAW_DISTANCE = 700
 // A chat handed to the thread has landed once its size has not changed for this long.
 const LANDED_AFTER = 40
 // How long a scroll the thread makes itself may take: a finger that comes down meanwhile
@@ -226,13 +231,13 @@ export function ChatThread({
     [onAwayChange]
   )
 
-  // Rows take on their rich views only once the list rests.
+  // Rows take on their rich views more slowly while the list scrolls.
   const restTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reason = useMemo(() => `thread:${Math.random()}`, [])
   const moving = useCallback(() => {
     landing.current = false
     if (restTimer.current) clearTimeout(restTimer.current)
-    holdHydration(reason, true)
+    slowHydration(reason, true)
   }, [reason])
   const grabbed = useCallback(() => {
     held.current = true
@@ -241,7 +246,7 @@ export function ChatThread({
   }, [moving])
   const rested = useCallback(() => {
     if (restTimer.current) clearTimeout(restTimer.current)
-    restTimer.current = setTimeout(() => holdHydration(reason, false), SCROLL_REST)
+    restTimer.current = setTimeout(() => slowHydration(reason, false), SCROLL_REST)
   }, [reason])
   // Let go near the end, the list snaps onto it, as onto a magnet; after a fling, once it
   // stops there. Put off a moment, for the fling's start to arrive after the release.
@@ -284,7 +289,7 @@ export function ChatThread({
   useEffect(
     () => () => {
       if (restTimer.current) clearTimeout(restTimer.current)
-      holdHydration(reason, false)
+      slowHydration(reason, false)
     },
     [reason]
   )
@@ -347,6 +352,7 @@ export function ChatThread({
       renderItem={renderItem}
       renderScrollComponent={renderScroll}
       maintainVisibleContentPosition={POSITION}
+      drawDistance={DRAW_DISTANCE}
       onScroll={onScroll}
       onContentSizeChange={onContentSizeChange}
       onScrollBeginDrag={grabbed}

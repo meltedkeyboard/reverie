@@ -11,8 +11,7 @@ type Props = {
   // How *emphasis* looks: a roleplay reply mutes its actions, other text just slants.
   emStyle?: StyleProp<TextStyle>
   streaming?: boolean
-  // false draws plain Text, which leaves a long press to the parent: the user's bubble
-  // opens its menu on one, where a reply selects text.
+  // false draws plain Text, as a row does before it is hydrated (see thread/hydration).
   selectable?: boolean
   // Told whether some of the text is selected now.
   onSelect?: (selected: boolean) => void

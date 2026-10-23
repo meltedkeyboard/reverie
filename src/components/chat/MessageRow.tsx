@@ -2,7 +2,7 @@ import { Icon } from '@/components/visuals/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Image } from 'expo-image'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
@@ -15,7 +15,6 @@ import type { MessageImage } from '@/db/messages'
 import { withAlpha } from '@/lib/core/color'
 import { isWeb } from '@/lib/core/platform'
 import { showSheet } from '@/lib/ui/dialogs'
-import { PRESS_ANYWHERE } from '@/lib/ui/press'
 import * as Haptics from '@/lib/ui/haptics'
 import { pictureUri } from '@/lib/images/attachments'
 import { CHAT_METRICS, useChatText } from '@/lib/chat/chatText'
@@ -70,8 +69,9 @@ function textSize({ fontFamily, scaled }: ReturnType<typeof useChatText>, metric
   return { fontFamily, fontSize: scaled(metrics.size), lineHeight: scaled(metrics.line) }
 }
 
-// A long press on the user's own bubble opens the message menu. Replies have no such
-// menu: a long press there selects text, and their actions sit in the bar below.
+// A long press on a picture the user sent opens the message menu. Text has no such menu,
+// the user's as much as a reply's: a long press there selects it, and the actions sit in
+// the bar below.
 const LONG_PRESS_MS = 350
 
 function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1, scene, hydrate = 'off' }: Props) {
@@ -152,7 +152,7 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           <Picture key={index} image={image} onLongPress={openSheet} />
         ))}
         {message.content ? (
-          <Pressable onLongPress={openSheet} delayLongPress={LONG_PRESS_MS} pressRetentionOffset={PRESS_ANYWHERE}
+          <View
             style={[
               styles.bubble,
               bubbleOpacity < 1 && { backgroundColor: withAlpha(colors.bubble, bubbleOpacity) },
@@ -161,16 +161,24 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           >
             {chatText.userMarkdown ? (
               <Markdown
+                key={`${message.variant}:${message.content}`}
                 text={message.content}
                 style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}
-                selectable={false}
+                selectable={rich}
               />
+            ) : rich ? (
+              <SelectableText
+                key={`${message.variant}:${message.content}`}
+                style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}
+              >
+                {message.content}
+              </SelectableText>
             ) : (
               <Text style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}>
                 {message.content}
               </Text>
             )}
-          </Pressable>
+          </View>
         ) : null}
         {scene?.overheard ? <Overheard names={scene.overheard} end /> : null}
         {bar}
