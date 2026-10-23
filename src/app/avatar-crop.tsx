@@ -1,28 +1,33 @@
+import Slider from '@react-native-community/slider'
 import { Image } from 'expo-image'
 import { ImageManipulator } from 'expo-image-manipulator'
-import { useRouter } from 'expo-router'
+import { useNavigation, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Path } from 'react-native-svg'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import { Button } from '@/components/controls/Button'
 import { GlassButton } from '@/components/chrome/Glass'
 import { GlassHeader, HeaderTitle } from '@/components/chrome/GlassHeader'
 import { useTranslation } from '@/i18n'
 import { avatarCropDraft } from '@/lib/images/avatarCrop'
+import { avatarCropLook, CROP_SHEET_UP, cropSheetOpen, MAX_ZOOM } from '@/lib/images/avatarCropLook'
 import { squareAvatar } from '@/lib/images/avatars'
 import { alertError } from '@/lib/transfer/report'
-import { HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
-import { isWeb } from '@/lib/core/platform'
+import { HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles, type Colors } from '@/theme'
+import { isIOS, isWeb } from '@/lib/core/platform'
 
-const MAX_ZOOM = 4
-// The hint and the button under the window.
-const DOCK_SPACE = 110
-// On a screen wider than tall they stand beside the window instead, in a column this wide.
-const SIDE_DOCK = 220
+// The hint, the zoom slider and the buttons under the window.
+const DOCK_SPACE = 160
+// On a screen wider than tall they stand beside the window instead, in a column this wide:
+// enough for Choose with a round button on each side.
+const SIDE_DOCK = 280
+// The settle of the background editor's reset.
+const SPRING = { damping: 22, stiffness: 220, mass: 0.9 }
 
 // The Files picker has no editor of its own, so a picked file is framed here the way the
 // photo library frames a photo: moved and pinched under a round window.
@@ -46,12 +51,26 @@ export default function AvatarCropScreen() {
       .catch((err) => alertError(t('editor.avatarFailedTitle'), err))
   }, [draft, t])
 
-  // The window is the largest circle that fits between the header and the button.
+  // On iOS the controls are the system sheet, /avatar-crop-look, as on /background: a route
+  // over this screen, opened once the screen has come in, that reads and sets the framing
+  // through `avatarCropLook` and is closed with the screen.
+  const navigation = useNavigation()
+  useEffect(() => {
+    if (!isIOS || !draft) return
+    return navigation.addListener('transitionEnd' as never, (e: { data: { closing: boolean } }) => {
+      if (!e.data.closing && !cropSheetOpen()) router.push('/avatar-crop-look')
+    })
+  }, [navigation, router, draft])
+  useEffect(() => () => avatarCropLook.set(null), [])
+
+  // The window is the largest circle that fits between the header and the controls. On iOS
+  // the sheet has the title, so there is no header, and the window stands above the sheet
+  // as it is opened.
   const landscape = frame.width > frame.height
-  const top = insets.top + HEADER_ROW_HEIGHT
-  const bottom = insets.bottom + (landscape ? 0 : DOCK_SPACE)
+  const top = insets.top + (isIOS ? 0 : HEADER_ROW_HEIGHT)
+  const bottom = isIOS ? (landscape ? insets.bottom : CROP_SHEET_UP) : insets.bottom + (landscape ? 0 : DOCK_SPACE)
   const left = insets.left
-  const right = landscape ? insets.right + SIDE_DOCK : 0
+  const right = landscape ? insets.right + (isIOS ? 0 : SIDE_DOCK) : 0
   const diameter = Math.max(0, Math.min(frame.width - left - right - 32, frame.height - top - bottom - 32))
   const cx = left + (frame.width - left - right) / 2
   const cy = top + (frame.height - top - bottom) / 2
@@ -69,6 +88,16 @@ export default function AvatarCropScreen() {
   const coverWidth = useSharedValue(0)
   const coverHeight = useSharedValue(0)
   const window = useSharedValue(0)
+  const sliding = useSharedValue(false)
+  // The slider follows a pinch, the wheel and the buttons, but not while it is being dragged
+  // itself: the thumb is then under the finger, and a value sent back would make it jitter.
+  const [shownZoom, setShownZoom] = useState(1)
+  useAnimatedReaction(
+    () => Math.round(zoom.value * 100) / 100,
+    (now, was) => {
+      if (now !== was && !sliding.value) scheduleOnRN(setShownZoom, now)
+    },
+  )
 
   useEffect(() => {
     coverWidth.value = pictureWidth
@@ -160,9 +189,41 @@ export default function AvatarCropScreen() {
     transform: [{ translateX: offsetX.value }, { translateY: offsetY.value }, { scale: zoom.value }],
   }))
 
+  // The slider zooms around the middle of the window, so what is there stays there.
+  const slide = (to: number) => {
+    const from = zoom.value
+    zoom.value = to
+    offsetX.value = clampX(offsetX.value * (to / from), to)
+    offsetY.value = clampY(offsetY.value * (to / from), to)
+  }
+  const endSlide = (to: number) => {
+    slide(to)
+    sliding.value = false
+    setShownZoom(to)
+  }
+  // It is as wide as the buttons under it.
+  const [actionsWidth, setActionsWidth] = useState(0)
+
+  // Reset frames the photo as it first came; center keeps the zoom. The center lies inside
+  // the limits at every zoom, so neither needs the clamp.
+  const reset = () => {
+    zoom.value = withSpring(1, SPRING)
+    offsetX.value = withSpring(0, SPRING)
+    offsetY.value = withSpring(0, SPRING)
+  }
+  const center = () => {
+    offsetX.value = withSpring(0, SPRING)
+    offsetY.value = withSpring(0, SPRING)
+  }
+
   const onLayout = (event: LayoutChangeEvent) => setFrame(event.nativeEvent.layout)
 
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
+  // With the controls' sheet over the screen, both go together.
+  const close = () => {
+    if (cropSheetOpen()) router.dismiss(2)
+    else if (router.canGoBack()) router.back()
+    else router.replace('/')
+  }
 
   const choose = async () => {
     if (!draft || !natural || !cover || saving) return
@@ -186,6 +247,23 @@ export default function AvatarCropScreen() {
       alertError(t('editor.avatarFailedTitle'), err)
     }
   }
+
+  // The sheet follows the values as they change.
+  useEffect(() => {
+    if (!isIOS) return
+    avatarCropLook.set({
+      zoom: shownZoom,
+      startSlide: () => (sliding.value = true),
+      slide,
+      endSlide,
+      center,
+      reset,
+      ready: !!natural,
+      saving,
+      choose,
+      close,
+    })
+  })
 
   const r = diameter / 2
   // The screen with a round hole in it: evenodd leaves the circle unfilled.
@@ -216,21 +294,45 @@ export default function AvatarCropScreen() {
         </Svg>
       ) : null}
 
-      <GlassHeader floating left={<GlassButton icon="chevron-back" iconSize={26} onPress={close} />}>
-        <HeaderTitle>{t('avatarCrop.title')}</HeaderTitle>
-      </GlassHeader>
+      {/* On iOS the sheet's bar has the title, close, centering and reset. */}
+      {isIOS ? null : (
+        <GlassHeader floating left={<GlassButton icon="chevron-back" iconSize={26} onPress={close} />}>
+          <HeaderTitle>{t('avatarCrop.title')}</HeaderTitle>
+        </GlassHeader>
+      )}
 
-      <View
-        style={
-          landscape
-            ? [styles.sideDock, { top, right: insets.right + 16, bottom: insets.bottom + 16 }]
-            : [styles.dock, { paddingBottom: insets.bottom + 8 }]
-        }
-        pointerEvents="box-none"
-      >
-        <Text style={styles.hint}>{t('avatarCrop.hint')}</Text>
-        <Button variant="glass" label={t('avatarCrop.choose')} onPress={choose} disabled={!natural} loading={saving} />
-      </View>
+      {/* On iOS the controls are the system sheet, /avatar-crop-look. */}
+      {isIOS ? null : (
+        <View
+          style={
+            landscape
+              ? [styles.sideDock, { top, right: insets.right + 16, bottom: insets.bottom + 16 }]
+              : [styles.dock, { paddingBottom: insets.bottom + 8 }]
+          }
+          pointerEvents="box-none"
+        >
+          <Text style={styles.hint}>{t('avatarCrop.hint')}</Text>
+          <Slider
+            value={shownZoom}
+            minimumValue={1}
+            maximumValue={MAX_ZOOM}
+            onSlidingStart={() => (sliding.value = true)}
+            onValueChange={slide}
+            onSlidingComplete={endSlide}
+            disabled={!natural}
+            minimumTrackTintColor={colors.accent}
+            maximumTrackTintColor={colors.borderStrong}
+            thumbTintColor={ON_ACCENT}
+            accessibilityLabel={t('avatarCrop.zoom')}
+            style={[styles.slider, { width: actionsWidth }]}
+          />
+          <View style={styles.actions} onLayout={(event) => setActionsWidth(event.nativeEvent.layout.width)}>
+            <GlassButton icon="locate" onPress={center} disabled={!natural} accessibilityLabel={t('avatarCrop.center')} />
+            <Button variant="glass" label={t('avatarCrop.choose')} onPress={choose} disabled={!natural} loading={saving} />
+            <GlassButton icon="refresh" onPress={reset} disabled={!natural} accessibilityLabel={t('avatarCrop.reset')} />
+          </View>
+        </View>
+      )}
     </View>
   )
 }
@@ -242,4 +344,7 @@ const createStyles = (colors: Colors) =>
     dock: { position: 'absolute', left: 16, right: 16, bottom: 0, gap: 12, alignItems: 'center' },
     sideDock: { position: 'absolute', width: SIDE_DOCK - 32, gap: 12, justifyContent: 'center' },
     hint: { color: colors.textMuted, fontSize: 13, textAlign: 'center' },
+    // Both sized to the row of buttons, not stretched across the side column.
+    slider: { alignSelf: 'center', height: 36 },
+    actions: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 12 },
   })
