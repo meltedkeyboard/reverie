@@ -1,12 +1,20 @@
 import { Icon } from '@/components/visuals/Icon'
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { ChatSurface, bubbleOpacityOf } from '@/components/chrome/ChatChrome'
+import {
+  ChatSurface,
+  bubbleOpacityOf,
+  pictureOf,
+  useChatBackdropTone,
+  useChatScheme,
+  type ChatLook,
+} from '@/components/chrome/ChatChrome'
 import { AsidePanel } from '@/components/chat/AsidePanel'
 import { ChatDrawer, useChatDrawer } from '@/components/chrome/ChatDrawer'
 import { Avatar } from '@/components/visuals/Avatar'
@@ -51,13 +59,18 @@ import { useTranslation } from '@/i18n'
 import { characterScene } from '@/lib/chat/aside'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import { prefetchMessages } from '@/lib/chat/messageCache'
+import { measurePictureColor } from '@/lib/images/pictureColor'
 import { formatWhen } from '@/lib/core/format'
 import { isAndroid } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
-import { FILL, fonts, HEADER_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
+import { FILL, fonts, HEADER_FONT_SCALE, SchemeOverride, useColors, useStyles, type Colors, type Scheme } from '@/theme'
 
 type Loaded = { chat: Chat; owner: Owner }
+
+// How long a chat waits for its picture to be measured before it comes up anyway, in the
+// scheme it can tell without it, to turn over once the measure is in.
+const MEASURE_WAIT = 400
 
 export default function ChatScreen() {
   // /chat/new?character=ID (or ?room=ID for a scene) creates the chat on arrival. A
@@ -75,6 +88,15 @@ export default function ChatScreen() {
   const router = useRouter()
   const colors = useColors()
   const [loaded, setLoaded] = useState<Loaded | null>(null)
+  // The picture is measured before the chat comes up, so it comes up in its own scheme.
+  const text = useChatTextSettings()
+  const textRef = useRef(text)
+  textRef.current = text
+  const measured = (look: ChatLook) => {
+    const picture = pictureOf(look, textRef.current.wallpaper, textRef.current.pattern)
+    if (!picture) return
+    return Promise.race([measurePictureColor(picture.uri), new Promise((done) => setTimeout(done, MEASURE_WAIT))])
+  }
   // Kept across focus changes, so coming back from the character editor does not
   // start yet another chat.
   const created = useRef<Promise<number> | null>(null)
@@ -107,6 +129,7 @@ export default function ChatScreen() {
           // Re-read on every focus: the room or its cast may have been edited meanwhile.
           const room = await getRoom(db, chat.roomId)
           if (!room) return router.back()
+          await measured(room)
           setLoaded({ chat, owner: { kind: 'room', room, members: await listRoomMembers(db, room.id) } })
           setContinueHidden(db, 'room', false)
           setLastOpened(db, 'room', chat.id)
@@ -116,6 +139,7 @@ export default function ChatScreen() {
         const character = chat?.characterId ? await getCharacter(db, chat.characterId) : null
         if (chat && character) {
           // Re-read on every focus as well: the character may have been edited.
+          await measured(character)
           setLoaded({ chat, owner: { kind: 'character', character } })
           // A continue button swiped away on the home screen comes back once a chat opens.
           setContinueHidden(db, 'character', false)
@@ -365,76 +389,93 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
     lists[activeRef.current.thread].current?.scrollToNewest()
   }, [lists, away])
 
+  // The chat takes the scheme its picture reads best in, and the drawer's list the one of
+  // the picture blurred under it; over a pattern both keep the app's.
+  const scheme = useChatScheme(lookOf(owner))
+  const backdrop = useChatBackdropTone(lookOf(owner))
+
   return (
-    <ChatDrawer
-      owner={owner}
-      chatId={active.chat.id}
-      enabled={!wide}
-      onStage={stage}
-      flipTo={flipTo}
-      onSelect={onSelect}
-      onNewChat={startNew}
-      onCurrentDeleted={replaceDeleted}
-      onClosed={onClosed}
-    >
-      <View style={styles.screen}>
-        <ChatSurface owner={lookOf(owner)} />
-        {[0, 1].map((thread) => (
-          <ThreadSurface
-            key={thread}
-            index={thread}
-            store={threads[thread]}
-            front={front}
-            onScreen={active.thread === thread}
-            frozen={frozen[thread]}
-            listRef={lists[thread]}
-            owner={owner}
-            composerHeight={composerHeight}
-            onLaidOut={laidOut}
-            onAwayChange={(value) => {
-              if (activeRef.current.thread === thread) away.set(value)
-            }}
-          />
-        ))}
-        <ChatChrome
-          store={chrome}
-          away={away}
-          owner={owner}
-          composerHeight={composerHeight}
-          composerTop={composerTop}
-          onJump={() => lists[activeRef.current.thread].current?.jumpToNewest()}
-        />
-      </View>
-      {owner.kind === 'character' ? (
-        <ChatController
-          key={active.chat.id}
-          chat={active.chat}
-          character={owner.character}
-          thread={threads[active.thread]}
-          chrome={chrome}
-          focusMessageId={active.chat.id === start.id ? focusMessageId : null}
-          composerHeight={composerHeight}
-          scrollToNewest={scrollToNewest}
-          onDeleted={replaceDeleted}
-        />
-      ) : (
-        <RoomController
-          key={active.chat.id}
-          chat={active.chat}
-          room={owner.room}
-          members={owner.members}
-          onRoomChange={(room) => setOwner((o) => (o.kind === 'room' ? { ...o, room } : o))}
-          onMembersChange={(members) => setOwner((o) => (o.kind === 'room' ? { ...o, members } : o))}
-          thread={threads[active.thread]}
-          chrome={chrome}
-          focusMessageId={active.chat.id === start.id ? focusMessageId : null}
-          composerHeight={composerHeight}
-          scrollToNewest={scrollToNewest}
-          onDeleted={replaceDeleted}
-        />
-      )}
-    </ChatDrawer>
+    <SchemeOverride scheme={wide ? null : backdrop}>
+      <ChatDrawer
+        owner={owner}
+        chatId={active.chat.id}
+        enabled={!wide}
+        onStage={stage}
+        flipTo={flipTo}
+        onSelect={onSelect}
+        onNewChat={startNew}
+        onCurrentDeleted={replaceDeleted}
+        onClosed={onClosed}
+      >
+        <SchemeOverride scheme={scheme}>
+          {scheme ? <ChatStatusBar scheme={scheme} /> : null}
+          <View style={styles.screen}>
+            <ChatSurface owner={lookOf(owner)} />
+            {[0, 1].map((thread) => (
+              <ThreadSurface
+                key={thread}
+                index={thread}
+                store={threads[thread]}
+                front={front}
+                onScreen={active.thread === thread}
+                frozen={frozen[thread]}
+                listRef={lists[thread]}
+                owner={owner}
+                composerHeight={composerHeight}
+                onLaidOut={laidOut}
+                onAwayChange={(value) => {
+                  if (activeRef.current.thread === thread) away.set(value)
+                }}
+              />
+            ))}
+            <ChatChrome
+              store={chrome}
+              away={away}
+              owner={owner}
+              composerHeight={composerHeight}
+              composerTop={composerTop}
+              onJump={() => lists[activeRef.current.thread].current?.jumpToNewest()}
+            />
+          </View>
+          {owner.kind === 'character' ? (
+            <ChatController
+              key={active.chat.id}
+              chat={active.chat}
+              character={owner.character}
+              thread={threads[active.thread]}
+              chrome={chrome}
+              focusMessageId={active.chat.id === start.id ? focusMessageId : null}
+              composerHeight={composerHeight}
+              scrollToNewest={scrollToNewest}
+              onDeleted={replaceDeleted}
+            />
+          ) : (
+            <RoomController
+              key={active.chat.id}
+              chat={active.chat}
+              room={owner.room}
+              members={owner.members}
+              onRoomChange={(room) => setOwner((o) => (o.kind === 'room' ? { ...o, room } : o))}
+              onMembersChange={(members) => setOwner((o) => (o.kind === 'room' ? { ...o, members } : o))}
+              thread={threads[active.thread]}
+              chrome={chrome}
+              focusMessageId={active.chat.id === start.id ? focusMessageId : null}
+              composerHeight={composerHeight}
+              scrollToNewest={scrollToNewest}
+              onDeleted={replaceDeleted}
+            />
+          )}
+        </SchemeOverride>
+      </ChatDrawer>
+    </SchemeOverride>
   )
+}
+
+// The status bar in the chat's scheme while the chat is on top; the app's comes back with
+// the screen pushed over it, as the bar mounted last is the one shown.
+function ChatStatusBar({ scheme }: { scheme: Scheme }) {
+  const focused = useIsFocused()
+  return focused ? <StatusBar style={scheme === 'light' ? 'dark' : 'light'} /> : null
 }
 
 // How long after the chat comes up the thread behind lays it out as well.

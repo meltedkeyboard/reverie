@@ -15,12 +15,12 @@ import Animated, {
 } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 
-import { ChatBackdrop, type ChatLook } from '@/components/chrome/ChatChrome'
+import { ChatBackdrop, useChatBackdropTone, type ChatLook } from '@/components/chrome/ChatChrome'
 import type { RoomMember } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
 import { isDesktop, isIOS } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
-import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { type Colors, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
 import { BottomSheet, useSheetTones } from '../overlays/BottomSheet'
@@ -59,8 +59,18 @@ const DOT: CSSTransitionProperties = { transitionProperty: ['width', 'marginRigh
 
 // Who the next message is for, in a sheet: the whole room, the narrator's voice, or
 // someone of the cast. A tap on someone writes to them alone, a swipe to the left
-// walks them out of the scene or back in, and a long press has the rest.
-export function CastSheet({
+// walks them out of the scene or back in, and a long press has the rest. Over the room's
+// picture it takes the scheme the picture reads best in, blurred as the sheet shows it.
+export function CastSheet(props: Props) {
+  const scheme = useChatBackdropTone(props.look)
+  return (
+    <SchemeOverride scheme={scheme}>
+      <CastSheetBody {...props} />
+    </SchemeOverride>
+  )
+}
+
+function CastSheetBody({
   visible,
   onClose,
   onDismissed,

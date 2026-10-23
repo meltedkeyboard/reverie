@@ -24,6 +24,7 @@ import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
 import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
+import { lookSheetDetents, lookSheetDown } from '@/lib/images/backgroundLook'
 import { ChatTextProvider } from '@/lib/chat/chatText'
 import { isElectron, isWeb } from '@/lib/core/platform'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
@@ -78,7 +79,7 @@ function ThemedApp() {
 
 // Full-screen routes that go over the sidebar rather than beside it. The viewer goes over it
 // see-through instead, the screen under it keeping its sidebar.
-const WITHOUT_SIDEBAR = ['/onboarding', '/background', '/avatar-crop']
+const WITHOUT_SIDEBAR = ['/onboarding', '/background', '/background-look', '/avatar-crop']
 
 function AppShell() {
   const { colors, scheme } = useTheme()
@@ -126,6 +127,25 @@ function AppShell() {
               />
               <Stack.Screen name="background" options={{ animation: 'fade' }} />
               <Stack.Screen name="avatar-crop" options={{ animation: 'fade' }} />
+              {/* The controls of /background (iOS): open in full, and let down from anywhere on
+                  it low over the picture, which stays bright and takes the fingers under it; not
+                  swiped away, it goes with the screen. */}
+              <Stack.Screen
+                name="background-look"
+                options={() => ({
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: lookSheetDetents(),
+                  sheetInitialDetentIndex: 'last',
+                  sheetLargestUndimmedDetentIndex: 'last',
+                  sheetGrabberVisible: true,
+                  gestureEnabled: false,
+                  headerShown: false,
+                  contentStyle: { backgroundColor: sheetTones.sheet },
+                })}
+                listeners={{
+                  sheetDetentChange: (e) => lookSheetDown.set(e.data.index === 0),
+                }}
+              />
               {/* The system sheet with a grabber, pulled down to close; its bar is set by the screen. */}
               <Stack.Screen
                 name="generate"

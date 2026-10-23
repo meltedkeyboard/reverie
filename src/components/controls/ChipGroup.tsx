@@ -87,7 +87,7 @@ export function FadingRow({
 }
 
 const styles = StyleSheet.create({
-  // Room above and below the chips, taken back by the margin: a glass chip grows a little
+  // Room above and below the chips, taken back by the margin: a glass chip (`glass`) grows a little
   // as its menu opens, and the scroll view would cut it off with a straight edge.
   scroll: { flexGrow: 0, marginVertical: -16 },
   // flexGrow on the content makes it at least as wide as the viewport, so the chips can grow into it.
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   chip: { flexGrow: 1, flexShrink: 0 },
   // The menu centers its label, so the chip is stretched back to the menu's width.
   inMenu: { alignSelf: 'stretch' },
-  // zIndex keeps the fades above the glass chips, which are native layers of their own.
+  // zIndex keeps the fades above glass chips, which are native layers of their own.
   fade: { position: 'absolute', top: 0, bottom: 0, width: FADE, zIndex: 1, elevation: 1 },
   left: { left: 0 },
   right: { right: 0 },

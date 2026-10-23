@@ -3,18 +3,29 @@ import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { AttachStackContext } from '@/components/chat/AttachMenu'
-import { ChatBackdrop, useChatBackdrop } from '@/components/chrome/ChatChrome'
+import { ChatBackdrop, useChatBackdrop, useChatBackdropTone } from '@/components/chrome/ChatChrome'
 import { useSheetTones } from '@/components/overlays/BottomSheet'
-import { attachSession, finishAttachSession } from '@/lib/chat/attachSession'
-import { useColors } from '@/theme'
+import { attachSession, finishAttachSession, type AttachSession } from '@/lib/chat/attachSession'
+import { SchemeOverride, useColors } from '@/theme'
 
 // The attach menu of the composer as the system sheet (iOS): a stack of its own, so the
 // persona picker is pushed inside the sheet with the system's bar and back button. The
-// sheet itself is set in the root layout.
+// sheet itself is set in the root layout. Over the chat's picture the menu takes the scheme
+// the picture reads best in, blurred as the sheet shows it; the system's own buttons on the
+// bar keep the app's.
 export default function AttachLayout() {
+  const [session] = useState(attachSession)
+  const scheme = useChatBackdropTone(session?.look)
+  return (
+    <SchemeOverride scheme={scheme}>
+      <AttachStack session={session} />
+    </SchemeOverride>
+  )
+}
+
+function AttachStack({ session }: { session: AttachSession | null }) {
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
-  const [session] = useState(attachSession)
   // Over the chat's background the bar is see-through and each screen draws the background
   // from under it (AttachScreenFrame); the one under the stack shows should a screen be
   // clipped to its own frame.

@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useRef, useState, type RefObject 
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
-import { ChatBackdrop, useChatBackdrop } from '@/components/chrome/ChatChrome'
+import { ChatBackdrop, useChatBackdrop, useChatBackdropTone } from '@/components/chrome/ChatChrome'
 import { Button } from '@/components/controls/Button'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
@@ -24,7 +24,7 @@ import { pictureUri } from '@/lib/images/attachments'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
-import { type Colors, FILL, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { type Colors, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
 
 import { GlassButton } from '../chrome/Glass'
 import { BottomSheet, useSheetTones } from '../overlays/BottomSheet'
@@ -452,19 +452,26 @@ export function AttachScreenFrame({ session, children }: { session: AttachSessio
   )
 }
 
-// The menu in the app's own bottom sheet, where there is no system one (the web, the
-// desktop, Android); the persona picker slides in over it within the same sheet.
-export function AttachSheet({
-  visible,
-  session,
-  onClose,
-  onDismissed,
-}: {
+type AttachSheetProps = {
   visible: boolean
   session: AttachSession | null
   onClose: Close
   onDismissed: () => void
-}) {
+}
+
+// The menu in the app's own bottom sheet, where there is no system one (the web, the
+// desktop, Android); the persona picker slides in over it within the same sheet. Over the
+// chat's picture it takes the scheme the picture reads best in, blurred as the sheet shows it.
+export function AttachSheet(props: AttachSheetProps) {
+  const scheme = useChatBackdropTone(props.session?.look)
+  return (
+    <SchemeOverride scheme={scheme}>
+      <AttachSheetBody {...props} />
+    </SchemeOverride>
+  )
+}
+
+function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheetProps) {
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)

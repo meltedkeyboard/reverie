@@ -19,6 +19,8 @@ type Props = {
   icon?: { symbol: ComponentProps<typeof SFIcon>['name']; fallback: ComponentProps<typeof SFIcon>['fallback'] }
   // The ink while not chosen, as colors.danger for removing.
   ink?: string
+  // Liquid Glass on iOS 26. Off by default: a chip is the plain surface, filled when chosen.
+  glass?: boolean
   // Interactive glass springs under the finger. Off by default: in a row that scrolls
   // sideways the spring pulls the chip along with the scroll.
   interactive?: boolean
@@ -32,14 +34,31 @@ type Props = {
   disabled?: boolean
 }
 
-// A small Liquid Glass capsule to pick from a row of them; the chosen one is tinted
-// with the accent. Outside iOS 26 it is the plain surface, filled when chosen.
-export function Chip({ label, active, onPress, style, icon, ink, interactive = false, labeled, loading, slide, disabled }: Props) {
+// A small capsule to pick from a row of them: the plain surface, filled with the accent
+// when chosen; with `glass`, a Liquid Glass one tinted with the accent on iOS 26.
+export function Chip({ label, active, onPress, style, icon, ink, glass = false, interactive = false, labeled, loading, slide, disabled }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const sliding = useAtLeastOneLap(!!loading && !!slide)
   const busy = !!loading || sliding
+  const glassy = glass && liquidGlass
   const color = active ? ON_ACCENT : disabled && !busy ? colors.textFaint : (ink ?? colors.textMuted)
+  const body = (
+    <View style={styles.content}>
+      {loading && !sliding ? (
+        <ActivityIndicator size="small" color={color} />
+      ) : icon ? (
+        <SlidingIcon direction={slide} active={sliding}>
+          <SFIcon name={icon.symbol} fallback={icon.fallback} size={18} color={color} />
+        </SlidingIcon>
+      ) : null}
+      {!icon || labeled ? (
+        <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color }]} numberOfLines={1}>
+          {label}
+        </Text>
+      ) : null}
+    </View>
+  )
   return (
     <Pressable
       disabled={disabled || busy}
@@ -50,30 +69,16 @@ export function Chip({ label, active, onPress, style, icon, ink, interactive = f
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}
-      // The glass is not interactive (its press spring pulls the chip along with a sideways scroll), so on glass nothing moves.
-      style={({ pressed }) => [style, !liquidGlass && !isDesktop && pressed && { transform: [{ scale: 0.96 }] }, isDesktop && pressed && { opacity: 0.8 }]}
+      // Glass is not interactive by default (its press spring pulls the chip along with a sideways scroll), so on glass nothing moves.
+      style={({ pressed }) => [style, !glassy && !isDesktop && pressed && { transform: [{ scale: 0.96 }] }, isDesktop && pressed && { opacity: 0.8 }]}
     >
-      <GlassSurface
-        interactive={interactive}
-        tintColor={active ? colors.accent : undefined}
-        style={styles.chip}
-        fallbackStyle={active ? styles.solidActive : styles.solid}
-      >
-        <View style={styles.content}>
-          {loading && !sliding ? (
-            <ActivityIndicator size="small" color={color} />
-          ) : icon ? (
-            <SlidingIcon direction={slide} active={sliding}>
-              <SFIcon name={icon.symbol} fallback={icon.fallback} size={18} color={color} />
-            </SlidingIcon>
-          ) : null}
-          {!icon || labeled ? (
-            <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, { color }]} numberOfLines={1}>
-              {label}
-            </Text>
-          ) : null}
-        </View>
-      </GlassSurface>
+      {glassy ? (
+        <GlassSurface interactive={interactive} tintColor={active ? colors.accent : undefined} style={styles.chip}>
+          {body}
+        </GlassSurface>
+      ) : (
+        <View style={[styles.chip, active ? styles.solidActive : styles.solid]}>{body}</View>
+      )}
     </Pressable>
   )
 }

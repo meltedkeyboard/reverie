@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import type { BackgroundEffect } from '@/db/characters'
+import { backgroundToneOf, type BackgroundEffect, type BackgroundTone } from '@/db/characters'
 
 import {
   CHAT_MESSAGES,
@@ -264,6 +264,7 @@ export type ChatWallpaper = {
   effect: BackgroundEffect
   intensity: number
   bubbleTransparency: number
+  tone: BackgroundTone
 }
 
 export const DEFAULT_CHAT_WALLPAPER: ChatWallpaper = {
@@ -273,6 +274,7 @@ export const DEFAULT_CHAT_WALLPAPER: ChatWallpaper = {
   effect: 'blur',
   intensity: 0.5,
   bubbleTransparency: 0.3,
+  tone: 'auto',
 }
 
 const CHAT_WALLPAPER_KEYS = {
@@ -282,6 +284,7 @@ const CHAT_WALLPAPER_KEYS = {
   effect: 'chat_wallpaper_effect',
   intensity: 'chat_wallpaper_intensity',
   bubbleTransparency: 'chat_wallpaper_bubble_transparency',
+  tone: 'chat_wallpaper_tone',
 } as const
 
 export async function loadChatWallpaper(db: SQLiteDatabase): Promise<ChatWallpaper | null> {
@@ -304,7 +307,9 @@ export async function loadChatWallpaper(db: SQLiteDatabase): Promise<ChatWallpap
   const rawTrans = Number(map.get(CHAT_WALLPAPER_KEYS.bubbleTransparency))
   const bubbleTransparency = Number.isFinite(rawTrans) ? rawTrans : 0.3
 
-  return { file, original, crop, effect, intensity, bubbleTransparency }
+  const tone = backgroundToneOf(map.get(CHAT_WALLPAPER_KEYS.tone))
+
+  return { file, original, crop, effect, intensity, bubbleTransparency, tone }
 }
 
 export async function saveChatWallpaper(db: SQLiteDatabase, wallpaper: ChatWallpaper | null) {
@@ -322,6 +327,7 @@ export async function saveChatWallpaper(db: SQLiteDatabase, wallpaper: ChatWallp
   await setSetting(db, CHAT_WALLPAPER_KEYS.effect, wallpaper.effect)
   await setSetting(db, CHAT_WALLPAPER_KEYS.intensity, String(wallpaper.intensity))
   await setSetting(db, CHAT_WALLPAPER_KEYS.bubbleTransparency, String(wallpaper.bubbleTransparency))
+  await setSetting(db, CHAT_WALLPAPER_KEYS.tone, wallpaper.tone)
 }
 
 export async function loadChatTextScale(db: SQLiteDatabase) {

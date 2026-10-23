@@ -33,6 +33,7 @@ export type CharacterFields = {
   backgroundIntensity: number
   // 0 to 1: how see-through the user's message bubbles are over the picture.
   backgroundBubbleTransparency: number
+  backgroundTone: BackgroundTone
 }
 
 export type ThinkingMode = 'auto' | 'on' | 'off'
@@ -41,6 +42,13 @@ export type ThinkingMode = 'auto' | 'on' | 'off'
 // the light or the dark one whatever the theme. Stored as text, so older rows and
 // backups read as they were.
 export type BackgroundEffect = 'blur' | 'dim' | 'dim-light' | 'dim-dark'
+
+// The scheme a chat is shown in over its picture: 'auto' takes the one that reads best over
+// the picture as it is softened, measured from the picture itself; the others are the
+// user's own choice for when that misjudges it.
+export type BackgroundTone = 'auto' | 'light' | 'dark'
+
+export const backgroundToneOf = (value: unknown): BackgroundTone => (value === 'light' || value === 'dark' ? value : 'auto')
 
 export type Character = CharacterFields & { id: number; createdAt: number }
 
@@ -62,7 +70,7 @@ export const CHARACTER_COLUMNS = `
   thinking, background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
   background_effect AS backgroundEffect,
   background_intensity AS backgroundIntensity,
-  background_bubble_transparency AS backgroundBubbleTransparency, created_at AS createdAt
+  background_bubble_transparency AS backgroundBubbleTransparency, background_tone AS backgroundTone, created_at AS createdAt
 `
 
 export function listCharacters(db: SQLiteDatabase) {
@@ -128,7 +136,7 @@ export function getAvatarOriginal(db: SQLiteDatabase, avatar: string) {
 }
 
 const FIELD_COLUMNS =
-  'name, avatar, avatar_original, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget, notes'
+  'name, avatar, avatar_original, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget, notes, background_tone'
 
 function fieldValues(fields: CharacterFields) {
   return [
@@ -151,6 +159,7 @@ function fieldValues(fields: CharacterFields) {
     fields.backgroundBubbleTransparency,
     fields.reasoningBudget,
     fields.notes,
+    fields.backgroundTone,
   ]
 }
 
@@ -168,7 +177,7 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
     `UPDATE characters
      SET name = ?, avatar = ?, avatar_original = ?, avatar_crop = ?, system_prompt = ?, greeting = ?, temperature = ?, max_tokens = ?, top_p = ?, reply_limit = ?, thinking = ?,
          background = ?, background_original = ?, background_crop = ?, background_effect = ?, background_intensity = ?,
-         background_bubble_transparency = ?, reasoning_budget = ?, notes = ?
+         background_bubble_transparency = ?, reasoning_budget = ?, notes = ?, background_tone = ?
      WHERE id = ?`,
     [...fieldValues(fields), id]
   )
@@ -192,7 +201,7 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
       // The copy stays in the original's group.
       `INSERT INTO characters (${FIELD_COLUMNS}, created_at, group_id)
        SELECT ?, ?, ?, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking,
-         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget, notes, ?, group_id
+         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget, notes, background_tone, ?, group_id
        FROM characters WHERE id = ?`,
       [name, images.avatar, images.avatarOriginal, images.background, images.backgroundOriginal, Date.now(), id]
     )

@@ -1,4 +1,4 @@
-import type { BackgroundEffect } from '@/db/characters'
+import type { BackgroundEffect, BackgroundTone } from '@/db/characters'
 import type { CropRect } from '@/lib/images/avatars'
 
 // What the background screen edits, and where its result goes. It is passed around the
@@ -13,10 +13,12 @@ export type BackgroundDraft = {
   effect: BackgroundEffect
   intensity: number
   bubbleTransparency: number
+  tone: BackgroundTone
   onDone: (result: {
     effect: BackgroundEffect
     intensity: number
     bubbleTransparency: number
+    tone: BackgroundTone
     // The copy the chat shows, cut to the frame and shrunk, and the frame (null: all of it).
     uri: string
     crop: CropRect | null

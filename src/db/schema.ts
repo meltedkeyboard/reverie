@@ -275,6 +275,11 @@ const MIGRATIONS = [
   `
     ALTER TABLE messages ADD COLUMN refines TEXT;
   `,
+  // Whether a chat over its picture is shown light or dark: 'auto' measures the picture.
+  `
+    ALTER TABLE characters ADD COLUMN background_tone TEXT NOT NULL DEFAULT 'auto';
+    ALTER TABLE rooms ADD COLUMN background_tone TEXT NOT NULL DEFAULT 'auto';
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

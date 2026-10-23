@@ -20,6 +20,7 @@ import {
   getCharacter,
   saveCharacter,
   type BackgroundEffect,
+  type BackgroundTone,
   type ThinkingMode,
 } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
@@ -93,6 +94,7 @@ export default function CharacterEditorScreen() {
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>('blur')
   const [bgIntensity, setBgIntensity] = useState(0.5)
   const [bgBubbleTransparency, setBgBubbleTransparency] = useState(0.3)
+  const [bgTone, setBgTone] = useState<BackgroundTone>('auto')
   // The greeting before the generated one replaced it, until it is edited by hand.
   const [beforeGreeting, setBeforeGreeting] = useState<string | null>(null)
   // What the prompt was before the last AI result replaced it, until the user edits the
@@ -122,6 +124,7 @@ export default function CharacterEditorScreen() {
       setBgEffect(found.backgroundEffect)
       setBgIntensity(found.backgroundIntensity)
       setBgBubbleTransparency(found.backgroundBubbleTransparency)
+      setBgTone(found.backgroundTone)
       avatarSlot.remember({ file: found.avatar, original: found.avatarOriginal })
       bgSlot.remember({ file: found.background, original: found.backgroundOriginal })
       setReady(true)
@@ -196,12 +199,14 @@ export default function CharacterEditorScreen() {
       effect: bgEffect,
       intensity: bgIntensity,
       bubbleTransparency: bgBubbleTransparency,
+      tone: bgTone,
       onDone: (result) => {
         bgSlot.setFramed(result.uri, result.crop, original)
         if (original) setBackgroundOriginal(null)
         setBgEffect(result.effect)
         setBgIntensity(result.intensity)
         setBgBubbleTransparency(result.bubbleTransparency)
+        setBgTone(result.tone)
       },
     })
     router.push('/background')
@@ -255,6 +260,7 @@ export default function CharacterEditorScreen() {
         backgroundEffect: bgEffect,
         backgroundIntensity: bgIntensity,
         backgroundBubbleTransparency: bgBubbleTransparency,
+        backgroundTone: bgTone,
       })
       avatarSlot.settle(nextAvatarValue)
       setRemovedAvatar(null)

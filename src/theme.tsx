@@ -384,6 +384,18 @@ export function ThemeContextProvider({
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
+// What is inside takes the theme's light or dark palette whatever the app's own scheme, as a
+// chat does from its picture; null leaves it the app's. Only the app's own views follow:
+// alerts and the window keep the app's scheme, which Appearance holds for the whole app.
+export function SchemeOverride({ scheme, children }: { scheme: Scheme | null; children: React.ReactNode }) {
+  const outer = useThemeContext()
+  const value = useMemo(
+    () => (!scheme || scheme === outer.scheme ? outer : { ...outer, scheme, colors: palettes[outer.theme][scheme] }),
+    [outer, scheme]
+  )
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+}
+
 export function useColors() {
   return useThemeContext().colors
 }

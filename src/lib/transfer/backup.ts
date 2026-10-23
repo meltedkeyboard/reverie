@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { CHARACTER_COLUMNS, DEFAULT_SAMPLING, insertCharacter, type BackgroundEffect, type ThinkingMode } from '@/db/characters'
+import { backgroundToneOf, CHARACTER_COLUMNS, DEFAULT_SAMPLING, insertCharacter, type BackgroundEffect, type BackgroundTone, type ThinkingMode } from '@/db/characters'
 import { MESSAGE_COLUMNS } from '@/db/messages'
 import { DEFAULT_MEMBER, DEFAULT_ROOM, insertRoom, ROOM_COLUMNS, type FloorMode } from '@/db/rooms'
 import { loadSettings, saveSettings } from '@/db/prefs/settings'
@@ -46,6 +46,8 @@ type BackupCharacter = {
   backgroundEffect?: BackgroundEffect
   backgroundIntensity?: number
   backgroundBubbleTransparency?: number
+  // Backups from before the tone leave it out.
+  backgroundTone?: BackgroundTone
   createdAt: number
   // The group the character was in and its place there, top down. Backups from before
   // groups leave it out.
@@ -92,6 +94,7 @@ type BackupRoom = {
   backgroundEffect: BackgroundEffect
   backgroundIntensity: number
   backgroundBubbleTransparency: number
+  backgroundTone?: BackgroundTone
   createdAt: number
 }
 
@@ -470,6 +473,7 @@ export async function importBackup(
           backgroundEffect: character.backgroundEffect ?? 'blur',
           backgroundIntensity: character.backgroundIntensity ?? 0.5,
           backgroundBubbleTransparency: character.backgroundBubbleTransparency ?? 0.3,
+          backgroundTone: backgroundToneOf(character.backgroundTone),
         },
         character.createdAt
       )
@@ -500,6 +504,7 @@ export async function importBackup(
           background: await importImage(room.background, 'backgrounds'),
           backgroundOriginal: await importImage(room.backgroundOriginal, 'backgrounds'),
           backgroundCrop: room.backgroundCrop ?? null,
+          backgroundTone: backgroundToneOf(room.backgroundTone),
         },
         room.createdAt
       )

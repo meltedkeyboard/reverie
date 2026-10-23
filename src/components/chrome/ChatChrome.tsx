@@ -2,41 +2,75 @@ import { StyleSheet, View } from 'react-native'
 
 import { ChatBackground } from '@/components/chat/ChatBackground'
 import { Pattern } from '@/components/visuals/Pattern'
-import type { Character } from '@/db/characters'
+import type { BackgroundEffect, BackgroundTone, Character } from '@/db/characters'
+import type { ChatWallpaper } from '@/db/prefs/settings'
 import { avatarUri, cropFromJson } from '@/lib/images/avatars'
+import { schemeOver } from '@/lib/images/backgroundTone'
+import { usePictureColor } from '@/lib/images/pictureColor'
 import { useChatTextSettings } from '@/lib/chat/chatText'
-import { FILL, useColors, useTheme } from '@/theme'
+import { FILL, useColors, useTheme, type Scheme } from '@/theme'
 
 // What a character or a room says about the look of its chats.
-export type ChatLook = Pick<Character, 'background' | 'backgroundCrop' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency'>
+export type ChatLook = Pick<
+  Character,
+  'background' | 'backgroundCrop' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency' | 'backgroundTone'
+>
+
+type ChatPicture = { uri: string; crop: string | null; effect: BackgroundEffect; intensity: number; tone: BackgroundTone }
+
+// The picture behind a chat: the owner's own, else the custom wallpaper chosen in Settings;
+// null where a pattern is drawn.
+export function pictureOf(owner: ChatLook, wallpaper: ChatWallpaper | null | undefined, pattern: string): ChatPicture | null {
+  if (owner.background) {
+    return {
+      uri: avatarUri(owner.background, 'backgrounds') ?? '',
+      crop: owner.backgroundCrop,
+      effect: owner.backgroundEffect,
+      intensity: owner.backgroundIntensity,
+      tone: owner.backgroundTone,
+    }
+  }
+  if (pattern === 'custom' && wallpaper?.file) {
+    return {
+      uri: avatarUri(wallpaper.file, 'backgrounds') ?? '',
+      crop: wallpaper.crop,
+      effect: wallpaper.effect,
+      intensity: wallpaper.intensity,
+      tone: wallpaper.tone,
+    }
+  }
+  return null
+}
 
 // What is behind the messages: the owner's own picture, else the custom wallpaper or pattern chosen in Settings.
 // `anchor` is the pattern's, off in a sheet. `blurred` is ChatBackground's.
 export function ChatSurface({ owner, anchor, blurred }: { owner: ChatLook; anchor?: boolean; blurred?: boolean }) {
   const { pattern, wallpaper } = useChatTextSettings()
-  if (owner.background) {
+  const picture = pictureOf(owner, wallpaper, pattern)
+  if (picture) {
     return (
       <ChatBackground
-        uri={avatarUri(owner.background, 'backgrounds') ?? ''}
-        crop={cropFromJson(owner.backgroundCrop)}
-        effect={owner.backgroundEffect}
-        intensity={owner.backgroundIntensity}
-        blurred={blurred}
-      />
-    )
-  }
-  if (pattern === 'custom' && wallpaper?.file) {
-    return (
-      <ChatBackground
-        uri={avatarUri(wallpaper.file, 'backgrounds') ?? ''}
-        crop={cropFromJson(wallpaper.crop)}
-        effect={wallpaper.effect}
-        intensity={wallpaper.intensity}
+        uri={picture.uri}
+        crop={cropFromJson(picture.crop)}
+        effect={picture.effect}
+        intensity={picture.intensity}
         blurred={blurred}
       />
     )
   }
   return <Pattern id={pattern} anchor={anchor} />
+}
+
+// The scheme a chat is shown in over its picture (`schemeOver`), for a SchemeOverride around
+// it; null over a pattern, which is drawn in the theme's own colors. `blurred` is for the
+// picture as the drawer's list and the menus show it. Read where the app's own scheme is.
+export function useChatScheme(owner: ChatLook | null | undefined, blurred = false): Scheme | null {
+  const { theme, scheme } = useTheme()
+  const { pattern, wallpaper } = useChatTextSettings()
+  const picture = owner ? pictureOf(owner, wallpaper, pattern) : null
+  const color = usePictureColor(picture?.uri ?? null)
+  if (!picture) return null
+  return schemeOver({ ...picture, color: color ?? null, blurred }, theme, scheme)
 }
 
 // Whether the chat's background is carried onto what opens over the chat or slides out from
@@ -48,16 +82,14 @@ export function useChatBackdrop(owner: ChatLook | null | undefined) {
   return pattern === 'custom' ? Boolean(wallpaper?.file) : pattern !== 'none'
 }
 
-// How light the carried background is, for what is laid over it see-through: the scheme of
-// a picture's dim (dim-light, dim-dark, the theme's for the rest), else of the theme; null
-// when nothing is carried.
-export function useChatBackdropTone(owner: ChatLook | null | undefined): 'light' | 'dark' | null {
+// How light the carried background is, for what is laid over it: the scheme a blurred
+// picture reads best in (`useChatScheme`), the theme's over a pattern; null when nothing is
+// carried. What shows over it takes that scheme, through a SchemeOverride.
+export function useChatBackdropTone(owner: ChatLook | null | undefined): Scheme | null {
   const { scheme } = useTheme()
-  const { pattern, wallpaper } = useChatTextSettings()
   const shown = useChatBackdrop(owner)
-  if (!shown || !owner) return null
-  const effect = owner.background ? owner.backgroundEffect : pattern === 'custom' ? wallpaper?.effect : undefined
-  return effect === 'dim-light' ? 'light' : effect === 'dim-dark' ? 'dark' : scheme
+  const picture = useChatScheme(owner, true)
+  return shown ? (picture ?? scheme) : null
 }
 
 // The chat's background under a sheet or the drawer's list, on the chat's own color, which

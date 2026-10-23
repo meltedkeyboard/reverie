@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
-import { CHARACTER_COLUMNS, type BackgroundEffect, type Character } from '@/db/characters'
+import { CHARACTER_COLUMNS, type BackgroundEffect, type BackgroundTone, type Character } from '@/db/characters'
 import { CHAT_COLUMNS, PREVIEW, type Chat, type ChatPreview } from '@/db/chats'
 import { dropDraft } from '@/db/drafts'
 import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
@@ -30,6 +30,7 @@ export type RoomFields = {
   backgroundEffect: BackgroundEffect
   backgroundIntensity: number
   backgroundBubbleTransparency: number
+  backgroundTone: BackgroundTone
 }
 
 export type Room = RoomFields & { id: number; createdAt: number }
@@ -74,6 +75,7 @@ export const DEFAULT_ROOM: RoomFields = {
   backgroundEffect: 'blur',
   backgroundIntensity: 0.5,
   backgroundBubbleTransparency: 0.3,
+  backgroundTone: 'auto',
 }
 
 export const DEFAULT_MEMBER: Omit<MemberSettings, 'characterId'> = {
@@ -88,7 +90,7 @@ export const ROOM_COLUMNS = `
   id, name, scenario, opening, user_name AS userName, floor, max_chain AS maxChain, director,
   background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
   background_effect AS backgroundEffect, background_intensity AS backgroundIntensity,
-  background_bubble_transparency AS backgroundBubbleTransparency, created_at AS createdAt
+  background_bubble_transparency AS backgroundBubbleTransparency, background_tone AS backgroundTone, created_at AS createdAt
 `
 
 type RoomRow = Omit<Room, 'director'> & { director: number }
@@ -152,7 +154,7 @@ export async function listRoomMembers(db: SQLiteDatabase, roomId: number): Promi
 }
 
 const FIELD_COLUMNS =
-  'name, scenario, opening, user_name, floor, max_chain, director, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency'
+  'name, scenario, opening, user_name, floor, max_chain, director, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, background_tone'
 
 function fieldValues(fields: RoomFields) {
   return [
@@ -169,6 +171,7 @@ function fieldValues(fields: RoomFields) {
     fields.backgroundEffect,
     fields.backgroundIntensity,
     fields.backgroundBubbleTransparency,
+    fields.backgroundTone,
   ]
 }
 

@@ -9,15 +9,15 @@ import { Picture } from '@/components/visuals/Picture'
 import type { BackgroundEffect } from '@/db/characters'
 import type { CropRect } from '@/lib/images/avatars'
 import { placeCrop } from '@/lib/images/backgroundFrame'
+import { BLURRED_DIM, MAX_DIM } from '@/lib/images/backgroundTone'
 import { movingKind } from '@/lib/images/media'
 import { FILL, paletteOf, useTheme } from '@/theme'
 
-// How far each effect goes at full intensity.
+// How far a blur goes at full intensity. The dims are with the measure of how light a chat
+// reads over its picture (backgroundTone.ts); the one over a picture blurred whatever its
+// effect is fixed, so text reads over it at any intensity chosen for the chat, where a faint
+// dim would leave a bright picture too loud.
 const MAX_BLUR = 40
-const MAX_DIM = 0.9
-// The dim over a picture blurred whatever its effect: fixed, so text reads over it at any
-// intensity chosen for the chat, where a faint dim would leave a bright picture too loud.
-const BLURRED_DIM = 0.38
 // Pixels past each edge, so subpixel rounding on high-DPI screens never leaves a 1px gap.
 const BLEED = 2
 

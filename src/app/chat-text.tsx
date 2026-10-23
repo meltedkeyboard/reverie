@@ -7,6 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { ChatBackground } from '@/components/chat/ChatBackground'
 import { Pattern } from '@/components/visuals/Pattern'
+import { useChatScheme, type ChatLook } from '@/components/chrome/ChatChrome'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { ButtonCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
@@ -37,7 +38,7 @@ import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { installedFontFamilies } from '../../modules/reverie-fonts'
-import { type Colors, FILL, ON_ACCENT, paletteOf, THEMES, type ThemeMode, type ThemeName, useColors, useStyles, useTheme } from '@/theme'
+import { type Colors, FILL, ON_ACCENT, paletteOf, SchemeOverride, THEMES, type ThemeMode, type ThemeName, useColors, useStyles, useTheme } from '@/theme'
 
 const FIELD_HEIGHT = 48
 // A tile shows a whole 393 x 852 board, small.
@@ -83,6 +84,91 @@ function ThemePreviewTile({ theme, selected, font }: { theme: ThemeName; selecte
   )
 }
 
+// A chat with no picture of its own: what it shows is the wallpaper or the pattern.
+const NO_PICTURE: ChatLook = {
+  background: null,
+  backgroundCrop: null,
+  backgroundEffect: 'blur',
+  backgroundIntensity: 0.5,
+  backgroundBubbleTransparency: 0.3,
+  backgroundTone: 'auto',
+}
+
+// The preview card, a component of its own so that it reads the colors of the scheme set
+// around it.
+function ChatPreview() {
+  const colors = useColors()
+  const glass = useGlassStyles()
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  const { font, userFont, userMarkdown, pattern, wallpaper, scale } = useChatTextSettings()
+  const wallpaperUri = wallpaper?.file ? avatarUri(wallpaper.file, 'backgrounds') : null
+  const fontFamily = font
+  const scaled = (value: number) => value * scale
+
+  const bot = {
+    color: colors.text,
+    letterSpacing: 0.1,
+    fontFamily,
+    fontSize: scaled(CHAT_METRICS.bot.size),
+    lineHeight: scaled(CHAT_METRICS.bot.line),
+  }
+
+  const user = {
+    color: colors.text,
+    fontFamily: userFont ? fontFamily : undefined,
+    fontSize: scaled(CHAT_METRICS.user.size),
+    lineHeight: scaled(CHAT_METRICS.user.line),
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {pattern === 'custom' && wallpaperUri ? (
+          <ChatBackground
+            uri={wallpaperUri}
+            crop={cropFromJson(wallpaper?.crop ?? null)}
+            effect={wallpaper?.effect ?? 'blur'}
+            intensity={wallpaper?.intensity ?? 0.5}
+          />
+        ) : (
+          <Pattern id={pattern} />
+        )}
+      </View>
+      <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
+        <View
+          style={[
+            styles.bubble,
+            pattern === 'custom' && wallpaper?.file
+              ? { backgroundColor: withAlpha(colors.bubble, 1 - (wallpaper.bubbleTransparency ?? 0.3)) }
+              : null,
+          ]}
+        >
+          {userMarkdown ? (
+            <Markdown text={t('chatPreview.user')} style={user} selectable={false} />
+          ) : (
+            <Text style={user}>{t('chatPreview.user')}</Text>
+          )}
+        </View>
+        <Markdown text={t('chatPreview.reply')} style={bot} emStyle={styles.action} />
+      </ScrollView>
+      <View style={styles.composer}>
+        <GlassSurface interactive style={[glass.circle, styles.circle]} fallbackStyle={glass.solid}>
+          <Icon name="add" size={24} color={colors.text} />
+        </GlassSurface>
+        <GlassSurface interactive style={styles.field} fallbackStyle={glass.solid}>
+          <Text style={styles.placeholder} numberOfLines={1}>
+            {t('chat.messagePlaceholder')}
+          </Text>
+          <View style={styles.send}>
+            <Icon name="arrow-up" size={18} color={colors.textFaint} />
+          </View>
+        </GlassSurface>
+      </View>
+    </View>
+  )
+}
+
 export default function ChatTextScreen() {
   const router = useRouter()
   const db = useDatabase()
@@ -116,6 +202,7 @@ export default function ChatTextScreen() {
   } = useChatTextSettings()
 
   const wallpaperUri = wallpaper?.file ? avatarUri(wallpaper.file, 'backgrounds') : null
+  const previewScheme = useChatScheme(NO_PICTURE)
 
   const openBackground = (uri: string, crop: CropRect | null, original: string | null) => {
     setBackgroundDraft({
@@ -125,6 +212,7 @@ export default function ChatTextScreen() {
       effect: wallpaper?.effect ?? 'blur',
       intensity: wallpaper?.intensity ?? 0.5,
       bubbleTransparency: wallpaper?.bubbleTransparency ?? 0.3,
+      tone: wallpaper?.tone ?? 'auto',
       onDone: async (result) => {
         try {
           // A moving picture comes back as it went and is its own original; given only a
@@ -141,6 +229,7 @@ export default function ChatTextScreen() {
             effect: result.effect,
             intensity: result.intensity,
             bubbleTransparency: result.bubbleTransparency,
+            tone: result.tone,
           }
           setWallpaper(nextWallpaper)
           setPattern('custom')
@@ -186,8 +275,6 @@ export default function ChatTextScreen() {
     setScale(CHAT_TEXT_SCALE_RANGE.default)
   }
   const untouched = font === DEFAULT_CHAT_FONT && !userFont && scale === CHAT_TEXT_SCALE_RANGE.default
-  const fontFamily = font
-  const scaled = (value: number) => value * scale
   // The regular size is felt, not drawn: the thumb clicks as it reaches it.
   const atNormal = useRef(scale === CHAT_TEXT_SCALE_RANGE.default)
   const drag = (value: number) => {
@@ -213,21 +300,6 @@ export default function ChatTextScreen() {
       })),
     [families, font, setFont, t]
   )
-
-  const bot = {
-    color: colors.text,
-    letterSpacing: 0.1,
-    fontFamily,
-    fontSize: scaled(CHAT_METRICS.bot.size),
-    lineHeight: scaled(CHAT_METRICS.bot.line),
-  }
-
-  const user = {
-    color: colors.text,
-    fontFamily: userFont ? fontFamily : undefined,
-    fontSize: scaled(CHAT_METRICS.user.size),
-    lineHeight: scaled(CHAT_METRICS.user.line),
-  }
 
   return (
     <View style={styles.screen}>
@@ -261,51 +333,11 @@ export default function ChatTextScreen() {
           </View>
         </ListSection>
 
-        {/* A made-up exchange, so a change shows at once as it will look in a chat. */}
-        <View style={styles.card}>
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            {pattern === 'custom' && wallpaperUri ? (
-              <ChatBackground
-                uri={wallpaperUri}
-                crop={cropFromJson(wallpaper?.crop ?? null)}
-                effect={wallpaper?.effect ?? 'blur'}
-                intensity={wallpaper?.intensity ?? 0.5}
-              />
-            ) : (
-              <Pattern id={pattern} />
-            )}
-          </View>
-          <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
-            <View
-              style={[
-                styles.bubble,
-                pattern === 'custom' && wallpaper?.file
-                  ? { backgroundColor: withAlpha(colors.bubble, 1 - (wallpaper.bubbleTransparency ?? 0.3)) }
-                  : null,
-              ]}
-            >
-              {userMarkdown ? (
-                <Markdown text={t('chatPreview.user')} style={user} selectable={false} />
-              ) : (
-                <Text style={user}>{t('chatPreview.user')}</Text>
-              )}
-            </View>
-            <Markdown text={t('chatPreview.reply')} style={bot} emStyle={styles.action} />
-          </ScrollView>
-          <View style={styles.composer}>
-            <GlassSurface interactive style={[glass.circle, styles.circle]} fallbackStyle={glass.solid}>
-              <Icon name="add" size={24} color={colors.text} />
-            </GlassSurface>
-            <GlassSurface interactive style={styles.field} fallbackStyle={glass.solid}>
-              <Text style={styles.placeholder} numberOfLines={1}>
-                {t('chat.messagePlaceholder')}
-              </Text>
-              <View style={styles.send}>
-                <Icon name="arrow-up" size={18} color={colors.textFaint} />
-              </View>
-            </GlassSurface>
-          </View>
-        </View>
+        {/* A made-up exchange, so a change shows at once as it will look in a chat, in the
+            scheme the chat takes over the wallpaper. */}
+        <SchemeOverride scheme={previewScheme}>
+          <ChatPreview />
+        </SchemeOverride>
 
         <ListSection>
           <View style={styles.sizeRow}>

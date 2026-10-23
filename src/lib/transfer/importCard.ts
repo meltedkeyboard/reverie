@@ -136,6 +136,7 @@ export async function importCardFile(db: SQLiteDatabase, uri: string, pictureOnl
     backgroundEffect: 'blur',
     backgroundIntensity: 0.5,
     backgroundBubbleTransparency: 0.3,
+    backgroundTone: 'auto',
   })
   return fields.name
 }

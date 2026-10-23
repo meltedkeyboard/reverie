@@ -1,5 +1,6 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
-import { useRouter } from 'expo-router'
+import { useNavigation, useRouter } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
 import { useEffect, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -22,11 +23,15 @@ import { ChipGroup } from '@/components/controls/ChipGroup'
 import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, HeaderTitle } from '@/components/chrome/GlassHeader'
 import { ParamSlider } from '@/components/controls/ParamSlider'
-import type { BackgroundEffect } from '@/db/characters'
+import { Segmented } from '@/components/controls/Segmented'
+import type { BackgroundEffect, BackgroundTone } from '@/db/characters'
 import { useTranslation } from '@/i18n'
 import { frameBackground } from '@/lib/images/avatars'
-import { backgroundDraft } from '@/lib/images/backgroundDraft'
+import { backgroundDraft, type BackgroundDraft } from '@/lib/images/backgroundDraft'
+import { backgroundLook, lookSheetOpen } from '@/lib/images/backgroundLook'
+import { schemeOver } from '@/lib/images/backgroundTone'
 import { movingKind } from '@/lib/images/media'
+import { usePictureColor } from '@/lib/images/pictureColor'
 import {
   clamp,
   coverSize,
@@ -41,7 +46,8 @@ import {
 import { withAlpha } from '@/lib/core/color'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
-import { type Colors, FILL, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
+import { isIOS } from '@/lib/core/platform'
+import { type Colors, FILL, HEADER_ROW_HEIGHT, SchemeOverride, useColors, useStyles, useTheme, type Scheme } from '@/theme'
 
 const DOUBLE_TAP_ZOOM = 2
 const SPRING = { damping: 22, stiffness: 220, mass: 0.9 }
@@ -57,23 +63,62 @@ const bump = () => Haptics.selectionAsync()
 // The longer side of the preview, the size the chat background is stored at.
 const PREVIEW_SIDE = 1600
 
+// How the picture is softened, and the scheme the chat takes over it: held above the editor,
+// so the whole screen is shown in the scheme the chat will have.
+type Look = {
+  effect: BackgroundEffect
+  setEffect: (effect: BackgroundEffect) => void
+  intensity: number
+  setIntensity: (intensity: number) => void
+  tone: BackgroundTone
+  setTone: (tone: BackgroundTone) => void
+  scheme: Scheme
+}
+
 export default function BackgroundScreen() {
+  const { theme, scheme: own } = useTheme()
+  // Read once: the draft may be replaced under a screen still closing.
+  const [draft] = useState(backgroundDraft)
+  const [effect, setEffect] = useState<BackgroundEffect>(draft?.effect ?? 'blur')
+  const [intensity, setIntensity] = useState(draft?.intensity ?? 0.5)
+  const [tone, setTone] = useState<BackgroundTone>(draft?.tone ?? 'auto')
+  // Measured over the whole picture, not the frame being chosen: near enough to tell light
+  // from dark, and it does not change under the fingers.
+  const color = usePictureColor(draft?.uri ?? null)
+  const scheme = schemeOver({ color: color ?? null, effect, intensity, tone }, theme, own)
+  return (
+    <SchemeOverride scheme={scheme}>
+      <BackgroundEditor draft={draft} look={{ effect, setEffect, intensity, setIntensity, tone, setTone, scheme }} />
+    </SchemeOverride>
+  )
+}
+
+function BackgroundEditor({ draft, look }: { draft: BackgroundDraft | null; look: Look }) {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const glass = useGlassStyles()
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  // Read once: the draft may be replaced under a screen still closing.
-  const [draft] = useState(backgroundDraft)
+  const { effect, setEffect, intensity, setIntensity, tone, setTone } = look
   // A moving picture or a video is kept whole and drawn at its frame, so nothing is cut here.
   const [moving] = useState(() => (draft ? movingKind(draft.uri) : null))
-  const [effect, setEffect] = useState<BackgroundEffect>(draft?.effect ?? 'blur')
-  const [intensity, setIntensity] = useState(draft?.intensity ?? 0.5)
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [bubbleTransparency, setBubbleTransparency] = useState(draft?.bubbleTransparency ?? 0.3)
 
   const [saving, setSaving] = useState(false)
+
+  // On iOS the controls are the system sheet, /background-look, a route over this screen,
+  // opened once the screen has come in; it reads and sets the values through
+  // `backgroundLook`, and is closed with the screen.
+  const navigation = useNavigation()
+  useEffect(() => {
+    if (!isIOS || !draft) return
+    return navigation.addListener('transitionEnd' as never, (e: { data: { closing: boolean } }) => {
+      if (!e.data.closing && !lookSheetOpen()) router.push('/background-look')
+    })
+  }, [navigation, router, draft])
+  useEffect(() => () => backgroundLook.set(null), [])
 
   // The screen is the frame: the picture covers it, and is moved and zoomed under it.
   const [frame, setFrame] = useState({ width: 0, height: 0 })
@@ -92,7 +137,6 @@ export default function BackgroundScreen() {
   const hitBound = useSharedValue(false)
   const appear = useSharedValue(0)
   const grid = useSharedValue(0)
-  const hint = useSharedValue(1)
 
   useEffect(() => {
     // A video's size comes from the player of the preview itself, once it has loaded.
@@ -145,13 +189,12 @@ export default function BackgroundScreen() {
     cancelAnimation(y)
   }
 
-  // Shown while a finger is on the picture: the grid, and the hint goes for good.
+  // Shown while a finger is on the picture: the grid.
   const touchStart = () => {
     'worklet'
     if (active.value === 0) {
       hitBound.value = false
       grid.value = withTiming(1, FADE)
-      hint.value = withTiming(0, FADE)
     }
     active.value += 1
   }
@@ -271,7 +314,6 @@ export default function BackgroundScreen() {
     transform: [{ translateX: x.value }, { translateY: y.value }, { scale: k.value }],
   }))
   const gridStyle = useAnimatedStyle(() => ({ opacity: grid.value }))
-  const hintStyle = useAnimatedStyle(() => ({ opacity: hint.value }))
 
   // A turn of the phone gives the picture a new covering size: the zoom stays, and the
   // offsets are scaled with the picture and clamped, so roughly the same part stays in view.
@@ -290,7 +332,12 @@ export default function BackgroundScreen() {
     setFrame(next)
   }
 
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
+  // With the controls' sheet over the screen, both go together.
+  const close = () => {
+    if (lookSheetOpen()) router.dismiss(2)
+    else if (router.canGoBack()) router.back()
+    else router.replace('/')
+  }
 
   const done = async () => {
     if (saving) return
@@ -304,9 +351,9 @@ export default function BackgroundScreen() {
         const crop = natural ? cropFromTransform(natural, frame, { k: zoom, x: clamp(x.value, -limit.x, limit.x), y: clamp(y.value, -limit.y, limit.y) }) : null
         if (moving) {
           const framed = crop && natural ? { ...crop, sourceWidth: natural.width, sourceHeight: natural.height } : null
-          draft.onDone({ effect, intensity, bubbleTransparency, uri: draft.uri, crop: framed })
+          draft.onDone({ effect, intensity, bubbleTransparency, tone, uri: draft.uri, crop: framed })
         } else {
-          draft.onDone({ effect, intensity, bubbleTransparency, uri: await frameBackground(draft.uri, crop), crop })
+          draft.onDone({ effect, intensity, bubbleTransparency, tone, uri: await frameBackground(draft.uri, crop), crop })
         }
       }
       close()
@@ -315,11 +362,32 @@ export default function BackgroundScreen() {
     }
   }
 
+  // The sheet follows the values as they change.
+  useEffect(() => {
+    if (!isIOS) return
+    backgroundLook.set({
+      effect,
+      setEffect,
+      intensity,
+      setIntensity,
+      bubbleTransparency,
+      setBubbleTransparency,
+      tone,
+      setTone,
+      scheme: look.scheme,
+      saving,
+      save: done,
+      close,
+      framed,
+      reset,
+    })
+  })
+
   if (!draft) return <View style={styles.screen} />
 
   const landscape = width > height
   // What is left of the screen beside the side panel, where the chat's own things stand.
-  const chatRight = landscape ? insets.right + SIDE_PANEL : 0
+  const chatRight = landscape && !isIOS ? insets.right + SIDE_PANEL : 0
 
   // Dim opens a menu of the color it lays over the picture: the theme's, light or dark.
   const dimItems = (['dim', 'dim-light', 'dim-dark'] as const).map((value) => ({
@@ -332,9 +400,22 @@ export default function BackgroundScreen() {
     { value: 'dim' as const, label: t('background.effectDim'), menu: dimItems },
   ]
   const kind = effect === 'blur' ? 'blur' : 'dim'
+  const toneOptions = [
+    { value: 'auto' as const, label: t('background.toneAuto') },
+    { value: 'light' as const, label: t('background.toneLight') },
+    { value: 'dark' as const, label: t('background.toneDark') },
+  ]
+  // Whether the chat over the picture is light or dark: measured, or the user's own choice.
+  const toneBlock = (
+    <View style={styles.tone}>
+      <Text style={styles.toneLabel}>{t('background.tone')}</Text>
+      <Segmented options={toneOptions} value={tone} onChange={setTone} />
+    </View>
+  )
 
   return (
     <View style={styles.screen} onLayout={onLayout}>
+      <StatusBar style={look.scheme === 'light' ? 'dark' : 'light'} />
       {/* The gestures are on a still layer the size of the screen, so their points are in
           the screen's coordinates and not in those of the moving picture. */}
       <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
@@ -367,12 +448,6 @@ export default function BackgroundScreen() {
         </View>
       </GestureDetector>
 
-      <View style={[styles.empty, { left: insets.left, right: chatRight }]} pointerEvents="none">
-        <Text style={styles.emptyName}>{draft.characterName}</Text>
-        <Text style={styles.emptyHint}>{t('chat.emptyHint')}</Text>
-        <Animated.Text style={[styles.cropHint, hintStyle]}>{t('background.cropHint')}</Animated.Text>
-      </View>
-
       {/* A message of the user's, to judge how see-through its bubble is. */}
       <View style={[styles.sample, { right: chatRight + 16 }]} pointerEvents="none">
         <View style={[styles.bubble, { backgroundColor: withAlpha(colors.bubble, 1 - bubbleTransparency) }]}>
@@ -380,26 +455,21 @@ export default function BackgroundScreen() {
         </View>
       </View>
 
-      <GlassHeader
-        floating
-        fade={false}
-        left={<GlassButton icon="chevron-back" iconSize={26} onPress={close} />}
-        right={framed ? <GlassButton icon="refresh" iconSize={22} onPress={reset} accessibilityLabel={t('background.reset')} /> : null}
-      >
-        <HeaderTitle>{t('background.title')}</HeaderTitle>
-      </GlassHeader>
+      {/* On iOS the sheet's bar has the title, close and reset. */}
+      {isIOS ? null : (
+        <GlassHeader
+          floating
+          fade={false}
+          left={<GlassButton icon="chevron-back" iconSize={26} onPress={close} />}
+          right={framed ? <GlassButton icon="refresh" iconSize={22} onPress={reset} accessibilityLabel={t('background.reset')} /> : null}
+        >
+          <HeaderTitle>{t('background.title')}</HeaderTitle>
+        </GlassHeader>
+      )}
 
-      {landscape ? (
+      {/* On iOS the controls are the system sheet, /background-look. */}
+      {isIOS ? null : landscape ? (
         <>
-          <View
-            style={[styles.dock, { left: insets.left, right: chatRight, paddingBottom: insets.bottom + 8 }]}
-            pointerEvents="box-none"
-          >
-            {/* Stands in for the composer, so the picture is judged with the real bar on it. */}
-            <GlassSurface style={styles.fakeField} fallbackStyle={glass.solid}>
-              <Text style={styles.fakePlaceholder}>{t('chat.messagePlaceholder')}</Text>
-            </GlassSurface>
-          </View>
           <ScrollView
             style={[styles.sidePanel, { top: insets.top + HEADER_ROW_HEIGHT, right: insets.right }]}
             contentContainerStyle={[styles.sidePanelContent, { paddingBottom: insets.bottom + 8 }]}
@@ -410,6 +480,7 @@ export default function BackgroundScreen() {
             <View style={[styles.panel, !liquidGlass && glass.solid]}>
               <ChipGroup options={options} value={kind} onChange={setEffect} />
               <GlassSurface style={styles.slider}>
+                {toneBlock}
                 <ParamSlider
                   label={t('background.intensity')}
                   value={intensity}
@@ -435,16 +506,12 @@ export default function BackgroundScreen() {
         </>
       ) : (
         <View style={[styles.dock, { paddingBottom: insets.bottom + 8 }]} pointerEvents="box-none">
-          {/* Stands in for the composer, so the picture is judged with the real bar on it. */}
-          <GlassSurface style={styles.fakeField} fallbackStyle={glass.solid}>
-            <Text style={styles.fakePlaceholder}>{t('chat.messagePlaceholder')}</Text>
-          </GlassSurface>
-
           {/* With Liquid Glass each control is its own piece of glass, as glass on glass
               would muddy both; without it they share one solid panel. */}
           <View style={[styles.panel, !liquidGlass && glass.solid]}>
             <ChipGroup options={options} value={kind} onChange={setEffect} />
             <GlassSurface style={styles.slider}>
+              {toneBlock}
               <ParamSlider
                 label={t('background.intensity')}
                 value={intensity}
@@ -477,9 +544,6 @@ const createStyles = (colors: Colors) =>
     screen: { flex: 1, backgroundColor: colors.bg },
     picture: { position: 'absolute' },
     gridLine: { position: 'absolute', backgroundColor: withAlpha('#ffffff', 0.55) },
-    empty: { ...FILL, alignItems: 'center', justifyContent: 'center', gap: 6 },
-    emptyName: { color: colors.text, fontSize: 22, fontWeight: '600' },
-    emptyHint: { color: colors.textMuted, fontSize: 15 },
     dock: {
       position: 'absolute',
       left: 0,
@@ -493,11 +557,10 @@ const createStyles = (colors: Colors) =>
     sample: { position: 'absolute', top: '22%', right: 16, left: 56, alignItems: 'flex-end' },
     bubble: { borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10 },
     bubbleText: { color: colors.text, fontSize: 16, lineHeight: 22 },
-    cropHint: { color: colors.textFaint, fontSize: 13, marginTop: 14 },
-    fakeField: { borderRadius: 22, paddingVertical: 11, paddingHorizontal: 16 },
-    fakePlaceholder: { color: colors.textFaint, fontSize: 16 },
     sidePanel: { position: 'absolute', bottom: 0, width: SIDE_PANEL },
     sidePanelContent: { flexGrow: 1, justifyContent: 'flex-end', paddingHorizontal: 10 },
     panel: { borderRadius: 24, padding: 12, gap: 10 },
     slider: { borderRadius: 22, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
+    tone: { gap: 8, marginBottom: 14 },
+    toneLabel: { color: colors.textFaint, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   })
