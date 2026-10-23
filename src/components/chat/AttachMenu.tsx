@@ -27,7 +27,7 @@ import { liquidGlass } from '@/lib/ui/nativeUI'
 import { type Colors, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
 
 import { GlassButton } from '../chrome/Glass'
-import { BottomSheet, useSheetTones } from '../overlays/BottomSheet'
+import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { SFIcon } from '../visuals/SFIcon'
 
 // The latest pictures sent for the row at the top of the menu, null when it is switched off.
@@ -466,7 +466,9 @@ export function AttachSheet(props: AttachSheetProps) {
   const scheme = useChatBackdropTone(props.session?.look)
   return (
     <SchemeOverride scheme={scheme}>
-      <AttachSheetBody {...props} />
+      <SheetBackdropContext.Provider value={scheme !== null}>
+        <AttachSheetBody {...props} />
+      </SheetBackdropContext.Provider>
     </SchemeOverride>
   )
 }

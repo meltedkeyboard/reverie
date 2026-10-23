@@ -23,7 +23,7 @@ import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
-import { BottomSheet, useSheetTones } from '../overlays/BottomSheet'
+import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { Check } from '../controls/Check'
 import { StarToggle } from '../visuals/motifs/StarToggle'
 
@@ -65,7 +65,9 @@ export function CastSheet(props: Props) {
   const scheme = useChatBackdropTone(props.look)
   return (
     <SchemeOverride scheme={scheme}>
-      <CastSheetBody {...props} />
+      <SheetBackdropContext.Provider value={scheme !== null}>
+        <CastSheetBody {...props} />
+      </SheetBackdropContext.Provider>
     </SchemeOverride>
   )
 }

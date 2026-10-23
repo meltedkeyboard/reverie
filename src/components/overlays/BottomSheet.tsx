@@ -1,5 +1,5 @@
 import { Icon } from '@/components/visuals/Icon'
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, { LayoutAnimationConfig, ZoomIn, ZoomOut, interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { useTranslation } from '@/i18n'
+import { withAlpha } from '@/lib/core/color'
 import { isIOS } from '@/lib/core/platform'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { FILL, HEADER_FONT_SCALE, useStyles, useTheme, type Colors } from '@/theme'
@@ -47,16 +48,29 @@ const CLOSE = 44
 // Gap between the floating sheet and the screen edges.
 const INSET = 8
 
+// Whether the chat's background is drawn under the sheet (ChatBackdrop). Its cards then let
+// the background through, the way they let the glass through, so the menu does not sit on
+// flat slabs over it; a row is see-through on its card, which would show twice otherwise.
+// The sheet's own header keeps its solid buttons (`header`), which read as part of the
+// title rather than of the menu.
+export const SheetBackdropContext = createContext(false)
+
 // The sheet and the grouped cards inside it. On Liquid Glass the card is a faint layer
 // over the glass and a row is see-through until pressed; an opaque card would hide the
 // glass it sits on. Without it, the iOS way: in the dark the cards are lighter than the
 // sheet, in the light the sheet is gray and the cards white.
-export function useSheetTones(options?: { noGlass?: boolean }) {
+export function useSheetTones(options?: { noGlass?: boolean; header?: boolean }) {
   const { colors, scheme } = useTheme()
+  const backdrop = useContext(SheetBackdropContext) && !options?.header
   if (liquidGlass && !options?.noGlass) {
     return scheme === 'light'
       ? { sheet: 'transparent', card: 'rgba(255, 255, 255, 0.55)', row: 'transparent', pressed: 'rgba(0, 0, 0, 0.06)' }
       : { sheet: 'transparent', card: 'rgba(255, 255, 255, 0.07)', row: 'transparent', pressed: 'rgba(255, 255, 255, 0.08)' }
+  }
+  if (backdrop) {
+    return scheme === 'light'
+      ? { sheet: colors.bg, card: withAlpha(colors.surface, 0.55), row: 'transparent', pressed: withAlpha(colors.surfaceRaised, 0.6) }
+      : { sheet: colors.surface, card: withAlpha(colors.surfaceRaised, 0.5), row: 'transparent', pressed: withAlpha(colors.bubble, 0.6) }
   }
   return scheme === 'light'
     ? { sheet: colors.bg, card: colors.surface, row: colors.surface, pressed: colors.surfaceRaised }
@@ -83,7 +97,7 @@ export function BottomSheet({
   children,
 }: Props) {
   const styles = useStyles(createStyles)
-  const tones = useSheetTones({ noGlass })
+  const tones = useSheetTones({ noGlass, header: true })
   const isGlass = liquidGlass && !noGlass
   // Header buttons use glass either when the sheet itself is glass, or when explicitly requested.
   const isGlassButtons = liquidGlass && (!noGlass || glassButtons)
