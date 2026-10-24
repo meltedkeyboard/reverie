@@ -11,22 +11,20 @@ type IconsModule = {
 // on import without it, hence the module is reached directly.
 const native = requireOptionalNativeModule<IconsModule>('ExpoAlternateAppIcons')
 
-export const alternateIconsAvailable = native?.supportsAlternateIcons ?? false
+// A development build without the module (Expo Go, the web) still shows the picker, so its
+// look can be checked: the choice is only kept in memory there and the icon stays as it is.
+export const alternateIconsAvailable = native?.supportsAlternateIcons ?? __DEV__
+let previewChoice: string | null = null
 
 // The names are the ones given to the plugin in app.json, drawn in assets/brand/alt and
 // rendered by scripts/build-icons.mjs, previews included. The standard icon is not here:
 // it is the app's own, in a light and a dark look. An icon that is pale or dark all over
 // comes in both looks too, and so does its preview: { light, dark }.
 export const APP_ICONS = [
-  { name: 'VioletGradient', preview: require('../../../assets/images/alt/icon-02-violet-gradient-preview.png') },
-  { name: 'CoralSunrise', preview: require('../../../assets/images/alt/icon-03-coral-sunrise-preview.png') },
-  { name: 'PaperLight', preview: { light: require('../../../assets/images/alt/icon-04-paper-light-preview.png'), dark: require('../../../assets/images/alt/icon-04-paper-light-dark-preview.png') } },
-  { name: 'VioletSun', preview: require('../../../assets/images/alt/icon-05-violet-solid-sun-preview.png') },
-  { name: 'Outline', preview: { light: require('../../../assets/images/alt/icon-06-outline-light-preview.png'), dark: require('../../../assets/images/alt/icon-06-outline-preview.png') } },
-  { name: 'NeonGlow', preview: { light: require('../../../assets/images/alt/icon-07-neon-glow-light-preview.png'), dark: require('../../../assets/images/alt/icon-07-neon-glow-preview.png') } },
+  { name: 'CoralSunrise', preview: require('../../../assets/images/alt/icon-03-sunrise-preview.png') },
+  { name: 'PaperLight', preview: { light: require('../../../assets/images/alt/icon-04-paper-preview.png'), dark: require('../../../assets/images/alt/icon-04-paper-dark-preview.png') } },
+  { name: 'VioletSun', preview: require('../../../assets/images/alt/icon-05-violet-sun-preview.png') },
   { name: 'Metal', preview: require('../../../assets/images/alt/icon-08-metal-preview.png') },
-  { name: 'RetroSticker', preview: { light: require('../../../assets/images/alt/icon-09-retro-sticker-preview.png'), dark: require('../../../assets/images/alt/icon-09-retro-sticker-dark-preview.png') } },
-  { name: 'ToneOnTone', preview: require('../../../assets/images/alt/icon-10-tone-on-tone-preview.png') },
 ] as const
 
 // The picture of an icon as the Home Screen shows it in the given look.
@@ -41,10 +39,14 @@ export const DEFAULT_ICON_PREVIEW = {
 
 // null is the standard icon.
 export function currentAppIcon() {
-  return native?.getAppIconName() ?? null
+  return native ? native.getAppIconName() : previewChoice
 }
 
 export function setAppIcon(name: string | null) {
-  if (!native) throw new Error('Alternate icons are not available in this build')
+  if (!native) {
+    if (!__DEV__) throw new Error('Alternate icons are not available in this build')
+    previewChoice = name
+    return Promise.resolve(name)
+  }
   return native.setAlternateAppIcon(name)
 }

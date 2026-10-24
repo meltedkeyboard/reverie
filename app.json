@@ -94,49 +94,24 @@
         "expo-alternate-app-icons",
         [
           {
-            "name": "VioletGradient",
-            "ios": "./assets/images/alt/icon-02-violet-gradient.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-02-violet-gradient-foreground.png", "backgroundColor": "#594ABA" }
-          },
-          {
             "name": "CoralSunrise",
-            "ios": "./assets/images/alt/icon-03-coral-sunrise.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-03-coral-sunrise-foreground.png", "backgroundColor": "#FA7A43" }
+            "ios": "./assets/images/alt/icon-03-sunrise.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-03-sunrise-foreground.png", "backgroundColor": "#FA6E4F" }
           },
           {
             "name": "PaperLight",
-            "ios": { "light": "./assets/images/alt/icon-04-paper-light.png", "dark": "./assets/images/alt/icon-04-paper-light-dark.png", "tinted": "./assets/images/alt/icon-04-paper-light-tinted.png" },
-            "android": { "foregroundImage": "./assets/images/alt/icon-04-paper-light-foreground.png", "backgroundColor": "#F5F1EA" }
+            "ios": { "light": "./assets/images/alt/icon-04-paper.png", "dark": "./assets/images/alt/icon-04-paper-dark.png", "tinted": "./assets/images/alt/icon-04-paper-tinted.png" },
+            "android": { "foregroundImage": "./assets/images/alt/icon-04-paper-foreground.png", "backgroundColor": "#F5F1EA" }
           },
           {
             "name": "VioletSun",
-            "ios": "./assets/images/alt/icon-05-violet-solid-sun.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-05-violet-solid-sun-foreground.png", "backgroundColor": "#5F55E0" }
-          },
-          {
-            "name": "Outline",
-            "ios": { "light": "./assets/images/alt/icon-06-outline-light.png", "dark": "./assets/images/alt/icon-06-outline.png", "tinted": "./assets/images/alt/icon-06-outline-tinted.png" },
-            "android": { "foregroundImage": "./assets/images/alt/icon-06-outline-foreground.png", "backgroundColor": "#0B0D17" }
-          },
-          {
-            "name": "NeonGlow",
-            "ios": { "light": "./assets/images/alt/icon-07-neon-glow-light.png", "dark": "./assets/images/alt/icon-07-neon-glow.png", "tinted": "./assets/images/alt/icon-07-neon-glow-tinted.png" },
-            "android": { "foregroundImage": "./assets/images/alt/icon-07-neon-glow-foreground.png", "backgroundColor": "#0D0A1F" }
+            "ios": "./assets/images/alt/icon-05-violet-sun.png",
+            "android": { "foregroundImage": "./assets/images/alt/icon-05-violet-sun-foreground.png", "backgroundColor": "#5F55E0" }
           },
           {
             "name": "Metal",
             "ios": "./assets/images/alt/icon-08-metal.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-08-metal-foreground.png", "backgroundColor": "#840F41" }
-          },
-          {
-            "name": "RetroSticker",
-            "ios": { "light": "./assets/images/alt/icon-09-retro-sticker.png", "dark": "./assets/images/alt/icon-09-retro-sticker-dark.png", "tinted": "./assets/images/alt/icon-09-retro-sticker-tinted.png" },
-            "android": { "foregroundImage": "./assets/images/alt/icon-09-retro-sticker-foreground.png", "backgroundColor": "#FFF1D6" }
-          },
-          {
-            "name": "ToneOnTone",
-            "ios": "./assets/images/alt/icon-10-tone-on-tone.png",
-            "android": { "foregroundImage": "./assets/images/alt/icon-10-tone-on-tone-foreground.png", "backgroundColor": "#5F55E0" }
+            "android": { "foregroundImage": "./assets/images/alt/icon-08-metal-foreground.png", "backgroundColor": "#138CF8" }
           }
         ]
       ]

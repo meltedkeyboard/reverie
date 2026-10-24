@@ -50,78 +50,70 @@ png(dark, 'assets/images/splash-icon-dark.png', 512)
 const wordmark = readFileSync(`${BRAND}/wordmark.svg`, 'utf8')
 png(wordmark, 'assets/images/wordmark.png', 552)
 
-// Alternate app icons, drawn in Penpot and kept in assets/brand/alt, each with a 'bg' and a
-// 'glyph' group (the letter and the spark). iOS takes the whole picture. A launcher cuts an
-// Android adaptive icon with its mask, so there the background is stretched past the edges
-// and the glyph shrunk into the middle, as with the main icon. Where the glyph sits in the
-// 1024 art (its box's center) is the same in all of them but the cropped one.
+// Alternate app icons, drawn in Penpot and exported into assets/brand/alt. Each SVG marks its
+// parts with comments: bg, the glyph (the letter and the spark) and top, what lies over the
+// glyph, such as Paper's creases. iOS takes the whole picture. A launcher cuts an Android
+// adaptive icon with its mask, so there the background and what lies on top are stretched
+// past the edges and the glyph shrunk into the middle, as with the main icon. Where the glyph
+// sits in the 1024 art (its box's center) is the same in all of them.
 const GLYPH = { x: 412, y: 445, scale: 0.62 }
-const GLYPH_OF = { 'icon-10-tone-on-tone': { x: 532, y: 617, scale: 0.47 } }
 
-function adaptive(svg, glyph) {
-  const [left, top] = svg.match(/viewBox='(\S+) (\S+) /).slice(1).map(Number)
-  const defs = svg.match(/<defs>[\s\S]*?<\/defs>/)[0]
-  const bg = svg.match(/<g id='bg'>([\s\S]*?)<\/g>/)[1]
-  const art = svg.match(/<g id='glyph'>([\s\S]*?)<\/g>/)[1]
-  const cx = left + 512
-  const cy = top + 512
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="${left} ${top} 1024 1024" fill="none">${defs}
-<g transform="translate(${cx} ${cy}) scale(1.8) translate(${-cx} ${-cy})">${bg}</g>
-<g transform="translate(${cx} ${cy}) scale(${glyph.scale}) translate(${-(left + glyph.x)} ${-(top + glyph.y)})">${art}</g></svg>`
+function part(svg, name) {
+  return svg.match(new RegExp(`<!--${name}-->([\\s\\S]*?)<!--/${name}-->`))[1]
 }
 
-// The icons that are pale or dark all over get a version for the other look of the Home
-// Screen, and a tinted one, since iOS 18 takes the three together or none: what is drawn in
-// assets/brand/alt is one look, the other is recolored here, like the main icon's tinted one.
-// A tinted icon is shapes on black that iOS colors by their luminance, so the glyph is white
-// with the spark grey, without the glows and shadows.
+function canvas(svg) {
+  const [left, top] = svg.match(/viewBox="(\S+) (\S+) /).slice(1).map(Number)
+  const open = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="${left} ${top} 1024 1024" fill="none">`
+  return { left, top, open }
+}
+
+function adaptive(svg) {
+  const { left, top, open } = canvas(svg)
+  const cx = left + 512
+  const cy = top + 512
+  return `${open}
+<g transform="translate(${cx} ${cy}) scale(1.8) translate(${-cx} ${-cy})">${part(svg, 'bg')}${part(svg, 'top')}</g>
+<g transform="translate(${cx} ${cy}) scale(${GLYPH.scale}) translate(${-(left + GLYPH.x)} ${-(top + GLYPH.y)})">${part(svg, 'glyph')}</g></svg>`
+}
+
+// An icon drawn in both looks of the Home Screen, its other look in <slug>-<look>.svg, also
+// gets a tinted one, since iOS 18 takes the three together or none. A tinted icon is shapes on
+// black that iOS colors by their luminance: the glyph alone, the letter white and the spark
+// grey, without the shadows.
 const VARIANTS = {
-  'icon-04-paper-light': {
-    other: 'dark',
-    colors: [['#f5f1ea', '#1b1916'], ['#14121f', '#f5f1ea']],
-    tinted: [['#f5f1ea', '#000000'], ['#14121f', '#ffffff'], ['#f0616d', '#8e8e93']],
-  },
-  'icon-09-retro-sticker': {
-    other: 'dark',
-    // The ink outlines and the sticker's hard shadow turn cream, to stay visible on the dark.
-    colors: [['#fff1d6', '#1d1912'], ['#0b0d17', '#fff1d6'], ['0 0 0 0 0.04 0 0 0 0 0.05 0 0 0 0 0.09', '0 0 0 0 1 0 0 0 0 0.945 0 0 0 0 0.84']],
-    tinted: [['#fff1d6', '#000000'], ['#5F55E0', '#ffffff'], ['#ffd166', '#8e8e93'], ['#0b0d17', '#000000']],
-  },
-  'icon-06-outline': {
-    other: 'light',
-    colors: [['#0b0d17', '#f5f5f7'], ['#8675F0', '#4C42C8']],
-    tinted: [['#0b0d17', '#000000'], ['#8675F0', '#ffffff'], ['#f0616d', '#8e8e93']],
-  },
-  'icon-07-neon-glow': {
-    other: 'light',
-    // A pale lavender glow, the letter and the spark deep enough to read on it; the halos softer.
-    colors: [['#130F33', '#ffffff'], ['#05040c', '#E1DFFB'], ['#B0A8FA', '#4C42C8'], ['#ff5c8a', '#f0336d'], [' 0 0 0 0.95 0', ' 0 0 0 0.45 0']],
-    tinted: [['#130F33', '#000000'], ['#05040c', '#000000'], ['#B0A8FA', '#ffffff'], ['#ff5c8a', '#8e8e93']],
-  },
+  'icon-04-paper': { other: 'dark', tinted: [['fill:#14121f', 'fill:#ffffff'], ['fill:#f0616d', 'fill:#8e8e93']] },
 }
 
 function recolor(svg, pairs) {
   return pairs.reduce((out, [from, to]) => out.split(from).join(to), svg)
 }
 
-const withoutEffects = (svg) => svg.replace(/ filter='url\(#i\d+\)'/g, '')
+function tintedLook(svg, pairs) {
+  const { left, top, open } = canvas(svg)
+  const glyph = recolor(part(svg, 'glyph'), pairs).replace(/ filter="url\(#[^)]*\)"/g, '')
+  return `${open}<rect x="${left}" y="${top}" width="1024" height="1024" fill="#000000"/>${glyph}</svg>`
+}
+
+// The other looks are drawn files of their own, not icons to list.
+const looks = new Set(Object.entries(VARIANTS).map(([slug, v]) => `${slug}-${v.other}.svg`))
 
 // The previews are what the picker in Settings shows.
 mkdirSync('assets/images/alt', { recursive: true })
 png(light, 'assets/images/alt/default-light-preview.png', 256)
 png(dark, 'assets/images/alt/default-dark-preview.png', 256)
-for (const file of readdirSync(`${BRAND}/alt`).filter((f) => f.endsWith('.svg')).sort()) {
+for (const file of readdirSync(`${BRAND}/alt`).filter((f) => f.endsWith('.svg') && !looks.has(f)).sort()) {
   const slug = file.replace(/\.svg$/, '')
   const svg = readFileSync(`${BRAND}/alt/${file}`, 'utf8')
   png(svg, `assets/images/alt/${slug}.png`)
   png(svg, `assets/images/alt/${slug}-preview.png`, 256)
-  png(adaptive(svg, GLYPH_OF[slug] ?? GLYPH), `assets/images/alt/${slug}-foreground.png`)
+  png(adaptive(svg), `assets/images/alt/${slug}-foreground.png`)
   const variant = VARIANTS[slug]
   if (variant) {
-    const other = recolor(svg, variant.colors)
+    const other = readFileSync(`${BRAND}/alt/${slug}-${variant.other}.svg`, 'utf8')
     png(other, `assets/images/alt/${slug}-${variant.other}.png`)
     png(other, `assets/images/alt/${slug}-${variant.other}-preview.png`, 256)
-    png(withoutEffects(recolor(svg, variant.tinted)), `assets/images/alt/${slug}-tinted.png`)
+    png(tintedLook(svg, variant.tinted), `assets/images/alt/${slug}-tinted.png`)
   }
 }
 
