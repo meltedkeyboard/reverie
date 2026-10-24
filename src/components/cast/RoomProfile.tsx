@@ -10,7 +10,8 @@ import { ListSection } from '../lists/GroupedList'
 import type { MenuItem } from '../overlays/NativeMenu'
 import { Avatar } from '../visuals/Avatar'
 import { Icon } from '../visuals/Icon'
-import { ProfileActions, ProfileBackground, ProfileParams, ProfileText } from './CharacterProfile'
+import { NativeHostedRow, NativeSection } from '../lists/NativeForm'
+import { ProfileActions, ProfileBackground, ProfileParams, ProfileText, SystemListBlock, SystemProfileRest } from './CharacterProfile'
 
 type Member = MemberSettings & { character: Character }
 
@@ -20,6 +21,12 @@ type Props = {
   background: React.ComponentProps<typeof ProfileBackground>['background']
   // The rows of the export group at the bottom; without them there is none.
   exportItems?: MenuItem[]
+  // On iOS 18 and later with SwiftUI: the settings, background and export as the system's own
+  // list, the cards above drawn to match it (see NativeProfileList), "more" and "show less" in
+  // `ink`, and `systemStyle` taking the list out to the edges of the screen.
+  system?: boolean
+  ink?: string
+  systemStyle?: React.ComponentProps<typeof SystemProfileRest>['style']
 }
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
@@ -35,48 +42,74 @@ export function memberSummary(member: MemberSettings, t: typeof translate) {
 // A room to look at rather than to edit, as a character's profile is: who is in it, the
 // scene they share, how the talk goes and the background, in the grouped look of the
 // editor. A member opens their own profile. Empty parts are left out.
-export function RoomProfile({ fields, members, background, exportItems }: Props) {
+export function RoomProfile({ fields, members, background, exportItems, system = false, ink, systemStyle }: Props) {
   const router = useRouter()
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const onOff = (on: boolean) => (on ? t('editor.thinkingOn') : t('editor.thinkingOff'))
+  // A member's row, which opens their profile. In the system's list it does not light up under
+  // the touch, as in the room's editor.
+  const memberRow = (member: Member, index: number) => (
+    <Pressable
+      key={member.characterId}
+      onPress={() => router.push(`/character/${member.characterId}?profile=1`)}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.member, pressed && !system && styles.pressed]}
+    >
+      <Avatar name={member.character.name} file={member.character.avatar} size={36} />
+      <View style={styles.memberBody}>
+        <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
+          {member.character.name}
+        </Text>
+        <Text style={styles.memberMeta} numberOfLines={1}>
+          {memberSummary(member, t)}
+        </Text>
+      </View>
+      <Icon name="chevron-forward" size={14} color={colors.textFaint} />
+    </Pressable>
+  )
+  const params = [
+    { label: t('room.floorTitle'), value: t(`room.floor.${fields.floor}`) },
+    { label: t('roomEditor.maxChain'), value: String(fields.maxChain) },
+    { label: t('roomEditor.director'), value: onOff(fields.director) },
+    ...(fields.userName.trim() ? [{ label: t('roomEditor.userName'), value: fields.userName.trim() }] : []),
+  ]
   return (
     <View>
-      <ListSection header={t('roomEditor.membersSection')} footer={members.length ? undefined : t('roomEditor.noMembers')}>
-        {members.map((member, index) => (
-          <Pressable
-            key={member.characterId}
-            onPress={() => router.push(`/character/${member.characterId}?profile=1`)}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.member, pressed && styles.pressed]}
-          >
-            <Avatar name={member.character.name} file={member.character.avatar} size={36} />
-            <View style={styles.memberBody}>
-              <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
-                {member.character.name}
-              </Text>
-              <Text style={styles.memberMeta} numberOfLines={1}>
-                {memberSummary(member, t)}
-              </Text>
-            </View>
-            <Icon name="chevron-forward" size={14} color={colors.textFaint} />
-          </Pressable>
-        ))}
-      </ListSection>
-      <ProfileText header={t('roomEditor.scenario')} text={fields.scenario} lines={6} />
-      <ProfileText header={t('roomEditor.opening')} text={fields.opening} lines={4} />
-      <ProfileParams
-        header={t('roomProfile.settings')}
-        params={[
-          { label: t('room.floorTitle'), value: t(`room.floor.${fields.floor}`) },
-          { label: t('roomEditor.maxChain'), value: String(fields.maxChain) },
-          { label: t('roomEditor.director'), value: onOff(fields.director) },
-          ...(fields.userName.trim() ? [{ label: t('roomEditor.userName'), value: fields.userName.trim() }] : []),
-        ]}
-      />
-      <ProfileBackground background={background} />
-      {exportItems ? <ProfileActions header={t('rooms.export')} items={exportItems} /> : null}
+      {system ? (
+        // The members' rows stay the profile's own, in rows of the system's list: a name keeps
+        // its color, which a button of the list would paint over.
+        <SystemListBlock style={systemStyle}>
+          <NativeSection title={t('roomEditor.membersSection')} footer={members.length ? undefined : t('roomEditor.noMembers')}>
+            {members.map((member, index) => (
+              <NativeHostedRow key={member.characterId}>{memberRow(member, index)}</NativeHostedRow>
+            ))}
+          </NativeSection>
+        </SystemListBlock>
+      ) : (
+        <ListSection header={t('roomEditor.membersSection')} footer={members.length ? undefined : t('roomEditor.noMembers')}>
+          {members.map((member, index) => memberRow(member, index))}
+        </ListSection>
+      )}
+      <ProfileText header={t('roomEditor.scenario')} text={fields.scenario} lines={6} system={system} ink={ink} />
+      <ProfileText header={t('roomEditor.opening')} text={fields.opening} lines={4} system={system} ink={ink} />
+      {system ? (
+        <SystemProfileRest
+          paramsHeader={t('roomProfile.settings')}
+          params={params}
+          background={background}
+          exportHeader={t('rooms.export')}
+          exportItems={exportItems}
+          style={systemStyle}
+        />
+      ) : (
+        <>
+          <ProfileParams header={t('roomProfile.settings')} params={params} />
+          <ProfileBackground background={background} />
+          {exportItems ? <ProfileActions header={t('rooms.export')} items={exportItems} /> : null}
+        </>
+      )}
     </View>
   )
 }

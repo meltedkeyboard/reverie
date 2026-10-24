@@ -52,6 +52,53 @@ export function CharacterProfile({ greeting, systemPrompt, notes, params, backgr
 // `linkColor`, the color of the glow, tints "more" and "show less".
 export function NativeProfileList({ style, linkColor, ...profile }: Props & { style?: StyleProp<ViewStyle>; linkColor?: string }) {
   const { t } = useTranslation()
+  return (
+    <View>
+      <ProfileText header={t('editor.systemPromptLabel')} text={profile.systemPrompt} lines={6} system ink={linkColor} />
+      <ProfileText header={t('editor.greetingLabel')} text={profile.greeting} lines={4} system ink={linkColor} />
+      <ProfileText header={t('editor.notesLabel')} text={profile.notes} lines={4} system ink={linkColor} />
+      <SystemProfileRest
+        paramsHeader={t('editor.genParamsSection')}
+        params={profile.params}
+        background={profile.background}
+        exportHeader={t('card.export')}
+        exportItems={profile.exportItems}
+        style={style}
+      />
+    </View>
+  )
+}
+
+// The end of a profile, a character's or a room's, as the system's own list under the
+// profile's cards: its settings, its background and the ways to export it. The list does not
+// scroll itself but is as tall as what it holds; `style` takes it out to the edges of the
+// screen, since it keeps its own margins.
+export function SystemProfileRest({
+  paramsHeader,
+  params,
+  background,
+  exportHeader,
+  exportItems,
+  style,
+}: {
+  paramsHeader: string
+  params: Props['params']
+  background: Props['background']
+  exportHeader: string
+  exportItems?: MenuItem[]
+  style?: StyleProp<ViewStyle>
+}) {
+  return (
+    <SystemListBlock style={style}>
+      <SystemProfileSections paramsHeader={paramsHeader} params={params} background={background} exportHeader={exportHeader} exportItems={exportItems} />
+    </SystemListBlock>
+  )
+}
+
+// A piece of the system's own list laid into a page's scroll view: it does not scroll itself
+// but is as tall as the sections it holds. `style` takes it out to the edges of the screen,
+// since it keeps its own margins.
+export function SystemListBlock({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
   const styles = useStyles(createStyles)
   const { height: screenHeight } = useWindowDimensions()
   // As tall as the screen at first, so that the list lays out its rows rather than guessing
@@ -63,30 +110,31 @@ export function NativeProfileList({ style, linkColor, ...profile }: Props & { st
     if (next > 0) setHeight((was) => (Math.abs(was - next) > 1 ? next : was))
   })
   return (
-    <View>
-      <ProfileText header={t('editor.systemPromptLabel')} text={profile.systemPrompt} lines={6} system ink={linkColor} />
-      <ProfileText header={t('editor.greetingLabel')} text={profile.greeting} lines={4} system ink={linkColor} />
-      <ProfileText header={t('editor.notesLabel')} text={profile.notes} lines={4} system ink={linkColor} />
-      <View style={[styles.systemList, { height }, style]}>
-        {/* Under the status bar as the page scrolls, the list would take in the safe area and
-            move its rows down by as much. */}
-        <NativeForm clear modifiers={[scrollDisabled(true), ignoreSafeArea(), ...(measure ? [measure] : [])]}>
-          <NativeProfileRest {...profile} />
-        </NativeForm>
-      </View>
+    <View style={[styles.systemList, { height }, style]}>
+      {/* Under the status bar as the page scrolls, the list would take in the safe area and
+          move its rows down by as much. */}
+      <NativeForm clear modifiers={[scrollDisabled(true), ignoreSafeArea(), ...(measure ? [measure] : [])]}>
+        {children}
+      </NativeForm>
     </View>
   )
 }
 
-// The profile's sections under its texts in the system's list: the settings are the system's,
-// the background's thumbnail a React Native view in a row of its own.
-function NativeProfileRest({ params, background, exportItems }: Props) {
+// The settings are the system's rows, the background's thumbnail a React Native view in a row
+// of its own.
+function SystemProfileSections({
+  paramsHeader,
+  params,
+  background,
+  exportHeader,
+  exportItems,
+}: Omit<React.ComponentProps<typeof SystemProfileRest>, 'style'>) {
   const { t } = useTranslation()
   const { LabeledContent, Text } = nativeForm!.ui
   return (
     <>
       {params.length ? (
-        <NativeSection title={t('editor.genParamsSection')}>
+        <NativeSection title={paramsHeader}>
           {params.map((param) => (
             <LabeledContent key={param.label} label={param.label}>
               <Text>{param.value}</Text>
@@ -102,7 +150,7 @@ function NativeProfileRest({ params, background, exportItems }: Props) {
         </NativeSection>
       ) : null}
       {exportItems ? (
-        <NativeSection title={t('card.export')}>
+        <NativeSection title={exportHeader}>
           {exportItems.map((item) => (
             <NativeActionRow key={item.label} label={item.label} onPress={() => item.onSelect?.()} />
           ))}

@@ -1,7 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Fragment, useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 
@@ -44,6 +44,10 @@ import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles, useTheme } from '
 type Member = MemberSettings & { character: Character }
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
+
+// The profile's settings, background and export are the system's own list where the list can
+// tell how tall it is (iOS 18).
+const systemProfile = nativeForm !== null && Number.parseInt(String(Platform.Version), 10) >= 18
 
 export default function RoomEditorScreen() {
   const { id, profile } = useLocalSearchParams<{ id: string; profile?: string }>()
@@ -598,6 +602,10 @@ export default function RoomEditorScreen() {
                   onSelect: () => exportFile({ id: Number(id), name: title, background: fields.background, backgroundOriginal: fields.backgroundOriginal }),
                 },
               ]}
+              system={systemProfile}
+              ink={glowColor ? `#${glowColor.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}` : undefined}
+              // The system's list keeps margins of its own, so it is taken out to the edges.
+              systemStyle={{ marginLeft: -sideLeft, marginRight: -sideRight }}
             />
           )}
         </KeyboardAwareScrollView>
