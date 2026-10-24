@@ -58,8 +58,14 @@ public class ReverieDragModule: Module {
       Prop("dragEnabled") { (view: DragCardView, enabled: Bool) in
         // Flags only: taking the menu interaction off every card and putting it back stalled
         // the switch into and out of edit mode.
-        view.drag.isEnabled = enabled
-        view.menuEnabled = enabled
+        view.enabled = enabled
+        view.applyEnabled()
+      }
+      // A card that only has the menu, never lifted into a drag: a room's, which carries no
+      // character to drop anywhere.
+      Prop("draggable") { (view: DragCardView, draggable: Bool) in
+        view.draggable = draggable
+        view.applyEnabled()
       }
       // What the card carries when dragged: one character, or every member of a group.
       Prop("items") { (view: DragCardView, items: [[String: Any]]) in
@@ -139,6 +145,9 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
   lazy var drag = UIDragInteraction(delegate: self)
   var contextMenu: UIContextMenuInteraction?
   var menuEnabled = true
+  // Off while the list is edited: neither the menu nor the drag.
+  var enabled = true
+  var draggable = true
   // The target's mark: a dashed outline just outside the card.
   private let ring = UIView()
   private let dashes = CAShapeLayer()
@@ -213,6 +222,11 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
       self.picked = true
       self.restyle()
     }
+  }
+
+  func applyEnabled() {
+    drag.isEnabled = enabled && draggable
+    menuEnabled = enabled
   }
 
   func addContextMenu() {

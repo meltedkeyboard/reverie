@@ -4,24 +4,26 @@ import { StyleSheet, Text, View } from 'react-native'
 import { KeyboardController } from 'react-native-keyboard-controller'
 import Animated, { FadeIn, FadeOut, type SharedValue } from 'react-native-reanimated'
 
-import { AvatarStack, castGallery } from '@/components/cast/AvatarStack'
+import { castGallery } from '@/components/cast/AvatarStack'
+import { CastMosaic } from '@/components/cast/CastMosaic'
 import { CastBar, FloorButton, FLOOR_ICONS } from '@/components/cast/CastBar'
-import { CastSheet } from '@/components/cast/CastSheet'
+import { CastSheet, type CastProps } from '@/components/cast/CastSheet'
 import { AsidePanel } from '@/components/chat/AsidePanel'
 import type { RowMessage, RowScene } from '@/components/chat/MessageRow'
 import { TypingIndicator } from '@/components/chat/TypingIndicator'
 import type { ChromeData, RowConfig, ThreadData } from '@/components/chat/thread/screen'
 import type { Store } from '@/components/chat/thread/store'
+import { useChatDrawer } from '@/components/chrome/ChatDrawer'
 import { GlassSurface } from '@/components/chrome/Glass'
 import { bubbleOpacityOf } from '@/components/chrome/ChatChrome'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { useOpenViewer } from '@/components/visuals/ImageLink'
-import type { Chat } from '@/db/chats'
+import { getChat, listChats, type Chat } from '@/db/chats'
 import { getDraft, setDraft } from '@/db/drafts'
 import { newMessage, type Message } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
-import { setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
+import { importChatToRoom, setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
 import { useAside } from '@/hooks/chat/useAside'
 import { useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useRoom, type RoomPhase } from '@/hooks/chat/useRoom'
@@ -29,11 +31,12 @@ import { useSuggestion } from '@/hooks/chat/useSuggestion'
 import { useChatSwitches } from '@/hooks/util/useStoredFlag'
 import { useTranslation } from '@/i18n'
 import { roomScene } from '@/lib/chat/aside'
-import { promptRenameChat } from '@/lib/chat/chatDialogs'
 import { USER } from '@/lib/chat/room/audience'
-import { isDesktop } from '@/lib/core/platform'
-import { countLabel } from '@/lib/core/format'
-import { showSheet } from '@/lib/ui/dialogs'
+import { castSession, closeCastSession, openCastSession } from '@/lib/chat/castSession'
+import { isDesktop, isIOS } from '@/lib/core/platform'
+import { countLabel, formatWhen } from '@/lib/core/format'
+import { showMessage, showSheet } from '@/lib/ui/dialogs'
+import { reportError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { CONTROL_FONT_SCALE, fonts, useColors, useStyles, type Colors } from '@/theme'
 
@@ -84,7 +87,12 @@ type Props = {
   composerHeight: SharedValue<number>
   scrollToNewest: () => void
   onDeleted: () => void
+  // Shows another scene of the room on the screen: one just started from a chat.
+  onShow: (chat: Chat) => void
 }
+
+// How many chats of the cast a room offers to start a scene from.
+const IMPORT_CHOICES = 12
 
 // The logic of the scene on screen, the room's counterpart of ChatController: it hands
 // the rows to its thread, and the cast bar, the status and the menu to the header and the
@@ -101,6 +109,7 @@ export function RoomController({
   composerHeight,
   scrollToNewest,
   onDeleted,
+  onShow,
 }: Props) {
   const chatId = chat.id
   const db = useDatabase()
@@ -151,10 +160,29 @@ export function RoomController({
   const [castOpen, setCastOpen] = useState(false)
   const { suggestEnabled } = useChatSwitches()
 
+  // While a sheet is up over the scene its drawer is off: the touch on the cast button that
+  // opened it begins the drawer's drag too, and with the sheet taking the screen the drag
+  // would never end (see suspend in ChatDrawer).
+  const drawer = useChatDrawer()
   const openCast = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     if (KeyboardController.isVisible()) await KeyboardController.dismiss({ animated: true })
+    drawer?.suspend(true)
     setCastOpen(true)
+    if (!isIOS) return
+    // On iOS the system's sheet, a route of its own, which reads the cast from castSession.
+    openCastSession(castProps(), () => {
+      setCastOpen(false)
+      drawer?.suspend(false)
+    })
+    router.push('/cast')
+  }
+  // Takes the sheet away; `then` waits until it is gone, as a screen pushed or the viewer
+  // must not start while the system's sheet is still going away.
+  const closeCast = (then?: () => void) => {
+    if (isIOS) return closeCastSession(then)
+    setCastOpen(false)
+    then?.()
   }
 
   const scene = useMemo(() => roomScene(room, members), [room, members])
@@ -216,7 +244,7 @@ export function RoomController({
   )
 
   const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow })
-  const { confirmDelete, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
+  const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
   const { pattern, wallpaper } = useChatTextSettings()
   const bubbleOpacity = bubbleOpacityOf(room, wallpaper, pattern)
@@ -242,30 +270,31 @@ export function RoomController({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
   }
 
-  // Opened from the cast sheet. What leads back to the scene or away from it closes the
-  // sheet; muting and walking in or out stay there, so the change is seen in the list.
-  const memberMenu = (member: RoomMember) => {
+  // A long press on someone in the cast sheet. What leads back to the scene or away from it
+  // closes the sheet; muting and walking in or out stay there, so the change is seen in the list.
+  const memberItems = (member: RoomMember): MenuItem[] => {
     // A tap on a row in the cast sheet picks who is addressed, so the photo is here.
     const avatar = castGallery([member.character])
-    const showAvatar = avatar.length ? [{ label: t('chat.menuShowAvatar'), onSelect: () => openViewer(avatar) }] : []
-    const openCharacter = {
-      label: t('room.openCharacter'),
-      onSelect: () => {
-        setCastOpen(false)
-        router.push(`/character/${member.characterId}`)
-      },
+    const showAvatar: MenuItem[] = avatar.length
+      ? [{ label: t('chat.menuShowAvatar'), systemImage: 'photo', onSelect: () => closeCast(() => openViewer(avatar)) }]
+      : []
+    const openProfile: MenuItem = {
+      label: t('chat.menuShowProfile'),
+      systemImage: 'person.crop.circle',
+      onSelect: () => closeCast(() => router.push(`/character/${member.characterId}?profile=1`)),
     }
     if (!member.present) {
-      return showSheet(member.character.name, [
-        ...(idle ? [{ label: t('room.enter'), onSelect: () => togglePresent(member) }] : []),
+      return [
+        ...(idle ? [{ label: t('room.enter'), systemImage: 'figure.walk', onSelect: () => togglePresent(member) }] : []),
         ...showAvatar,
-        openCharacter,
-      ])
+        openProfile,
+      ]
     }
     const picked = !narration && addressees.includes(member.characterId)
-    const actions = [
+    return [
       {
         label: picked ? t('room.removeAddressee') : t('room.addAddressee'),
+        systemImage: picked ? 'person.badge.minus' : 'person.badge.plus',
         onSelect: () => {
           const id = member.characterId
           setAddressees(picked ? addressees.filter((a) => a !== id) : [...(narration ? [] : addressees), id])
@@ -276,8 +305,9 @@ export function RoomController({
         ? [
             {
               label: t('room.letSpeak'),
+              systemImage: 'text.bubble',
               onSelect: () => {
-                setCastOpen(false)
+                closeCast()
                 nudge(member.characterId)
                 scrollToNewest()
               },
@@ -286,19 +316,25 @@ export function RoomController({
         : []),
       {
         label: t('room.whisperToMember'),
+        systemImage: 'lock',
         onSelect: () => {
-          setCastOpen(false)
+          closeCast()
           setNarration(false)
           setAddressees([member.characterId])
           setWhisper(true)
         },
       },
-      { label: member.muted ? t('room.unmute') : t('room.mute'), onSelect: () => toggleMuted(member) },
-      ...(idle ? [{ label: t('room.leave'), onSelect: () => togglePresent(member) }] : []),
+      {
+        label: member.muted ? t('room.unmute') : t('room.mute'),
+        systemImage: member.muted ? 'speaker.wave.2' : 'speaker.slash',
+        onSelect: () => toggleMuted(member),
+      },
+      ...(idle
+        ? [{ label: t('room.leave'), systemImage: 'rectangle.portrait.and.arrow.right', onSelect: () => togglePresent(member) }]
+        : []),
       ...showAvatar,
-      openCharacter,
+      openProfile,
     ]
-    showSheet(member.character.name, actions)
   }
 
   const changeFloor = (mode: FloorMode) => {
@@ -308,25 +344,52 @@ export function RoomController({
     setRoomFloor(db, room.id, mode)
   }
 
+  // Someone is there to talk: present and not only listening.
+  const canTalk = members.some((m) => m.present && !m.muted)
+  const autoplayItems: MenuItem[] = AUTOPLAY_LENGTHS.map((count) => ({
+    label: countLabel(count, 'line', locale),
+    onSelect: () => {
+      if (!idle || !canTalk) return
+      autoplay(count)
+      scrollToNewest()
+    },
+  }))
+  // For the long press on Continue, which has no menu of its own to grow out of.
   const chooseAutoplay = () => {
-    if (!idle || !members.some((m) => m.present && !m.muted)) return
+    if (!idle || !canTalk) return
+    showSheet(t('room.autoplayTitle'), autoplayItems)
+  }
+
+  // Any one-on-one chat of someone in the room can seed a new scene here; the original
+  // stays put. The scene then takes the place of this one, as a new one would.
+  const importScene = async () => {
+    const found = (
+      await Promise.all(members.map(async (m) => (await listChats(db, m.characterId)).map((c) => ({ chat: c, name: m.character.name }))))
+    )
+      .flat()
+      .filter(({ chat: c }) => c.messageCount > 1)
+      .sort((a, b) => b.chat.lastActivity - a.chat.lastActivity)
+      .slice(0, IMPORT_CHOICES)
+    if (!found.length) return showMessage(t('rooms.importNothingTitle'), t('rooms.importNothingMessage'))
     showSheet(
-      t('room.autoplayTitle'),
-      AUTOPLAY_LENGTHS.map((count) => ({
-        label: countLabel(count, 'line', locale),
-        onSelect: () => {
-          autoplay(count)
-          scrollToNewest()
+      t('rooms.importTitle'),
+      found.map(({ chat: c, name }) => ({
+        label: `${name}: ${c.title ?? formatWhen(c.lastActivity, locale)}`,
+        onSelect: async () => {
+          try {
+            const { chatId: sceneId } = await importChatToRoom(db, c.id, room.id)
+            const scene = await getChat(db, sceneId)
+            if (scene) onShow(scene)
+          } catch (err) {
+            reportError(t('rooms.importFailed'), err)
+          }
         },
       }))
     )
   }
 
-  // The cast in the header is the menu's trigger, so their photos open from the menu.
-  const gallery = castGallery(members.map((m) => m.character))
   const chatMenu: MenuItem[] = [
-    ...(gallery.length ? [{ label: t('room.menuShowAvatars'), systemImage: 'photo.on.rectangle', onSelect: () => openViewer(gallery) }] : []),
-    { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: () => promptRenameChat(title, rename) },
+    { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     {
       label: t('room.floorTitle'),
@@ -337,8 +400,9 @@ export function RoomController({
         onSelect: () => changeFloor(mode),
       })),
     },
-    { label: t('room.menuAutoplay'), systemImage: 'bubble.left.and.bubble.right', onSelect: chooseAutoplay },
-    { label: t('room.menuEditRoom'), systemImage: 'slider.horizontal.3', onSelect: () => router.push(`/room/${room.id}`) },
+    ...(canTalk ? [{ label: t('room.menuAutoplay'), systemImage: 'bubble.left.and.bubble.right', children: autoplayItems }] : []),
+    { label: t('room.menuImportScene'), systemImage: 'square.and.arrow.down', onSelect: importScene },
+    { label: t('chat.menuShowProfile'), systemImage: 'person.2.circle', onSelect: () => router.push(`/room/${room.id}?profile=1`) },
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 
@@ -417,7 +481,7 @@ export function RoomController({
         },
         onStop: asideOpen ? aside.stop : stop,
         onContinue:
-          members.some((m) => m.present && !m.muted) && !asideOpen
+          canTalk && !asideOpen
             ? () => {
                 proceed()
                 scrollToNewest()
@@ -433,31 +497,47 @@ export function RoomController({
     })
   })
 
-  return (
-    <CastSheet
-      look={room}
-      visible={castOpen}
-      onClose={() => setCastOpen(false)}
-      members={members}
-      addressees={addressees}
-      narration={narration}
-      onChangeAddressees={(ids) => {
+  // What the cast sheet shows, the app's own or the system's.
+  function castProps(): CastProps {
+    return {
+      look: room,
+      members,
+      addressees,
+      narration,
+      onChangeAddressees: (ids) => {
         setNarration(false)
         setAddressees(ids)
         // A whisper stays on while picking whom to whisper to, but not for the whole room.
         if (!ids.length) setWhisper(false)
-      }}
-      onNarrate={() => {
+      },
+      onNarrate: () => {
         setWhisper(false)
         setNarration(true)
-      }}
-      whisper={whisper}
-      onToggleWhisper={() => setWhisper((on) => !on)}
-      speakingId={draft?.speakerId ?? null}
-      queuedIds={queue.map((p) => p.characterId)}
-      canMove={idle}
-      onTogglePresent={togglePresent}
-      onMemberMenu={memberMenu}
+      },
+      whisper,
+      onToggleWhisper: () => setWhisper((on) => !on),
+      speakingId: draft?.speakerId ?? null,
+      queuedIds: queue.map((p) => p.characterId),
+      canMove: idle,
+      onTogglePresent: togglePresent,
+      memberMenu: memberItems,
+    }
+  }
+
+  // The system's sheet follows the scene while it is up: who speaks, who is picked.
+  useLayoutEffect(() => {
+    if (isIOS && castOpen) castSession.set(castProps())
+  })
+  // A scene going away with its sheet up takes the sheet with it.
+  useEffect(() => () => closeCastSession(), [])
+
+  if (isIOS) return null
+  return (
+    <CastSheet
+      {...castProps()}
+      visible={castOpen}
+      onClose={() => setCastOpen(false)}
+      onDismissed={() => drawer?.suspend(false)}
     />
   )
 }
@@ -498,16 +578,20 @@ function Status({ phase, draftSpeaker, next, auto }: StatusProps) {
   )
 }
 
-// The room's photos, name and scenario above its first line, and in the middle of an empty scene.
-export function RoomIntro({ room, members, hint }: { room: Room; members: RoomMember[]; hint?: string }) {
+// The room's cast, name and scenario above its first line, and in the middle of an empty
+// scene, as a character's photo and name stand over its chat: the cast as one round picture
+// of the same size, and under the scenario the day the scene began, or the hint.
+export function RoomIntro({ room, members, createdAt, hint }: { room: Room; members: RoomMember[]; createdAt?: number; hint?: string }) {
   const styles = useStyles(createStyles)
+  const { locale } = useTranslation()
   const cast = useMemo(() => members.map((m) => ({ name: m.character.name, avatar: m.character.avatar })), [members])
+  const meta = hint ?? (createdAt ? formatWhen(createdAt, locale) : null)
   return (
     <View style={styles.intro}>
-      <AvatarStack cast={cast} size={56} max={4} />
+      <CastMosaic cast={cast} name={room.name} size={72} round viewable />
       <Text style={styles.introName}>{room.name}</Text>
       {room.scenario.trim() ? <Text style={styles.introScenario}>{room.scenario.trim()}</Text> : null}
-      {hint ? <Text style={styles.introMeta}>{hint}</Text> : null}
+      {meta ? <Text style={styles.introMeta}>{meta}</Text> : null}
     </View>
   )
 }

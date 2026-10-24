@@ -24,7 +24,7 @@ import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/G
 import { GlassHeader, useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { MessageRow, type RowMessage } from '@/components/chat/MessageRow'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
-import { AvatarStack } from '@/components/cast/AvatarStack'
+import { CastMosaic } from '@/components/cast/CastMosaic'
 import { RoomController, RoomIntro, useSceneOf } from '@/components/cast/RoomController'
 import { ChatThread } from '@/components/chat/thread/ChatThread'
 import {
@@ -463,6 +463,7 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
               composerHeight={composerHeight}
               scrollToNewest={scrollToNewest}
               onDeleted={replaceDeleted}
+              onShow={show}
             />
           )}
         </SchemeOverride>
@@ -606,6 +607,10 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump }:
   const asideOpen = data?.asideOpen ?? false
   const { pattern, wallpaper } = useChatTextSettings()
   const hasCustomBackground = Boolean(lookOf(owner).background) || (pattern === 'custom' && Boolean(wallpaper?.file))
+  const cast = useMemo(
+    () => (owner.kind === 'room' ? owner.members.map((m) => ({ name: m.character.name, avatar: m.character.avatar })) : []),
+    [owner]
+  )
   // Private is asked from the menu under the name. It stays while the thread is open, even
   // if it is turned off in Settings, so the thread can always be closed from there too.
   const chatMenu: MenuItem[] = data?.chatMenu ?? []
@@ -627,31 +632,23 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump }:
         }
         right={
           // The photo is a button of its own at the right end, as in Telegram: it opens full
-          // screen, and the pill keeps the menu.
-          owner.kind === 'character' ? (
-            <GlassSurface interactive style={[styles.photo, isAndroid && glass.solid]}>
+          // screen, and the pill keeps the menu. A room's is its cast, swiped through.
+          <GlassSurface interactive style={[styles.photo, isAndroid && glass.solid]}>
+            {owner.kind === 'character' ? (
               <Avatar name={owner.character.name} file={owner.character.avatar} size={38} />
-            </GlassSurface>
-          ) : undefined
+            ) : (
+              <CastMosaic cast={cast} name={owner.room.name} size={38} round viewable />
+            )}
+          </GlassSurface>
         }
       >
-        {owner.kind === 'character' ? (
-          // When the menu can, it draws the pill's glass itself, so the menu morphs out of
-          // the pill. The chat's title heads the menu, as on a row of the drawer.
-          <NativeMenu items={menu} title={data?.title ?? undefined} style={styles.whoPress} glassRadius={22}>
-            <PillSurface style={[styles.who, pilled && styles.whoPill, isAndroid && glass.solid]}>
-              <WhoText name={owner.character.name} data={data} />
-            </PillSurface>
-          </NativeMenu>
-        ) : (
-          // The cast is the menu's trigger, so their photos open from the menu.
-          <NativeMenu items={menu} title={data?.title ?? undefined} style={styles.roomPress} glassRadius={22}>
-            <PillSurface style={[styles.roomWho, pilled && styles.roomPill, isAndroid && glass.solid]}>
-              <AvatarStack cast={owner.members.map((m) => ({ name: m.character.name, avatar: m.character.avatar }))} size={28} viewable={false} />
-              <WhoText name={owner.room.name} data={data} />
-            </PillSurface>
-          </NativeMenu>
-        )}
+        {/* When the menu can, it draws the pill's glass itself, so the menu morphs out of the
+            pill. The chat's title heads the menu, as on a row of the drawer. */}
+        <NativeMenu items={menu} title={data?.title ?? undefined} style={styles.whoPress} glassRadius={22}>
+          <PillSurface style={[styles.who, pilled && styles.whoPill, isAndroid && glass.solid]}>
+            <WhoText name={owner.kind === 'character' ? owner.character.name : owner.room.name} data={data} />
+          </PillSurface>
+        </NativeMenu>
       </GlassHeader>
 
       {data ? (
@@ -889,7 +886,7 @@ function WhoText({ name, data }: { name: string; data: ChromeData | null }) {
 function Intro({ owner, chat, hint }: { owner: Owner; chat: Chat; hint?: string }) {
   const styles = useStyles(createStyles)
   const { locale } = useTranslation()
-  if (owner.kind === 'room') return <RoomIntro room={owner.room} members={owner.members} hint={hint} />
+  if (owner.kind === 'room') return <RoomIntro room={owner.room} members={owner.members} createdAt={chat.createdAt} hint={hint} />
   const { character } = owner
   return (
     <View style={styles.intro}>
@@ -913,9 +910,6 @@ const createStyles = (colors: Colors) =>
   who: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   whoPill: { borderRadius: 22, paddingVertical: 4, paddingHorizontal: 16 },
   whoText: { flexShrink: 1, alignItems: 'center' },
-  roomPress: { maxWidth: '100%' },
-  roomWho: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  roomPill: { borderRadius: 22, paddingVertical: 4, paddingLeft: 6, paddingRight: 14 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%' },
   name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
   subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 1, textAlign: 'center' },

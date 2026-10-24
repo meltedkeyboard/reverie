@@ -38,7 +38,7 @@ export default function AttachPersonaScreen() {
 
   if (!session) return null
   return (
-    <AttachScreenFrame session={session}>
+    <AttachScreenFrame look={session.look}>
       <PersonaPicker session={session} onClose={close} onChosen={() => router.back()} scrollStyle={fillScreen} />
     </AttachScreenFrame>
   )

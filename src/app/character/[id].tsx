@@ -12,7 +12,7 @@ import { CharacterProfile } from '@/components/cast/CharacterProfile'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
 import { ExpandingAvatar, usePhotoNameSpot, useSpreadPush } from '@/components/cast/ExpandingAvatar'
-import { glowTop, ProfileGlow, profileTint } from '@/components/cast/ProfileGlow'
+import { glowTop, hexRgb, ProfileGlow, profileTint } from '@/components/cast/ProfileGlow'
 import { BarButton, DrawnFormScreenHeader, useAvatarHandOff } from '@/components/chrome/FormScreenHeader'
 import { useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import {
@@ -34,7 +34,7 @@ import { setGenDraft } from '@/lib/chat/genDraft'
 import { acceptMoving, pickAvatar, pickBackground, type CropRect } from '@/lib/images/avatars'
 import { movingKind } from '@/lib/images/media'
 import { avatarTint } from '@/lib/images/initial'
-import { usePictureColor, type Rgb } from '@/lib/images/pictureColor'
+import { usePictureColor } from '@/lib/images/pictureColor'
 import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
 import type { ImageSource } from '@/lib/images/images'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
@@ -681,11 +681,6 @@ const AVATAR_SIZE = 96
 // How far past the bottom of the screen the profile's glow runs out, so the details on the
 // first screen all stand in it.
 const GLOW_BELOW = 120
-
-const hexRgb = (hex: string): Rgb => {
-  const value = parseInt(hex.slice(1, 7), 16)
-  return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
-}
 
 // Android only: carries the gesture that stands in for the overscroll pull of iOS. Elsewhere
 // it renders its children as they are.

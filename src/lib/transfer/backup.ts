@@ -193,6 +193,30 @@ export async function characterSelection(db: SQLiteDatabase, id: number): Promis
   }
 }
 
+// One room with its cast, its scenes and the personas they are held in. The members come as
+// characters without their own chats: a room member without its character would drop out.
+export async function roomSelection(db: SQLiteDatabase, id: number): Promise<Selection> {
+  const members = await db.getAllAsync<{ characterId: number }>('SELECT character_id AS characterId FROM room_members WHERE room_id = ?', id)
+  const scenes = await db.getAllAsync<{ id: number; personaId: number | null }>(
+    'SELECT id, persona_id AS personaId FROM chats WHERE room_id = ?',
+    id
+  )
+  return {
+    characters: new Set(members.map((m) => m.characterId)),
+    rooms: new Set([id]),
+    chats: new Set(scenes.map((scene) => scene.id)),
+    personas: new Set(scenes.flatMap((scene) => (scene.personaId ? [scene.personaId] : []))),
+  }
+}
+
+// A room as a file of its own, named after it, the way a character goes out as its card:
+// the same archive a backup is, which opening it in Reverie imports.
+export async function exportRoom(db: SQLiteDatabase, room: { id: number; name: string }) {
+  const zip = await buildBackupArchive(db, await roomSelection(db, room.id))
+  const name = room.name.replace(/[\\/:*?"<>|]/g, '').trim() || 'room'
+  return saveFile(`${name}.reverie`, zip, 'application/zip')
+}
+
 // Everything when `selection` is left out.
 export async function exportBackup(db: SQLiteDatabase, selection?: Selection) {
   const zip = await buildBackupArchive(db, selection)

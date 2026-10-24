@@ -27,59 +27,76 @@ type Props = {
 // what the character is, and how it answers, in the grouped look of the editor. The name stays in the header, from where it
 // moves onto the photo when the avatar spreads. Empty parts are left out.
 export function CharacterProfile({ greeting, systemPrompt, notes, params, background, exportItems }: Props) {
-  const styles = useStyles(createStyles)
   const { t } = useTranslation()
 
   return (
     <View>
-      {systemPrompt.trim() ? (
-        <ListSection header={t('editor.systemPromptLabel')}>
-          <View style={styles.textCell}>
-            <ClampedText text={systemPrompt} lines={6} />
-          </View>
-        </ListSection>
-      ) : null}
-      {greeting.trim() ? (
-        <ListSection header={t('editor.greetingLabel')}>
-          <View style={styles.textCell}>
-            <ClampedText text={greeting} lines={4} />
-          </View>
-        </ListSection>
-      ) : null}
-      {notes.trim() ? (
-        <ListSection header={t('editor.notesLabel')}>
-          <View style={styles.textCell}>
-            <ClampedText text={notes} lines={4} />
-          </View>
-        </ListSection>
-      ) : null}
-      <ListSection header={t('editor.genParamsSection')}>
-        {params.map((param) => (
-          <View key={param.label} style={styles.param}>
-            <Text style={styles.paramLabel}>{param.label}</Text>
-            <Text style={styles.paramValue}>{param.value}</Text>
-          </View>
-        ))}
-      </ListSection>
-      {background ? (
-        <ListSection header={t('background.title')}>
-          <View style={styles.backgroundCell}>
-            <View style={styles.backgroundThumb}>
-              <ChatBackground uri={background.uri} crop={background.crop} effect={background.effect} intensity={background.intensity} />
-            </View>
-          </View>
-        </ListSection>
-      ) : null}
-      {/* Each way out is a row of its own rather than a menu: the system menu jumps
-          behind the scroll as it closes on iOS 26 and 27. */}
-      {exportItems ? (
-        <ListSection header={t('card.export')}>
-          {exportItems.map((item) => (
-            <ButtonCell key={item.label} label={item.label} onPress={() => item.onSelect?.()} />
-          ))}
-        </ListSection>
-      ) : null}
+      <ProfileText header={t('editor.systemPromptLabel')} text={systemPrompt} lines={6} />
+      <ProfileText header={t('editor.greetingLabel')} text={greeting} lines={4} />
+      <ProfileText header={t('editor.notesLabel')} text={notes} lines={4} />
+      <ProfileParams header={t('editor.genParamsSection')} params={params} />
+      <ProfileBackground background={background} />
+      {exportItems ? <ProfileActions header={t('card.export')} items={exportItems} /> : null}
     </View>
+  )
+}
+
+// The parts a profile is made of, a character's or a room's.
+
+// A long text under its header, cut to a few lines; nothing for an empty one.
+export function ProfileText({ header, text, lines }: { header: string; text: string; lines: number }) {
+  const styles = useStyles(createStyles)
+  if (!text.trim()) return null
+  return (
+    <ListSection header={header}>
+      <View style={styles.textCell}>
+        <ClampedText text={text} lines={lines} />
+      </View>
+    </ListSection>
+  )
+}
+
+// Settings as they read, already put in words by the screen.
+export function ProfileParams({ header, params }: { header?: string; params: { label: string; value: string }[] }) {
+  const styles = useStyles(createStyles)
+  if (!params.length) return null
+  return (
+    <ListSection header={header}>
+      {params.map((param) => (
+        <View key={param.label} style={styles.param}>
+          <Text style={styles.paramLabel}>{param.label}</Text>
+          <Text style={styles.paramValue}>{param.value}</Text>
+        </View>
+      ))}
+    </ListSection>
+  )
+}
+
+// The picture behind the chats, small, as it looks behind them.
+export function ProfileBackground({ background }: { background: Props['background'] }) {
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  if (!background) return null
+  return (
+    <ListSection header={t('background.title')}>
+      <View style={styles.backgroundCell}>
+        <View style={styles.backgroundThumb}>
+          <ChatBackground uri={background.uri} crop={background.crop} effect={background.effect} intensity={background.intensity} />
+        </View>
+      </View>
+    </ListSection>
+  )
+}
+
+// Each way out is a row of its own rather than a menu: the system menu jumps behind the
+// scroll as it closes on iOS 26 and 27.
+export function ProfileActions({ header, items }: { header: string; items: MenuItem[] }) {
+  return (
+    <ListSection header={header}>
+      {items.map((item) => (
+        <ButtonCell key={item.label} label={item.label} onPress={() => item.onSelect?.()} />
+      ))}
+    </ListSection>
   )
 }
 

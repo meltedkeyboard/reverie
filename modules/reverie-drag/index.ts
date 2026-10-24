@@ -13,6 +13,8 @@ type DragModule = {
 type DragCardProps = ViewProps & {
   menu: DragMenuEntry[]
   dragEnabled: boolean
+  // False for a card that has the menu but is never lifted into a drag.
+  draggable?: boolean
   // What the card carries when dragged: one character, or the members of a group.
   items: { id: number; name: string }[]
   acceptsCards: boolean

@@ -201,16 +201,6 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   const speaker = scene?.speaker
   return (
     <View style={[styles.botRow, message.kind === 'reaction' && styles.reactionRow]}>
-      {refine ? (
-        <RefineNote
-          text={refine}
-          live={Boolean(message.streaming)}
-          locked={locked}
-          canRegenerate={canRegenerate}
-          rich={rich}
-          onAction={(action) => onAction(message, action)}
-        />
-      ) : null}
       {scene ? (
         <View style={styles.speaker}>
           {speaker ? <Avatar name={speaker.name} file={speaker.avatar} size={22} /> : null}
@@ -234,6 +224,18 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
             </View>
           ) : null}
         </View>
+      ) : null}
+      {/* In a room the line opens with who says it, and the wish it was refined with
+          stands under the name, above the line itself, as it stands above a reply. */}
+      {refine ? (
+        <RefineNote
+          text={refine}
+          live={Boolean(message.streaming)}
+          locked={locked}
+          canRegenerate={canRegenerate}
+          rich={rich}
+          onAction={(action) => onAction(message, action)}
+        />
       ) : null}
       {thought ? (
         <ThoughtBlock

@@ -8,6 +8,7 @@ import Animated, { useAnimatedStyle, withTiming, Easing } from 'react-native-rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Avatar } from '@/components/visuals/Avatar'
+import { CastMosaic } from '@/components/cast/CastMosaic'
 import { openInNewTab, useMiddleClick, wantsNewTab } from '@/components/chrome/TabBar'
 import { deleteChat, setChatTitle } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
@@ -251,7 +252,11 @@ export function Sidebar() {
                 onMiddle={() => openInNewTab(`/chat/${chat.id}`)}
                 onMenu={() => openMenu(chat)}
               >
-                <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={isDesktop ? 20 : 26} viewable={false} />
+                {chat.cast ? (
+                  <CastMosaic cast={chat.cast} name={chat.ownerName} size={isDesktop ? 20 : 26} round />
+                ) : (
+                  <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={isDesktop ? 20 : 26} viewable={false} />
+                )}
                 <View style={styles.chatText}>
                   <Text style={styles.chatTitle} numberOfLines={1}>
                     {chat.title ?? chat.ownerName}

@@ -1,16 +1,19 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Fragment, useEffect, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 
 import { Avatar } from '@/components/visuals/Avatar'
-import { Segmented } from '@/components/controls/Segmented'
-import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
-import { useScreenPadding } from '@/components/chrome/GlassHeader'
-import { ButtonCell, InputCell, ListFooter, ListSection, SliderCell, SwitchCell, TextCell } from '@/components/lists/GroupedList'
+import { CastMosaic } from '@/components/cast/CastMosaic'
+import { glowTop, hexRgb, ProfileGlow, profileTint } from '@/components/cast/ProfileGlow'
+import { memberSummary, RoomProfile } from '@/components/cast/RoomProfile'
+import { BarButton, DrawnFormScreenHeader, useAvatarHandOff } from '@/components/chrome/FormScreenHeader'
+import { useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
+import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, SwitchCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection } from '@/components/lists/PictureCells'
-import { PageSheet } from '@/components/overlays/PageSheet'
+import { AddCharactersSheet } from '@/components/overlays/AddCharactersSheet'
 import { listCharacters, type Character, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import {
@@ -25,28 +28,37 @@ import {
   type RoomFields,
 } from '@/db/rooms'
 import { useImageSlot } from '@/hooks/features/useImageSlot'
+import { useRoomActions } from '@/hooks/features/useRoomActions'
 import { useTranslation } from '@/i18n'
-import { pickBackground, type CropRect } from '@/lib/images/avatars'
+import { avatarUri, pickBackground, type CropRect } from '@/lib/images/avatars'
 import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
+import { avatarTint } from '@/lib/images/initial'
+import { usePictureColor } from '@/lib/images/pictureColor'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
-import { type Colors, useColors, useStyles } from '@/theme'
+import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles, useTheme } from '@/theme'
 
 type Member = MemberSettings & { character: Character }
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
 
 export default function RoomEditorScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, profile } = useLocalSearchParams<{ id: string; profile?: string }>()
   const isNew = id === 'new'
+  // Opened as the room's profile, it is only looked at until the pencil turns it into the
+  // editor, and saving turns it back, as a character's profile does.
+  const asProfile = profile === '1' && !isNew
+  const [editing, setEditing] = useState(!asProfile)
   const db = useDatabase()
   const router = useRouter()
   const padding = useScreenPadding('form')
   const colors = useColors()
+  const { scheme } = useTheme()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
+  const { exportFile } = useRoomActions(() => {})
 
   const FLOOR_OPTIONS: { value: FloorMode; label: string }[] = [
     { value: 'addressee', label: t('room.floor.addressee') },
@@ -90,13 +102,19 @@ export default function RoomEditorScreen() {
   const updateMember = (characterId: number, patch: Partial<MemberSettings>) =>
     setMembers((list) => list.map((m) => (m.characterId === characterId ? { ...m, ...patch } : m)))
 
-  const toggleCharacter = (character: Character) => {
-    Haptics.selectionAsync()
-    setMembers((list) =>
-      list.some((m) => m.characterId === character.id)
-        ? list.filter((m) => m.characterId !== character.id)
-        : [...list, { ...DEFAULT_MEMBER, characterId: character.id, character }]
-    )
+  // Those kept keep their place and settings; the newly picked come after them in the order
+  // they were ticked.
+  const pickMembers = (ids: number[]) => {
+    setPicking(false)
+    setMembers((list) => {
+      const kept = list.filter((m) => ids.includes(m.characterId))
+      const added = ids.flatMap((characterId) => {
+        if (list.some((m) => m.characterId === characterId)) return []
+        const character = characters.find((c) => c.id === characterId)
+        return character ? [{ ...DEFAULT_MEMBER, characterId, character }] : []
+      })
+      return [...kept, ...added]
+    })
   }
 
   const backgroundValue = { file: fields.background, original: fields.backgroundOriginal, crop: fields.backgroundCrop }
@@ -153,15 +171,17 @@ export default function RoomEditorScreen() {
     try {
       const nextBackground = await bgSlot.persist(backgroundValue)
       const { file: background, original: backgroundOriginal, crop: backgroundCrop } = nextBackground
-      const roomId = await saveRoom(
-        db,
-        isNew ? null : Number(id),
-        { ...fields, name: fields.name.trim() || defaultName(), background, backgroundOriginal, backgroundCrop },
-        members
-      )
+      const name = fields.name.trim() || defaultName()
+      const roomId = await saveRoom(db, isNew ? null : Number(id), { ...fields, name, background, backgroundOriginal, backgroundCrop }, members)
       bgSlot.settle(nextBackground)
-      if (isNew) router.replace(`/chat/latest?room=${roomId}`)
-      else router.back()
+      if (isNew) return router.replace(`/chat/latest?room=${roomId}`)
+      if (!asProfile) return router.back()
+      // Back to the profile, now showing what was saved.
+      setFields((f) => ({ ...f, name, background, backgroundOriginal, backgroundCrop }))
+      setExpanded(null)
+      setSaving(false)
+      setEditing(false)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (err) {
       setSaving(false)
       alertError(t('editor.saveFailedTitle'), err)
@@ -180,231 +200,271 @@ export default function RoomEditorScreen() {
     })
   }
 
-  const title = isNew ? t('roomEditor.newTitle') : t('roomEditor.title')
+  // The room's own name heads the screen once it has one, as a character's does.
+  const title = fields.name.trim() || defaultName() || (isNew ? t('roomEditor.newTitle') : t('roomEditor.title'))
   // While a member is open, its notes stand under the group rather than beside each row.
   const memberOpen = members.some((m) => m.characterId === expanded)
+  const cast = members.map((m) => ({ name: m.character.name, avatar: m.character.avatar }))
+
+  // The profile is washed in the color of its first photo, or of the first member's initial,
+  // as a character's is in its avatar's.
+  const face = members.find((m) => m.character.avatar)?.character.avatar ?? null
+  const faceColor = usePictureColor(editing || !face ? null : avatarUri(face))
+  const average = editing ? null : face ? faceColor : hexRgb(avatarTint(members[0]?.character.name ?? title))
+  const glowColor = average ? profileTint(average) : null
+
+  const scrollY = useSharedValue(0)
+  // The cast does not spread out over the page as a photo does: only the hand-off into the
+  // header on a scroll is the profile's.
+  const still = useSharedValue(0)
+  const handOff = useAvatarHandOff(still, scrollY)
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y
+  })
+  const contentPadding = editing ? padding : { ...padding, paddingTop: padding.paddingTop + PROFILE_TOP_GAP }
+  const sideLeft = padding.paddingLeft ?? padding.paddingHorizontal
+  const sideRight = padding.paddingRight ?? padding.paddingHorizontal
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
+  const headerHeight = useHeaderHeight()
+  const castCenterY = contentPadding.paddingTop + CAST_SIZE / 2
+  const headerAvatar = editing
+    ? undefined
+    : {
+        node: <CastMosaic cast={cast} name={title} size={CAST_SIZE} round />,
+        size: CAST_SIZE,
+        centerX: sideLeft + (screenWidth - sideLeft - sideRight) / 2,
+        centerY: castCenterY,
+      }
+  // A short profile would stop scrolling before the cast reaches the star and leave it
+  // halfway, so the page always has room for the whole way up.
+  const scrollRoom = editing
+    ? contentPadding
+    : { ...contentPadding, minHeight: screenHeight + castCenterY - (headerHeight - HEADER_ROW_HEIGHT / 2) }
+
+  const profileBackground = backgroundUri
+    ? { uri: backgroundUri, crop: bgSlot.shownCrop(fields.backgroundCrop), effect: fields.backgroundEffect, intensity: fields.backgroundIntensity }
+    : null
 
   return (
     <View style={styles.screen}>
+      {ready ? <ProfileGlow color={glowColor} height={screenHeight + GLOW_BELOW} scrollY={scrollY} spread={still} /> : null}
       {ready ? (
         <KeyboardAwareScrollView
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
-          contentContainerStyle={padding}
+          contentContainerStyle={scrollRoom}
+          onScroll={onScroll}
         >
-          <ListSection>
-            <InputCell
-              label={t('roomEditor.nameLabel')}
-              value={fields.name}
-              onChangeText={(v) => set('name', v)}
-              placeholder={defaultName() || t('roomEditor.namePlaceholder')}
-              autoCapitalize="sentences"
-            />
-          </ListSection>
+          <Animated.View style={[styles.castBlock, editing ? null : handOff]}>
+            <CastMosaic cast={cast} name={title} size={CAST_SIZE} round viewable />
+          </Animated.View>
+          {editing ? (
+            <>
+              <ListSection>
+                <InputCell
+                  label={t('roomEditor.nameLabel')}
+                  value={fields.name}
+                  onChangeText={(v) => set('name', v)}
+                  placeholder={defaultName() || t('roomEditor.namePlaceholder')}
+                  autoCapitalize="sentences"
+                />
+              </ListSection>
 
-          <ListSection
-            header={t('roomEditor.membersSection')}
-            footer={
-              memberOpen ? (
-                <>
-                  <ListFooter>{t('roomEditor.perceptionHint')}</ListFooter>
-                  <ListFooter>{t('roomEditor.triggersHint')}</ListFooter>
-                  <ListFooter>{t('roomEditor.presentNote')}</ListFooter>
-                  <ListFooter>{t('roomEditor.mutedNote')}</ListFooter>
-                </>
-              ) : members.length ? undefined : (
-                t('roomEditor.noMembers')
-              )
-            }
-          >
-            {members.map((member, index) => {
-              const open = expanded === member.characterId
-              // An open member's own rows follow it in the group.
-              return (
-                <Fragment key={member.characterId}>
-                  <Pressable
-                    onPress={() => setExpanded(open ? null : member.characterId)}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: open }}
-                    style={({ pressed }) => [styles.memberHead, pressed && styles.pressed]}
-                  >
-                    <Avatar name={member.character.name} file={member.character.avatar} size={36} />
-                    <View style={styles.memberBody}>
-                      <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
-                        {member.character.name}
-                      </Text>
-                      <Text style={styles.memberMeta} numberOfLines={1}>
-                        {!member.present
-                          ? t('roomEditor.outOfScene')
-                          : member.muted
-                            ? t('roomEditor.listensOnly')
-                            : t('roomEditor.memberSummary', {
-                                talk: percent(member.talkativeness),
-                                ear: percent(member.perception),
-                              })}
-                      </Text>
-                    </View>
-                    <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
-                  </Pressable>
-                  {open ? (
+              <ListSection
+                header={t('roomEditor.membersSection')}
+                footer={
+                  memberOpen ? (
                     <>
-                      <SliderCell
-                        label={t('roomEditor.talkativeness')}
-                        value={member.talkativeness}
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        formatValue={percent}
-                        onChange={(v) => updateMember(member.characterId, { talkativeness: Math.round(v * 100) / 100 })}
-                      />
-                      <SliderCell
-                        label={t('roomEditor.perception')}
-                        value={member.perception}
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        formatValue={percent}
-                        onChange={(v) => updateMember(member.characterId, { perception: Math.round(v * 100) / 100 })}
-                      />
-                      <InputCell
-                        label={t('roomEditor.triggers')}
-                        value={member.triggers}
-                        onChangeText={(v) => updateMember(member.characterId, { triggers: v })}
-                        placeholder={t('roomEditor.triggersPlaceholder')}
-                      />
-                      <SwitchCell
-                        label={t('roomEditor.present')}
-                        value={member.present}
-                        onValueChange={(v) => updateMember(member.characterId, { present: v })}
-                      />
-                      <SwitchCell
-                        label={t('roomEditor.muted')}
-                        value={member.muted}
-                        onValueChange={(v) => updateMember(member.characterId, { muted: v })}
-                      />
-                      <ButtonCell
-                        danger
-                        label={t('roomEditor.removeMember')}
-                        onPress={() => setMembers((list) => list.filter((m) => m.characterId !== member.characterId))}
-                      />
+                      <ListFooter>{t('roomEditor.perceptionHint')}</ListFooter>
+                      <ListFooter>{t('roomEditor.triggersHint')}</ListFooter>
+                      <ListFooter>{t('roomEditor.presentNote')}</ListFooter>
+                      <ListFooter>{t('roomEditor.mutedNote')}</ListFooter>
                     </>
-                  ) : null}
-                </Fragment>
-              )
-            })}
-            <ButtonCell label={t('roomEditor.addMembers')} onPress={() => setPicking(true)} />
-          </ListSection>
+                  ) : members.length ? undefined : (
+                    t('roomEditor.noMembers')
+                  )
+                }
+              >
+                {members.map((member, index) => {
+                  const open = expanded === member.characterId
+                  // An open member's own rows follow it in the group.
+                  return (
+                    <Fragment key={member.characterId}>
+                      <Pressable
+                        onPress={() => setExpanded(open ? null : member.characterId)}
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: open }}
+                        style={({ pressed }) => [styles.memberHead, pressed && styles.pressed]}
+                      >
+                        <Avatar name={member.character.name} file={member.character.avatar} size={36} />
+                        <View style={styles.memberBody}>
+                          <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
+                            {member.character.name}
+                          </Text>
+                          <Text style={styles.memberMeta} numberOfLines={1}>
+                            {memberSummary(member, t)}
+                          </Text>
+                        </View>
+                        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
+                      </Pressable>
+                      {open ? (
+                        <>
+                          <SliderCell
+                            label={t('roomEditor.talkativeness')}
+                            value={member.talkativeness}
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            formatValue={percent}
+                            onChange={(v) => updateMember(member.characterId, { talkativeness: Math.round(v * 100) / 100 })}
+                          />
+                          <SliderCell
+                            label={t('roomEditor.perception')}
+                            value={member.perception}
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            formatValue={percent}
+                            onChange={(v) => updateMember(member.characterId, { perception: Math.round(v * 100) / 100 })}
+                          />
+                          <InputCell
+                            label={t('roomEditor.triggers')}
+                            value={member.triggers}
+                            onChangeText={(v) => updateMember(member.characterId, { triggers: v })}
+                            placeholder={t('roomEditor.triggersPlaceholder')}
+                          />
+                          <SwitchCell
+                            label={t('roomEditor.present')}
+                            value={member.present}
+                            onValueChange={(v) => updateMember(member.characterId, { present: v })}
+                          />
+                          <SwitchCell
+                            label={t('roomEditor.muted')}
+                            value={member.muted}
+                            onValueChange={(v) => updateMember(member.characterId, { muted: v })}
+                          />
+                          <ButtonCell
+                            danger
+                            label={t('roomEditor.removeMember')}
+                            onPress={() => setMembers((list) => list.filter((m) => m.characterId !== member.characterId))}
+                          />
+                        </>
+                      ) : null}
+                    </Fragment>
+                  )
+                })}
+                <ButtonCell label={t('roomEditor.addMembers')} onPress={() => setPicking(true)} />
+              </ListSection>
 
-          <ListSection
-            header={t('roomEditor.floorSection')}
-            footer={
-              <>
-                <ListFooter>{t(`room.floorHint.${fields.floor}`)}</ListFooter>
-                <ListFooter>{t('roomEditor.maxChainHint')}</ListFooter>
-                <ListFooter>{t('roomEditor.directorNote')}</ListFooter>
-              </>
-            }
-          >
-            <View style={styles.segmentRow}>
-              <Segmented options={FLOOR_OPTIONS} value={fields.floor} onChange={(v) => set('floor', v)} />
-            </View>
-            <SliderCell label={t('roomEditor.maxChain')} value={fields.maxChain} min={1} max={5} step={1} onChange={(v) => set('maxChain', v)} />
-            <SwitchCell label={t('roomEditor.director')} value={fields.director} onValueChange={(v) => set('director', v)} />
-          </ListSection>
+              <ListSection
+                header={t('roomEditor.floorSection')}
+                footer={
+                  <>
+                    <ListFooter>{t(`room.floorHint.${fields.floor}`)}</ListFooter>
+                    <ListFooter>{t('roomEditor.maxChainHint')}</ListFooter>
+                    <ListFooter>{t('roomEditor.directorNote')}</ListFooter>
+                  </>
+                }
+              >
+                <SegmentCell label={t('roomEditor.floorMode')} options={FLOOR_OPTIONS} value={fields.floor} onChange={(v) => set('floor', v)} />
+                <SliderCell label={t('roomEditor.maxChain')} value={fields.maxChain} min={1} max={5} step={1} onChange={(v) => set('maxChain', v)} />
+                <SwitchCell label={t('roomEditor.director')} value={fields.director} onValueChange={(v) => set('director', v)} />
+              </ListSection>
 
-          <ListSection header={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>
-            <TextCell
-              title={t('roomEditor.scenario')}
-              value={fields.scenario}
-              placeholder={t('roomEditor.scenarioPlaceholder')}
-              onChangeText={(v) => set('scenario', v)}
-              lines={6}
+              <ListSection header={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>
+                <TextCell
+                  title={t('roomEditor.scenario')}
+                  value={fields.scenario}
+                  placeholder={t('roomEditor.scenarioPlaceholder')}
+                  onChangeText={(v) => set('scenario', v)}
+                  lines={6}
+                />
+              </ListSection>
+
+              <ListSection header={t('roomEditor.opening')} footer={t('roomEditor.openingHint')}>
+                <TextCell
+                  title={t('roomEditor.opening')}
+                  value={fields.opening}
+                  placeholder={t('roomEditor.openingPlaceholder')}
+                  onChangeText={(v) => set('opening', v)}
+                />
+              </ListSection>
+
+              <ListSection footer={t('roomEditor.userNameHint')}>
+                <InputCell
+                  label={t('roomEditor.userName')}
+                  value={fields.userName}
+                  onChangeText={(v) => set('userName', v)}
+                  placeholder={t('roomEditor.userNamePlaceholder')}
+                  autoCapitalize="words"
+                />
+              </ListSection>
+
+              <BackgroundSection
+                uri={backgroundUri}
+                crop={bgSlot.shownCrop(fields.backgroundCrop)}
+                effect={fields.backgroundEffect}
+                intensity={fields.backgroundIntensity}
+                onPick={onPickBackground}
+                onAdjust={onAdjustBackground}
+                onClear={onClearBackground}
+              />
+
+              {!isNew ? (
+                <ListSection>
+                  <ButtonCell danger label={t('roomEditor.deleteRoom')} onPress={confirmDelete} />
+                </ListSection>
+              ) : null}
+            </>
+          ) : (
+            <RoomProfile
+              fields={fields}
+              members={members}
+              background={profileBackground}
+              // Saves the room as it is stored, so edits not yet saved are not in it.
+              exportItems={[
+                {
+                  label: t('card.saveToFiles'),
+                  systemImage: 'folder',
+                  onSelect: () => exportFile({ id: Number(id), name: title, background: fields.background, backgroundOriginal: fields.backgroundOriginal }),
+                },
+              ]}
             />
-          </ListSection>
-
-          <ListSection header={t('roomEditor.opening')} footer={t('roomEditor.openingHint')}>
-            <TextCell
-              title={t('roomEditor.opening')}
-              value={fields.opening}
-              placeholder={t('roomEditor.openingPlaceholder')}
-              onChangeText={(v) => set('opening', v)}
-            />
-          </ListSection>
-
-          <ListSection footer={t('roomEditor.userNameHint')}>
-            <InputCell
-              label={t('roomEditor.userName')}
-              value={fields.userName}
-              onChangeText={(v) => set('userName', v)}
-              placeholder={t('roomEditor.userNamePlaceholder')}
-              autoCapitalize="words"
-            />
-          </ListSection>
-
-          <BackgroundSection
-            uri={backgroundUri}
-            crop={bgSlot.shownCrop(fields.backgroundCrop)}
-            effect={fields.backgroundEffect}
-            intensity={fields.backgroundIntensity}
-            onPick={onPickBackground}
-            onAdjust={onAdjustBackground}
-            onClear={onClearBackground}
-          />
-
-          {!isNew ? (
-            <ListSection>
-              <ButtonCell danger label={t('roomEditor.deleteRoom')} onPress={confirmDelete} />
-            </ListSection>
-          ) : null}
+          )}
         </KeyboardAwareScrollView>
       ) : null}
 
-      <PageSheet
+      <AddCharactersSheet
         visible={picking}
-        onClose={() => setPicking(false)}
+        characters={characters}
+        initial={members.map((m) => m.characterId)}
         title={t('roomEditor.pickTitle')}
-        background={colors.bg}
-        right={
-          <Pressable onPress={() => setPicking(false)} hitSlop={8}>
-            <Text style={styles.done}>{t('roomEditor.done')}</Text>
-          </Pressable>
-        }
-      >
-        <ScrollView contentContainerStyle={styles.pickList}>
-          <ListSection footer={characters.length ? undefined : t('roomEditor.noCharacters')}>
-            {characters.map((character) => {
-              const on = members.some((m) => m.characterId === character.id)
-              return (
-                <Pressable
-                  key={character.id}
-                  onPress={() => toggleCharacter(character)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on }}
-                  style={({ pressed }) => [styles.pickRow, pressed && styles.pressed]}
-                >
-                  <Avatar name={character.name} file={character.avatar} size={36} viewable={false} />
-                  <Text style={styles.pickName} numberOfLines={1}>
-                    {character.name}
-                  </Text>
-                  {on ? <Icon name="checkmark" size={22} color={colors.accent} /> : null}
-                </Pressable>
-              )
-            })}
-          </ListSection>
-        </ScrollView>
-      </PageSheet>
+        confirmLabel={t('roomEditor.done')}
+        onConfirm={pickMembers}
+        onClose={() => setPicking(false)}
+      />
 
+      {/* Opened with a zoom from the list of rooms, so the header is drawn here rather than
+          by the native bar; see DrawnFormScreenHeader. */}
       <DrawnFormScreenHeader
         title={title}
+        overPhoto={still}
+        scrollY={scrollY}
+        avatar={headerAvatar}
+        clearAtTop={!editing}
+        fadeRgb={glowColor ? glowTop(glowColor, colors.bgRgb, scheme) : undefined}
         right={
+          // One button that turns from the pencil into the checkmark, so the change is the
+          // symbol's own transition rather than a swap.
           <BarButton
-            symbol="checkmark"
-            fallback="checkmark"
-            disabled={!canSave}
-            onPress={onSave}
-            accessibilityLabel={t('common.save')}
-            prominent
+            symbol={editing ? 'checkmark' : 'pencil'}
+            fallback={editing ? 'checkmark' : 'pencil'}
+            disabled={editing ? !canSave : !ready}
+            onPress={editing ? onSave : () => setEditing(true)}
+            accessibilityLabel={editing ? t('common.save') : t('action.edit')}
+            prominent={editing}
+            animateChange
           />
         }
       />
@@ -412,17 +472,18 @@ export default function RoomEditorScreen() {
   )
 }
 
+const PROFILE_TOP_GAP = 14
+const CAST_SIZE = 96
+// How far past the bottom of the screen the profile's glow runs out.
+const GLOW_BELOW = 120
+
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
+    castBlock: { alignItems: 'center', marginBottom: 24 },
     pressed: { backgroundColor: colors.surfaceRaised },
     memberHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
     memberBody: { flex: 1 },
     memberName: { fontSize: 17, fontWeight: '600' },
     memberMeta: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-    segmentRow: { paddingHorizontal: 16, paddingVertical: 12 },
-    done: { color: colors.accent, fontSize: 17, fontWeight: '600' },
-    pickList: { padding: 16 },
-    pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8, minHeight: 52 },
-    pickName: { flex: 1, color: colors.text, fontSize: 17 },
   })
