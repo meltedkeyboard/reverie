@@ -98,21 +98,23 @@ function tintedLook(svg, pairs) {
 // The other looks are drawn files of their own, not icons to list.
 const looks = new Set(Object.entries(VARIANTS).map(([slug, v]) => `${slug}-${v.other}.svg`))
 
-// The previews are what the picker in Settings shows.
+// The previews are what the picker in Settings shows, an icon up to 220 points wide in the
+// middle of its carousel: 660 pixels on a 3x screen keeps it sharp there.
+const PREVIEW = 660
 mkdirSync('assets/images/alt', { recursive: true })
-png(light, 'assets/images/alt/default-light-preview.png', 256)
-png(dark, 'assets/images/alt/default-dark-preview.png', 256)
+png(light, 'assets/images/alt/default-light-preview.png', PREVIEW)
+png(dark, 'assets/images/alt/default-dark-preview.png', PREVIEW)
 for (const file of readdirSync(`${BRAND}/alt`).filter((f) => f.endsWith('.svg') && !looks.has(f)).sort()) {
   const slug = file.replace(/\.svg$/, '')
   const svg = readFileSync(`${BRAND}/alt/${file}`, 'utf8')
   png(svg, `assets/images/alt/${slug}.png`)
-  png(svg, `assets/images/alt/${slug}-preview.png`, 256)
+  png(svg, `assets/images/alt/${slug}-preview.png`, PREVIEW)
   png(adaptive(svg), `assets/images/alt/${slug}-foreground.png`)
   const variant = VARIANTS[slug]
   if (variant) {
     const other = readFileSync(`${BRAND}/alt/${slug}-${variant.other}.svg`, 'utf8')
     png(other, `assets/images/alt/${slug}-${variant.other}.png`)
-    png(other, `assets/images/alt/${slug}-${variant.other}-preview.png`, 256)
+    png(other, `assets/images/alt/${slug}-${variant.other}-preview.png`, PREVIEW)
     png(tintedLook(svg, variant.tinted), `assets/images/alt/${slug}-tinted.png`)
   }
 }

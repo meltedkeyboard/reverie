@@ -25,13 +25,16 @@ type Props = {
 export function Button({ label, icon, onPress, disabled, loading, variant = 'primary', style }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
-  const tint = variant === 'primary' || variant === 'glass' ? ON_ACCENT : variant === 'soft' ? colors.accent : colors.text
+  // Liquid Glass is not rendered under a parent with opacity, so a disabled glass button is
+  // shown as a disabled bar button is: the glass stays, without the tint, and the label greys.
+  const plainGlass = variant === 'glass' && !!disabled && !!liquidGlass
+  const tint = plainGlass ? colors.textMuted : variant === 'primary' || variant === 'glass' ? ON_ACCENT : variant === 'soft' ? colors.accent : colors.text
   const content = loading ? (
     <ActivityIndicator color={tint} />
   ) : (
     <>
       {icon ? <Icon name={icon} size={isDesktop ? 15 : variant === 'soft' ? 17 : 18} color={tint} /> : null}
-      <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
+      <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, styles[`${variant}Label`], plainGlass && { color: tint }]}>{label}</Text>
     </>
   )
 
@@ -40,11 +43,12 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
       <Pressable
         onPress={onPress}
         disabled={disabled || loading}
-        style={({ pressed }) => [!liquidGlass && !isDesktop && pressed && { transform: [{ scale: 0.98 }] }, isDesktop && pressed && { opacity: 0.85 }, disabled && { opacity: 0.4 }]}
+        accessibilityRole="button"
+        style={({ pressed }) => [!liquidGlass && !isDesktop && pressed && { transform: [{ scale: 0.98 }] }, isDesktop && pressed && { opacity: 0.85 }, disabled && !liquidGlass && { opacity: 0.4 }]}
       >
         <GlassSurface
-          interactive
-          tintColor={colors.accent}
+          interactive={!disabled}
+          tintColor={plainGlass ? undefined : colors.accent}
           style={[styles.base, styles.glass, style]}
           fallbackStyle={{ backgroundColor: colors.accent }}
         >
@@ -57,6 +61,7 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.base,
         styles[variant],

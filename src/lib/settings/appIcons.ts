@@ -1,9 +1,20 @@
 import { requireOptionalNativeModule } from 'expo'
 
+import { isAndroid } from '@/lib/core/platform'
+
 type IconsModule = {
   supportsAlternateIcons: boolean
   getAppIconName(): string | null
   setAlternateAppIcon(name: string | null): Promise<string | null>
+}
+
+type Look = 'light' | 'dark'
+
+export type AppIcon = {
+  name: string | null
+  preview: number | { light: number; dark: number }
+  android?: Look
+  glow: string
 }
 
 // The alternate icons are baked into the native build by the expo-alternate-app-icons
@@ -16,25 +27,39 @@ const native = requireOptionalNativeModule<IconsModule>('ExpoAlternateAppIcons')
 export const alternateIconsAvailable = native?.supportsAlternateIcons ?? __DEV__
 let previewChoice: string | null = null
 
-// The names are the ones given to the plugin in app.json, drawn in assets/brand/alt and
-// rendered by scripts/build-icons.mjs, previews included. The standard icon is not here:
-// it is the app's own, in a light and a dark look. An icon that is pale or dark all over
-// comes in both looks too, and so does its preview: { light, dark }.
-export const APP_ICONS = [
-  { name: 'CoralSunrise', preview: require('../../../assets/images/alt/icon-03-sunrise-preview.png') },
-  { name: 'PaperLight', preview: { light: require('../../../assets/images/alt/icon-04-paper-preview.png'), dark: require('../../../assets/images/alt/icon-04-paper-dark-preview.png') } },
-  { name: 'VioletSun', preview: require('../../../assets/images/alt/icon-05-violet-sun-preview.png') },
-  { name: 'Metal', preview: require('../../../assets/images/alt/icon-08-metal-preview.png') },
-] as const
+// What the picker offers: the standard icon first (null, the app's own from app.json), then
+// the alternates under the names given to the plugin in app.json, drawn in assets/brand/alt
+// and rendered by tools/build-icons.mjs, previews included. An icon that is pale or dark all
+// over comes in both looks of the Home Screen, and so does its preview: { light, dark }. An
+// Android launcher has no dark icons and shows the one look named by android. glow is the
+// color the picker lights the page with behind the icon, the one the icon reads as.
+export const APP_ICONS: readonly AppIcon[] = [
+  {
+    name: null,
+    preview: { light: require('../../../assets/images/alt/default-light-preview.png'), dark: require('../../../assets/images/alt/default-dark-preview.png') },
+    android: 'dark',
+    glow: '#5F55E0',
+  },
+  { name: 'CoralSunrise', preview: require('../../../assets/images/alt/icon-03-sunrise-preview.png'), glow: '#FA6E4F' },
+  {
+    name: 'PaperLight',
+    preview: { light: require('../../../assets/images/alt/icon-04-paper-preview.png'), dark: require('../../../assets/images/alt/icon-04-paper-dark-preview.png') },
+    android: 'light',
+    glow: '#C9B490',
+  },
+  { name: 'VioletSun', preview: require('../../../assets/images/alt/icon-05-violet-sun-preview.png'), glow: '#5F55E0' },
+  { name: 'Metal', preview: require('../../../assets/images/alt/icon-08-metal-preview.png'), glow: '#138CF8' },
+]
 
 // The picture of an icon as the Home Screen shows it in the given look.
-export function previewFor(preview: number | { light: number; dark: number }, scheme: 'light' | 'dark') {
-  return typeof preview === 'number' ? preview : preview[scheme]
+export function previewFor(icon: AppIcon, scheme: Look) {
+  if (typeof icon.preview === 'number') return icon.preview
+  return icon.preview[isAndroid ? (icon.android ?? 'light') : scheme]
 }
 
-export const DEFAULT_ICON_PREVIEW = {
-  light: require('../../../assets/images/alt/default-light-preview.png'),
-  dark: require('../../../assets/images/alt/default-dark-preview.png'),
+// Whether the icon on the Home Screen changes with its light and dark look.
+export function followsLook(icon: AppIcon) {
+  return !isAndroid && typeof icon.preview !== 'number'
 }
 
 // null is the standard icon.
