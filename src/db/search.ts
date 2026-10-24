@@ -1,11 +1,15 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
+import { listRoomCasts, type CastFace } from '@/db/chats'
+
 export type SearchChat = {
   id: number
   title: string | null
   roomId: number | null
   ownerName: string
   ownerAvatar: string | null
+  // A scene's cast, shown in place of a photo; null for a one-on-one chat.
+  cast: CastFace[] | null
   lastActivity: number
 }
 
@@ -32,8 +36,8 @@ const OWNER_AVATAR = `
 
 // Every chat with who it belongs to. There are few enough of them to match the titles
 // in JS, where case folding works for Cyrillic too, unlike SQLite's LIKE.
-export function listSearchChats(db: SQLiteDatabase) {
-  return db.getAllAsync<SearchChat>(`
+export async function listSearchChats(db: SQLiteDatabase): Promise<SearchChat[]> {
+  const chats = await db.getAllAsync<Omit<SearchChat, 'cast'>>(`
     SELECT ch.id, ch.title, ch.room_id AS roomId, COALESCE(c.name, r.name) AS ownerName, ${OWNER_AVATAR},
       COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.chat_id = ch.id), ch.created_at) AS lastActivity
     FROM chats ch
@@ -41,6 +45,8 @@ export function listSearchChats(db: SQLiteDatabase) {
       LEFT JOIN rooms r ON r.id = ch.room_id
     ORDER BY lastActivity DESC
   `)
+  const casts = await listRoomCasts(db)
+  return chats.map((chat) => ({ ...chat, cast: chat.roomId === null ? null : (casts.get(chat.roomId) ?? []) }))
 }
 
 // SQLite folds case only for ASCII, so the query goes in the spellings a word usually

@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { CHARACTER_COLUMNS, type BackgroundEffect, type BackgroundTone, type Character } from '@/db/characters'
-import { CHAT_COLUMNS, PREVIEW, type Chat, type ChatPreview } from '@/db/chats'
+import { CHAT_COLUMNS, listRoomCasts, PREVIEW, type Chat, type ChatPreview } from '@/db/chats'
 import { dropDraft } from '@/db/drafts'
 import { addMessage, MESSAGE_COPY_COLUMNS } from '@/db/messages'
 import { notifyChatsChanged } from '@/lib/chat/chatEvents'
@@ -115,15 +115,8 @@ export async function listRooms(db: SQLiteDatabase): Promise<RoomPreview[]> {
     FROM rooms r
     ORDER BY r.sort_order DESC, r.id DESC
   `)
-  const cast = await db.getAllAsync<{ roomId: number; name: string; avatar: string | null }>(`
-    SELECT rm.room_id AS roomId, c.name, c.avatar
-    FROM room_members rm JOIN characters c ON c.id = rm.character_id
-    ORDER BY rm.room_id, rm.position
-  `)
-  return rows.map((row) => ({
-    ...fromRow(row),
-    cast: cast.filter((m) => m.roomId === row.id).map(({ name, avatar }) => ({ name, avatar })),
-  }))
+  const casts = await listRoomCasts(db)
+  return rows.map((row) => ({ ...fromRow(row), cast: casts.get(row.id) ?? [] }))
 }
 
 export async function getRoom(db: SQLiteDatabase, id: number) {
@@ -237,6 +230,49 @@ export function setRoomOrder(db: SQLiteDatabase, ids: number[]) {
       await db.runAsync('UPDATE rooms SET sort_order = ? WHERE id = ?', [ids.length - index, id])
     }
   })
+}
+
+// A copy of a room under another name, with its cast as it is set up and its scenes with
+// their lines, as a duplicated character takes its chats. The pictures are copied by the
+// caller, so the two rooms never share a file.
+export async function duplicateRoom(
+  db: SQLiteDatabase,
+  id: number,
+  name: string,
+  images: { background: string | null; backgroundOriginal: string | null }
+) {
+  let roomId = 0
+  await db.withTransactionAsync(async () => {
+    const res = await db.runAsync(
+      `INSERT INTO rooms (${FIELD_COLUMNS}, created_at)
+       SELECT ?, scenario, opening, user_name, floor, max_chain, director, ?, ?, background_crop, background_effect,
+         background_intensity, background_bubble_transparency, background_tone, ?
+       FROM rooms WHERE id = ?`,
+      [name, images.background, images.backgroundOriginal, Date.now(), id]
+    )
+    roomId = res.lastInsertRowId
+    await db.runAsync(
+      `INSERT INTO room_members (room_id, character_id, position, talkativeness, perception, triggers, muted, present)
+       SELECT ?, character_id, position, talkativeness, perception, triggers, muted, present
+       FROM room_members WHERE room_id = ?`,
+      [roomId, id]
+    )
+    const scenes = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE room_id = ? ORDER BY id', id)
+    for (const scene of scenes) {
+      const copy = await db.runAsync(
+        'INSERT INTO chats (room_id, title, created_at, thinking) SELECT ?, title, created_at, thinking FROM chats WHERE id = ?',
+        [roomId, scene.id]
+      )
+      await db.runAsync(
+        `INSERT INTO messages (chat_id, ${MESSAGE_COPY_COLUMNS})
+         SELECT ?, ${MESSAGE_COPY_COLUMNS}
+         FROM messages WHERE chat_id = ? ORDER BY id`,
+        [copy.lastInsertRowId, scene.id]
+      )
+    }
+  })
+  notifyChatsChanged()
+  return roomId
 }
 
 export async function deleteRoom(db: SQLiteDatabase, id: number) {

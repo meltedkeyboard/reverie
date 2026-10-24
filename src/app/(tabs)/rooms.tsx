@@ -9,15 +9,19 @@ import ReorderableList from 'react-native-reorderable-list'
 import { Button } from '@/components/controls/Button'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { GlassButton } from '@/components/chrome/Glass'
+import { IconButton } from '@/components/controls/IconButton'
+import { GlassButton, GlassGroup } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Pattern } from '@/components/visuals/Pattern'
-import type { MenuItem } from '@/components/overlays/NativeMenu'
+import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
+import { PopoverMenu, usePopoverMenu } from '@/components/overlays/PopoverMenu'
 import { RoomCard } from '@/components/lists/RoomCard'
 import { listCharacters } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { deleteRoom, listRooms, setRoomOrder, type RoomPreview } from '@/db/rooms'
+import { useBackupImport } from '@/hooks/features/useBackupImport'
+import { useRoomActions } from '@/hooks/features/useRoomActions'
 import { useFeaturedFill } from '@/hooks/features/useFeaturedFill'
 import { useContinueAnchor, useLastChat } from '@/hooks/chat/useLastChat'
 import { useReloadOnFocus } from '@/hooks/chat/useChatListActions'
@@ -26,6 +30,7 @@ import { useReorder } from '@/hooks/features/useReorder'
 import { useTranslation } from '@/i18n'
 import { removeAvatar } from '@/lib/images/avatars'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
+import { swiftUI } from '@/lib/ui/nativeUI'
 import { useColors, useStyles, type Colors } from '@/theme'
 
 
@@ -77,6 +82,7 @@ export default function RoomsScreen() {
         for (const room of doomed) {
           await deleteRoom(db, room.id)
           if (room.background) removeAvatar(room.background, 'backgrounds')
+          if (room.backgroundOriginal) removeAvatar(room.backgroundOriginal, 'backgrounds')
         }
         setEditing(false)
         reload()
@@ -84,22 +90,15 @@ export default function RoomsScreen() {
     })
   }
 
-  const confirmDelete = (room: RoomPreview) => {
-    confirmDeletion({
-      title: t('roomEditor.deleteConfirmTitle'),
-      message: t('rooms.deleteConfirmMessage', { name: room.name }),
-      onConfirm: async () => {
-        await deleteRoom(db, room.id)
-        if (room.background) removeAvatar(room.background, 'backgrounds')
-        reload()
-      },
-    })
-  }
+  const { menuItems, confirmDelete } = useRoomActions(reload)
+  // A room saved as a file comes back in through the same sheet a backup does.
+  const backupImport = useBackupImport(reload)
+  const createMenu = usePopoverMenu()
 
-  const roomMenu = (room: RoomPreview): MenuItem[] => [
-    { label: t('rooms.newScene'), systemImage: 'plus.bubble', onSelect: () => router.push(`/chat/new?room=${room.id}`) },
-    { label: t('characters.edit'), systemImage: 'pencil', onSelect: () => router.push(`/room/${room.id}`) },
-    { label: t('common.delete'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(room) },
+  // The menu of the plus on iOS: a new room, or one brought in from a file.
+  const createItems: MenuItem[] = [
+    { label: t('rooms.createRoom'), systemImage: 'plus.bubble', onSelect: () => router.push('/room/new') },
+    { label: t('rooms.importRoom'), systemImage: 'square.and.arrow.down', onSelect: backupImport.pick },
   ]
 
   return (
@@ -132,12 +131,13 @@ export default function RoomsScreen() {
             />
           ) : null
         }
+        onScrollBeginDrag={createMenu.close}
         renderItem={({ item: room }) => (
           <RoomCard
             room={room}
             onOpen={() => router.push(`/chat/latest?room=${room.id}`)}
             onDelete={() => confirmDelete(room)}
-            menu={roomMenu(room)}
+            menu={menuItems(room)}
             fillHeight={fillHeight}
             editing={{ active: editing, checked: checked.has(room.id), onToggle: () => toggleChecked([room.id]), motion }}
           />
@@ -174,27 +174,39 @@ export default function RoomsScreen() {
       <GlassHeader
         floating
         right={
-          <View style={styles.headerButtons}>
+          // The edit and create buttons share one capsule, as on the Characters tab.
+          <GlassGroup interactive={false}>
             {rooms?.length ? (
-              <GlassButton
-                icon={editing ? 'checkmark' : 'list'}
-                tint={editing ? colors.accent : undefined}
+              <IconButton
+                name={editing ? 'checkmark' : 'list'}
+                color={editing ? colors.accent : undefined}
                 {...editButton}
                 accessibilityLabel={editing ? t('characters.doneEditing') : t('rooms.editList')}
               />
             ) : null}
-            {editing ? null : (
-              <Link href="/room/new" asChild>
-                <Link.AppleZoom>
-                  <GlassButton icon="add" iconSize={26} accessibilityLabel={t('rooms.createRoom')} />
-                </Link.AppleZoom>
-              </Link>
+            {editing ? null : swiftUI ? (
+              // The system menu grows out of the button, in Liquid Glass on iOS 26.
+              <NativeMenu items={createItems}>
+                <IconButton name="add" size={26} accessibilityLabel={t('rooms.createRoom')} />
+              </NativeMenu>
+            ) : (
+              <IconButton name="add" size={26} onPress={createMenu.toggle} accessibilityLabel={t('rooms.createRoom')} />
             )}
-          </View>
+          </GlassGroup>
         }
       >
         <TabTitle>{t('rooms.title')}</TabTitle>
       </GlassHeader>
+      <PopoverMenu
+        visible={createMenu.visible}
+        onClose={createMenu.close}
+        style={[styles.createMenu, { top: insets.top + 4, right: 8 }]}
+        items={[
+          { label: t('rooms.createRoom'), icon: 'add-circle-outline', onSelect: () => router.push('/room/new') },
+          { label: t('rooms.importRoom'), icon: 'folder-outline', onSelect: backupImport.pick },
+        ]}
+      />
+      {backupImport.sheet}
     </View>
   )
 }
@@ -202,7 +214,7 @@ export default function RoomsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    createMenu: { position: 'absolute', zIndex: 100, transformOrigin: 'right top' },
     editBar: {
       position: 'absolute',
       left: 16,

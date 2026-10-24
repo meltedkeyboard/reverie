@@ -6,6 +6,7 @@ import type { SearchBarCommands } from 'react-native-screens'
 
 import { Avatar } from '@/components/visuals/Avatar'
 import { AvatarStack } from '@/components/cast/AvatarStack'
+import { CastMosaic } from '@/components/cast/CastMosaic'
 import { EmptyState } from '@/components/lists/EmptyState'
 import { EdgeFade } from '@/components/chrome/BarChrome'
 import { TabTitle, useHeaderHeight } from '@/components/chrome/GlassHeader'
@@ -374,7 +375,11 @@ function ResultRow({ item, needle, locale, you }: RowProps) {
     const when = formatWhen(chat.lastActivity, locale)
     return (
       <>
-        <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={40} />
+        {chat.cast ? (
+          <CastMosaic cast={chat.cast} name={chat.ownerName} size={40} round viewable />
+        ) : (
+          <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={40} />
+        )}
         <View style={styles.body}>
           <Highlighted text={chat.title ?? when} needle={needle} style={styles.title} />
           <Text style={styles.subtitle} numberOfLines={1}>

@@ -14,6 +14,7 @@ import { formatWhen } from '@/lib/core/format'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
+import { CastMosaic } from '../cast/CastMosaic'
 import { GlassSurface } from '../chrome/Glass'
 import { SwipeToDelete } from '../lists/SwipeToDelete'
 
@@ -72,7 +73,11 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
   // Every focus of a tab reloads the chat as a fresh object, so only a change of what is
   // written on the button counts.
   const looksSame = (a: LastChat, b: LastChat) =>
-    a.id === b.id && a.characterName === b.characterName && a.characterAvatar === b.characterAvatar && subtitle(a) === subtitle(b)
+    a.id === b.id &&
+    a.characterName === b.characterName &&
+    a.characterAvatar === b.characterAvatar &&
+    JSON.stringify(a.cast) === JSON.stringify(b.cast) &&
+    subtitle(a) === subtitle(b)
 
   const [shown, setShown] = useState(chat)
   const shownRef = useRef(shown)
@@ -140,7 +145,11 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
       >
         <GlassSurface interactive tintColor={colors.accent} style={styles.pill} fallbackStyle={styles.solid}>
           <Animated.View style={[styles.content, contentStyle]}>
-            <Avatar name={shown.characterName} file={shown.characterAvatar} size={HEIGHT - 16} viewable={false} />
+            {shown.cast ? (
+              <CastMosaic cast={shown.cast} name={shown.characterName} size={HEIGHT - 16} round />
+            ) : (
+              <Avatar name={shown.characterName} file={shown.characterAvatar} size={HEIGHT - 16} viewable={false} />
+            )}
             <View style={styles.text}>
               <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={styles.name} numberOfLines={1}>
                 {shown.characterName}

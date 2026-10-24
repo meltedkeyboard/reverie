@@ -165,21 +165,38 @@ export async function getLatestChatId(db: SQLiteDatabase, characterId: number) {
   return row?.id ?? null
 }
 
+export type CastFace = { name: string; avatar: string | null }
+
+// Who is in each room, in their order there: what stands for a scene where a chat shows its
+// character's photo (the cast as one picture, CastMosaic).
+export async function listRoomCasts(db: SQLiteDatabase) {
+  const rows = await db.getAllAsync<CastFace & { roomId: number }>(`
+    SELECT rm.room_id AS roomId, c.name, c.avatar
+    FROM room_members rm JOIN characters c ON c.id = rm.character_id
+    ORDER BY rm.room_id, rm.position
+  `)
+  const casts = new Map<number, CastFace[]>()
+  for (const { roomId, name, avatar } of rows) casts.set(roomId, [...(casts.get(roomId) ?? []), { name, avatar }])
+  return casts
+}
+
 export type LastChat = {
   id: number
   title: string | null
   lastActivity: number
   characterName: string
   characterAvatar: string | null
+  // A scene's cast, shown in place of a photo; null for a one-on-one chat.
+  cast: CastFace[] | null
 }
 
 // The chat of the given kind for the continue button on its home tab: the one opened last if
 // it is still there and has been written in, otherwise the one written in most recently.
-// A scene shows its room's name and the avatar of the room's first member.
-export function getLastChat(db: SQLiteDatabase, kind: 'character' | 'room', openedId: number | null) {
+// A scene shows its room's name and its cast.
+export async function getLastChat(db: SQLiteDatabase, kind: 'character' | 'room', openedId: number | null): Promise<LastChat | null> {
   const column = kind === 'room' ? 'room_id' : 'character_id'
-  return db.getFirstAsync<LastChat>(`
-    SELECT ch.id, ch.title,
+  const row = await db.getFirstAsync<Omit<LastChat, 'cast'> & { roomId: number | null }>(`
+    SELECT ch.id, ch.title, ch.room_id AS roomId,
       COALESCE(c.name, r.name) AS characterName,
       COALESCE(c.avatar, (SELECT mc.avatar FROM room_members rm JOIN characters mc ON mc.id = rm.character_id
         WHERE rm.room_id = r.id ORDER BY rm.position LIMIT 1)) AS characterAvatar,
@@ -202,4 +219,7 @@ export function getLastChat(db: SQLiteDatabase, kind: 'character' | 'room', open
     ORDER BY ch.id = ? DESC, lastActivity DESC, ch.id DESC
     LIMIT 1
   `, openedId ?? -1)
+  if (!row) return null
+  const { roomId, ...chat } = row
+  return { ...chat, cast: roomId === null ? null : ((await listRoomCasts(db)).get(roomId) ?? []) }
 }

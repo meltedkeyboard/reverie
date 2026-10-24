@@ -27,6 +27,11 @@ type Props = {
   characters: CharacterPreview[]
   onConfirm: (ids: number[]) => void
   onClose: () => void
+  // Who is ticked as it opens, for a list that is being changed rather than added to (the
+  // cast of a room): then the confirm button also takes the list emptied or unchanged.
+  initial?: number[]
+  title?: string
+  confirmLabel?: string
 }
 
 const SPRING = { damping: 28, stiffness: 320, mass: 0.8 }
@@ -86,7 +91,7 @@ function Ring({ state, children }: { state: 'all' | 'none'; children: React.Reac
   )
 }
 
-export function AddCharactersSheet({ visible, characters, onConfirm, onClose }: Props) {
+export function AddCharactersSheet({ visible, characters, onConfirm, onClose, initial, title, confirmLabel }: Props) {
   const { t, locale } = useTranslation()
   const colors = useColors()
   const styles = useStyles(createStyles)
@@ -96,9 +101,11 @@ export function AddCharactersSheet({ visible, characters, onConfirm, onClose }: 
 
   useEffect(() => {
     if (visible) {
-      setSelected(new Set())
+      setSelected(new Set(initial))
       setSearch('')
     }
+    // Read as it opens; a change of the list behind it while it is up stays out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
 
   const filtered = useMemo(() => {
@@ -132,6 +139,8 @@ export function AddCharactersSheet({ visible, characters, onConfirm, onClose }: 
     })
   }
 
+  const canConfirm = initial !== undefined || selected.size > 0
+
   const handleConfirm = () => {
     onConfirm(Array.from(selected))
   }
@@ -140,7 +149,7 @@ export function AddCharactersSheet({ visible, characters, onConfirm, onClose }: 
     <PageSheet
       visible={visible}
       onClose={onClose}
-      title={t('groups.addCharacterTitle')}
+      title={title ?? t('groups.addCharacterTitle')}
       background={colors.bg}
       left={
         <Pressable onPress={onClose} hitSlop={8}>
@@ -150,18 +159,18 @@ export function AddCharactersSheet({ visible, characters, onConfirm, onClose }: 
       right={
         <Pressable
           onPress={handleConfirm}
-          disabled={selected.size === 0}
+          disabled={!canConfirm}
           hitSlop={8}
-          style={selected.size === 0 && { opacity: 0.4 }}
+          style={!canConfirm && { opacity: 0.4 }}
         >
           <GlassSurface
-            interactive={selected.size > 0}
+            interactive={canConfirm}
             tintColor={colors.accent}
             style={styles.confirm}
             fallbackStyle={{ backgroundColor: colors.accent }}
           >
             <Text style={styles.confirmLabel}>
-              {selected.size > 0 ? `${t('groups.addCharacter')} (${selected.size})` : t('groups.addCharacter')}
+              {confirmLabel ?? (selected.size > 0 ? `${t('groups.addCharacter')} (${selected.size})` : t('groups.addCharacter'))}
             </Text>
           </GlassSurface>
         </Pressable>

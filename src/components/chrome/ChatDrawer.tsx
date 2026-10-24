@@ -10,7 +10,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 import { AvatarStack } from '@/components/cast/AvatarStack'
 import { holdHydration } from '@/components/chat/thread/hydration'
 import { listChatsOf, lookOf, ownerKey, type Owner } from '@/components/chat/thread/screen'
-import { deleteChat, listChats, pruneUntouchedChats, setChatOrder, type Chat, type ChatPreview } from '@/db/chats'
+import { deleteChat, pruneUntouchedChats, setChatOrder, type Chat, type ChatPreview } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { importChatToRoom, listRooms } from '@/db/rooms'
 import { useChatListActions } from '@/hooks/chat/useChatListActions'
@@ -21,7 +21,7 @@ import { prefetchMessages } from '@/lib/chat/messageCache'
 import { confirmDeleteChat } from '@/lib/chat/chatDialogs'
 import { plainPreview } from '@/lib/chat/roleplay'
 import { countLabel, formatWhen } from '@/lib/core/format'
-import { showMessage, showSheet } from '@/lib/ui/dialogs'
+import { showSheet } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
 import { swiftUI } from '@/lib/ui/nativeUI'
 import { FILL, fonts, HEADER_FONT_SCALE, useColors, useStyles, useTheme, type Colors } from '@/theme'
@@ -78,9 +78,6 @@ export const useChatDrawer = () => useContext(DrawerContext)
 
 // How many chats of the list have their messages read ahead when it opens.
 const READ_AHEAD = 5
-// How many chats of the cast a room offers to start a scene from.
-const IMPORT_CHOICES = 12
-
 // How much of the width the chat moves aside: the strip left of it is tapped or dragged back.
 const SHIFT = 0.84
 // A flick faster than this (pt/s) settles the way it goes, wherever the finger let go.
@@ -125,7 +122,6 @@ function keepSame(prev: ChatPreview[], next: ChatPreview[]) {
 export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, onNewChat, onCurrentDeleted, onClosed, children }: Props) {
   const db = useDatabase()
   const router = useRouter()
-  const colors = useColors()
   // Read through a ref: a room's cast changes as people come and go, its list does not.
   const ownerRef = useRef(owner)
   ownerRef.current = owner
@@ -133,7 +129,8 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const glass = useGlassStyles()
-  const { t, locale } = useTranslation()
+  const colors = useColors()
+  const { t } = useTranslation()
   // The list lies on the chat's own background, so the chat slides off it as off its own.
   const backdrop = useChatBackdropTone(lookOf(owner))
   const { width } = useWindowDimensions()
@@ -416,44 +413,6 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
     if (roomId === null) router.push(`/room/${target}`)
   }
 
-  // Any one-on-one chat of someone in the room can seed a scene here; the original stays put.
-  const importScene = async () => {
-    if (owner.kind !== 'room') return
-    const found = (
-      await Promise.all(
-        owner.members.map(async (m) => (await listChats(db, m.characterId)).map((chat) => ({ chat, name: m.character.name })))
-      )
-    )
-      .flat()
-      .filter(({ chat }) => chat.messageCount > 1)
-      .sort((a, b) => b.chat.lastActivity - a.chat.lastActivity)
-      .slice(0, IMPORT_CHOICES)
-    if (!found.length) return showMessage(t('rooms.importNothingTitle'), t('rooms.importNothingMessage'))
-    showSheet(
-      t('rooms.importTitle'),
-      found.map(({ chat, name }) => ({
-        label: `${name}: ${chat.title ?? formatWhen(chat.lastActivity, locale)}`,
-        onSelect: async () => {
-          const { chatId: sceneId } = await importChatToRoom(db, chat.id, owner.room.id)
-          await reload()
-          const scene = (await listChatsOf(db, owner)).find((c) => c.id === sceneId)
-          if (scene) {
-            hide()
-            onSelect(scene, false)
-          }
-        },
-      }))
-    )
-  }
-
-  const roomMenu: MenuItem[] =
-    owner.kind === 'room'
-      ? [
-          { label: t('rooms.importTitle'), systemImage: 'square.and.arrow.down', onSelect: importScene },
-          { label: t('room.menuEditRoom'), systemImage: 'slider.horizontal.3', onSelect: () => router.push(`/room/${owner.room.id}`) },
-        ]
-      : []
-
   const moveItem = (chat: ChatPreview): MenuItem =>
     rooms.length
       ? {
@@ -478,6 +437,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
     () => (owner.kind === 'room' ? owner.members.map((m) => ({ name: m.character.name, avatar: m.character.avatar })) : []),
     [owner]
   )
+  const ownerName = owner.kind === 'character' ? owner.character.name : owner.room.name
 
   // Made once, so the rows are memoized and a switch renders only the two whose state changed.
   // The menus are made anew only when the rooms they offer do.
@@ -510,57 +470,43 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
             >
               <View style={styles.head}>
                 <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />
-                <View style={[styles.who, owner.kind === 'room' && styles.whoRoom]}>
-                  {owner.kind === 'character' ? (
-                    // The character's pill of the old list of chats: a tap opens the profile.
-                    <Pressable
-                      onPress={() => router.push(`/character/${owner.character.id}?profile=1`)}
-                      style={styles.whoPress}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('profile.title')}
-                    >
-                      <GlassSurface interactive style={styles.whoPill} fallbackStyle={glass.solid}>
-                        <Avatar name={owner.character.name} file={owner.character.avatar} size={32} viewable={false} />
+                {/* A tap on the owner opens the profile, a character's or a room's. A room of
+                    several stands as in iMessage, the faces over a small pill with its name,
+                    in the middle; one of one or none is a pill on the left, as a character's. */}
+                <View style={[styles.who, cast.length > 1 && styles.whoGroup]}>
+                  <Pressable
+                    onPress={() =>
+                      router.push(owner.kind === 'character' ? `/character/${owner.character.id}?profile=1` : `/room/${owner.room.id}?profile=1`)
+                    }
+                    style={styles.whoPress}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('profile.title')}
+                  >
+                    {cast.length > 1 ? (
+                      <View style={styles.imessageHeader}>
+                        <View style={styles.avatarRow}>
+                          <AvatarStack cast={cast} size={34} max={3} viewable={false} />
+                        </View>
+                        <GlassSurface interactive style={styles.namePill} fallbackStyle={glass.solid}>
+                          <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.imessageName} numberOfLines={1}>
+                            {ownerName}
+                          </Text>
+                          <Icon name="chevron-forward" size={11} color={colors.textMuted} />
+                        </GlassSurface>
+                      </View>
+                    ) : (
+                      <GlassSurface interactive style={[styles.whoPill, owner.kind === 'room' && !cast.length && styles.whoPillNoAvatar]} fallbackStyle={glass.solid}>
+                        {owner.kind === 'character' ? (
+                          <Avatar name={owner.character.name} file={owner.character.avatar} size={32} viewable={false} />
+                        ) : cast.length ? (
+                          <Avatar name={cast[0].name} file={cast[0].avatar} size={32} viewable={false} />
+                        ) : null}
                         <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
-                          {owner.character.name}
+                          {ownerName}
                         </Text>
                       </GlassSurface>
-                    </Pressable>
-                  ) : (
-                    // The room's pill of the old list of scenes: its menu starts a scene from a
-                    // chat of the cast, or opens the room's settings.
-                    <NativeMenu items={roomMenu} title={owner.room.name} style={styles.whoPress}>
-                      {cast.length > 1 ? (
-                        <View style={styles.imessageHeader}>
-                          <View style={styles.avatarRow}>
-                            <AvatarStack cast={cast} size={34} max={3} viewable={false} />
-                          </View>
-                          <GlassSurface interactive style={styles.namePill} fallbackStyle={glass.solid}>
-                            <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.imessageName} numberOfLines={1}>
-                              {owner.room.name}
-                            </Text>
-                            <Icon name="chevron-forward" size={11} color={colors.textMuted} />
-                          </GlassSurface>
-                        </View>
-                      ) : (
-                        <GlassSurface
-                          interactive
-                          style={[styles.whoPill, !cast.length && styles.whoPillNoAvatar]}
-                          fallbackStyle={glass.solid}
-                        >
-                          {cast.length === 1 ? (
-                            <Avatar name={cast[0].name} file={cast[0].avatar} size={32} viewable={false} />
-                          ) : null}
-                          <View style={styles.nameRow}>
-                            <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.name} numberOfLines={1}>
-                              {owner.room.name}
-                            </Text>
-                            <Icon name="chevron-down" size={14} color={colors.textMuted} />
-                          </View>
-                        </GlassSurface>
-                      )}
-                    </NativeMenu>
-                  )}
+                    )}
+                  </Pressable>
                 </View>
                 <GlassButton icon="create-outline" onPress={startNew} accessibilityLabel={t('chatDrawer.newChat')} />
               </View>
@@ -724,7 +670,7 @@ const createStyles = (colors: Colors) =>
     list: { position: 'absolute', top: 0, bottom: 0, left: 0 },
     head: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 56, paddingLeft: 8, paddingRight: 12 },
     who: { flex: 1, alignItems: 'flex-start' },
-    whoRoom: { alignItems: 'center' },
+    whoGroup: { alignItems: 'center' },
     whoPress: { maxWidth: '100%', alignItems: 'center' },
     whoPill: {
       height: 44,
@@ -737,21 +683,10 @@ const createStyles = (colors: Colors) =>
       alignItems: 'center',
       maxWidth: '100%',
     },
-    whoPillNoAvatar: {
-      paddingHorizontal: 16,
-    },
-    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+    whoPillNoAvatar: { paddingHorizontal: 16 },
     name: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 18, fontWeight: '600' },
-    imessageHeader: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      maxWidth: '100%',
-    },
-    avatarRow: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1,
-    },
+    imessageHeader: { alignItems: 'center', justifyContent: 'center', maxWidth: '100%' },
+    avatarRow: { alignItems: 'center', justifyContent: 'center', zIndex: 1 },
     namePill: {
       height: 22,
       borderRadius: 11,
@@ -765,13 +700,7 @@ const createStyles = (colors: Colors) =>
       zIndex: 2,
       maxWidth: '100%',
     },
-    imessageName: {
-      flexShrink: 1,
-      color: colors.text,
-      fontFamily: fonts.prose,
-      fontSize: 13,
-      fontWeight: '600',
-    },
+    imessageName: { flexShrink: 1, color: colors.text, fontFamily: fonts.prose, fontSize: 13, fontWeight: '600' },
     rows: { paddingHorizontal: 8, paddingTop: 8 },
     row: {
       flexDirection: 'row',

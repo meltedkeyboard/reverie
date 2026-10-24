@@ -24,6 +24,7 @@ import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
 import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
+import { castDetent, finishCastSession } from '@/lib/chat/castSession'
 import { cropSheetDetents, cropSheetDown } from '@/lib/images/avatarCropLook'
 import { lookSheetDetents, lookSheetDown } from '@/lib/images/backgroundLook'
 import { ChatTextProvider } from '@/lib/chat/chatText'
@@ -197,6 +198,23 @@ function AppShell() {
                 listeners={{
                   transitionEnd: (e) => {
                     if (e.data.closing) finishAttachSession()
+                  },
+                }}
+              />
+              {/* A scene's cast sheet, the system sheet of iOS as the attach menu is: as tall as
+                  the cast needs, pulled up to the full height, down to close. */}
+              <Stack.Screen
+                name="cast"
+                options={() => ({
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: castDetent() < 1 ? [castDetent(), 1] : [1],
+                  sheetGrabberVisible: true,
+                  headerShown: false,
+                  contentStyle: { backgroundColor: sheetTones.sheet },
+                })}
+                listeners={{
+                  transitionEnd: (e) => {
+                    if (e.data.closing) finishCastSession()
                   },
                 }}
               />

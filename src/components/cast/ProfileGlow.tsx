@@ -48,6 +48,12 @@ export function glowTop(color: Rgb, bgRgb: string, scheme: Scheme) {
   return bg.map((c, i) => Math.round(c + (color[i] - c) * STRENGTH[scheme])).join(', ')
 }
 
+// A color written as #rrggbb, as the initials' tints are, for a profile without a photo.
+export function hexRgb(hex: string): Rgb {
+  const value = parseInt(hex.slice(1, 7), 16)
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
+}
+
 // The color a profile is washed in: the avatar's average, made more vivid. An average comes
 // out greyish, a photo's colors cancelling out, and washed over the page as it is it read
 // as a dirty shade rather than the character's color. The hue is kept, the saturation

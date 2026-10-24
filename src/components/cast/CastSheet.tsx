@@ -1,6 +1,6 @@
 import { Icon } from '@/components/visuals/Icon'
 import { Fragment, useEffect } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View, type StyleProp, type TextStyle } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
@@ -19,18 +19,19 @@ import { ChatBackdrop, useChatBackdropTone, type ChatLook } from '@/components/c
 import type { RoomMember } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
 import { isDesktop, isIOS } from '@/lib/core/platform'
+import { showSheet } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
 import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { Check } from '../controls/Check'
-import { StarToggle } from '../visuals/motifs/StarToggle'
+import { DraggableCard, systemCardMenu, unlessDragging } from '../lists/DraggableCard'
+import type { MenuItem } from '../overlays/NativeMenu'
 
-type Props = {
-  visible: boolean
-  onClose: () => void
-  onDismissed?: () => void
+// What the sheet of the cast shows and what changes it, whether it is the app's own sheet or
+// the system's (app/cast on iOS, which reads it from castSession).
+export type CastProps = {
   members: RoomMember[]
   addressees: number[]
   narration: boolean
@@ -44,9 +45,17 @@ type Props = {
   // Walking in and out is told by the narrator, so it waits until nobody is replying.
   canMove: boolean
   onTogglePresent: (member: RoomMember) => void
-  onMemberMenu: (member: RoomMember) => void
+  // What a long press on someone offers: the system's menu over their row on iOS, an
+  // action sheet elsewhere.
+  memberMenu: (member: RoomMember) => MenuItem[]
   // The room's look, whose background the sheet carries.
   look?: ChatLook
+}
+
+type Props = CastProps & {
+  visible: boolean
+  onClose: () => void
+  onDismissed?: () => void
 }
 
 const AVATAR = 38
@@ -61,21 +70,35 @@ const DOT: CSSTransitionProperties = { transitionProperty: ['width', 'marginRigh
 // someone of the cast. A tap on someone writes to them alone, a swipe to the left
 // walks them out of the scene or back in, and a long press has the rest. Over the room's
 // picture it takes the scheme the picture reads best in, blurred as the sheet shows it.
-export function CastSheet(props: Props) {
-  const scheme = useChatBackdropTone(props.look)
+// The app's own sheet, for where the system's (app/cast) is not used.
+export function CastSheet({ visible, onClose, onDismissed, ...cast }: Props) {
+  const scheme = useChatBackdropTone(cast.look)
+  const { t } = useTranslation()
   return (
     <SchemeOverride scheme={scheme}>
       <SheetBackdropContext.Provider value={scheme !== null}>
-        <CastSheetBody {...props} />
+        <BottomSheet
+          visible={visible}
+          onClose={onClose}
+          onDismissed={onDismissed}
+          title={t('room.castTitle')}
+          compactHeader
+          noGlass
+          underlay={<ChatBackdrop owner={cast.look} />}
+        >
+          <CastSheetContent {...cast} scrollStyle={sheetScroll} />
+        </BottomSheet>
       </SheetBackdropContext.Provider>
     </SchemeOverride>
   )
 }
 
-function CastSheetBody({
-  visible,
-  onClose,
-  onDismissed,
+// In the app's sheet the list takes no more room than its rows and scrolls past that.
+const sheetScroll = { flexGrow: 0, flexShrink: 1 }
+
+// The rows of the sheet: the whole room, the narrator and the cast in one card, the whisper
+// in another, and the hint between them.
+export function CastSheetContent({
   members,
   addressees,
   narration,
@@ -87,9 +110,9 @@ function CastSheetBody({
   queuedIds,
   canMove,
   onTogglePresent,
-  onMemberMenu,
-  look,
-}: Props) {
+  memberMenu,
+  scrollStyle,
+}: CastProps & { scrollStyle?: StyleProp<ViewStyle> }) {
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
@@ -132,117 +155,104 @@ function CastSheetBody({
   }
 
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      onDismissed={onDismissed}
-      title={t('room.castTitle')}
-      compactHeader
-      noGlass
-      underlay={<ChatBackdrop owner={look} />}
+    <ScrollView
+      style={scrollStyle}
+      contentContainerStyle={styles.sheetContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="always"
+      bounces={false}
     >
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.sheetContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="always"
-        bounces={false}
-      >
-        <View style={[styles.sheetCard, { backgroundColor: tones.card }]}>
-          <ModeRow
-            icon="people"
-            title={t('room.everyone')}
-            hint={t('room.castEveryoneHint')}
-            on={!picked.length && !narration}
-            onPress={() => pickOnly([])}
-          />
-          <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
-          <ModeRow
-            icon="book"
-            title={t('room.narration')}
-            hint={t('room.castNarrationHint')}
-            on={narration}
-            onPress={() => {
-              Haptics.selectionAsync()
-              onNarrate()
-            }}
-          />
+      <View style={[styles.sheetCard, { backgroundColor: tones.card }]}>
+        <ModeRow
+          icon="people"
+          title={t('room.everyone')}
+          hint={t('room.castEveryoneHint')}
+          on={!picked.length && !narration}
+          onPress={() => pickOnly([])}
+        />
+        <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+        <ModeRow
+          icon="book"
+          title={t('room.narration')}
+          hint={t('room.castNarrationHint')}
+          on={narration}
+          onPress={() => {
+            Haptics.selectionAsync()
+            onNarrate()
+          }}
+        />
 
-          {members.map((member) => {
-            const id = member.characterId
-            const speaking = id === speakingId
-            const live = speaking || queuedIds.includes(id)
-            return (
-              <Fragment key={id}>
-                <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
-                <SwipeRow
-                  enabled={canMove}
-                  present={member.present}
-                  onToggle={() => onTogglePresent(member)}
-                  onPress={() => pickOnly([id])}
-                  onLongPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                    onMemberMenu(member)
-                  }}
-                  name={member.character.name}
-                >
-                  <Animated.View style={[{ opacity: member.present ? 1 : AWAY }, FADE]}>
-                    <Speaking active={speaking} color={colors.cast[member.position % colors.cast.length]}>
-                      <Avatar name={member.character.name} file={member.character.avatar} size={AVATAR} viewable={false} />
-                    </Speaking>
-                  </Animated.View>
-                  <Animated.View style={[styles.body, { opacity: member.present ? 1 : AWAY }, FADE]}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {member.character.name}
-                    </Text>
-                    <View style={styles.statusRow}>
-                      <Animated.View
-                        style={[
-                          styles.liveDot,
-                          { backgroundColor: colors.cast[member.position % colors.cast.length] },
-                          live ? styles.liveDotOn : styles.liveDotOff,
-                          DOT,
-                        ]}
-                      />
-                      <View style={styles.statusText}>
-                        <CrossFade texts={statuses} index={statusOf(member)} style={styles.status} numberOfLines={1} />
-                      </View>
+        {members.map((member) => {
+          const id = member.characterId
+          const speaking = id === speakingId
+          const live = speaking || queuedIds.includes(id)
+          return (
+            <Fragment key={id}>
+              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+              <SwipeRow
+                enabled={canMove}
+                present={member.present}
+                onToggle={() => onTogglePresent(member)}
+                onPress={() => pickOnly([id])}
+                menu={memberMenu(member)}
+                name={member.character.name}
+              >
+                <Animated.View style={[{ opacity: member.present ? 1 : AWAY }, FADE]}>
+                  <Speaking active={speaking} color={colors.cast[member.position % colors.cast.length]}>
+                    <Avatar name={member.character.name} file={member.character.avatar} size={AVATAR} viewable={false} />
+                  </Speaking>
+                </Animated.View>
+                <Animated.View style={[styles.body, { opacity: member.present ? 1 : AWAY }, FADE]}>
+                  <Text style={styles.name} numberOfLines={1}>
+                    {member.character.name}
+                  </Text>
+                  <View style={styles.statusRow}>
+                    <Animated.View
+                      style={[
+                        styles.liveDot,
+                        { backgroundColor: colors.cast[member.position % colors.cast.length] },
+                        live ? styles.liveDotOn : styles.liveDotOff,
+                        DOT,
+                      ]}
+                    />
+                    <View style={styles.statusText}>
+                      <CrossFade texts={statuses} index={statusOf(member)} style={styles.status} numberOfLines={1} />
                     </View>
-                  </Animated.View>
-                  <Check on={picked.includes(id)} />
-                </SwipeRow>
-              </Fragment>
-            )
-          })}
-        </View>
-        <CrossFade texts={[t('room.castHint'), t('room.castBusy')]} index={canMove ? 0 : 1} style={styles.hint} />
+                  </View>
+                </Animated.View>
+                <Check on={picked.includes(id)} />
+              </SwipeRow>
+            </Fragment>
+          )
+        })}
+      </View>
+      <CrossFade texts={[t('room.castHint'), t('room.castBusy')]} index={canMove ? 0 : 1} style={styles.hint} />
 
-        <View style={[styles.sheetCard, styles.sheetCardSecondary, { backgroundColor: tones.card }]}>
-          <View style={[styles.row, styles.whisperRow, { backgroundColor: tones.row }]}>
-            <Animated.View style={[styles.modeIcon, { opacity: canWhisper ? 1 : AWAY }, FADE]}>
-              <Icon name="lock-closed" size={18} color={colors.accent} />
-            </Animated.View>
-            <View style={styles.body}>
-              <Animated.Text style={[styles.name, { opacity: canWhisper ? 1 : AWAY }, FADE]}>{t('room.whisper')}</Animated.Text>
-              <CrossFade texts={whisperHints} index={whisperHint} style={styles.status} />
-            </View>
-            <Animated.View style={[{ opacity: canWhisper ? 1 : AWAY }, FADE]} pointerEvents={canWhisper ? 'auto' : 'none'}>
-              <Switch
-                value={whisper && canWhisper}
-                onValueChange={() => {
-                  Haptics.selectionAsync()
-                  onToggleWhisper()
-                }}
-                disabled={!canWhisper}
-                accessibilityLabel={t('room.whisper')}
-                trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
-                {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
-              />
-            </Animated.View>
+      <View style={[styles.sheetCard, styles.sheetCardSecondary, { backgroundColor: tones.card }]}>
+        <View style={[styles.row, styles.whisperRow, { backgroundColor: tones.row }]}>
+          <Animated.View style={[styles.modeIcon, { opacity: canWhisper ? 1 : AWAY }, FADE]}>
+            <Icon name="lock-closed" size={18} color={colors.accent} />
+          </Animated.View>
+          <View style={styles.body}>
+            <Animated.Text style={[styles.name, { opacity: canWhisper ? 1 : AWAY }, FADE]}>{t('room.whisper')}</Animated.Text>
+            <CrossFade texts={whisperHints} index={whisperHint} style={styles.status} />
           </View>
+          <Animated.View style={[{ opacity: canWhisper ? 1 : AWAY }, FADE]} pointerEvents={canWhisper ? 'auto' : 'none'}>
+            <Switch
+              value={whisper && canWhisper}
+              onValueChange={() => {
+                Haptics.selectionAsync()
+                onToggleWhisper()
+              }}
+              disabled={!canWhisper}
+              accessibilityLabel={t('room.whisper')}
+              trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
+              {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
+            />
+          </Animated.View>
         </View>
-      </ScrollView>
-    </BottomSheet>
+      </View>
+    </ScrollView>
   )
 }
 
@@ -315,7 +325,7 @@ type SwipeRowProps = {
   present: boolean
   onToggle: () => void
   onPress: () => void
-  onLongPress: () => void
+  menu: MenuItem[]
   name: string
   children: React.ReactNode
 }
@@ -326,7 +336,7 @@ const SPRING = { damping: 24, stiffness: 240 }
 
 // A member's row. A swipe to the left uncovers what it will do and does it on release,
 // then the row springs back; there is nothing to confirm, the way back is the same swipe.
-function SwipeRow({ enabled, present, onToggle, onPress, onLongPress, name, children }: SwipeRowProps) {
+function SwipeRow({ enabled, present, onToggle, onPress, menu, name, children }: SwipeRowProps) {
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
@@ -360,6 +370,12 @@ function SwipeRow({ enabled, present, onToggle, onPress, onLongPress, name, chil
       })
     })
 
+  // Where there is no system menu over the row, an action sheet with the same choices.
+  const openMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    showSheet(name, menu)
+  }
+
   // Someone out of the scene can't be written to; the tap hints at the swipe instead.
   const peek = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -385,17 +401,21 @@ function SwipeRow({ enabled, present, onToggle, onPress, onLongPress, name, chil
       </Animated.View>
       <GestureDetector gesture={pan}>
         <Animated.View style={content}>
-          <Pressable
-            onPress={present ? onPress : peek}
-            onLongPress={onLongPress}
-            delayLongPress={350}
-            accessibilityLabel={name}
-            accessibilityActions={enabled ? [{ name: 'toggle', label: action }] : undefined}
-            onAccessibilityAction={() => onToggle()}
-            style={({ pressed }) => [styles.row, { backgroundColor: pressed ? tones.pressed : tones.row }]}
-          >
-            {children}
-          </Pressable>
+          {/* On iOS the long press is the system's: the row lifts and the menu grows out of
+              it, as a character's card does. The touch that opened it must not pick the row. */}
+          <DraggableCard menu={menu} items={[]} dragEnabled draggable={false} cornerRadius={0}>
+            <Pressable
+              onPress={unlessDragging(present ? onPress : peek)}
+              onLongPress={systemCardMenu ? undefined : openMenu}
+              delayLongPress={350}
+              accessibilityLabel={name}
+              accessibilityActions={enabled ? [{ name: 'toggle', label: action }] : undefined}
+              onAccessibilityAction={() => onToggle()}
+              style={({ pressed }) => [styles.row, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+            >
+              {children}
+            </Pressable>
+          </DraggableCard>
         </Animated.View>
       </GestureDetector>
     </View>
@@ -427,7 +447,6 @@ const ringStyle = StyleSheet.create({
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    scroll: { flexGrow: 0, flexShrink: 1 },
     sheetContent: { paddingHorizontal: 16, paddingBottom: 10 },
     sheetCard: { borderRadius: 24, overflow: 'hidden' },
     sheetCardSecondary: { marginTop: 14 },

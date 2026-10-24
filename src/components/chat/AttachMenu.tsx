@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useRef, useState, type RefObject 
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
-import { ChatBackdrop, useChatBackdrop, useChatBackdropTone } from '@/components/chrome/ChatChrome'
+import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, type ChatLook } from '@/components/chrome/ChatChrome'
 import { Button } from '@/components/controls/Button'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
@@ -413,13 +413,13 @@ export function PersonaPicker({
 // The whole stack of the system sheet (iOS, app/attach), which its screens measure the bar against.
 export const AttachStackContext = createContext<RefObject<View | null> | null>(null)
 
-// A screen of the system sheet. Over the chat's background the bar is see-through and the
+// A screen of the system sheet (the attach menu's, the cast's). Over the chat's background the bar is see-through and the
 // screen draws the background itself, so a screen pushed covers the one under it as it
 // slides in. The system lays the screen out below the bar; the background reaches up under
 // the bar by as far as the screen's top is below the stack's, measured, since the height
 // the stack reports for its bar is not to be trusted inside a sheet.
-export function AttachScreenFrame({ session, children }: { session: AttachSession; children: React.ReactNode }) {
-  const backdrop = useChatBackdrop(session.look)
+export function AttachScreenFrame({ look, children }: { look: ChatLook | null | undefined; children: React.ReactNode }) {
+  const backdrop = useChatBackdrop(look)
   const stack = useContext(AttachStackContext)
   const self = useRef<View>(null)
   const [bar, setBar] = useState(0)
@@ -445,7 +445,7 @@ export function AttachScreenFrame({ session, children }: { session: AttachSessio
       }}
     >
       <View pointerEvents="none" style={[FILL, { top: -bar }]}>
-        <ChatBackdrop owner={session.look} />
+        <ChatBackdrop owner={look} />
       </View>
       {children}
     </View>
