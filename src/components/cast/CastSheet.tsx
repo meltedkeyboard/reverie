@@ -27,7 +27,8 @@ import { Avatar } from '../visuals/Avatar'
 import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { Check } from '../controls/Check'
 import { DraggableCard, systemCardMenu, unlessDragging } from '../lists/DraggableCard'
-import type { MenuItem } from '../overlays/NativeMenu'
+import { NativeHostedRow, NativeSection, NativeSheetForm, nativeForm } from '../lists/NativeForm'
+import { menuItemViews, NativeMenu, type MenuItem } from '../overlays/NativeMenu'
 
 // What the sheet of the cast shows and what changes it, whether it is the app's own sheet or
 // the system's (app/cast on iOS, which reads it from castSession).
@@ -133,25 +134,10 @@ export function CastSheetContent({
     t('room.castWhisperPick'),
   ]
   const whisperHint = narration ? 0 : !whisper ? 1 : picked.length ? 2 : 3
-  const statuses = [
-    t('room.castSpeaking'),
-    t('room.castQueued'),
-    t('room.castAway'),
-    t('room.castMuted'),
-    t('room.castPresent'),
-  ]
 
   const pickOnly = (ids: number[]) => {
     Haptics.selectionAsync()
     onChangeAddressees(ids)
-  }
-
-  const statusOf = (member: RoomMember) => {
-    if (member.characterId === speakingId) return 0
-    if (queuedIds.includes(member.characterId)) return 1
-    if (!member.present) return 2
-    if (member.muted) return 3
-    return 4
   }
 
   return (
@@ -184,8 +170,6 @@ export function CastSheetContent({
 
         {members.map((member) => {
           const id = member.characterId
-          const speaking = id === speakingId
-          const live = speaking || queuedIds.includes(id)
           return (
             <Fragment key={id}>
               <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
@@ -197,30 +181,7 @@ export function CastSheetContent({
                 menu={memberMenu(member)}
                 name={member.character.name}
               >
-                <Animated.View style={[{ opacity: member.present ? 1 : AWAY }, FADE]}>
-                  <Speaking active={speaking} color={colors.cast[member.position % colors.cast.length]}>
-                    <Avatar name={member.character.name} file={member.character.avatar} size={AVATAR} viewable={false} />
-                  </Speaking>
-                </Animated.View>
-                <Animated.View style={[styles.body, { opacity: member.present ? 1 : AWAY }, FADE]}>
-                  <Text style={styles.name} numberOfLines={1}>
-                    {member.character.name}
-                  </Text>
-                  <View style={styles.statusRow}>
-                    <Animated.View
-                      style={[
-                        styles.liveDot,
-                        { backgroundColor: colors.cast[member.position % colors.cast.length] },
-                        live ? styles.liveDotOn : styles.liveDotOff,
-                        DOT,
-                      ]}
-                    />
-                    <View style={styles.statusText}>
-                      <CrossFade texts={statuses} index={statusOf(member)} style={styles.status} numberOfLines={1} />
-                    </View>
-                  </View>
-                </Animated.View>
-                <Check on={picked.includes(id)} />
+                <MemberContent member={member} picked={picked.includes(id)} speakingId={speakingId} queuedIds={queuedIds} />
               </SwipeRow>
             </Fragment>
           )
@@ -256,16 +217,187 @@ export function CastSheetContent({
   )
 }
 
+// A member's photo, name and what they are doing, and the check of the one written to.
+function MemberContent({ member, picked, speakingId, queuedIds }: { member: RoomMember; picked: boolean; speakingId: number | null; queuedIds: number[] }) {
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  const id = member.characterId
+  const speaking = id === speakingId
+  const live = speaking || queuedIds.includes(id)
+  const statuses = [t('room.castSpeaking'), t('room.castQueued'), t('room.castAway'), t('room.castMuted'), t('room.castPresent')]
+  const status = speaking ? 0 : queuedIds.includes(id) ? 1 : !member.present ? 2 : member.muted ? 3 : 4
+  const ink = colors.cast[member.position % colors.cast.length]
+  return (
+    <>
+      <Animated.View style={[{ opacity: member.present ? 1 : AWAY }, FADE]}>
+        <Speaking active={speaking} color={ink}>
+          <Avatar name={member.character.name} file={member.character.avatar} size={AVATAR} viewable={false} />
+        </Speaking>
+      </Animated.View>
+      <Animated.View style={[styles.body, { opacity: member.present ? 1 : AWAY }, FADE]}>
+        <Text style={styles.name} numberOfLines={1}>
+          {member.character.name}
+        </Text>
+        <View style={styles.statusRow}>
+          <Animated.View style={[styles.liveDot, { backgroundColor: ink }, live ? styles.liveDotOn : styles.liveDotOff, DOT]} />
+          <View style={styles.statusText}>
+            <CrossFade texts={statuses} index={status} style={styles.status} numberOfLines={1} />
+          </View>
+        </View>
+      </Animated.View>
+      <Check on={picked} />
+    </>
+  )
+}
+
+// The same sheet as the system's own list (iOS with SwiftUI), over the room's picture as the
+// app's rows are. The rows are the app's own, in rows of the list: the photo, the name in its
+// color and what each one is doing are not the system's. The swipe that walks someone out of
+// the scene or back in is the list's own, and so is the whisper's switch and the menu of a
+// long press on someone. A tap on someone out of the scene brings them back in
+// and writes to them, as the swipe would and then the tap.
+export function NativeCastList({
+  members,
+  addressees,
+  narration,
+  onChangeAddressees,
+  onNarrate,
+  whisper,
+  onToggleWhisper,
+  speakingId,
+  queuedIds,
+  canMove,
+  onTogglePresent,
+  memberMenu,
+}: CastProps) {
+  const colors = useColors()
+  const tones = useSheetTones({ noGlass: true })
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  const { SwipeActions, Button, Toggle, ContextMenu } = nativeForm!.ui
+  const { tint, disabled } = nativeForm!.modifiers
+  const picked = narration ? [] : addressees
+  const canWhisper = !narration
+  const whisperNames = members
+    .filter((m) => picked.includes(m.characterId))
+    .map((m) => m.character.name)
+    .join(', ')
+  const whisperHint = narration
+    ? t('room.castWhisperNarration')
+    : !whisper
+      ? t('room.castWhisperOff')
+      : picked.length
+        ? t('room.castWhisperHint', { names: whisperNames })
+        : t('room.castWhisperPick')
+
+  const pickOnly = (ids: number[]) => {
+    Haptics.selectionAsync()
+    onChangeAddressees(ids)
+  }
+  const tapMember = (member: RoomMember) => {
+    if (member.present) return pickOnly([member.characterId])
+    // Walking in is told by the narrator, so it waits until nobody is replying.
+    if (!canMove) return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    onTogglePresent(member)
+    onChangeAddressees([member.characterId])
+  }
+
+  return (
+    <NativeSheetForm>
+      <NativeSection fill={tones.card} top footer={canMove ? t('room.castHint') : t('room.castBusy')}>
+        <NativeHostedRow>
+          <ModeRow icon="people" title={t('room.everyone')} hint={t('room.castEveryoneHint')} on={!picked.length && !narration} onPress={() => pickOnly([])} bare />
+        </NativeHostedRow>
+        <NativeHostedRow>
+          <ModeRow
+            icon="book"
+            title={t('room.narration')}
+            hint={t('room.castNarrationHint')}
+            on={narration}
+            onPress={() => {
+              Haptics.selectionAsync()
+              onNarrate()
+            }}
+            bare
+          />
+        </NativeHostedRow>
+        {members.map((member) => (
+          <SwipeActions key={member.characterId}>
+            {/* The long press is the list's own menu of the row: the menu of a view inside the
+                row never opened, the row taking the press. */}
+            <ContextMenu>
+              <ContextMenu.Items>{menuItemViews(memberMenu(member))}</ContextMenu.Items>
+              <ContextMenu.Trigger>
+                <NativeHostedRow>
+                  <View style={styles.memberLine}>
+                    <Pressable
+                      onPress={() => tapMember(member)}
+                      accessibilityLabel={member.character.name}
+                      accessibilityActions={canMove ? [{ name: 'toggle', label: member.present ? t('room.castLeave') : t('room.castEnter') }] : undefined}
+                      onAccessibilityAction={() => onTogglePresent(member)}
+                      style={[styles.row, styles.memberPress]}
+                    >
+                      <MemberContent member={member} picked={picked.includes(member.characterId)} speakingId={speakingId} queuedIds={queuedIds} />
+                    </Pressable>
+                    {/* The same menu as the long press, for whoever does not know to hold, as
+                        beside a persona in the attach menu. */}
+                    <View style={styles.menuSlot} onStartShouldSetResponder={() => true}>
+                      <NativeMenu items={memberMenu(member)} title={member.character.name}>
+                        <View style={styles.menuButton}>
+                          <Icon name="ellipsis-horizontal" size={18} color={colors.textFaint} />
+                        </View>
+                      </NativeMenu>
+                    </View>
+                  </View>
+                </NativeHostedRow>
+              </ContextMenu.Trigger>
+            </ContextMenu>
+            {/* Not the destructive role: with it a full swipe takes the row out of the list,
+                as if it were deleted. */}
+            {canMove ? (
+              <SwipeActions.Actions edge="trailing" allowsFullSwipe>
+                <Button
+                  label={member.present ? t('room.castLeave') : t('room.castEnter')}
+                  systemImage={member.present ? 'rectangle.portrait.and.arrow.right' : 'figure.walk'}
+                  onPress={() => onTogglePresent(member)}
+                  modifiers={[tint(member.present ? colors.danger : colors.success)]}
+                />
+              </SwipeActions.Actions>
+            ) : null}
+          </SwipeActions>
+        ))}
+      </NativeSection>
+
+      <NativeSection fill={tones.card} footer={whisperHint}>
+        <Toggle
+          label={t('room.whisper')}
+          systemImage="lock.fill"
+          isOn={whisper && canWhisper}
+          onIsOnChange={() => {
+            Haptics.selectionAsync()
+            onToggleWhisper()
+          }}
+          modifiers={[disabled(!canWhisper)]}
+        />
+      </NativeSection>
+    </NativeSheetForm>
+  )
+}
+
 type ModeRowProps = {
   icon: 'people' | 'book'
   title: string
   hint: string
   on: boolean
   onPress: () => void
+  // In a row of the system's list, which draws the fill: no fill of its own and, as the list's
+  // other rows that are the app's, no highlight.
+  bare?: boolean
 }
 
 // A row that is not a character: the whole room, or the narrator's voice.
-function ModeRow({ icon, title, hint, on, onPress }: ModeRowProps) {
+function ModeRow({ icon, title, hint, on, onPress, bare = false }: ModeRowProps) {
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
@@ -274,7 +406,7 @@ function ModeRow({ icon, title, hint, on, onPress }: ModeRowProps) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: on }}
-      style={({ pressed }) => [styles.row, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+      style={({ pressed }) => [styles.row, { backgroundColor: bare ? 'transparent' : pressed ? tones.pressed : tones.row }]}
     >
       <View style={styles.modeIcon}>
         <Icon name={icon} size={20} color={colors.accent} />
@@ -303,6 +435,29 @@ function CrossFade({
   numberOfLines?: number
 }) {
   const styles = useStyles(createStyles)
+  // A single line needs no tallest wording: the wordings lie over a line kept for the height,
+  // from the left edge. The percentages of the stack below came out against another width in
+  // a row of the system's list, and the line stood off to the right.
+  if (numberOfLines === 1) {
+    return (
+      <View>
+        <Text style={[style, styles.spacer]} numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {texts[index]}
+        </Text>
+        {texts.map((text, i) => (
+          <Animated.Text
+            key={i}
+            style={[style, styles.overlay, { opacity: i === index ? 1 : 0 }, FADE]}
+            numberOfLines={1}
+            accessibilityElementsHidden={i !== index}
+            importantForAccessibility={i === index ? 'auto' : 'no-hide-descendants'}
+          >
+            {text}
+          </Animated.Text>
+        ))}
+      </View>
+    )
+  }
   return (
     <View style={styles.stack}>
       {texts.map((text, i) => (
@@ -487,6 +642,8 @@ const createStyles = (colors: Colors) =>
     statusText: { flex: 1 },
     stackItem: { width: '100%', flexShrink: 0 },
     stackOver: { marginLeft: '-100%' },
+    spacer: { opacity: 0 },
+    overlay: { position: 'absolute', top: 0, left: 0, right: 0 },
     status: { color: colors.textMuted, fontSize: 15, flexShrink: 1 },
     behind: {
       position: 'absolute',
@@ -512,4 +669,9 @@ const createStyles = (colors: Colors) =>
       fontWeight: '600',
     },
     hint: { color: colors.textMuted, fontSize: 14, lineHeight: 19, paddingHorizontal: 16, paddingTop: 12 },
+    memberLine: { flexDirection: 'row', alignItems: 'center' },
+    // The ellipsis takes the row's padding at its end.
+    memberPress: { flex: 1, paddingRight: 4 },
+    menuSlot: { paddingRight: 12, paddingLeft: 4, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+    menuButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   })

@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Chip } from '@/components/controls/Chip'
-import { NativeForm, NativeFreeSliderRow, NativeSection, NativeSegmentRow, nativeForm } from '@/components/lists/NativeForm'
+import { LIST_TOP, NativeForm, NativeFreeSliderRow, NativeSection, NativeSegmentRow, nativeForm } from '@/components/lists/NativeForm'
 import { NativeMenu } from '@/components/overlays/NativeMenu'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { ParamSlider } from '@/components/controls/ParamSlider'
@@ -18,9 +18,6 @@ import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 // Far enough to take the controls out of the strip under the bar of the sheet let down.
 const HIDE_BY = 160
-
-// The room the system's list leaves above its first section.
-const LIST_TOP = 35
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
 

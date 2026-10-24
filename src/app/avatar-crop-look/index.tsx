@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ParamSlider } from '@/components/controls/ParamSlider'
-import { NativeForm, NativeSection, NativeSliderRow, nativeForm } from '@/components/lists/NativeForm'
+import { LIST_TOP, NativeForm, NativeSection, NativeSliderRow, nativeForm } from '@/components/lists/NativeForm'
 import { useStore } from '@/components/chat/thread/store'
 import { useSheetTones } from '@/components/overlays/BottomSheet'
 import { SFIcon } from '@/components/visuals/SFIcon'
@@ -15,9 +15,6 @@ import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 // Far enough to take the controls out of the strip under the bar of the sheet let down.
 const HIDE_BY = 160
-
-// The room the system's list leaves above its first section, as on /background-look.
-const LIST_TOP = 35
 
 const times = (value: number) => `${value.toFixed(1)}×`
 

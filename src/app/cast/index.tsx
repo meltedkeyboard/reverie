@@ -1,7 +1,8 @@
 import { useNavigation, useRouter } from 'expo-router'
 import { useEffect, useLayoutEffect } from 'react'
 
-import { CastSheetContent } from '@/components/cast/CastSheet'
+import { CastSheetContent, NativeCastList } from '@/components/cast/CastSheet'
+import { nativeForm } from '@/components/lists/NativeForm'
 import { AttachScreenFrame, fillScreen } from '@/components/chat/AttachMenu'
 import { useStore } from '@/components/chat/thread/store'
 import { useTranslation } from '@/i18n'
@@ -42,7 +43,7 @@ export default function CastScreen() {
   if (!cast) return null
   return (
     <AttachScreenFrame look={cast.look}>
-      <CastSheetContent {...cast} scrollStyle={fillScreen} />
+      {nativeForm ? <NativeCastList {...cast} /> : <CastSheetContent {...cast} scrollStyle={fillScreen} />}
     </AttachScreenFrame>
   )
 }

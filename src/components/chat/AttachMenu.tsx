@@ -9,6 +9,7 @@ import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring
 import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, type ChatLook } from '@/components/chrome/ChatChrome'
 import { Button } from '@/components/controls/Button'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
+import { NativeHostedRow, NativeLinkRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { Avatar } from '@/components/visuals/Avatar'
 import { Star } from '@/components/visuals/motifs/Star'
@@ -40,6 +41,9 @@ export async function loadRecentPictures(db: SQLiteDatabase): Promise<MessageIma
     return []
   }
 }
+
+// What a row of the system's list draws under it where the app's own view stands alone.
+const CLEAR = '#00000000'
 
 // Closes the menu; `then` runs once it is fully off the screen (see attachSession.ts).
 type Close = (then?: () => void) => void
@@ -126,6 +130,103 @@ export function AttachMenu({
     </Pressable>
   ) : null
 
+  const tiles = showRow ? (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="always"
+      contentContainerStyle={[styles.tilesRow, nativeForm && styles.tilesInList]}
+    >
+      {camera}
+
+      {recents.map((item) => {
+        const isSelected = selected.some((p) => p.file === item.file)
+        return (
+          <Pressable
+            key={item.file}
+            onPress={() => toggleRecent(item)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isSelected }}
+            accessibilityLabel={t('attach.recent')}
+            style={({ pressed }) => [styles.recentTile, pressed && { opacity: 0.8 }]}
+          >
+            <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
+            {isSelected ? (
+              <View style={styles.recentCheckBadge}>
+                <Icon name="checkmark" size={13} color="#FFFFFF" />
+              </View>
+            ) : null}
+          </Pressable>
+        )
+      })}
+    </ScrollView>
+  ) : null
+
+  // Gray and idle until a picture in the row is ticked; gone with the row.
+  const action = showRow ? (
+    <Pressable
+      onPress={confirmRecents}
+      disabled={selected.length === 0}
+      accessibilityRole="button"
+      accessibilityLabel={actionLabel}
+      style={({ pressed }) => [styles.actionButton, pressed && selected.length > 0 && { opacity: 0.85 }]}
+    >
+      <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.surfaceRaised }]} />
+      <Animated.View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }, armedStyle]} />
+      <Text style={[styles.actionText, { color: selected.length > 0 ? ON_ACCENT : colors.textMuted }]}>{actionLabel}</Text>
+    </Pressable>
+  ) : null
+
+  const toggleThinking = (value: boolean) => {
+    Haptics.selectionAsync()
+    setThinking(value)
+    session.onToggleThinking?.(value)
+  }
+  const openPersonas = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    onOpenPersonas()
+  }
+
+  // The same menu as the system's own list (iOS with SwiftUI), over the chat's picture as the
+  // app's cards are. The row of the camera and the latest pictures and the button that attaches
+  // them are the app's own, in rows of the list with nothing drawn under them; the camera
+  // without the row, files, the persona and the thinking switch are the system's rows.
+  if (nativeForm) {
+    const { Button: SwiftButton, Toggle } = nativeForm.ui
+    const { tint } = nativeForm.modifiers
+    return (
+      <NativeSheetForm>
+        {tiles ? (
+          <NativeSection fill={CLEAR} top>
+            <NativeHostedRow clear>{tiles}</NativeHostedRow>
+          </NativeSection>
+        ) : null}
+        <NativeSection fill={tones.card} top={!tiles} footer={recents === null ? t('attach.recentsOff') : undefined}>
+          {!showRow ? (
+            <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onClose(() => session.onPick('camera'))} modifiers={[tint(colors.text)]} />
+          ) : null}
+          <SwiftButton label={t('attach.addFiles')} systemImage="doc" onPress={() => onClose(() => session.onPick('files'))} modifiers={[tint(colors.text)]} />
+          <NativeLinkRow
+            label={t('attach.persona')}
+            symbol="person"
+            value={session.persona?.name ? session.persona.name : t('attach.personaNone')}
+            onPress={openPersonas}
+          />
+        </NativeSection>
+        {session.onToggleThinking ? (
+          <NativeSection fill={tones.card}>
+            <Toggle label={t('chat.thinking')} systemImage="brain" isOn={thinking} onIsOnChange={toggleThinking} />
+          </NativeSection>
+        ) : null}
+        {action ? (
+          <NativeSection fill={CLEAR}>
+            <NativeHostedRow clear>{action}</NativeHostedRow>
+          </NativeSection>
+        ) : null}
+      </NativeSheetForm>
+    )
+  }
+
   return (
     <ScrollView
       style={[styles.scroll, scrollStyle]}
@@ -133,32 +234,7 @@ export function AttachMenu({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {showRow ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={styles.tilesRow}>
-          {camera}
-
-          {recents.map((item) => {
-            const isSelected = selected.some((p) => p.file === item.file)
-            return (
-              <Pressable
-                key={item.file}
-                onPress={() => toggleRecent(item)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isSelected }}
-                accessibilityLabel={t('attach.recent')}
-                style={({ pressed }) => [styles.recentTile, pressed && { opacity: 0.8 }]}
-              >
-                <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
-                {isSelected ? (
-                  <View style={styles.recentCheckBadge}>
-                    <Icon name="checkmark" size={13} color="#FFFFFF" />
-                  </View>
-                ) : null}
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-      ) : null}
+      {tiles}
 
       <View style={[styles.card, { backgroundColor: tones.card }]}>
         {/* Without the pictures row, the camera is a row of its own here. */}
@@ -191,10 +267,7 @@ export function AttachMenu({
         <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
 
         <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-            onOpenPersonas()
-          }}
+          onPress={openPersonas}
           accessibilityRole="button"
           accessibilityLabel={t('attach.persona')}
           style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
@@ -220,11 +293,7 @@ export function AttachMenu({
             </View>
             <Switch
               value={thinking}
-              onValueChange={(value) => {
-                Haptics.selectionAsync()
-                setThinking(value)
-                session.onToggleThinking?.(value)
-              }}
+              onValueChange={toggleThinking}
               accessibilityLabel={t('chat.thinking')}
               trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
               {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
@@ -234,22 +303,7 @@ export function AttachMenu({
         </View>
       ) : null}
 
-      {/* Gray and idle until a picture in the row is ticked; gone with the row. */}
-      {showRow ? (
-        <View style={styles.actionSlot}>
-          <Pressable
-            onPress={confirmRecents}
-            disabled={selected.length === 0}
-            accessibilityRole="button"
-            accessibilityLabel={actionLabel}
-            style={({ pressed }) => [styles.actionButton, pressed && selected.length > 0 && { opacity: 0.85 }]}
-          >
-            <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.surfaceRaised }]} />
-            <Animated.View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }, armedStyle]} />
-            <Text style={[styles.actionText, { color: selected.length > 0 ? ON_ACCENT : colors.textMuted }]}>{actionLabel}</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      {action ? <View style={styles.actionSlot}>{action}</View> : null}
     </ScrollView>
   )
 }
@@ -298,14 +352,98 @@ export function PersonaPicker({
     onChosen()
   }
 
-  return (
-    <ScrollView
-      style={[styles.scroll, scrollStyle]}
-      contentContainerStyle={[styles.content, styles.personaContent]}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
+  // In a row of the system's list, which draws the card, the row has no fill and does not
+  // light up under the touch: the list does not light its rows that are the app's own, and a
+  // highlight of the app's beside the system's rows would be the odd one out.
+  const rowFill = (pressed: boolean) => (nativeForm ? 'transparent' : pressed ? tones.pressed : tones.row)
+
+  const noneRow = (
+    <Pressable
+      onPress={() => choose(null)}
+      accessibilityRole="button"
+      accessibilityLabel={t('persona.none')}
+      style={({ pressed }) => [styles.personaRow, { backgroundColor: rowFill(pressed) }]}
     >
-      {personas.length === 0 ? (
+      <View style={[styles.personaIconCircle, { backgroundColor: colors.surfaceRaised }]}>
+        <Icon name="person-outline" size={20} color={colors.textMuted} />
+      </View>
+      <View style={styles.personaText}>
+        <Text style={styles.personaName}>{t('persona.none')}</Text>
+        <Text style={styles.personaSubtitle}>{t('persona.noneSubtitle')}</Text>
+      </View>
+      {currentId === null ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} /> : null}
+    </Pressable>
+  )
+
+  const personaRow = (item: Persona) => {
+    const isSelected = currentId === item.id
+    const menu: MenuItem[] = [
+      {
+        label: t('persona.edit'),
+        systemImage: 'pencil',
+        onSelect: () => onClose(() => router.push(`/persona/${item.id}`)),
+      },
+      {
+        label: t('persona.delete'),
+        systemImage: 'trash',
+        destructive: true,
+        onSelect: () => {
+          confirmDeletion({
+            title: t('persona.delete'),
+            message: t('persona.deleteConfirm', { name: item.name }),
+            confirmLabel: t('persona.delete'),
+            destructive: true,
+            onConfirm: async () => {
+              if (isSelected) choosePersona(session, null)
+              await deletePersona(db, item.id)
+            },
+          })
+        },
+      },
+    ]
+    return (
+      <View style={styles.personaRowContainer}>
+        <Pressable
+          onPress={() => choose(item)}
+          accessibilityRole="button"
+          accessibilityLabel={item.name}
+          style={({ pressed }) => [styles.personaRow, { backgroundColor: rowFill(pressed) }]}
+        >
+          <Avatar name={item.name} file={item.avatar} size={36} />
+          <View style={styles.personaText}>
+            <View style={styles.personaNameRow}>
+              <Text style={styles.personaName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              {item.isDefault ? <Star size={12} color={colors.accent} /> : null}
+            </View>
+            {item.description ? (
+              <Text style={styles.personaSubtitle} numberOfLines={1}>
+                {item.description}
+              </Text>
+            ) : null}
+          </View>
+          {isSelected ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} /> : null}
+        </Pressable>
+        <View style={styles.personaMenuWrapper} onStartShouldSetResponder={() => true}>
+          <NativeMenu items={menu}>
+            <View style={styles.personaEditButton}>
+              <Icon name="ellipsis-horizontal" size={18} color={colors.textFaint} />
+            </View>
+          </NativeMenu>
+        </View>
+      </View>
+    )
+  }
+
+  if (personas.length === 0) {
+    return (
+      <ScrollView
+        style={[styles.scroll, scrollStyle]}
+        contentContainerStyle={[styles.content, styles.personaContent]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.personaEmpty}>
           <EmptyState
             title={t('persona.emptyTitle')}
@@ -323,89 +461,42 @@ export function PersonaPicker({
             }
           />
         </View>
-      ) : (
-        <View style={[styles.card, { backgroundColor: tones.card }]}>
-          <Pressable
-            onPress={() => choose(null)}
-            accessibilityRole="button"
-            accessibilityLabel={t('persona.none')}
-            style={({ pressed }) => [styles.personaRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
-          >
-            <View style={[styles.personaIconCircle, { backgroundColor: colors.surfaceRaised }]}>
-              <Icon name="person-outline" size={20} color={colors.textMuted} />
-            </View>
-            <View style={styles.personaText}>
-              <Text style={styles.personaName}>{t('persona.none')}</Text>
-              <Text style={styles.personaSubtitle}>{t('persona.noneSubtitle')}</Text>
-            </View>
-            {currentId === null ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} /> : null}
-          </Pressable>
+      </ScrollView>
+    )
+  }
 
-          {personas.map((item) => {
-            const isSelected = currentId === item.id
-            const menu: MenuItem[] = [
-              {
-                label: t('persona.edit'),
-                systemImage: 'pencil',
-                onSelect: () => onClose(() => router.push(`/persona/${item.id}`)),
-              },
-              {
-                label: t('persona.delete'),
-                systemImage: 'trash',
-                destructive: true,
-                onSelect: () => {
-                  confirmDeletion({
-                    title: t('persona.delete'),
-                    message: t('persona.deleteConfirm', { name: item.name }),
-                    confirmLabel: t('persona.delete'),
-                    destructive: true,
-                    onConfirm: async () => {
-                      if (isSelected) choosePersona(session, null)
-                      await deletePersona(db, item.id)
-                    },
-                  })
-                },
-              },
-            ]
-            return (
-              <View key={item.id}>
-                <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
-                <View style={styles.personaRowContainer}>
-                  <Pressable
-                    onPress={() => choose(item)}
-                    accessibilityRole="button"
-                    accessibilityLabel={item.name}
-                    style={({ pressed }) => [styles.personaRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
-                  >
-                    <Avatar name={item.name} file={item.avatar} size={36} />
-                    <View style={styles.personaText}>
-                      <View style={styles.personaNameRow}>
-                        <Text style={styles.personaName} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        {item.isDefault ? <Star size={12} color={colors.accent} /> : null}
-                      </View>
-                      {item.description ? (
-                        <Text style={styles.personaSubtitle} numberOfLines={1}>
-                          {item.description}
-                        </Text>
-                      ) : null}
-                    </View>
-                    {isSelected ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} /> : null}
-                  </Pressable>
-                  <View style={styles.personaMenuWrapper} onStartShouldSetResponder={() => true}>
-                    <NativeMenu items={menu}>
-                      <View style={styles.personaEditButton}>
-                        <Icon name="ellipsis-horizontal" size={18} color={colors.textFaint} />
-                      </View>
-                    </NativeMenu>
-                  </View>
-                </View>
-              </View>
-            )
-          })}
-        </View>
-      )}
+  // In the system's own list (iOS with SwiftUI) the rows stay the app's, with their photo, the
+  // star of the default and the ellipsis of each. A row is made anew whenever one above it
+  // goes, or the list would leave it blank (see NativeHostedRow).
+  if (nativeForm) {
+    return (
+      <NativeSheetForm>
+        <NativeSection fill={tones.card} top>
+          <NativeHostedRow>{noneRow}</NativeHostedRow>
+          {personas.map((item, index) => (
+            <NativeHostedRow key={`${item.id}:${index}`}>{personaRow(item)}</NativeHostedRow>
+          ))}
+        </NativeSection>
+      </NativeSheetForm>
+    )
+  }
+
+  return (
+    <ScrollView
+      style={[styles.scroll, scrollStyle]}
+      contentContainerStyle={[styles.content, styles.personaContent]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={[styles.card, { backgroundColor: tones.card }]}>
+        {noneRow}
+        {personas.map((item) => (
+          <View key={item.id}>
+            <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+            {personaRow(item)}
+          </View>
+        ))}
+      </View>
     </ScrollView>
   )
 }
@@ -606,6 +697,8 @@ const createStyles = (colors: Colors) =>
     content: { paddingHorizontal: 16, paddingBottom: 16 },
     personaContent: { paddingBottom: 24 },
     tilesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
+    // In a row of the system's list, which keeps the gap under it itself.
+    tilesInList: { paddingBottom: 0 },
     cameraTile: {
       width: 96,
       height: 96,

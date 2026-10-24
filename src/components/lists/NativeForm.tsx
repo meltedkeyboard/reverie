@@ -57,17 +57,38 @@ export function NativeForm({
   )
 }
 
+// The room the list leaves above its first section, which a sheet with its own controls
+// above the list takes back by laying the list's top under them.
+export const LIST_TOP = 35
+
+// The list of a screen of a sheet, under the sheet's bar, over what the sheet draws, its
+// groups as near each other as the app's cards stood. Its first group takes `top` to come as
+// near the bar. Pulled up under the bar instead, the list had the bar take it for content
+// scrolled under it, and the bar drew its edge.
+export function NativeSheetForm({ children }: { children: ReactNode }) {
+  const { listSectionSpacing } = nativeForm!.modifiers
+  return (
+    <NativeForm clear modifiers={[listSectionSpacing(SHEET_GAP)]}>
+      {children}
+    </NativeForm>
+  )
+}
+
+const SHEET_GAP = 12
+
 type Footer = string | { text: string; danger?: boolean }[]
 
 // A group of rows on the theme's surface, with the header over it and the note under it: a
 // string, or lines of which some are warnings in red. `inset` is room above it for a header
-// drawn over the list, and `id` the name a jump finds it by.
+// drawn over the list, and `id` the name a jump finds it by. `top`, on the first group of a
+// sheet's list, is the room above it in place of the list's own (iOS 26).
 export function NativeSection({
   title,
   footer,
   inset,
   id: name,
   fill,
+  top,
   children,
 }: {
   title?: string
@@ -76,11 +97,12 @@ export function NativeSection({
   id?: string
   // The rows' color where it is not the theme's surface, as the cards of a sheet.
   fill?: string
+  top?: boolean
   children: ReactNode
 }) {
   const { colors } = useTheme()
   const { Section, Text, VStack, ZStack } = nativeForm!.ui
-  const { listRowBackground, foregroundStyle, frame, id } = nativeForm!.modifiers
+  const { listRowBackground, foregroundStyle, frame, id, listSectionMargins } = nativeForm!.modifiers
   const lines = typeof footer === 'string' ? [{ text: footer }] : (footer ?? [])
   const header =
     inset !== undefined ? (
@@ -106,7 +128,11 @@ export function NativeSection({
           </VStack>
         ) : undefined
       }
-      modifiers={[listRowBackground(fill ?? colors.surface), ...(name ? [id(name)] : [])]}
+      modifiers={[
+        listRowBackground(fill ?? colors.surface),
+        ...(name ? [id(name)] : []),
+        ...(top ? [listSectionMargins({ edges: 'top', length: SHEET_GAP })] : []),
+      ]}
     >
       {children}
     </Section>
@@ -145,14 +171,15 @@ export function NativeHostedRow({ height, clear = false, children }: { height?: 
 }
 
 // A row that opens another screen: its name, the value in grey and a chevron, as a navigation
-// row of Settings, the whole row highlighting on a tap.
-export function NativeLinkRow({ label, value, onPress }: { label: string; value?: string; onPress: () => void }) {
+// row of Settings, the whole row highlighting on a tap. `symbol` stands before the name, in
+// the name's color.
+export function NativeLinkRow({ label, value, symbol, onPress }: { label: string; value?: string; symbol?: string; onPress: () => void }) {
   const { colors } = useTheme()
   const { Button, HStack, Spacer, Text, Image } = nativeForm!.ui
   const { tint, foregroundStyle, lineLimit } = nativeForm!.modifiers
   return (
     <HStack spacing={8}>
-      <Button label={label} onPress={onPress} modifiers={[tint(colors.text)]} />
+      <Button label={label} systemImage={symbol as never} onPress={onPress} modifiers={[tint(colors.text)]} />
       <Spacer />
       {value ? <Text modifiers={[foregroundStyle(colors.textMuted), lineLimit(1)]}>{value}</Text> : null}
       <Image systemName="chevron.right" size={13} color={colors.textFaint} />

@@ -52,28 +52,10 @@ export function TapTrigger({ onPress, disabled, style, children }: { onPress: ()
 
 type SymbolName = NonNullable<ComponentProps<NonNullable<typeof swiftUI>['ui']['Image']>['systemName']>
 
-// The trigger is drawn by React Native, so it matches the rest of the screen exactly.
-// On iOS it is hosted inside the label of a SwiftUI menu, which makes the system menu
-// grow out of the trigger itself. Elsewhere the tap opens the action sheet.
-export function NativeMenu({ title, items, children, style, disabled = false, glassRadius }: Props) {
-  const { scheme } = useTheme()
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
-
-  if (!swiftUI) {
-    return (
-      <TapTrigger onPress={() => showSheet(title, items)} disabled={disabled} style={style}>
-        {children}
-      </TapTrigger>
-    )
-  }
-
-  const onLayout = (e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout
-    setSize((prev) => (prev?.width === width && prev.height === height ? prev : { width, height }))
-  }
-
-  const { Host, Menu, Button, Section, Divider } = swiftUI.ui
-  const m = swiftUI.modifiers
+// The items as the views of a SwiftUI menu: buttons, submenus and the lines between them.
+// For a menu of SwiftUI's own, as NativeMenu's or the context menu of a row of a list.
+export function menuItemViews(items: MenuItem[]): ReactNode[] {
+  const { Menu, Button, Divider } = swiftUI!.ui
   // Keyed by place, not by label: two items may read the same (rooms with one name).
   const toView = (item: MenuItem, i: number): ReactNode =>
     item.separated ? (
@@ -94,7 +76,32 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
         onPress={item.onSelect}
       />
     )
-  const buttons = items.map(toView)
+  return items.map(toView)
+}
+
+// The trigger is drawn by React Native, so it matches the rest of the screen exactly.
+// On iOS it is hosted inside the label of a SwiftUI menu, which makes the system menu
+// grow out of the trigger itself. Elsewhere the tap opens the action sheet.
+export function NativeMenu({ title, items, children, style, disabled = false, glassRadius }: Props) {
+  const { scheme } = useTheme()
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+
+  if (!swiftUI) {
+    return (
+      <TapTrigger onPress={() => showSheet(title, items)} disabled={disabled} style={style}>
+        {children}
+      </TapTrigger>
+    )
+  }
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout
+    setSize((prev) => (prev?.width === width && prev.height === height ? prev : { width, height }))
+  }
+
+  const { Host, Menu, Section } = swiftUI.ui
+  const m = swiftUI.modifiers
+  const buttons = menuItemViews(items)
   const content = title ? <Section title={title}>{buttons}</Section> : buttons
 
   const { Group, RNHostView } = swiftUI.ui
