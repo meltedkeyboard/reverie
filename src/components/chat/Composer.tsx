@@ -3,13 +3,14 @@ import NativeMaskedView from '@react-native-masked-view/masked-view'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native'
+import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native'
 
 // The isWeb has no native mask: the package paints the mask element itself, a black slab
 // over the field. There the field is shown as it is, without the fade at its edges.
 const MaskedView: typeof NativeMaskedView =
   isWeb ? (({ children }: { children?: React.ReactNode }) => <>{children}</>) as never : NativeMaskedView
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import ReorderableList, { reorderItems, useReorderableDrag } from 'react-native-reorderable-list'
 import { KeyboardController, KeyboardStickyView } from 'react-native-keyboard-controller'
 import Animated, {
   Easing,
@@ -31,9 +32,11 @@ import { GlassSurface, useGlassStyles } from '../chrome/Glass'
 import { AttachSheet, loadRecentPictures } from './AttachMenu'
 import { useInputColors } from '../controls/Field'
 import { IconButton } from '../controls/IconButton'
+import { ImageLink, useImageGroup, type ImageGroup } from '../visuals/ImageLink'
 import { SFIcon } from '../visuals/SFIcon'
 import type { MessageImage } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
+import { reorderFeel } from '@/hooks/features/useReorder'
 import { CHAT_COLUMN } from '@/hooks/util/useLayoutMode'
 import { useTranslation } from '@/i18n'
 import { withAlpha } from '@/lib/core/color'
@@ -186,6 +189,8 @@ export function Composer({
   picturedRef.current = images.length > 0 && !editing
   const [picking, setPicking] = useState(false)
   const imageUris = useMemo(() => images.map(pictureUri), [images])
+  // The attached pictures, swiped through together in the viewer before they are sent.
+  const thumbs = useImageGroup()
 
   const shownKey = useRef(resetKey)
   useEffect(() => {
@@ -544,25 +549,26 @@ export function Composer({
           </View>
         ) : null}
         {images.length && !editing ? (
-          <ScrollView
+          // A long press lifts a picture to put it elsewhere in the row, the order it is sent in.
+          <ReorderableList
             horizontal
+            data={images}
+            keyExtractor={(image) => image.file}
+            onReorder={({ from, to }) => setImages((current) => reorderItems(current, from, to))}
+            {...reorderFeel}
             showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             onLayout={(e) => setImagesH(e.nativeEvent.layout.height)}
-          >
-            {imageUris.map((uri, index) => (
-              <View key={index} style={styles.attachment}>
-                <Image source={{ uri }} style={styles.thumb} contentFit="cover" transition={200} />
-                <Pressable
-                  onPress={() => setImages((current) => current.filter((_, i) => i !== index))}
-                  hitSlop={8}
-                  style={styles.thumbRemove}
-                >
-                  <Icon name="close" size={13} color={ON_ACCENT} />
-                </Pressable>
-              </View>
-            ))}
-          </ScrollView>
+            renderItem={({ item: image, index }) => (
+              <AttachedThumb
+                image={image}
+                uri={imageUris[index]}
+                index={index}
+                group={thumbs}
+                onRemove={() => setImages((current) => current.filter((p) => p.file !== image.file))}
+              />
+            )}
+          />
         ) : null}
         <GestureDetector gesture={swipe}>
           <View>
@@ -844,6 +850,36 @@ const ICONS = {
   continue: { sf: 'forward.fill', fallback: 'play-forward' },
 } as const
 
+const THUMB_RADIUS = 14
+
+type AttachedThumbProps = { image: MessageImage; uri: string; index: number; group: ImageGroup; onRemove: () => void }
+
+// A picture attached to the message: a tap opens it in the viewer, a long press lifts it to
+// move, the cross takes it off.
+function AttachedThumb({ image, uri, index, group, onRemove }: AttachedThumbProps) {
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  const drag = useReorderableDrag()
+  return (
+    <View style={styles.attachment}>
+      <ImageLink
+        uri={uri}
+        aspect={image.width && image.height ? image.width / image.height : 1}
+        group={group}
+        index={index}
+        corners={THUMB_RADIUS}
+        onLongPress={drag}
+        accessibilityLabel={t('composer.openPicture')}
+      >
+        <Image source={{ uri }} style={styles.thumb} contentFit="cover" transition={200} />
+      </ImageLink>
+      <Pressable onPress={onRemove} hitSlop={8} style={styles.thumbRemove}>
+        <Icon name="close" size={13} color={ON_ACCENT} />
+      </Pressable>
+    </View>
+  )
+}
+
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
@@ -867,7 +903,7 @@ const createStyles = (colors: Colors) =>
   field: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: FIELD_PAD },
   hushed: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong },
   attachment: { margin: 6, marginBottom: 2, marginRight: 8 },
-  thumb: { width: 72, height: 72, borderRadius: 14 },
+  thumb: { width: 72, height: 72, borderRadius: THUMB_RADIUS },
   thumbRemove: {
     position: 'absolute',
     top: -6,

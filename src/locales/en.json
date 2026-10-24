@@ -484,6 +484,7 @@
   "chat.thinkingOutOfTokens": "The model spent the whole token limit thinking and never answered. Raise the character's thinking budget or turn thinking off for it",
   "composer.movingTooBig": "This picture is over {{mb}} MB, so it will be sent as a still",
   "composer.attachFailedTitle": "Couldn't attach photo",
+  "composer.openPicture": "Open picture",
 
   "chatDrawer.open": "Chats",
   "chatDrawer.close": "Back to the chat",

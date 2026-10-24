@@ -26,6 +26,9 @@ const onDragEnd = () => {
   scheduleOnRN(drop)
 }
 
+// The taps alone, for a list whose order lives only in the screen, as pictures before sending.
+export const reorderFeel = { onDragStart, onIndexChange, onDragEnd }
+
 // The props that make a ReorderableList draggable: shows the new order at once, saves it,
 // and taps on picking up, on every place swapped on the way, and on dropping.
 export function useReorder<T extends { id: number }>(
@@ -56,8 +59,6 @@ export function useReorder<T extends { id: number }>(
       setItems(next)
       save(next.map((item) => item.id))
     },
-    onDragStart,
-    onIndexChange,
-    onDragEnd,
+    ...reorderFeel,
   }
 }

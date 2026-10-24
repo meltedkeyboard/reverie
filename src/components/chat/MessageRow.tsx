@@ -17,6 +17,7 @@ import { isWeb } from '@/lib/core/platform'
 import { showSheet } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
 import { pictureUri } from '@/lib/images/attachments'
+import type { Corners } from '@/lib/images/viewer'
 import { CHAT_METRICS, useChatText } from '@/lib/chat/chatText'
 import { menuItems, messageActions, type MessageAction } from '@/lib/chat/messageActions'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -150,9 +151,11 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
             </Text>
           </View>
         ) : null}
-        {message.images.map((image, index) => (
-          <Picture key={index} image={image} group={pictures} index={index} onLongPress={openSheet} />
-        ))}
+        {message.images.length > 1 ? (
+          <Collage images={message.images} group={pictures} onLongPress={openSheet} />
+        ) : message.images.length ? (
+          <Picture image={message.images[0]} group={pictures} index={0} onLongPress={openSheet} />
+        ) : null}
         {message.content ? (
           <View
             style={[
@@ -660,9 +663,60 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
 const PICTURE_MAX = { width: 240, height: 300 }
 const PICTURE_RADIUS = 18
 
-type PictureProps = { image: MessageImage; group: ImageGroup; index: number; onLongPress: () => void }
+// Pictures of one message laid two to a row as one tile, the odd one out across the whole
+// last row; only the outer corners of the tile are round.
+const COLLAGE_GAP = 3
+const COLLAGE_INNER_RADIUS = 4
+const COLLAGE_HALF = (PICTURE_MAX.width - COLLAGE_GAP) / 2
+const COLLAGE_WIDE_HEIGHT = Math.round(PICTURE_MAX.width * 0.6)
 
-function Picture({ image, group, index, onLongPress }: PictureProps) {
+type CollageProps = { images: MessageImage[]; group: ImageGroup; onLongPress: () => void }
+
+function Collage({ images, group, onLongPress }: CollageProps) {
+  const styles = useStyles(createStyles)
+  const rows = Math.ceil(images.length / 2)
+  return (
+    <View style={styles.collage}>
+      {images.map((image, index) => {
+        const row = Math.floor(index / 2)
+        const wide = index === images.length - 1 && index % 2 === 0
+        const left = wide || index % 2 === 0
+        const right = wide || index % 2 === 1
+        const top = row === 0
+        const bottom = row === rows - 1
+        const corner = (outer: boolean) => (outer ? PICTURE_RADIUS : COLLAGE_INNER_RADIUS)
+        return (
+          <Picture
+            key={index}
+            image={image}
+            group={group}
+            index={index}
+            onLongPress={onLongPress}
+            frame={wide ? { width: PICTURE_MAX.width, height: COLLAGE_WIDE_HEIGHT } : { width: COLLAGE_HALF, height: COLLAGE_HALF }}
+            corners={{
+              topLeft: corner(top && left),
+              topRight: corner(top && right),
+              bottomRight: corner(bottom && right),
+              bottomLeft: corner(bottom && left),
+            }}
+          />
+        )
+      })}
+    </View>
+  )
+}
+
+type PictureProps = {
+  image: MessageImage
+  group: ImageGroup
+  index: number
+  onLongPress: () => void
+  // The size of its cell in a collage, which the picture covers; alone it keeps its own shape.
+  frame?: { width: number; height: number }
+  corners?: Exclude<Corners, number>
+}
+
+function Picture({ image, group, index, onLongPress, frame, corners }: PictureProps) {
   const styles = useStyles(createStyles)
   const uri = useMemo(() => pictureUri(image), [image.file, image.moving])
   const width = image.width || PICTURE_MAX.width
@@ -674,13 +728,23 @@ function Picture({ image, group, index, onLongPress }: PictureProps) {
       aspect={width / height}
       group={group}
       index={index}
-      corners={PICTURE_RADIUS}
+      corners={corners ?? PICTURE_RADIUS}
       onLongPress={onLongPress}
       delayLongPress={LONG_PRESS_MS}
     >
       <Image
         source={{ uri }}
-        style={[styles.picture, { width: width * scale, height: height * scale }]}
+        style={[
+          styles.picture,
+          frame ?? { width: width * scale, height: height * scale },
+          corners && {
+            marginBottom: 0,
+            borderTopLeftRadius: corners.topLeft,
+            borderTopRightRadius: corners.topRight,
+            borderBottomRightRadius: corners.bottomRight,
+            borderBottomLeftRadius: corners.bottomLeft,
+          },
+        ]}
         contentFit="cover"
       />
     </ImageLink>
@@ -697,6 +761,7 @@ const createStyles = (colors: Colors) =>
     paddingVertical: 10,
   },
   picture: { borderRadius: PICTURE_RADIUS, marginBottom: 4, backgroundColor: colors.surface },
+  collage: { flexDirection: 'row', flexWrap: 'wrap', gap: COLLAGE_GAP, width: PICTURE_MAX.width, marginBottom: 4 },
   userText: { color: colors.text },
   botRow: { alignItems: 'flex-start', paddingHorizontal: 20, marginVertical: 12, width: '100%', maxWidth: CHAT_COLUMN, alignSelf: 'center' },
   botText: { color: colors.text, letterSpacing: 0.1 },
