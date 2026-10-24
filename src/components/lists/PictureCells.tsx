@@ -83,6 +83,18 @@ export function SourceCell({ label, onPick }: { label: string; onPick: (source: 
   )
 }
 
+// The chat background's preview, with the effect on.
+export function BackgroundThumbCell({ uri, crop, effect, intensity }: { uri: string; crop: CropRect | null; effect: BackgroundEffect; intensity: number }) {
+  const styles = useStyles(createStyles)
+  return (
+    <View style={styles.thumbCell}>
+      <View style={styles.thumb}>
+        <ChatBackground uri={uri} crop={crop} effect={effect} intensity={intensity} />
+      </View>
+    </View>
+  )
+}
+
 // The chat background of a character or a room: its preview with the effect on, where a new
 // one comes from, and reframing or removing the one there is.
 export function BackgroundSection({
@@ -106,13 +118,7 @@ export function BackgroundSection({
   const { t } = useTranslation()
   return (
     <ListSection header={t('background.title')}>
-      {uri ? (
-        <View style={styles.thumbCell}>
-          <View style={styles.thumb}>
-            <ChatBackground uri={uri} crop={crop} effect={effect} intensity={intensity} />
-          </View>
-        </View>
-      ) : null}
+      {uri ? <BackgroundThumbCell uri={uri} crop={crop} effect={effect} intensity={intensity} /> : null}
       <SourceCell label={uri ? t('background.change') : t('background.choose')} onPick={onPick} />
       {uri ? <ButtonCell label={t('background.adjust')} onPress={onAdjust} /> : null}
       {uri ? <ButtonCell danger label={t('background.remove')} onPress={onClear} /> : null}

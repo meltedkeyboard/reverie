@@ -10,7 +10,8 @@ import { scheduleOnRN } from 'react-native-worklets'
 import { Avatar } from '@/components/visuals/Avatar'
 import { CharacterProfile } from '@/components/cast/CharacterProfile'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
-import { BackgroundSection, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
+import { BackgroundSection, BackgroundThumbCell, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
+import { NativeActionRow, NativeForm, NativeHostedRow, NativeSection, NativeSegmentRow, NativeSliderRow, NativeTextRow, nativeForm } from '@/components/lists/NativeForm'
 import { ExpandingAvatar, usePhotoNameSpot, useSpreadPush } from '@/components/cast/ExpandingAvatar'
 import { glowTop, hexRgb, ProfileGlow, profileTint } from '@/components/cast/ProfileGlow'
 import { BarButton, DrawnFormScreenHeader, useAvatarHandOff } from '@/components/chrome/FormScreenHeader'
@@ -376,6 +377,13 @@ export default function CharacterEditorScreen() {
   const scrollRoom = editing
     ? contentPadding
     : { ...contentPadding, minHeight: screenHeight + avatarCenterY - (headerHeight - HEADER_ROW_HEIGHT / 2) }
+  // The system's list and the profile's scroll view take turns, and each comes up at its top:
+  // what the header follows of the scroll starts there again.
+  useEffect(() => {
+    if (!nativeForm) return
+    scrollY.value = 0
+    photoSpread.value = 0
+  }, [editing, scrollY, photoSpread])
   // Over the open photo the status bar turns light, whatever the theme.
   const [photoOpen, setPhotoOpen] = useState(false)
   useAnimatedReaction(
@@ -421,12 +429,178 @@ export default function CharacterEditorScreen() {
     },
   })
 
+  // The editor's photo: the circle on the left and what is done with it on the right.
+  const editorPhoto = (
+    <View style={styles.editorAvatar}>
+      <Avatar name={name} file={avatar} uri={avatarSlot.uri} size={96} viewable={hasPhoto} />
+      <View style={styles.editorAvatarActions}>
+        <ListSection>
+          <SourceCell label={hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')} onPick={onPickAvatar} />
+          {hasPhoto || removedAvatar ? (
+            <ChipRowCell
+              actions={[
+                ...(canRecrop
+                  ? [{ label: t('editor.recropPhoto'), icon: { symbol: 'crop', fallback: 'crop-outline' } as const, onPress: onRecropAvatar }]
+                  : []),
+                removedAvatar
+                  ? {
+                      label: t('editor.restorePhoto'),
+                      icon: { symbol: 'arrow.uturn.backward', fallback: 'arrow-undo-outline' } as const,
+                      onPress: onRestoreAvatar,
+                    }
+                  : {
+                      label: t('editor.removePhoto'),
+                      icon: { symbol: 'trash', fallback: 'trash-outline' } as const,
+                      onPress: onClearAvatar,
+                      ink: colors.danger,
+                    },
+              ]}
+            />
+          ) : null}
+        </ListSection>
+      </View>
+    </View>
+  )
+
+  // The long texts as previews that open the editor over the whole screen.
+  const promptText = (
+    <TextCell
+      title={t('editor.systemPromptLabel')}
+      value={systemPrompt}
+      placeholder={t('editor.systemPromptPlaceholder')}
+      onChangeText={(v) => {
+        setSystemPrompt(v)
+        setBeforeGen(null)
+      }}
+      lines={6}
+    />
+  )
+  const greetingText = (
+    <TextCell
+      title={t('editor.greetingLabel')}
+      value={greeting}
+      placeholder={t('editor.greetingPlaceholder')}
+      onChangeText={(v) => {
+        setGreeting(v)
+        setBeforeGreeting(null)
+      }}
+    />
+  )
+  const notesText = (
+    <TextCell
+      title={t('editor.notesLabel')}
+      value={notes}
+      placeholder={t('editor.notesPlaceholder')}
+      onChangeText={setNotes}
+    />
+  )
+
+  // The editor as the system's own list (iOS with SwiftUI). The photo, the long texts'
+  // previews, the background's thumbnail and the button that brings up its sources stay
+  // React Native views in rows of their own; the profile is React Native throughout.
+  const renderNative = () => (
+    <NativeForm>
+      <NativeSection inset={HEADER_ROW_HEIGHT}>
+        <NativeHostedRow clear>{editorPhoto}</NativeHostedRow>
+      </NativeSection>
+
+      <NativeSection>
+        <NativeTextRow label={t('editor.nameLabel')} value={name} onChangeText={setName} placeholder={t('editor.namePlaceholder')} />
+      </NativeSection>
+
+      <NativeSection title={t('editor.systemPromptLabel')} footer={t('editor.systemPromptHint')}>
+        <NativeHostedRow>{promptText}</NativeHostedRow>
+        <NativeActionRow label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')} onPress={openPromptGen} />
+        {beforeGen !== null ? <NativeActionRow label={t('editor.undoGenerated')} onPress={undoGenerated} /> : null}
+      </NativeSection>
+
+      <NativeSection title={t('editor.greetingLabel')} footer={t('editor.greetingHint')}>
+        <NativeHostedRow>{greetingText}</NativeHostedRow>
+        {/* Written from the system prompt, so there must be one first. */}
+        <NativeActionRow label={t('editor.generateGreeting')} onPress={openGreetingGen} disabled={!systemPrompt.trim()} />
+        {beforeGreeting !== null ? <NativeActionRow label={t('editor.undoGenerated')} onPress={undoGreeting} /> : null}
+      </NativeSection>
+
+      <NativeSection title={t('editor.notesLabel')} footer={t('editor.notesHint')}>
+        <NativeHostedRow>{notesText}</NativeHostedRow>
+      </NativeSection>
+
+      <NativeSection title={t('background.title')}>
+        {backgroundUri ? (
+          <NativeHostedRow>
+            <BackgroundThumbCell uri={backgroundUri} crop={bgSlot.shownCrop(backgroundCrop)} effect={bgEffect} intensity={bgIntensity} />
+          </NativeHostedRow>
+        ) : null}
+        {/* A new view once the thumbnail comes or goes above it: the list remakes the rows
+            below the ones it adds or takes away, and a view hosted in one of them goes away
+            with the row it was in, leaving the new one blank. */}
+        <NativeHostedRow key={backgroundUri ? 'under' : 'alone'}>
+          <SourceCell label={backgroundUri ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
+        </NativeHostedRow>
+        {backgroundUri ? <NativeActionRow label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
+        {backgroundUri ? <NativeActionRow label={t('background.remove')} destructive onPress={onClearBackground} /> : null}
+      </NativeSection>
+
+      <NativeSection
+        title={t('editor.genParamsSection')}
+        footer={[{ text: t('editor.replyLengthHint') }, { text: t('editor.thinkingHint') }, { text: t('editor.reasoningBudgetHint') }]}
+      >
+        <NativeSliderRow
+          label={t('editor.temperature')}
+          value={temperature}
+          min={0}
+          max={2}
+          step={0.05}
+          format={(v) => v.toFixed(2)}
+          onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
+        />
+        <NativeSliderRow label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={(v) => setMaxTokens(Math.round(v))} />
+        <NativeSliderRow
+          label={t('editor.topP')}
+          value={topP}
+          min={0.1}
+          max={1}
+          step={0.01}
+          format={(v) => v.toFixed(2)}
+          onChange={(v) => setTopP(Math.round(v * 100) / 100)}
+        />
+        <NativeSliderRow
+          label={t('editor.paragraphLimit')}
+          value={replyLimit ?? 0}
+          min={0}
+          max={6}
+          step={1}
+          format={(v) => (v === 0 ? t('editor.unlimited') : countLabel(v, 'paragraph', locale))}
+          onChange={(v) => setReplyLimit(Math.round(v) === 0 ? null : Math.round(v))}
+        />
+        <NativeSegmentRow label={t('editor.thinkingSection')} options={THINKING_OPTIONS} value={thinking} onChange={setThinking} />
+        {/* Kept with thinking off too: a chat can still turn it on for itself. */}
+        <NativeSliderRow
+          label={t('editor.reasoningBudget')}
+          value={reasoningBudget}
+          min={256}
+          max={16384}
+          step={256}
+          onChange={(v) => setReasoningBudget(Math.round(v / 256) * 256)}
+        />
+      </NativeSection>
+
+      {!isNew ? (
+        <NativeSection>
+          <NativeActionRow label={t('editor.deleteCharacter')} destructive onPress={confirmDelete} />
+        </NativeSection>
+      ) : null}
+    </NativeForm>
+  )
+
   return (
     <View style={styles.screen}>
       {ready ? (
         <ProfileGlow color={glowColor} height={screenHeight + GLOW_BELOW} scrollY={scrollY} spread={photoSpread} />
       ) : null}
-      {ready ? (
+      {ready && editing && nativeForm ? (
+        renderNative()
+      ) : ready ? (
         <PullHost gesture={isAndroid ? androidPull : null}>
         <KeyboardAwareScrollView
           bottomOffset={24}
@@ -443,35 +617,7 @@ export default function CharacterEditorScreen() {
             {editing ? (
               // In the editor the circle stands on the left and what is done with it on
               // the right; the spreading photo is the profile's.
-              <View style={styles.editorAvatar}>
-                <Avatar name={name} file={avatar} uri={avatarSlot.uri} size={96} viewable={hasPhoto} />
-                <View style={styles.editorAvatarActions}>
-                  <ListSection>
-                    <SourceCell label={hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')} onPick={onPickAvatar} />
-                    {hasPhoto || removedAvatar ? (
-                      <ChipRowCell
-                        actions={[
-                          ...(canRecrop
-                            ? [{ label: t('editor.recropPhoto'), icon: { symbol: 'crop', fallback: 'crop-outline' } as const, onPress: onRecropAvatar }]
-                            : []),
-                          removedAvatar
-                            ? {
-                                label: t('editor.restorePhoto'),
-                                icon: { symbol: 'arrow.uturn.backward', fallback: 'arrow-undo-outline' } as const,
-                                onPress: onRestoreAvatar,
-                              }
-                            : {
-                                label: t('editor.removePhoto'),
-                                icon: { symbol: 'trash', fallback: 'trash-outline' } as const,
-                                onPress: onClearAvatar,
-                                ink: colors.danger,
-                              },
-                        ]}
-                      />
-                    ) : null}
-                  </ListSection>
-                </View>
-              </View>
+              editorPhoto
             ) : photoUri ? (
               <Animated.View style={[styles.spreadHost, handOff]}>
                 <ExpandingAvatar
@@ -509,16 +655,7 @@ export default function CharacterEditorScreen() {
                 </ListSection>
 
                 <ListSection header={t('editor.systemPromptLabel')} footer={t('editor.systemPromptHint')}>
-                  <TextCell
-                    title={t('editor.systemPromptLabel')}
-                    value={systemPrompt}
-                    placeholder={t('editor.systemPromptPlaceholder')}
-                    onChangeText={(v) => {
-                      setSystemPrompt(v)
-                      setBeforeGen(null)
-                    }}
-                    lines={6}
-                  />
+                  {promptText}
                   <ButtonCell
                     label={systemPrompt.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
                     onPress={openPromptGen}
@@ -527,15 +664,7 @@ export default function CharacterEditorScreen() {
                 </ListSection>
 
                 <ListSection header={t('editor.greetingLabel')} footer={t('editor.greetingHint')}>
-                  <TextCell
-                    title={t('editor.greetingLabel')}
-                    value={greeting}
-                    placeholder={t('editor.greetingPlaceholder')}
-                    onChangeText={(v) => {
-                      setGreeting(v)
-                      setBeforeGreeting(null)
-                    }}
-                  />
+                  {greetingText}
                   {/* Written from the system prompt, so there must be one first. */}
                   <ButtonCell
                     label={t('editor.generateGreeting')}
@@ -546,12 +675,7 @@ export default function CharacterEditorScreen() {
                 </ListSection>
 
                 <ListSection header={t('editor.notesLabel')} footer={t('editor.notesHint')}>
-                  <TextCell
-                    title={t('editor.notesLabel')}
-                    value={notes}
-                    placeholder={t('editor.notesPlaceholder')}
-                    onChangeText={setNotes}
-                  />
+                  {notesText}
                 </ListSection>
 
                 <BackgroundSection

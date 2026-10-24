@@ -88,7 +88,9 @@ export function NativeSection({ title, footer, inset, id: name, children }: { ti
 
 // A row that is a React Native view, laid edge to edge in its row: what the system has no
 // control for (a preview, a strip of tiles, a row of chips). Without `height` it is as tall as
-// the view lays itself out.
+// the view lays itself out. When rows above it in its section come and go, it needs a key that
+// changes with them: the list remakes the rows after the change, and the view hosted in the old
+// row goes away with it, leaving the new row blank.
 export function NativeHostedRow({ height, clear = false, children }: { height?: number; clear?: boolean; children: React.ReactElement }) {
   const [measured, setMeasured] = useState(0)
   const { ZStack, RNHostView } = nativeForm!.ui
@@ -181,6 +183,7 @@ export function NativeTextRow({
   keyboard = 'default',
   secure = false,
   plain = false,
+  capitalize,
   disabled = false,
 }: {
   label: string
@@ -191,6 +194,8 @@ export function NativeTextRow({
   secure?: boolean
   // No capitals or corrections: an address, a key, a model's name.
   plain?: boolean
+  // Capitals at the start of every word, as in a person's name.
+  capitalize?: 'words'
   disabled?: boolean
 }) {
   const { colors } = useTheme()
@@ -204,7 +209,7 @@ export function NativeTextRow({
     multilineTextAlignment('trailing'),
     foregroundStyle(colors.textMuted),
     ...(keyboard === 'url' ? [keyboardType('url')] : keyboard === 'number-pad' ? [keyboardType('ascii-capable-number-pad')] : []),
-    ...(plain || secure ? [textInputAutocapitalization('never'), autocorrectionDisabled()] : []),
+    ...(plain || secure ? [textInputAutocapitalization('never'), autocorrectionDisabled()] : capitalize ? [textInputAutocapitalization(capitalize)] : []),
   ]
   return (
     <HStack spacing={12} modifiers={[off(disabled)]}>

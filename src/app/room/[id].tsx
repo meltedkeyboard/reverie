@@ -12,7 +12,8 @@ import { memberSummary, RoomProfile } from '@/components/cast/RoomProfile'
 import { BarButton, DrawnFormScreenHeader, useAvatarHandOff } from '@/components/chrome/FormScreenHeader'
 import { useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, SwitchCell, TextCell } from '@/components/lists/GroupedList'
-import { BackgroundSection } from '@/components/lists/PictureCells'
+import { BackgroundSection, BackgroundThumbCell, SourceCell } from '@/components/lists/PictureCells'
+import { NativeActionRow, NativeForm, NativeHostedRow, NativeSection, NativeSegmentRow, NativeSliderRow, NativeTextRow, nativeForm } from '@/components/lists/NativeForm'
 import { AddCharactersSheet } from '@/components/overlays/AddCharactersSheet'
 import { listCharacters, type Character, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
@@ -221,6 +222,11 @@ export default function RoomEditorScreen() {
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y
   })
+  // The system's list and the profile's scroll view take turns, and each comes up at its top:
+  // what the header follows of the scroll starts there again.
+  useEffect(() => {
+    if (nativeForm) scrollY.value = 0
+  }, [editing, scrollY])
   const contentPadding = editing ? padding : { ...padding, paddingTop: padding.paddingTop + PROFILE_TOP_GAP }
   const sideLeft = padding.paddingLeft ?? padding.paddingHorizontal
   const sideRight = padding.paddingRight ?? padding.paddingHorizontal
@@ -245,10 +251,199 @@ export default function RoomEditorScreen() {
     ? { uri: backgroundUri, crop: bgSlot.shownCrop(fields.backgroundCrop), effect: fields.backgroundEffect, intensity: fields.backgroundIntensity }
     : null
 
+  // A member's row, which opens its settings under it.
+  const memberHead = (member: Member, index: number, open: boolean) => (
+    <Pressable
+      onPress={() => setExpanded(open ? null : member.characterId)}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      // No highlight in the system's list, where only its own rows light up under the touch.
+      style={({ pressed }) => [styles.memberHead, pressed && !nativeForm && styles.pressed]}
+    >
+      <Avatar name={member.character.name} file={member.character.avatar} size={36} />
+      <View style={styles.memberBody}>
+        <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
+          {member.character.name}
+        </Text>
+        <Text style={styles.memberMeta} numberOfLines={1}>
+          {memberSummary(member, t)}
+        </Text>
+      </View>
+      <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
+    </Pressable>
+  )
+
+  // The long texts as previews that open the editor over the whole screen.
+  const scenarioText = (
+    <TextCell
+      title={t('roomEditor.scenario')}
+      value={fields.scenario}
+      placeholder={t('roomEditor.scenarioPlaceholder')}
+      onChangeText={(v) => set('scenario', v)}
+      lines={6}
+    />
+  )
+  const openingText = (
+    <TextCell
+      title={t('roomEditor.opening')}
+      value={fields.opening}
+      placeholder={t('roomEditor.openingPlaceholder')}
+      onChangeText={(v) => set('opening', v)}
+    />
+  )
+
+  // The editor as the system's own list (iOS with SwiftUI), put in place of the profile's
+  // scroll view while editing. The cast, the members' rows, the long texts' previews, the
+  // background's thumbnail and the button that brings up its sources stay React Native views
+  // in rows of their own: a member's name keeps its color, which a button of the list
+  // would paint over.
+  const renderNative = ({ ui }: NonNullable<typeof nativeForm>) => (
+    <NativeForm>
+      <NativeSection inset={HEADER_ROW_HEIGHT}>
+        <NativeHostedRow clear>
+          <View style={styles.castFlush}>
+            <CastMosaic cast={cast} name={title} size={CAST_SIZE} round viewable />
+          </View>
+        </NativeHostedRow>
+      </NativeSection>
+
+      <NativeSection>
+        <NativeTextRow
+          label={t('roomEditor.nameLabel')}
+          value={fields.name}
+          onChangeText={(v) => set('name', v)}
+          placeholder={defaultName() || t('roomEditor.namePlaceholder')}
+        />
+      </NativeSection>
+
+      <NativeSection
+        title={t('roomEditor.membersSection')}
+        footer={
+          memberOpen
+            ? [
+                { text: t('roomEditor.perceptionHint') },
+                { text: t('roomEditor.triggersHint') },
+                { text: t('roomEditor.presentNote') },
+                { text: t('roomEditor.mutedNote') },
+              ]
+            : members.length
+              ? undefined
+              : t('roomEditor.noMembers')
+        }
+      >
+        {members.map((member, index) => {
+          const open = expanded === member.characterId
+          return (
+            <Fragment key={member.characterId}>
+              {/* A new view whenever a member opens or closes: the list remakes the rows below
+                  the ones it adds or takes away, and a view hosted in one of them goes away
+                  with the row it was in, leaving the new one blank. */}
+              <NativeHostedRow key={`${expanded}`}>{memberHead(member, index, open)}</NativeHostedRow>
+              {open ? (
+                <>
+                  <NativeSliderRow
+                    label={t('roomEditor.talkativeness')}
+                    value={member.talkativeness}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    format={percent}
+                    onChange={(v) => updateMember(member.characterId, { talkativeness: Math.round(v * 100) / 100 })}
+                  />
+                  <NativeSliderRow
+                    label={t('roomEditor.perception')}
+                    value={member.perception}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    format={percent}
+                    onChange={(v) => updateMember(member.characterId, { perception: Math.round(v * 100) / 100 })}
+                  />
+                  <NativeTextRow
+                    label={t('roomEditor.triggers')}
+                    value={member.triggers}
+                    onChangeText={(v) => updateMember(member.characterId, { triggers: v })}
+                    placeholder={t('roomEditor.triggersPlaceholder')}
+                  />
+                  <ui.Toggle
+                    label={t('roomEditor.present')}
+                    isOn={member.present}
+                    onIsOnChange={(v) => updateMember(member.characterId, { present: v })}
+                  />
+                  <ui.Toggle label={t('roomEditor.muted')} isOn={member.muted} onIsOnChange={(v) => updateMember(member.characterId, { muted: v })} />
+                  <NativeActionRow
+                    label={t('roomEditor.removeMember')}
+                    destructive
+                    onPress={() => setMembers((list) => list.filter((m) => m.characterId !== member.characterId))}
+                  />
+                </>
+              ) : null}
+            </Fragment>
+          )
+        })}
+        <NativeActionRow label={t('roomEditor.addMembers')} onPress={() => setPicking(true)} />
+      </NativeSection>
+
+      <NativeSection
+        title={t('roomEditor.floorSection')}
+        footer={[{ text: t(`room.floorHint.${fields.floor}`) }, { text: t('roomEditor.maxChainHint') }, { text: t('roomEditor.directorNote') }]}
+      >
+        <NativeSegmentRow label={t('roomEditor.floorMode')} options={FLOOR_OPTIONS} value={fields.floor} onChange={(v) => set('floor', v)} />
+        <NativeSliderRow label={t('roomEditor.maxChain')} value={fields.maxChain} min={1} max={5} step={1} onChange={(v) => set('maxChain', Math.round(v))} />
+        <ui.Toggle label={t('roomEditor.director')} isOn={fields.director} onIsOnChange={(v) => set('director', v)} />
+      </NativeSection>
+
+      <NativeSection title={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>
+        <NativeHostedRow>{scenarioText}</NativeHostedRow>
+      </NativeSection>
+
+      <NativeSection title={t('roomEditor.opening')} footer={t('roomEditor.openingHint')}>
+        <NativeHostedRow>{openingText}</NativeHostedRow>
+      </NativeSection>
+
+      <NativeSection footer={t('roomEditor.userNameHint')}>
+        <NativeTextRow
+          label={t('roomEditor.userName')}
+          value={fields.userName}
+          onChangeText={(v) => set('userName', v)}
+          placeholder={t('roomEditor.userNamePlaceholder')}
+          capitalize="words"
+        />
+      </NativeSection>
+
+      <NativeSection title={t('background.title')}>
+        {backgroundUri ? (
+          <NativeHostedRow>
+            <BackgroundThumbCell
+              uri={backgroundUri}
+              crop={bgSlot.shownCrop(fields.backgroundCrop)}
+              effect={fields.backgroundEffect}
+              intensity={fields.backgroundIntensity}
+            />
+          </NativeHostedRow>
+        ) : null}
+        {/* A new view once the thumbnail comes or goes above it, as with the members. */}
+        <NativeHostedRow key={backgroundUri ? 'under' : 'alone'}>
+          <SourceCell label={backgroundUri ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
+        </NativeHostedRow>
+        {backgroundUri ? <NativeActionRow label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
+        {backgroundUri ? <NativeActionRow label={t('background.remove')} destructive onPress={onClearBackground} /> : null}
+      </NativeSection>
+
+      {!isNew ? (
+        <NativeSection>
+          <NativeActionRow label={t('roomEditor.deleteRoom')} destructive onPress={confirmDelete} />
+        </NativeSection>
+      ) : null}
+    </NativeForm>
+  )
+
   return (
     <View style={styles.screen}>
       {ready ? <ProfileGlow color={glowColor} height={screenHeight + GLOW_BELOW} scrollY={scrollY} spread={still} /> : null}
-      {ready ? (
+      {ready && editing && nativeForm ? (
+        renderNative(nativeForm)
+      ) : ready ? (
         <KeyboardAwareScrollView
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
@@ -291,23 +486,7 @@ export default function RoomEditorScreen() {
                   // An open member's own rows follow it in the group.
                   return (
                     <Fragment key={member.characterId}>
-                      <Pressable
-                        onPress={() => setExpanded(open ? null : member.characterId)}
-                        accessibilityRole="button"
-                        accessibilityState={{ expanded: open }}
-                        style={({ pressed }) => [styles.memberHead, pressed && styles.pressed]}
-                      >
-                        <Avatar name={member.character.name} file={member.character.avatar} size={36} />
-                        <View style={styles.memberBody}>
-                          <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
-                            {member.character.name}
-                          </Text>
-                          <Text style={styles.memberMeta} numberOfLines={1}>
-                            {memberSummary(member, t)}
-                          </Text>
-                        </View>
-                        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
-                      </Pressable>
+                      {memberHead(member, index, open)}
                       {open ? (
                         <>
                           <SliderCell
@@ -373,22 +552,11 @@ export default function RoomEditorScreen() {
               </ListSection>
 
               <ListSection header={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>
-                <TextCell
-                  title={t('roomEditor.scenario')}
-                  value={fields.scenario}
-                  placeholder={t('roomEditor.scenarioPlaceholder')}
-                  onChangeText={(v) => set('scenario', v)}
-                  lines={6}
-                />
+                {scenarioText}
               </ListSection>
 
               <ListSection header={t('roomEditor.opening')} footer={t('roomEditor.openingHint')}>
-                <TextCell
-                  title={t('roomEditor.opening')}
-                  value={fields.opening}
-                  placeholder={t('roomEditor.openingPlaceholder')}
-                  onChangeText={(v) => set('opening', v)}
-                />
+                {openingText}
               </ListSection>
 
               <ListSection footer={t('roomEditor.userNameHint')}>
@@ -481,6 +649,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     castBlock: { alignItems: 'center', marginBottom: 24 },
+    castFlush: { alignItems: 'center' },
     pressed: { backgroundColor: colors.surfaceRaised },
     memberHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
     memberBody: { flex: 1 },
