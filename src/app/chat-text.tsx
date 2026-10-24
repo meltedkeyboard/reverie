@@ -10,7 +10,7 @@ import { Pattern } from '@/components/visuals/Pattern'
 import { useChatScheme, type ChatLook } from '@/components/chrome/ChatChrome'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
-import { ButtonCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
+import { ButtonCell, CheckCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
 import { Segmented } from '@/components/controls/Segmented'
 import { SourceCell } from '@/components/lists/PictureCells'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
@@ -43,9 +43,8 @@ import { type Colors, FILL, ON_ACCENT, paletteOf, SchemeOverride, THEMES, type T
 const FIELD_HEIGHT = 48
 // A tile shows a whole 393 x 852 board, small.
 const TILE_WIDTH = 84
-const TILE_BORDER = 2
-const TILE_INNER = TILE_WIDTH - TILE_BORDER * 2
-const TILE_HEIGHT = (TILE_INNER * 852) / 393 + TILE_BORDER * 2
+const TILE_HEIGHT = (TILE_WIDTH * 852) / 393
+const MARK_SIZE = 22
 
 const FALLBACK_FAMILIES =
   isAndroid
@@ -58,28 +57,33 @@ function snap(value: number) {
   return Math.abs(value - normal) < 0.025 ? normal : Math.round(value * 100) / 100
 }
 
-const THEME_TILE_WIDTH = 80
-const THEME_TILE_HEIGHT = 80
-
-// A theme is shown as its two halves, light and dark, with "Aa" in the chat font.
-function ThemePreviewTile({ theme, selected, font }: { theme: ThemeName; selected: boolean; font: string }) {
+// A theme's icon in its row, as the colored squares of the Settings rows: its background
+// with the accent in the middle, in the scheme in effect, so the mode under the rows
+// repaints them all at once.
+function ThemeIcon({ theme }: { theme: ThemeName }) {
   const styles = useStyles(createStyles)
-  const fontFamily = font === SYSTEM_FONT ? undefined : font
-  const light = paletteOf(theme, 'light')
-  const dark = paletteOf(theme, 'dark')
+  const { scheme } = useTheme()
+  const palette = paletteOf(theme, scheme)
   return (
-    <View style={styles.themeTile}>
-      <View style={[styles.themeTileHalfLeft, { backgroundColor: light.bg }]}>
-        <Text style={[styles.themeTileFontSample, { color: light.text, fontFamily }]}>A</Text>
-        <View style={[styles.themeAccentDotLeft, { backgroundColor: light.accent }]} />
-      </View>
-      <View style={[styles.themeTileHalfRight, { backgroundColor: dark.bg }]}>
-        <Text style={[styles.themeTileFontSample, { color: dark.text, fontFamily }]}>a</Text>
-        <View style={[styles.themeAccentDotRight, { backgroundColor: dark.accent }]} />
-      </View>
-      {/* Drawn over the halves rather than as the tile's border, so an unselected tile has
-          no ring at all and does not shrink when it gains one. */}
-      {selected ? <View style={styles.themeTileRing} pointerEvents="none" /> : null}
+    <View style={[styles.themeIcon, { backgroundColor: palette.bg }]}>
+      <View style={[styles.themeIconDot, { backgroundColor: palette.accent }]} />
+      <View style={[styles.edge, styles.themeIconEdge]} pointerEvents="none" />
+    </View>
+  )
+}
+
+// The choice under a tile, as under the Light and Dark previews of the system's Display
+// settings: an empty circle, filled with the accent and checked once it is the one chosen.
+// The tile itself is never outlined.
+function ChoiceMark({ selected }: { selected: boolean }) {
+  const styles = useStyles(createStyles)
+  return (
+    <View style={styles.mark}>
+      {selected ? (
+        <View style={styles.markOn}>
+          <SFIcon name="checkmark" fallback="checkmark" size={12} color={ON_ACCENT} onAccent />
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -305,29 +309,15 @@ export default function ChatTextScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={padding}>
         <ListSection header={t('settings.theme')}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeTiles}>
-            {THEMES.map((name) => {
-              const selected = theme === name
-              return (
-                <Pressable
-                  key={name}
-                  onPress={() => {
-                    if (!selected) Haptics.selectionAsync()
-                    setTheme(name)
-                  }}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={t(`theme.${name}`)}
-                  style={styles.themeTileButton}
-                >
-                  <ThemePreviewTile theme={name} selected={selected} font={font} />
-                  <Text style={[styles.themeLabel, selected && styles.themeLabelSelected]} numberOfLines={2}>
-                    {t(`theme.${name}`)}
-                  </Text>
-                </Pressable>
-              )
-            })}
-          </ScrollView>
+          {THEMES.map((name) => (
+            <CheckCell
+              key={name}
+              label={t(`theme.${name}`)}
+              checked={theme === name}
+              onPress={() => setTheme(name)}
+              leading={<ThemeIcon theme={name} />}
+            />
+          ))}
           <View style={styles.themeMode}>
             <Segmented options={modeOptions} value={mode} onChange={setMode} />
           </View>
@@ -397,7 +387,7 @@ export default function ChatTextScreen() {
               accessibilityLabel={t('chatPattern.custom')}
               style={styles.tileButton}
             >
-              <View style={[styles.tile, pattern === 'custom' && styles.tileSelected]}>
+              <View style={styles.tile}>
                 {wallpaperUri ? (
                   <ChatBackground
                     uri={wallpaperUri}
@@ -410,10 +400,12 @@ export default function ChatTextScreen() {
                     <Icon name="add" size={24} color={colors.textFaint} />
                   </View>
                 )}
+                <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
               </View>
-              <Text style={[styles.tileLabel, pattern === 'custom' && { color: colors.text }]} numberOfLines={1}>
+              <Text style={styles.tileLabel} numberOfLines={1}>
                 {t('chatPattern.custom')}
               </Text>
+              <ChoiceMark selected={pattern === 'custom'} />
             </Pressable>
             {CHAT_PATTERNS.map((id) => {
               const selected = id === pattern
@@ -429,12 +421,14 @@ export default function ChatTextScreen() {
                   accessibilityLabel={t(`chatPattern.${id}`)}
                   style={styles.tileButton}
                 >
-                  <View style={[styles.tile, selected && styles.tileSelected]}>
-                    <Pattern id={id} scale={TILE_INNER / 393} />
+                  <View style={styles.tile}>
+                    <Pattern id={id} scale={TILE_WIDTH / 393} />
+                    <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
                   </View>
-                  <Text style={[styles.tileLabel, selected && { color: colors.text }]} numberOfLines={1}>
+                  <Text style={styles.tileLabel} numberOfLines={1}>
                     {t(`chatPattern.${id}`)}
                   </Text>
+                  <ChoiceMark selected={selected} />
                 </Pressable>
               )
             })}
@@ -513,73 +507,38 @@ const createStyles = (colors: Colors) =>
       borderCurve: 'continuous',
       overflow: 'hidden',
       backgroundColor: colors.bg,
-      borderWidth: TILE_BORDER,
-      borderColor: colors.border,
     },
-    tileSelected: { borderColor: colors.accent },
+    // A hairline laid over a preview, so that a light one still has an edge on a light
+    // screen without a frame of its own.
+    edge: { ...FILL, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, borderCurve: 'continuous' },
+    tileEdge: { borderRadius: 14 },
+    mark: {
+      width: MARK_SIZE,
+      height: MARK_SIZE,
+      borderRadius: MARK_SIZE / 2,
+      borderWidth: 1.5,
+      borderColor: colors.borderStrong,
+      marginTop: 2,
+    },
+    markOn: {
+      position: 'absolute',
+      top: -1.5,
+      left: -1.5,
+      width: MARK_SIZE,
+      height: MARK_SIZE,
+      borderRadius: MARK_SIZE / 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accent,
+    },
     customTileEmpty: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    tileLabel: { color: colors.textMuted, fontSize: 12 },
-    themeTiles: { gap: 12, padding: 16 },
-    themeTileButton: { width: THEME_TILE_WIDTH, alignItems: 'center', gap: 8 },
-    themeTile: {
-      width: THEME_TILE_WIDTH,
-      height: THEME_TILE_HEIGHT,
-      borderRadius: 16,
-      borderCurve: 'continuous',
-      overflow: 'hidden',
-      flexDirection: 'row',
-    },
-    themeTileRing: {
-      ...FILL,
-      borderRadius: 16,
-      borderCurve: 'continuous',
-      borderWidth: 2,
-      borderColor: colors.accent,
-    },
-    themeLabel: {
-      color: colors.textMuted,
-      fontSize: 12,
-      textAlign: 'center',
-    },
-    themeLabelSelected: {
-      color: colors.text,
-      fontWeight: '600',
-    },
+    tileLabel: { color: colors.text, fontSize: 13, textAlign: 'center' },
     themeMode: { paddingHorizontal: 16, paddingVertical: 12 },
-    themeTileFontSample: {
-      fontSize: 28,
-      includeFontPadding: false,
-    },
-    themeTileHalfLeft: {
-      flex: 1,
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-      paddingRight: 2,
-    },
-    themeTileHalfRight: {
-      flex: 1,
-      alignItems: 'flex-start',
-      justifyContent: 'center',
-      paddingLeft: 2,
-    },
-    themeAccentDotLeft: {
-      position: 'absolute',
-      bottom: 8,
-      left: 8,
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-    },
-    themeAccentDotRight: {
-      position: 'absolute',
-      bottom: 8,
-      right: 8,
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-    },
+    themeIcon: { width: 29, height: 29, borderRadius: 7, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center' },
+    themeIconDot: { width: 11, height: 11, borderRadius: 5.5 },
+    themeIconEdge: { borderRadius: 7 },
   })

@@ -89,7 +89,14 @@ function CellSwitch({ value, onValueChange, disabled }: { value: boolean; onValu
 }
 
 // A choice among the rows of its group, marked with a checkmark like a ringtone list.
-export function CheckCell({ label, checked, onPress, disabled }: CellProps & { checked: boolean; onPress: () => void }) {
+// `leading` is the small picture before the label, as the icons of the Settings rows.
+export function CheckCell({
+  label,
+  checked,
+  onPress,
+  disabled,
+  leading,
+}: CellProps & { checked: boolean; onPress: () => void; leading?: ReactNode }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
@@ -104,6 +111,7 @@ export function CheckCell({ label, checked, onPress, disabled }: CellProps & { c
       }}
       style={({ pressed }) => [styles.row, pressed && styles.pressed, disabled && styles.disabled]}
     >
+      {leading ? <View style={styles.leading}>{leading}</View> : null}
       <Text style={styles.label}>{label}</Text>
       {checked ? <Icon name="checkmark" size={22} color={colors.accent} /> : null}
     </Pressable>
@@ -329,6 +337,7 @@ const baseStyles = (colors: Colors) =>
     pressed: { backgroundColor: colors.surfaceRaised },
     disabled: { opacity: 0.4 },
     label: { flex: 1, color: colors.text, fontSize: 17 },
+    leading: { marginRight: 4 },
     value: { color: colors.textMuted, fontSize: 17, flexShrink: 1, maxWidth: '55%' },
     inputLabel: { color: colors.text, fontSize: 17 },
     input: { flex: 1, color: colors.text, fontSize: 17, textAlign: 'right', paddingVertical: 0 },
