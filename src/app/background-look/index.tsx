@@ -5,6 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Chip } from '@/components/controls/Chip'
+import { NativeForm, NativeFreeSliderRow, NativeSection, NativeSegmentRow, nativeForm } from '@/components/lists/NativeForm'
 import { NativeMenu } from '@/components/overlays/NativeMenu'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { ParamSlider } from '@/components/controls/ParamSlider'
@@ -18,11 +19,16 @@ import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 // Far enough to take the controls out of the strip under the bar of the sheet let down.
 const HIDE_BY = 160
 
+// The room the system's list leaves above its first section.
+const LIST_TOP = 35
+
 const percent = (value: number) => `${Math.round(value * 100)}%`
 
 // The screen of the sheet: the effect on top, where the sheet let down still shows it, then
 // the sliders and the chat's colors in cards, as the attach menu lays out its rows, and Save
-// across the foot. Close and the reset of the frame are on the bar.
+// across the foot. Close and the reset of the frame are on the bar. With SwiftUI the cards
+// are the system's own list, its sliders and segments the system's; the chips, Save and the
+// hint stay React Native.
 export default function BackgroundLookScreen() {
   const navigation = useNavigation()
   const insets = useSafeAreaInsets()
@@ -90,44 +96,92 @@ export default function BackgroundLookScreen() {
   ]
 
   return (
-    // No scroll view: everything fits, and a drag anywhere on the sheet moves the sheet.
-    <Animated.View style={[styles.content, { paddingBottom: insets.bottom + 16 }, shownStyle]} pointerEvents={down ? 'none' : 'auto'}>
+    // No scroll view: everything fits, and a drag anywhere on the sheet moves the sheet. Over
+    // the taller rows of the system's list the hint comes down nearer the sheet's rounded foot,
+    // which already stands clear of the home indicator.
+    <Animated.View
+      style={[styles.content, nativeForm && styles.fill, { paddingBottom: nativeForm ? insets.bottom - 6 : insets.bottom + 16 }, shownStyle]}
+      pointerEvents={down ? 'none' : 'auto'}
+    >
       {/* Two chips always fit, so a plain row and not ChipGroup: its sideways scroll view,
           inside the sheet, was laid out past the sheet's left edge. */}
-      <View style={styles.chips}>
+      <View style={[styles.chips, nativeForm && styles.overList]}>
         <Chip label={t('background.effectBlur')} active={effect === 'blur'} onPress={() => setEffect('blur')} style={styles.chip} />
         <NativeMenu items={dimItems} style={styles.chip}>
           <Chip label={t('background.effectDim')} active={effect !== 'blur'} onPress={() => {}} style={styles.inMenu} />
         </NativeMenu>
       </View>
 
-      <View style={[styles.card, styles.sliders, { backgroundColor: tones.card }]}>
-        <ParamSlider
-          label={t('background.intensity')}
-          value={look.intensity}
-          min={0}
-          max={1}
-          step={0.01}
-          formatValue={percent}
-          onChange={look.setIntensity}
-        />
-        <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
-        <ParamSlider
-          label={t('background.bubbleTransparency')}
-          value={look.bubbleTransparency}
-          min={0}
-          max={1}
-          step={0.05}
-          formatValue={percent}
-          onChange={look.setBubbleTransparency}
-        />
-      </View>
+      {nativeForm ? (
+        <View style={styles.systemList}>
+          {/* It does not scroll, so a drag on it moves the sheet as anywhere else; and as the
+              controls slide down with the sheet let down, it would take in the safe area and
+              move its rows by as much. The sliders run freely: a hundred ticks of the system's
+              slider under a swipe are a rattle. */}
+          <NativeForm
+            clear
+            modifiers={[
+              nativeForm.modifiers.scrollDisabled(true),
+              nativeForm.modifiers.ignoreSafeArea(),
+              nativeForm.modifiers.listSectionSpacing(12),
+            ]}
+          >
+            <NativeSection fill={tones.card}>
+              <NativeFreeSliderRow
+                label={t('background.intensity')}
+                value={look.intensity}
+                min={0}
+                max={1}
+                step={0.01}
+                format={percent}
+                onChange={look.setIntensity}
+              />
+              <NativeFreeSliderRow
+                label={t('background.bubbleTransparency')}
+                value={look.bubbleTransparency}
+                min={0}
+                max={1}
+                step={0.05}
+                format={percent}
+                onChange={look.setBubbleTransparency}
+              />
+            </NativeSection>
+            <NativeSection fill={tones.card}>
+              <NativeSegmentRow label={t('background.tone')} options={toneOptions} value={look.tone} onChange={look.setTone} />
+            </NativeSection>
+          </NativeForm>
+        </View>
+      ) : (
+        <>
+          <View style={[styles.card, styles.sliders, { backgroundColor: tones.card }]}>
+            <ParamSlider
+              label={t('background.intensity')}
+              value={look.intensity}
+              min={0}
+              max={1}
+              step={0.01}
+              formatValue={percent}
+              onChange={look.setIntensity}
+            />
+            <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+            <ParamSlider
+              label={t('background.bubbleTransparency')}
+              value={look.bubbleTransparency}
+              min={0}
+              max={1}
+              step={0.05}
+              formatValue={percent}
+              onChange={look.setBubbleTransparency}
+            />
+          </View>
 
-      {/* Whether the chat over the picture is light or dark: measured, or the user's own choice. */}
-      <View style={[styles.card, styles.tone, { backgroundColor: tones.card }]}>
-        <Text style={styles.label}>{t('background.tone')}</Text>
-        <Segmented options={toneOptions} value={look.tone} onChange={look.setTone} />
-      </View>
+          {/* Whether the chat over the picture is light or dark: measured, or the user's own choice. */}
+          <View style={[styles.card, styles.tone, { backgroundColor: tones.card }]}>
+            <Text style={styles.label}>{t('background.tone')}</Text>
+            <Segmented options={toneOptions} value={look.tone} onChange={look.setTone} />
+          </View>
+        </>
+      )}
 
       {/* Across the foot, as the attach menu's button. */}
       <Pressable
@@ -150,6 +204,13 @@ export default function BackgroundLookScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     content: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+    fill: { flex: 1 },
+    // Out to the edges of the sheet, as the list keeps margins of its own, and up by the room
+    // it leaves above its first section, so the cards stand as far under the chips as Save
+    // stands under them. The list's clear top then lies under the chips, which are lifted
+    // over it to keep their taps.
+    systemList: { flex: 1, marginHorizontal: -16, marginTop: -LIST_TOP },
+    overList: { zIndex: 1 },
     chips: { flexDirection: 'row', gap: 8 },
     chip: { flex: 1 },
     // The menu centers its label, so the chip is stretched back to the menu's width.

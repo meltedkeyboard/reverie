@@ -1,7 +1,7 @@
-import { Fragment, useState, type ReactElement, type ReactNode } from 'react'
+import { Fragment, type ReactElement, type ReactNode } from 'react'
 
 import { AreaCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, SwitchCell } from '../lists/GroupedList'
-import { NativeAreaRow, NativeHostedRow, NativeSection, NativeSegmentRow, NativeSliderRow, NativeTextRow, nativeForm } from '../lists/NativeForm'
+import { NativeAreaRow, NativeFreeSliderRow, NativeHostedRow, NativeSection, NativeSegmentRow, NativeTextRow, nativeForm } from '../lists/NativeForm'
 
 // The generator sheets are the system's own list where there is SwiftUI (iOS), GroupedList
 // elsewhere. These cells are one or the other, so that a generator composes its page once
@@ -97,29 +97,7 @@ export function GenSlider({
   step: number
   onChange: (value: number) => void
 }) {
-  if (nativeGen) return <NativeFreeSlider label={label} value={value} min={min} max={max} step={step} onChange={onChange} />
+  // The limits have dozens of steps, too many for the system's ticks.
+  if (nativeGen) return <NativeFreeSliderRow label={label} value={value} min={min} max={max} step={step} onChange={onChange} />
   return <SliderCell label={label} value={value} min={min} max={max} step={step} onChange={onChange} />
-}
-
-// The limits have dozens of steps, and the system's slider ticks at every one it passes, a
-// rattle under a fast swipe. So its track runs freely and the value is put on a step; the
-// thumb keeps where the finger left it, since handing the stepped value back would pull it
-// to the step under the finger.
-function NativeFreeSlider({ value, step, min, onChange, ...rest }: React.ComponentProps<typeof GenSlider>) {
-  const [thumb, setThumb] = useState(value)
-  const snap = (v: number) => min + Math.round((v - min) / step) * step
-  // A value set from outside (loaded from the database) moves the thumb.
-  const shown = snap(thumb) === value ? thumb : value
-  return (
-    <NativeSliderRow
-      {...rest}
-      min={min}
-      value={shown}
-      format={(v) => String(snap(v))}
-      onChange={(v) => {
-        setThumb(v)
-        if (snap(v) !== value) onChange(snap(v))
-      }}
-    />
-  )
 }

@@ -62,7 +62,22 @@ type Footer = string | { text: string; danger?: boolean }[]
 // A group of rows on the theme's surface, with the header over it and the note under it: a
 // string, or lines of which some are warnings in red. `inset` is room above it for a header
 // drawn over the list, and `id` the name a jump finds it by.
-export function NativeSection({ title, footer, inset, id: name, children }: { title?: string; footer?: Footer; inset?: number; id?: string; children: ReactNode }) {
+export function NativeSection({
+  title,
+  footer,
+  inset,
+  id: name,
+  fill,
+  children,
+}: {
+  title?: string
+  footer?: Footer
+  inset?: number
+  id?: string
+  // The rows' color where it is not the theme's surface, as the cards of a sheet.
+  fill?: string
+  children: ReactNode
+}) {
   const { colors } = useTheme()
   const { Section, Text, VStack, ZStack } = nativeForm!.ui
   const { listRowBackground, foregroundStyle, frame, id } = nativeForm!.modifiers
@@ -91,7 +106,7 @@ export function NativeSection({ title, footer, inset, id: name, children }: { ti
           </VStack>
         ) : undefined
       }
-      modifiers={[listRowBackground(colors.surface), ...(name ? [id(name)] : [])]}
+      modifiers={[listRowBackground(fill ?? colors.surface), ...(name ? [id(name)] : [])]}
     >
       {children}
     </Section>
@@ -281,6 +296,7 @@ export function NativeSliderRow({
   step,
   format = (v) => String(v),
   onChange,
+  onEditing,
   tintColor,
 }: {
   label: string
@@ -290,6 +306,8 @@ export function NativeSliderRow({
   step?: number
   format?: (value: number) => string
   onChange: (value: number) => void
+  // When the finger takes the thumb and lets it go.
+  onEditing?: (editing: boolean) => void
   tintColor?: string
 }) {
   const { colors } = useTheme()
@@ -302,8 +320,39 @@ export function NativeSliderRow({
         <Spacer />
         <Text modifiers={[foregroundStyle(tintColor ?? colors.textMuted), monospacedDigit()]}>{format(value)}</Text>
       </HStack>
-      <Slider value={value} min={min} max={max} step={step} onValueChange={onChange} modifiers={tintColor ? [tint(tintColor)] : []} />
+      <Slider value={value} min={min} max={max} step={step} onValueChange={onChange} onEditingChanged={onEditing} modifiers={tintColor ? [tint(tintColor)] : []} />
     </VStack>
+  )
+}
+
+// A slider of many steps, whose value is put on a step while its track runs freely: the
+// system's slider ticks at every step it passes, a rattle under a fast swipe over dozens of
+// them. The thumb keeps where the finger left it, since handing the stepped value back would
+// pull it to the step under the finger. `format` shows the stepped value.
+export function NativeFreeSliderRow({
+  value,
+  min,
+  step,
+  format = (v) => String(v),
+  onChange,
+  ...rest
+}: Omit<React.ComponentProps<typeof NativeSliderRow>, 'step'> & { step: number }) {
+  const [thumb, setThumb] = useState(value)
+  // Rounded past the step, so that steps of a fraction do not come out as 0.15000000000000002.
+  const snap = (v: number) => Number((min + Math.round((v - min) / step) * step).toFixed(6))
+  // A value set from outside (loaded, reset) moves the thumb.
+  const shown = snap(thumb) === value ? thumb : value
+  return (
+    <NativeSliderRow
+      {...rest}
+      min={min}
+      value={shown}
+      format={(v) => format(snap(v))}
+      onChange={(v) => {
+        setThumb(v)
+        if (snap(v) !== value) onChange(snap(v))
+      }}
+    />
   )
 }
 

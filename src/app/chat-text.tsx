@@ -327,7 +327,7 @@ function Appearance() {
   // controls the system's, and what it has none for, the preview and the tiles, React Native
   // views in rows of their own.
   const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
-    const { Picker, Text: SwiftText, HStack, Toggle, Slider: SwiftSlider, Button: SwiftButton, Menu, Image } = ui
+    const { Picker, Text: SwiftText, HStack, Toggle, Slider: SwiftSlider, Button: SwiftButton, Image } = ui
     const { pickerStyle, tag, labelsHidden, font: swiftFont, foregroundStyle, buttonStyle, disabled, accessibilityLabel } = modifiers
     const secondary = { type: 'hierarchical', style: 'secondary' } as const
     return (
@@ -412,11 +412,10 @@ function Appearance() {
 
         <NativeSection title={t('settings.chatPattern')} footer={t('settings.chatBackdropHint')}>
           <NativeHostedRow height={tilesHeight}>{tiles}</NativeHostedRow>
-          <Menu label={wallpaper?.file ? t('background.change') : t('background.choose')}>
-            <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onPickBackground('camera')} />
-            <SwiftButton label={t('imageSource.photos')} systemImage="photo.on.rectangle" onPress={() => onPickBackground('library')} />
-            <SwiftButton label={t('imageSource.files')} systemImage="folder" onPress={() => onPickBackground('files')} />
-          </Menu>
+          {/* The sources as chips, as in the editors, rather than the system's menu. */}
+          <NativeHostedRow>
+            <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
+          </NativeHostedRow>
           {wallpaper?.file ? <SwiftButton label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
           {wallpaper?.file ? <SwiftButton label={t('background.remove')} role="destructive" onPress={onRemoveBackground} /> : null}
           <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} />

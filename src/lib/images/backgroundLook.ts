@@ -2,6 +2,7 @@ import { Dimensions } from 'react-native'
 import { initialWindowMetrics } from 'react-native-safe-area-context'
 
 import { createStore } from '@/components/chat/thread/store'
+import { swiftUI } from '@/lib/ui/nativeUI'
 import type { BackgroundEffect, BackgroundTone } from '@/db/characters'
 import type { Scheme } from '@/theme'
 
@@ -44,7 +45,8 @@ export const lookSheetDown = createStore(false)
 // up, everything.
 const SHEET_BAR = 56
 const LOOK_SHEET_DOWN = SHEET_BAR + (initialWindowMetrics?.insets.bottom ?? 0)
-const LOOK_SHEET_UP = 530
+// The system's list of the sheet (with SwiftUI) has taller rows than the cards elsewhere.
+const LOOK_SHEET_UP = swiftUI ? 574 : 530
 
 export function lookSheetDetents() {
   const height = Dimensions.get('window').height || 852
