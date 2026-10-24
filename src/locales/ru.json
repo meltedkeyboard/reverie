@@ -167,7 +167,6 @@
   "about.shakeHint": "Потрясите телефон, чтобы заново пройти онбординг",
 
   "characters.title": "Персонажи",
-  "characters.newChat": "Новый чат",
   "characters.edit": "Изменить",
   "characters.delete": "Удалить",
   "characters.duplicate": "Дублировать",
@@ -215,7 +214,7 @@
   "characters.dropFailed": "Не удалось импортировать файл",
   "card.importFromFiles": "Из Файлов",
   "card.importFromPhotos": "Из Фото",
-  "card.import": "Импорт карточки персонажа",
+  "card.import": "Импорт карточки",
   "card.export": "Экспорт карточки",
   "card.saveToFiles": "Сохранить в Файлы",
   "card.saveToPhotos": "Сохранить в Фото",

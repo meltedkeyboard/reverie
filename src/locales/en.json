@@ -167,7 +167,6 @@
   "about.shakeHint": "Shake your phone to go through onboarding again",
 
   "characters.title": "Characters",
-  "characters.newChat": "New chat",
   "characters.edit": "Edit",
   "characters.delete": "Delete",
   "characters.duplicate": "Duplicate",
@@ -215,7 +214,7 @@
   "characters.dropFailed": "Couldn't import the file",
   "card.importFromFiles": "Import from Files",
   "card.importFromPhotos": "Import from Photos",
-  "card.import": "Import character card",
+  "card.import": "Import card",
   "card.export": "Export card",
   "card.saveToFiles": "Save to Files",
   "card.saveToPhotos": "Save to Photos",

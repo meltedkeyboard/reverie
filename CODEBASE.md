@@ -64,7 +64,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 
 | Route | File | Purpose |
 |---|---|---|
-| `/` | `(tabs)/index.tsx` | Characters tab: combined glass edit/create menu, groups, edit mode (whole-card native reorder on iOS, checks, group action, delete several), drag and drop, server notice. Does not scroll while empty (so does Rooms, and Search without results) |
+| `/` | `(tabs)/index.tsx` | Characters tab: edit and create buttons in one glass capsule (the plus opens the system menu on iOS, Create and an Import submenu of Files / Photos; elsewhere the `PopoverMenu`), groups, edit mode (whole-card native reorder on iOS, checks, group action, delete several), drag and drop, server notice. Does not scroll while empty (so does Rooms, and Search without results) |
 | `/rooms` | `(tabs)/rooms.tsx` | Rooms tab: reorder |
 | `/settings` | `(tabs)/settings.tsx` | Settings tab: server, model picker with conflict/replace sheet on change, active loaded models list with live polling (every 3s), tap-to-select active chat model with checkmark and context sync, native iOS swipe-to-unload and unload-all, context token budget with 1K (1,000-token) step and optional message limit toggle, Personas row, the Appearance row, language, Continue capsule and where it leads, lock, haptics, private question button, recent pictures, size limits, folder sync, backup. `?section=` scrolls to a block and flashes it |
 | `/search` | `(tabs)/search/index.tsx` | Search tab in its own stack, for the native header search bar (moved into the tab bar on iOS 26) |
@@ -212,7 +212,7 @@ It is missing in Expo Go, and then the Settings block is hidden (`cloudSyncAvail
 | `useServerForm` | The server fields shared by Settings and onboarding: stored values, model menu, connection test |
 | `useRoom` | A room scene: the speaker queue, director, autoplay, nudges |
 | `useAside` | The Private thread with the model beside a chat or a scene, in memory only |
-| `useCharacterActions` | New chat / edit / duplicate / export / delete actions for a character |
+| `useCharacterActions` | The menu of a character card in the list: show profile / duplicate / export / remove from group / delete |
 | `useBackupImport` | The import sheet of opened backups and its toast, for Settings and the Characters tab |
 | `useCardExport` | The "Save to Files / Save to Photos" menu items for a character card and the toast after saving; used by the character menu and the character screen |
 | `useLastChat` | The chat behind the "Continue" capsule on the Characters and Rooms tabs: the one opened last, or the one written in last, as set in Settings. Chats without a user message never count. `LastChatProvider` in the tabs layout holds both kinds for the one shared button; `useContinueAnchor` on a tab's root view tells it where the content ends (inside a tab the safe area includes the tab bar); only the focused tab reports, re-measuring on focus and every half second |

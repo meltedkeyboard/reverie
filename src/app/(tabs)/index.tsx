@@ -17,6 +17,7 @@ import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassGroup, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
+import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { PopoverMenu, usePopoverMenu } from '@/components/overlays/PopoverMenu'
 import { Pattern } from '@/components/visuals/Pattern'
 import { Icon } from '@/components/visuals/Icon'
@@ -41,6 +42,7 @@ import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { confirm, promptText, showSheet } from '@/lib/ui/dialogs'
 import { buildBackupArchive, characterSelection, exportBackup, openBackupBytes } from '@/lib/transfer/backup'
 import { buildCardPng, cardFileName, importCardFile, importCharacterCard, type CardSource } from '@/lib/transfer/importCard'
+import { swiftUI } from '@/lib/ui/nativeUI'
 import { showToast } from '@/lib/ui/toast'
 import { reportError } from '@/lib/transfer/report'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
@@ -339,6 +341,19 @@ export default function CharactersScreen() {
   const barBottom = insets.bottom + 12
   const bottomSpace = editing ? EDIT_BAR_SPACE : lastChat ? CONTINUE_BUTTON_SPACE : 0
 
+  // The menu of the plus on iOS, with the kinds of import folded into one item.
+  const createItems: MenuItem[] = [
+    { label: t('characters.createCharacter'), systemImage: 'person.badge.plus', onSelect: () => router.push('/character/new') },
+    {
+      label: t('card.import'),
+      systemImage: 'square.and.arrow.down',
+      children: [
+        { label: t('card.importFromFiles'), systemImage: 'folder', onSelect: () => onImportCard('files') },
+        { label: t('card.importFromPhotos'), systemImage: 'photo', onSelect: () => onImportCard('photos') },
+      ],
+    },
+  ]
+
   const screen = (
     <View style={styles.screen} ref={anchor.ref} onLayout={(e) => {
       anchor.onLayout()
@@ -480,7 +495,12 @@ export default function CharactersScreen() {
                 accessibilityLabel={editing ? t('characters.doneEditing') : t('characters.editList')}
               />
             ) : null}
-            {editing ? null : (
+            {editing ? null : swiftUI ? (
+              // The system menu grows out of the button, in Liquid Glass on iOS 26.
+              <NativeMenu items={createItems}>
+                <IconButton name="add" size={26} accessibilityLabel={t('characters.createCharacter')} />
+              </NativeMenu>
+            ) : (
               <IconButton
                 name="add"
                 size={26}

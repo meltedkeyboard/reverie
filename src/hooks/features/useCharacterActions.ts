@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router'
 
 import { deleteCharacter, duplicateCharacter, type CharacterPreview } from '@/db/characters'
-import { createChat } from '@/db/chats'
 import { pruneGroups, removeFromGroup } from '@/db/groups'
 import { useDatabase } from '@/db/provider'
 import { useCardExport } from '@/hooks/features/useCardExport'
@@ -11,17 +10,13 @@ import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { showSheet } from '@/lib/ui/dialogs'
 
-// What a character in the list can do: start a chat, be edited or deleted; reload
-// re-lists them after a delete.
+// What a character in the list can do: open its profile, be copied, exported or deleted;
+// reload re-lists them after a change. A new chat is started from the drawer in the chat.
 export function useCharacterActions(reload: () => void) {
   const db = useDatabase()
   const router = useRouter()
   const { t } = useTranslation()
   const { exportItem } = useCardExport()
-
-  const startChat = async (character: CharacterPreview) => {
-    router.push(`/chat/${await createChat(db, character)}`)
-  }
 
   const confirmDelete = (character: CharacterPreview) => {
     confirmDeletion({
@@ -49,14 +44,13 @@ export function useCharacterActions(reload: () => void) {
   }
 
   const menuItems = (character: CharacterPreview): MenuItem[] => [
-    { label: t('characters.newChat'), systemImage: 'plus.bubble', onSelect: () => startChat(character) },
-    { label: t('characters.edit'), systemImage: 'pencil', onSelect: () => router.push(`/character/${character.id}`) },
+    { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) },
     { label: t('characters.duplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(character) },
     exportItem(async () => character),
     ...(character.groupId !== null
       ? [{ label: t('groups.removeFromGroup'), systemImage: 'rectangle.stack.badge.minus', onSelect: () => removeFromGroup(db, [character.id]).then(reload) }]
       : []),
-    { label: t('characters.delete'), systemImage: 'trash', destructive: true, onSelect: () => confirmDelete(character) },
+    { label: t('characters.delete'), systemImage: 'trash', destructive: true, separated: true, onSelect: () => confirmDelete(character) },
   ]
 
   const openMenu = (character: CharacterPreview) => showSheet(character.name, menuItems(character))
