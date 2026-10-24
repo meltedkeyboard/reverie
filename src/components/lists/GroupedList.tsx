@@ -181,10 +181,13 @@ export function ButtonCell({
   danger,
   loading,
   icon,
+  unlit = false,
 }: CellProps & {
   onPress: () => void
   danger?: boolean
   loading?: boolean
+  // No highlight under the touch.
+  unlit?: boolean
   // `symbol` is the SF Symbol drawn on iOS, `fallback` the icon elsewhere (or everywhere without one).
   icon?: { symbol?: ComponentProps<typeof SFIcon>['name']; fallback: ComponentProps<typeof Icon>['name']; slide?: 'up' | 'down' }
 }) {
@@ -197,7 +200,7 @@ export function ButtonCell({
       disabled={disabled || loading || sliding}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed, disabled && !loading && !sliding && styles.disabled]}
+      style={({ pressed }) => [styles.row, pressed && !unlit && styles.pressed, disabled && !loading && !sliding && styles.disabled]}
     >
       <Text style={[styles.label, { color: ink }]}>{label}</Text>
       {icon ? (

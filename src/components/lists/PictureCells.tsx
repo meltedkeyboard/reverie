@@ -46,6 +46,7 @@ export function ChipRowCell({ actions }: { actions: ChipAction[] }) {
 // Where a picture comes from: a button that fades away and leaves the sources behind as
 // chips, with no sheet or menu in between (the system menu jumps behind the scroll as it
 // closes on iOS 26 and 27). The desktop has only files to choose from, so it keeps the button.
+// The button has no highlight under the touch: it fades into the chips anyway.
 export function SourceCell({ label, onPick }: { label: string; onPick: (source: ImageSource) => void }) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -55,7 +56,7 @@ export function SourceCell({ label, onPick }: { label: string; onPick: (source: 
   // never faded: Liquid Glass is not drawn under an ancestor with opacity.
   const shown = useSharedValue(0)
   const buttonStyle = useAnimatedStyle(() => ({ opacity: 1 - shown.value }))
-  if (isWeb) return <ButtonCell label={label} onPress={() => onPick('files')} />
+  if (isWeb) return <ButtonCell label={label} onPress={() => onPick('files')} unlit />
   const toggle = (next: boolean) => {
     setOpen(next)
     shown.value = withTiming(next ? 1 : 0, { duration: 220 })
@@ -76,7 +77,7 @@ export function SourceCell({ label, onPick }: { label: string; onPick: (source: 
         />
       </View>
       <Animated.View style={[styles.cover, buttonStyle]} pointerEvents={open ? 'none' : 'auto'}>
-        <ButtonCell label={label} onPress={() => toggle(true)} />
+        <ButtonCell label={label} onPress={() => toggle(true)} unlit />
       </Animated.View>
     </View>
   )

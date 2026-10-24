@@ -5,6 +5,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { Avatar } from '@/components/visuals/Avatar'
 import { ButtonCell, InputCell, ListFooter, ListSection, SwitchCell, TextCell } from '@/components/lists/GroupedList'
+import { NativeActionRow, NativeForm, NativeHostedRow, NativeSection, NativeTextRow, nativeForm } from '@/components/lists/NativeForm'
 import { ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
 import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
@@ -18,7 +19,7 @@ import { acceptMoving, pickAvatar, type CropRect } from '@/lib/images/avatars'
 import type { ImageSource } from '@/lib/images/images'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { alertError } from '@/lib/transfer/report'
-import { type Colors, useColors, useStyles } from '@/theme'
+import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 
 export default function PersonaEditorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -198,46 +199,98 @@ export default function PersonaEditorScreen() {
   const canRecrop = hasPhoto
   const title = isNew ? t('persona.new') : t('persona.edit')
 
+  // The photo with where a new one comes from and what is done with the one there is.
+  const photo = (
+    <View style={styles.avatarBlock}>
+      <View style={styles.editorAvatar}>
+        <Avatar name={name} file={avatar} uri={avatarSlot.uri} size={96} viewable={hasPhoto} />
+        <View style={styles.editorAvatarActions}>
+          <ListSection>
+            <SourceCell label={hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')} onPick={onPickAvatar} />
+            {hasPhoto || removedAvatar ? (
+              <ChipRowCell
+                actions={[
+                  ...(canRecrop
+                    ? [{ label: t('editor.recropPhoto'), icon: { symbol: 'crop', fallback: 'crop-outline' } as const, onPress: onRecropAvatar }]
+                    : []),
+                  removedAvatar
+                    ? {
+                        label: t('editor.restorePhoto'),
+                        icon: { symbol: 'arrow.uturn.backward', fallback: 'arrow-undo-outline' } as const,
+                        onPress: onRestoreAvatar,
+                      }
+                    : {
+                        label: t('editor.removePhoto'),
+                        icon: { symbol: 'trash', fallback: 'trash-outline' } as const,
+                        onPress: onClearAvatar,
+                        ink: colors.danger,
+                      },
+                ]}
+              />
+            ) : null}
+          </ListSection>
+        </View>
+      </View>
+    </View>
+  )
+
+  // The description's preview, which opens the editor over the whole screen.
+  const descriptionText = (
+    <TextCell
+      title={t('persona.descriptionLabel')}
+      value={description}
+      placeholder={t('persona.descriptionPlaceholder')}
+      onChangeText={(v) => {
+        setDescription(v)
+        setBeforeGen(null)
+      }}
+      lines={6}
+    />
+  )
+
+  // The same page as the system's own list (iOS with SwiftUI). The photo and the
+  // description's preview stay React Native views in rows of their own: the photo as it is
+  // laid out here, the preview for the zoom into the editor.
+  const renderNative = ({ ui }: NonNullable<typeof nativeForm>) => (
+    <NativeForm>
+      <NativeSection inset={HEADER_ROW_HEIGHT}>
+        <NativeHostedRow clear>{photo}</NativeHostedRow>
+      </NativeSection>
+
+      <NativeSection>
+        <NativeTextRow label={t('persona.nameLabel')} value={name} onChangeText={setName} placeholder={t('persona.namePlaceholder')} />
+      </NativeSection>
+
+      <NativeSection title={t('persona.descriptionLabel')} footer={t('persona.descriptionHint')}>
+        <NativeHostedRow>{descriptionText}</NativeHostedRow>
+        <NativeActionRow label={description.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')} onPress={openPersonaGen} />
+        {beforeGen !== null ? <NativeActionRow label={t('editor.undoGenerated')} onPress={undoGenerated} /> : null}
+      </NativeSection>
+
+      <NativeSection footer={t('persona.defaultHint')}>
+        <ui.Toggle label={t('persona.defaultLabel')} isOn={isDefault} onIsOnChange={setIsDefault} />
+      </NativeSection>
+
+      {!isNew ? (
+        <NativeSection>
+          <NativeActionRow label={t('persona.delete')} destructive onPress={confirmDelete} />
+        </NativeSection>
+      ) : null}
+    </NativeForm>
+  )
+
   return (
     <View style={styles.screen}>
-      {ready ? (
+      {ready && nativeForm ? (
+        renderNative(nativeForm)
+      ) : ready ? (
         <KeyboardAwareScrollView
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           contentContainerStyle={padding}
         >
-          <View style={styles.avatarBlock}>
-            <View style={styles.editorAvatar}>
-              <Avatar name={name} file={avatar} uri={avatarSlot.uri} size={96} viewable={hasPhoto} />
-              <View style={styles.editorAvatarActions}>
-                <ListSection>
-                  <SourceCell label={hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')} onPick={onPickAvatar} />
-                  {hasPhoto || removedAvatar ? (
-                    <ChipRowCell
-                      actions={[
-                        ...(canRecrop
-                          ? [{ label: t('editor.recropPhoto'), icon: { symbol: 'crop', fallback: 'crop-outline' } as const, onPress: onRecropAvatar }]
-                          : []),
-                        removedAvatar
-                          ? {
-                              label: t('editor.restorePhoto'),
-                              icon: { symbol: 'arrow.uturn.backward', fallback: 'arrow-undo-outline' } as const,
-                              onPress: onRestoreAvatar,
-                            }
-                          : {
-                              label: t('editor.removePhoto'),
-                              icon: { symbol: 'trash', fallback: 'trash-outline' } as const,
-                              onPress: onClearAvatar,
-                              ink: colors.danger,
-                            },
-                      ]}
-                    />
-                  ) : null}
-                </ListSection>
-              </View>
-            </View>
-          </View>
+          <View style={styles.avatarGap}>{photo}</View>
 
           <ListSection>
             <InputCell
@@ -249,16 +302,7 @@ export default function PersonaEditorScreen() {
           </ListSection>
 
           <ListSection header={t('persona.descriptionLabel')} footer={t('persona.descriptionHint')}>
-            <TextCell
-              title={t('persona.descriptionLabel')}
-              value={description}
-              placeholder={t('persona.descriptionPlaceholder')}
-              onChangeText={(v) => {
-                setDescription(v)
-                setBeforeGen(null)
-              }}
-              lines={6}
-            />
+            {descriptionText}
             <ButtonCell
               label={description.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')}
               onPress={openPersonaGen}
@@ -305,7 +349,8 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    avatarBlock: { alignItems: 'center', marginBottom: 24 },
+    avatarBlock: { alignItems: 'center' },
+    avatarGap: { marginBottom: 24 },
     editorAvatar: { flexDirection: 'row', alignItems: 'center', gap: 16, alignSelf: 'stretch' },
     editorAvatarActions: { flex: 1, marginBottom: -28 },
   })
