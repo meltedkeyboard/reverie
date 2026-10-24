@@ -58,6 +58,8 @@ export function DrawnFormScreenHeader({
   scrollY,
   nameSpot,
   avatar,
+  clearAtTop = false,
+  fadeRgb,
 }: {
   title: string
   right?: React.ReactNode
@@ -65,6 +67,11 @@ export function DrawnFormScreenHeader({
   scrollY?: SharedValue<number>
   nameSpot?: NameSpot
   avatar?: PageAvatar
+  // The fade under the bar comes in only as the page scrolls under it, so what the page
+  // draws at its very top (the profile's glow) shows through while it is unscrolled.
+  clearAtTop?: boolean
+  // The color the fade under the bar takes, as "r, g, b", in place of the page's.
+  fadeRgb?: string
 }) {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
@@ -72,10 +79,14 @@ export function DrawnFormScreenHeader({
   const { t } = useTranslation()
   const styles = useStyles(createStyles)
   const giveWay = useAnimatedStyle(() => ({ opacity: overPhoto ? 1 - overPhoto.value : 1 }))
+  const fadeShown = useAnimatedStyle(() => {
+    const shown = overPhoto ? 1 - overPhoto.value : 1
+    return { opacity: clearAtTop && scrollY ? shown * interpolate(scrollY.value, [0, FADE_IN], [0, 1], 'clamp') : shown }
+  })
   return (
     <>
-      <Animated.View style={[styles.fade, { height: headerHeight + 28 }, giveWay]}>
-        <EdgeFade edge="top" style={StyleSheet.absoluteFill} />
+      <Animated.View style={[styles.fade, { height: headerHeight + 28 }, fadeShown]}>
+        <EdgeFade edge="top" rgb={fadeRgb} style={StyleSheet.absoluteFill} />
       </Animated.View>
       <View style={[styles.bar, { paddingTop: insets.top }]} pointerEvents="box-none">
         <View
@@ -147,6 +158,8 @@ export type NameSpot = { left: number; bottom: number }
 export type PageAvatar = { node: React.ReactNode; size: number; centerX: number; centerY: number }
 
 const HEADER_AVATAR = isDesktop ? 24 : 30
+// With clearAtTop, the page scrolls this far before the fade under the bar is fully in.
+const FADE_IN = 40
 
 // Whether the header holds the avatar: once the page is scrolled down with the photo
 // closed. Up to there the two lie on each other, so the hand-off doesn't show.

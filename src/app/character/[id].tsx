@@ -12,6 +12,7 @@ import { CharacterProfile } from '@/components/cast/CharacterProfile'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
 import { ExpandingAvatar, usePhotoNameSpot, useSpreadPush } from '@/components/cast/ExpandingAvatar'
+import { glowTop, ProfileGlow, profileTint } from '@/components/cast/ProfileGlow'
 import { BarButton, DrawnFormScreenHeader, useAvatarHandOff } from '@/components/chrome/FormScreenHeader'
 import { useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import {
@@ -32,12 +33,14 @@ import { setAvatarCropDraft } from '@/lib/images/avatarCrop'
 import { setGenDraft } from '@/lib/chat/genDraft'
 import { acceptMoving, pickAvatar, pickBackground, type CropRect } from '@/lib/images/avatars'
 import { movingKind } from '@/lib/images/media'
+import { avatarTint } from '@/lib/images/initial'
+import { usePictureColor, type Rgb } from '@/lib/images/pictureColor'
 import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
 import type { ImageSource } from '@/lib/images/images'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { countLabel } from '@/lib/core/format'
 import { alertError } from '@/lib/transfer/report'
-import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
+import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles, useTheme } from '@/theme'
 import { isAndroid } from '@/lib/core/platform'
 
 export default function CharacterEditorScreen() {
@@ -51,6 +54,7 @@ export default function CharacterEditorScreen() {
   const router = useRouter()
   const padding = useScreenPadding('form')
   const colors = useColors()
+  const { scheme } = useTheme()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const { exportTargets } = useCardExport()
@@ -331,6 +335,11 @@ export default function CharacterEditorScreen() {
   const photoUri = avatarSlot.shown(avatar)
   const hasPhoto = Boolean(photoUri)
   const canRecrop = hasPhoto && !movingKind(photoUri!)
+  // The profile's glow takes the photo's average color, or without a photo the tint the
+  // initial stands on. A video measures to nothing and has no glow.
+  const photoColor = usePictureColor(editing ? null : photoUri ?? null)
+  const average = editing ? null : hasPhoto ? photoColor : hexRgb(avatarTint(name))
+  const glowColor = average ? profileTint(average) : null
   // The character's own name heads the screen once it has one.
   const title = name.trim() || (isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle'))
 
@@ -414,6 +423,9 @@ export default function CharacterEditorScreen() {
 
   return (
     <View style={styles.screen}>
+      {ready ? (
+        <ProfileGlow color={glowColor} height={screenHeight + GLOW_BELOW} scrollY={scrollY} spread={photoSpread} />
+      ) : null}
       {ready ? (
         <PullHost gesture={isAndroid ? androidPull : null}>
         <KeyboardAwareScrollView
@@ -642,6 +654,8 @@ export default function CharacterEditorScreen() {
         // A name of its own moves down onto the photo; a fallback title only gives way.
         nameSpot={name.trim() ? nameSpot : undefined}
         avatar={headerAvatar}
+        clearAtTop={!editing}
+        fadeRgb={glowColor ? glowTop(glowColor, colors.bgRgb, scheme) : undefined}
         right={
           <View style={styles.headerButtons}>
             {/* One button that turns from the pencil into the checkmark, so the change is
@@ -664,6 +678,14 @@ export default function CharacterEditorScreen() {
 
 const PROFILE_TOP_GAP = 14
 const AVATAR_SIZE = 96
+// How far past the bottom of the screen the profile's glow runs out, so the details on the
+// first screen all stand in it.
+const GLOW_BELOW = 120
+
+const hexRgb = (hex: string): Rgb => {
+  const value = parseInt(hex.slice(1, 7), 16)
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
+}
 
 // Android only: carries the gesture that stands in for the overscroll pull of iOS. Elsewhere
 // it renders its children as they are.

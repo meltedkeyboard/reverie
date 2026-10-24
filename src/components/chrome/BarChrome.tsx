@@ -39,13 +39,15 @@ export function BlurBar({
 }
 
 // With Liquid Glass the bar goes away and the content fades out toward the edge instead,
-// so text scrolling underneath doesn't clash with the floating controls.
-export function EdgeFade({ edge, style }: { edge: Edge; style?: StyleProp<ViewStyle> }) {
+// so text scrolling underneath doesn't clash with the floating controls. `rgb`, as "r, g, b",
+// fades to another color than the page's, for a screen whose top is not the page's color.
+export function EdgeFade({ edge, rgb, style }: { edge: Edge; rgb?: string; style?: StyleProp<ViewStyle> }) {
   const { colors } = useTheme()
   const toEdge = edge === 'top' ? { start: { x: 0, y: 1 }, end: { x: 0, y: 0 } } : { start: { x: 0, y: 0 }, end: { x: 0, y: 1 } }
+  const to = rgb ?? colors.bgRgb
   return (
     <LinearGradient
-      colors={[`rgba(${colors.bgRgb}, 0)`, `rgba(${colors.bgRgb}, 0.8)`, colors.bg]}
+      colors={[`rgba(${to}, 0)`, `rgba(${to}, 0.8)`, `rgb(${to})`]}
       locations={[0, 0.45, 1]}
       {...toEdge}
       style={style}
