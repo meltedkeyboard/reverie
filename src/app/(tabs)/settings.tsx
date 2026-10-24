@@ -5,6 +5,17 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 import { ButtonCell, CheckCell, ChipChoiceCell, InputCell, LinkCell, ListFooter, ListSection, MenuCell, SegmentCell, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
+import {
+  nativeForm,
+  NativeActionRow,
+  NativeForm,
+  NativeHostedRow,
+  NativeLinkRow,
+  NativeSection,
+  NativeSegmentRow,
+  NativeSliderRow,
+  NativeTextRow,
+} from '@/components/lists/NativeForm'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import {
   inspectLoadedModel,
@@ -72,7 +83,7 @@ import type { SettingsSection } from '@/lib/core/searchScope'
 import { isShownInFiles } from '@/lib/core/storage'
 import { reportError } from '@/lib/transfer/report'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
-import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { type Colors, HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles } from '@/theme'
 import { Icon } from '@/components/visuals/Icon'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
@@ -101,17 +112,27 @@ export default function SettingsScreen() {
   const offsets = useRef<Partial<Record<SettingsSection, number>>>({})
   // `n` tells two jumps to the same section apart, so the tint plays again.
   const [flashed, setFlashed] = useState<{ section: SettingsSection; n: number } | null>(null)
+  // In the system's list the section is scrolled to by its id, with no flash. The module is
+  // there or not for the life of the app, so the hook is called on every render or on none.
+  const jumpTo = nativeForm?.ui.useNativeState<string | null>(null)
 
   // Runs when the parameter arrives and again as sections are laid out, since on the
   // first visit the one asked for may not have been measured yet. The parameter is
   // cleared afterwards, so asking for the same section again scrolls once more.
   const jump = useCallback(() => {
+    if (jumpTo) {
+      if (!section) return
+      jumpTo.set(null)
+      jumpTo.set(section)
+      router.setParams({ section: undefined })
+      return
+    }
     const y = section && offsets.current[section]
     if (!section || y === undefined) return
     scrollRef.current?.scrollTo({ y: Math.max(0, y - headerHeight - 16), animated: true })
     setFlashed((prev) => ({ section, n: (prev?.n ?? 0) + 1 }))
     router.setParams({ section: undefined })
-  }, [section, headerHeight, router])
+  }, [section, headerHeight, router, jumpTo])
 
   useEffect(() => {
     jump()
@@ -326,6 +347,9 @@ export default function SettingsScreen() {
     .filter(Boolean)
     .join('\n')
 
+  // The system's switch stays where it was flicked to whatever its value says, so when the
+  // lock is refused it is built anew, back off.
+  const [lockSwitch, setLockSwitch] = useState(0)
   const toggleAppLock = async (enabled: boolean) => {
     if (enabled) {
       // Verify it works before turning it on, so the app can't lock the user out.
@@ -335,10 +359,14 @@ export default function SettingsScreen() {
           title: t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId'),
           message: t(`settings.${isAndroid ? 'biometricsUnavailable' : 'faceIdUnavailable'}`),
         })
+        setLockSwitch((n) => n + 1)
         return
       }
       const result = await LocalAuthentication.authenticateAsync({ promptMessage: t('lock.prompt') })
-      if (!result.success) return
+      if (!result.success) {
+        setLockSwitch((n) => n + 1)
+        return
+      }
     }
     setAppLock(enabled)
   }
@@ -988,6 +1016,34 @@ export default function SettingsScreen() {
 
   const showCloud = cloudSync.available || cloudPreview
   const cloudBusy = cloudSync.syncing || backingUp
+  const cloudChips = (
+    <ChipRowCell
+      actions={[
+        {
+          label: t('settings.folderSyncPush'),
+          icon: { symbol: 'arrow.up', fallback: 'arrow-up' },
+          slide: 'up',
+          onPress: () => runCloud('push', cloudSync.pushNow),
+          loading: cloudAction === 'push',
+          disabled: cloudBusy || cloudAction === 'pull',
+        },
+        {
+          label: t('settings.folderSyncPull'),
+          icon: { symbol: 'arrow.down', fallback: 'arrow-down' },
+          slide: 'down',
+          onPress: () => runCloud('pull', cloudSync.pullNow),
+          loading: cloudAction === 'pull',
+          disabled: cloudBusy || cloudAction === 'push',
+        },
+        {
+          label: t('settings.folderSyncChangeFolder'),
+          icon: { symbol: 'folder', fallback: 'folder-outline' },
+          onPress: () => cloudSync.changeFolder().catch((err) => reportError(t('sync.failedTitle'), err)),
+          disabled: cloudBusy || cloudAction !== null,
+        },
+      ]}
+    />
+  )
   const folderSync = (
     <ListSection
       header={t('settings.folderSync')}
@@ -999,36 +1055,7 @@ export default function SettingsScreen() {
         onValueChange={toggleCloudSync}
         disabled={cloudBusy || cloudAction !== null}
       />
-      {cloudSync.enabled || cloudPreview ? (
-        <>
-          <ChipRowCell
-            actions={[
-              {
-                label: t('settings.folderSyncPush'),
-                icon: { symbol: 'arrow.up', fallback: 'arrow-up' },
-                slide: 'up',
-                onPress: () => runCloud('push', cloudSync.pushNow),
-                loading: cloudAction === 'push',
-                disabled: cloudBusy || cloudAction === 'pull',
-              },
-              {
-                label: t('settings.folderSyncPull'),
-                icon: { symbol: 'arrow.down', fallback: 'arrow-down' },
-                slide: 'down',
-                onPress: () => runCloud('pull', cloudSync.pullNow),
-                loading: cloudAction === 'pull',
-                disabled: cloudBusy || cloudAction === 'push',
-              },
-              {
-                label: t('settings.folderSyncChangeFolder'),
-                icon: { symbol: 'folder', fallback: 'folder-outline' },
-                onPress: () => cloudSync.changeFolder().catch((err) => reportError(t('sync.failedTitle'), err)),
-                disabled: cloudBusy || cloudAction !== null,
-              },
-            ]}
-          />
-        </>
-      ) : null}
+      {cloudSync.enabled || cloudPreview ? cloudChips : null}
     </ListSection>
   )
 
@@ -1067,32 +1094,41 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
+  const backupChips = (
+    <ChipRowCell
+      actions={[
+        {
+          label: t('settings.exportJson'),
+          icon: { symbol: 'square.and.arrow.up', fallback: 'share-outline' },
+          labeled: true,
+          onPress: onExport,
+          loading: exporting,
+          disabled: cloudAction !== null || importing,
+        },
+        {
+          label: t('settings.importJson'),
+          icon: { symbol: 'square.and.arrow.down', fallback: 'download-outline' },
+          labeled: true,
+          onPress: backupImport.pick,
+          loading: importing,
+          disabled: cloudAction !== null || exporting,
+        },
+      ]}
+    />
+  )
+  // What the backup opens over the page, on either page.
+  const backupSheets = (
+    <>
+      <BackupTreeSheet tree={exportTree} confirmLabel={t('settings.exportJson')} onConfirm={runExport} onClose={() => setExportTree(null)} />
+      {backupImport.sheet}
+    </>
+  )
   const backup = (
     <>
       <ListSection header={t('settings.backupTitle')} footer={t('settings.backupNote')}>
-        <ChipRowCell
-          actions={[
-            {
-              label: t('settings.exportJson'),
-              icon: { symbol: 'square.and.arrow.up', fallback: 'share-outline' },
-              labeled: true,
-              onPress: onExport,
-              loading: exporting,
-              disabled: cloudAction !== null || importing,
-            },
-            {
-              label: t('settings.importJson'),
-              icon: { symbol: 'square.and.arrow.down', fallback: 'download-outline' },
-              labeled: true,
-              onPress: backupImport.pick,
-              loading: importing,
-              disabled: cloudAction !== null || exporting,
-            },
-          ]}
-        />
+        {backupChips}
       </ListSection>
-      <BackupTreeSheet tree={exportTree} confirmLabel={t('settings.exportJson')} onConfirm={runExport} onClose={() => setExportTree(null)} />
-      {backupImport.sheet}
+      {backupSheets}
     </>
   )
 
@@ -1108,9 +1144,263 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
+  // The same page as the system's own list (iOS with SwiftUI). The model's chips and the rows
+  // of chips for the sync and the backup stay React Native views in rows of their own.
+  const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
+    const { Picker, Text: SwiftText, HStack, Spacer, Toggle, Button: SwiftButton, Image, ProgressView, SwipeActions } = ui
+    const { pickerStyle, tag, labelsHidden, disabled, id, tint, foregroundStyle, lineLimit } = modifiers
+    const toggle = (name: string | null, label: string, isOn: boolean, onChange: (on: boolean) => void, off = false, key?: string) => (
+      <Toggle key={key} label={label} isOn={isOn} onIsOnChange={onChange} modifiers={[disabled(off), ...(name ? [id(name)] : [])]} />
+    )
+    const numberRow = (label: string, value: string, onChange: (text: string) => void, off: boolean) => (
+      <NativeTextRow label={label} value={value} onChangeText={onChange} keyboard="number-pad" disabled={off} />
+    )
+    return (
+      <NativeForm jumpTo={jumpTo}>
+        <NativeSection id="appearance" inset={HEADER_ROW_HEIGHT}>
+          <NativeLinkRow
+            label={t('settings.appearance')}
+            value={`${chatText.font === 'System' ? t('chatFont.system') : chatText.font}, ${Math.round(chatText.scale * 100)}%`}
+            onPress={() => router.push('/chat-text')}
+          />
+          {alternateIconsAvailable ? (
+            <NativeLinkRow label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
+          ) : null}
+        </NativeSection>
+
+        <NativeSection id="language" title={t('settings.language')}>
+          <Picker
+            selection={localePreference}
+            onSelectionChange={(next: LocalePreference) => {
+              selectionAsync()
+              setLocalePreference(next)
+            }}
+            modifiers={[pickerStyle('inline'), labelsHidden()]}
+          >
+            {LANGUAGE_OPTIONS.map((o) => (
+              <SwiftText key={o.value} modifiers={[tag(o.value)]}>
+                {o.label}
+              </SwiftText>
+            ))}
+          </Picker>
+        </NativeSection>
+
+        <NativeSection id="continue" title={t('settings.homeScreen')} footer={t('settings.continueButtonNote')}>
+          {toggle(null, t('settings.continueButton'), continueButton, toggleContinueButton)}
+          {continueButton ? (
+            <NativeSegmentRow
+              label={t('settings.continueBy')}
+              options={CONTINUE_OPTIONS}
+              value={continueByVisit ? 'visit' : 'message'}
+              onChange={(value) => {
+                selectionAsync()
+                setContinueByVisitValue(value === 'visit')
+              }}
+            />
+          ) : null}
+        </NativeSection>
+
+        <NativeSection id="private" title={t('settings.chats')} footer={t('settings.privateButtonNote')}>
+          {toggle(null, t('settings.privateButton'), privateButton, togglePrivateButton)}
+        </NativeSection>
+
+        <NativeSection id="personas" title={t('persona.title')} footer={t('persona.emptyText')}>
+          <NativeLinkRow
+            label={t('persona.title')}
+            value={personas.length > 0 ? String(personas.length) : t('persona.none')}
+            onPress={() => router.push('/personas')}
+          />
+        </NativeSection>
+
+        <NativeSection id="suggest" footer={t('settings.suggestButtonNote')}>
+          {toggle(null, t('settings.suggestButton'), suggestions, toggleSuggestions)}
+          {suggestions ? (
+            <NativeSliderRow
+              label={t('settings.suggestTokens')}
+              value={suggestionTokens}
+              min={SUGGESTION_TOKENS.min}
+              max={SUGGESTION_TOKENS.max}
+              step={SUGGESTION_TOKENS.step}
+              onChange={(tokens) => {
+                setSuggestionTokens(tokens)
+                saveSuggestionTokens(db, tokens)
+              }}
+            />
+          ) : null}
+        </NativeSection>
+
+        <NativeSection id="recents" footer={t('settings.recentPicturesNote')}>
+          {toggle(null, t('settings.recentPictures'), recentPictures, toggleRecentPictures)}
+          {recentPictures
+            ? toggle(null, t('settings.recentUnlimited'), recent.unlimited, (unlimited) => {
+                setRecent((r) => ({ ...r, unlimited }))
+                setRecentUnlimited(db, unlimited)
+              })
+            : null}
+          {recentPictures ? numberRow(t('settings.recentCount'), recentDraft ?? String(recent.count), typeRecentCount, recent.unlimited) : null}
+        </NativeSection>
+
+        <NativeSection id="confirmDelete">{toggle(null, t('settings.confirmDelete'), confirmDelete, toggleConfirmDelete)}</NativeSection>
+
+        <NativeSection id="haptics" title={t('settings.feedback')}>
+          {toggle(null, t('settings.haptics'), haptics, toggleHaptics)}
+        </NativeSection>
+
+        <NativeSection title={t('settings.security')} footer={t('settings.showInFilesNote')}>
+          {toggle('faceId', t('settings.requireFaceId'), appLock, toggleAppLock, false, `lock${lockSwitch}`)}
+          {toggle('files', t('settings.showInFiles'), showInFiles, toggleShowInFiles, movingFiles)}
+        </NativeSection>
+
+        <NativeSection id="limits" title={t('settings.limitsTitle')} footer={t('settings.limitsNote')}>
+          {toggle(null, t('settings.limitsOff'), limits.off, (off) => {
+            setLimits((l) => ({ ...l, off }))
+            setLimitsOff(db, off)
+          })}
+          {numberRow(t('settings.limitAvatar'), limitDrafts.avatarMb ?? String(limits.avatarMb), (text) => typeLimit('avatarMb', text), limits.off)}
+          {numberRow(t('settings.limitBackground'), limitDrafts.backgroundMb ?? String(limits.backgroundMb), (text) => typeLimit('backgroundMb', text), limits.off)}
+          {numberRow(t('settings.limitAttachment'), limitDrafts.attachmentMb ?? String(limits.attachmentMb), (text) => typeLimit('attachmentMb', text), limits.off)}
+        </NativeSection>
+
+        <NativeSection
+          id="server"
+          title={t('settings.server')}
+          footer={[
+            { text: t('settings.baseUrlHint') },
+            ...(status.kind === 'ok' || status.kind === 'error' ? [{ text: status.text, danger: status.kind === 'error' }] : []),
+          ]}
+        >
+          <NativeTextRow
+            label={t('settings.baseUrlLabel')}
+            value={cfg.baseUrl}
+            onChangeText={(baseUrl) => update({ baseUrl })}
+            placeholder={t('settings.baseUrlPlaceholder')}
+            keyboard="url"
+            plain
+          />
+          <NativeTextRow
+            label={t('settings.apiKeyLabel')}
+            value={cfg.apiKey}
+            onChangeText={(apiKey) => update({ apiKey })}
+            placeholder={t('settings.apiKeyPlaceholder')}
+            secure
+          />
+          {/* Typed by hand until the server has listed its models, then picked from them. */}
+          {models.length > 0 ? (
+            <NativeHostedRow>
+              <ChipChoiceCell label={t('settings.modelLabel')} options={models} value={cfg.model} onChange={onSelectModel} />
+            </NativeHostedRow>
+          ) : (
+            <NativeTextRow
+              label={t('settings.modelLabel')}
+              value={cfg.model}
+              onChangeText={(model) => update({ model })}
+              placeholder={t('settings.modelPlaceholder')}
+              plain
+            />
+          )}
+          <NativeActionRow
+            label={t('settings.testConnection')}
+            symbol="bolt.horizontal"
+            effect={{ effect: 'variableColor', fillStyle: 'iterative' }}
+            busy={status.kind === 'testing'}
+            onPress={onTest}
+          />
+          <NativeActionRow
+            label={isSelectedModelLoaded ? t('settings.reloadModel') : t('settings.loadModel')}
+            symbol={isSelectedModelLoaded ? 'arrow.clockwise' : 'cpu'}
+            effect={isSelectedModelLoaded ? { effect: 'rotate' } : { effect: 'pulse' }}
+            busy={loadingModel}
+            disabled={!cfg.baseUrl.trim() || !cfg.model.trim()}
+            onPress={onLoadModel}
+          />
+        </NativeSection>
+
+        {loadedModels.length > 0 ? (
+          <NativeSection title={t('settings.loadedModelsHeader')} footer={t('settings.loadedModelsHint')}>
+            {loadedModels.map((entry, index) => {
+              const isCurrent = index === activeLoadedModelIndex
+              const isUnloading = unloadingModelIds.has(entry.id)
+              return (
+                <SwipeActions key={entry.id}>
+                  <HStack spacing={8} modifiers={[disabled(isUnloading)]}>
+                    <SwiftButton
+                      label={entry.key || entry.id}
+                      onPress={() => onSelectActiveModel(entry, index)}
+                      modifiers={[tint(colors.text), lineLimit(1)]}
+                    />
+                    <Spacer />
+                    {entry.contextLength ? (
+                      <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{formatContextTokens(entry.contextLength)}</SwiftText>
+                    ) : null}
+                    {isUnloading ? <ProgressView /> : isCurrent ? <Image systemName="checkmark" size={17} color={colors.accent} /> : null}
+                  </HStack>
+                  <SwipeActions.Actions edge="trailing">
+                    <SwiftButton label={t('settings.unload')} systemImage="eject" role="destructive" onPress={() => onUnloadSingle(entry)} />
+                  </SwipeActions.Actions>
+                </SwipeActions>
+              )
+            })}
+            <NativeActionRow label={t('settings.unloadAllModels')} symbol="xmark.circle" destructive busy={unloadingAll} onPress={onUnloadAll} />
+          </NativeSection>
+        ) : null}
+
+        <NativeSection
+          title={t('settings.contextLabel')}
+          footer={[
+            { text: t('settings.contextHint') },
+            ...(cfg.limitMessages ? [{ text: t('settings.contextMessagesHint') }] : []),
+            ...(cfg.limitMessages && (cfg.chatMessages > 1000 || cfg.roomMessages > 1000) ? [{ text: t('settings.contextMessagesWarning'), danger: true }] : []),
+          ]}
+        >
+          <NativeSliderRow
+            label={t('settings.contextTokensLabel')}
+            value={cfg.contextTokens}
+            min={MIN_CONTEXT_TOKENS}
+            max={MAX_CONTEXT_TOKENS}
+            step={CONTEXT_STEP_TOKENS}
+            format={(tokens) => formatTokensLabel(tokens)}
+            onChange={(tokens) => update({ contextTokens: tokens })}
+            tintColor={isLoaded ? colors.accent : '#8E8E93'}
+          />
+          {toggle(null, t('settings.contextMessages'), cfg.limitMessages, (limitMessages) => update({ limitMessages }))}
+          {numberRow(t('settings.contextChatMessages'), messageDrafts.chatMessages ?? String(cfg.chatMessages), (text) => setMessages('chatMessages', text), !cfg.limitMessages)}
+          {numberRow(t('settings.contextRoomMessages'), messageDrafts.roomMessages ?? String(cfg.roomMessages), (text) => setMessages('roomMessages', text), !cfg.limitMessages)}
+        </NativeSection>
+
+        {showCloud ? (
+          <NativeSection
+            id="folderSync"
+            title={t('settings.folderSync')}
+            footer={cloudSync.enabled || cloudPreview ? `${t('settings.folderSyncSyncNote')}\n\n${cloudStatus}` : t('settings.folderSyncSyncNote')}
+          >
+            {toggle(null, t('settings.folderSyncSync'), cloudSync.enabled, toggleCloudSync, cloudBusy || cloudAction !== null)}
+            {cloudSync.enabled || cloudPreview ? <NativeHostedRow>{cloudChips}</NativeHostedRow> : null}
+          </NativeSection>
+        ) : null}
+
+        <NativeSection id="backup" title={t('settings.backupTitle')} footer={t('settings.backupNote')}>
+          <NativeHostedRow>{backupChips}</NativeHostedRow>
+        </NativeSection>
+
+        <NativeSection title={t('settings.aboutTitle')}>
+          <NativeLinkRow label={t('settings.aboutReverie')} onPress={() => router.push('/about')} />
+        </NativeSection>
+
+        <NativeSection id="wipe" title={t('settings.dangerZone')} footer={t('settings.dangerNote')}>
+          <NativeActionRow label={t('settings.wipeAll')} destructive busy={wiping} onPress={onWipe} />
+        </NativeSection>
+      </NativeForm>
+    )
+  }
+
   return (
     <View style={styles.screen}>
-      {loaded ? (
+      {loaded && nativeForm ? (
+        <>
+          {renderNative(nativeForm)}
+          {backupSheets}
+        </>
+      ) : loaded ? (
         <KeyboardAwareScrollView
           ref={scrollRef}
           bottomOffset={24}

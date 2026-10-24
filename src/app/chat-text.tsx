@@ -3,7 +3,7 @@ import { SFIcon } from '@/components/visuals/SFIcon'
 import Slider from '@react-native-community/slider'
 import { useRouter } from 'expo-router'
 import { useMemo, useRef } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 
 import { ChatBackground } from '@/components/chat/ChatBackground'
 import { Pattern } from '@/components/visuals/Pattern'
@@ -11,6 +11,7 @@ import { useChatScheme, type ChatLook } from '@/components/chrome/ChatChrome'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { ButtonCell, CheckCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
+import { nativeForm, NativeForm, NativeHostedRow, NativeSection } from '@/components/lists/NativeForm'
 import { Segmented } from '@/components/controls/Segmented'
 import { SourceCell } from '@/components/lists/PictureCells'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
@@ -38,13 +39,16 @@ import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { installedFontFamilies } from '../../modules/reverie-fonts'
-import { type Colors, FILL, ImmediateTheme, ON_ACCENT, paletteOf, SchemeOverride, THEMES, type ThemeMode, type ThemeName, useColors, useStyles, useTheme } from '@/theme'
+import { type Colors, CONTROL_FONT_SCALE, FILL, ImmediateTheme, ON_ACCENT, paletteOf, SchemeOverride, THEMES, type ThemeMode, type ThemeName, useColors, useStyles, useTheme } from '@/theme'
 
 const FIELD_HEIGHT = 48
 // A tile shows a whole 393 x 852 board, small.
 const TILE_WIDTH = 84
 const TILE_HEIGHT = (TILE_WIDTH * 852) / 393
 const MARK_SIZE = 22
+const TILE_LABEL_LINE = 16
+// The preview card's set height: its padding, the messages and the composer.
+const PREVIEW_HEIGHT = 20 + 200 + 12 + FIELD_HEIGHT + 12
 
 const FALLBACK_FAMILIES =
   isAndroid
@@ -100,7 +104,7 @@ const NO_PICTURE: ChatLook = {
 
 // The preview card, a component of its own so that it reads the colors of the scheme set
 // around it.
-function ChatPreview() {
+function ChatPreview({ flush = false }: { flush?: boolean }) {
   const colors = useColors()
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
@@ -126,7 +130,7 @@ function ChatPreview() {
   }
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, flush && styles.cardFlush]}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         {pattern === 'custom' && wallpaperUri ? (
           <ChatBackground
@@ -186,6 +190,9 @@ function Appearance() {
   const router = useRouter()
   const db = useDatabase()
   const padding = useScreenPadding('form')
+  const { fontScale } = useWindowDimensions()
+  // The strip of tiles in its own row: padding, the tile, its name and its circle.
+  const tilesHeight = 32 + TILE_HEIGHT + 6 + Math.ceil(TILE_LABEL_LINE * Math.min(fontScale, CONTROL_FONT_SCALE)) + 6 + MARK_SIZE + 2
   const colors = useColors()
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
@@ -290,6 +297,8 @@ function Appearance() {
   const untouched = font === DEFAULT_CHAT_FONT && !userFont && scale === CHAT_TEXT_SCALE_RANGE.default
   // The regular size is felt, not drawn: the thumb clicks as it reaches it.
   const atNormal = useRef(scale === CHAT_TEXT_SCALE_RANGE.default)
+  // Where the system slider was let go, which it does not pass when editing ends.
+  const dragged = useRef(scale)
   const drag = (value: number) => {
     const next = snap(value)
     const onNormal = next === CHAT_TEXT_SCALE_RANGE.default
@@ -314,144 +323,259 @@ function Appearance() {
     [families, font, setFont, t]
   )
 
+  // The same screen as the system's own list (iOS with SwiftUI): the theme a checked row, the
+  // controls the system's, and what it has none for, the preview and the tiles, React Native
+  // views in rows of their own.
+  const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
+    const { Picker, Text: SwiftText, HStack, Toggle, Slider: SwiftSlider, Button: SwiftButton, Menu, Image } = ui
+    const { pickerStyle, tag, labelsHidden, font: swiftFont, foregroundStyle, buttonStyle, disabled, accessibilityLabel } = modifiers
+    const secondary = { type: 'hierarchical', style: 'secondary' } as const
+    return (
+      <NativeForm>
+        <NativeSection title={t('settings.theme')}>
+          <Picker
+            selection={theme}
+            onSelectionChange={(next: ThemeName) => {
+              Haptics.selectionAsync()
+              setTheme(next)
+            }}
+            modifiers={[pickerStyle('inline'), labelsHidden()]}
+          >
+            {/* Names alone: the picker draws only the text of its rows, so an icon there
+                comes out a blank or a white square. */}
+            {THEMES.map((name) => (
+              <SwiftText key={name} modifiers={[tag(name)]}>
+                {t(`theme.${name}`)}
+              </SwiftText>
+            ))}
+          </Picker>
+          <Picker
+            selection={mode}
+            onSelectionChange={(next: ThemeMode) => {
+              Haptics.selectionAsync()
+              setMode(next)
+            }}
+            modifiers={[pickerStyle('segmented'), labelsHidden()]}
+          >
+            {modeOptions.map((option) => (
+              <SwiftText key={option.value} modifiers={[tag(option.value)]}>
+                {option.label}
+              </SwiftText>
+            ))}
+          </Picker>
+        </NativeSection>
+
+        <NativeSection>
+          <NativeHostedRow height={PREVIEW_HEIGHT} clear>
+            <SchemeOverride scheme={previewScheme}>
+              <ChatPreview flush />
+            </SchemeOverride>
+          </NativeHostedRow>
+        </NativeSection>
+
+        <NativeSection>
+          <HStack spacing={12}>
+            <SwiftText modifiers={[swiftFont({ size: 14, weight: 'semibold' }), foregroundStyle(secondary)]}>A</SwiftText>
+            <SwiftSlider
+              value={scale}
+              min={CHAT_TEXT_SCALE_RANGE.min}
+              max={CHAT_TEXT_SCALE_RANGE.max}
+              onValueChange={(value) => {
+                dragged.current = value
+                drag(value)
+              }}
+              onEditingChanged={(editing) => {
+                if (!editing) setScale(snap(dragged.current))
+              }}
+              modifiers={[accessibilityLabel(t('settings.chatTextSize'))]}
+            />
+            <SwiftText modifiers={[swiftFont({ size: 24, weight: 'semibold' }), foregroundStyle(secondary)]}>A</SwiftText>
+            {/* Only the size back to the default; the button below resets everything. Borderless,
+                or the whole row would be the button. */}
+            <SwiftButton
+              onPress={resetSize}
+              modifiers={[buttonStyle('borderless'), disabled(scale === CHAT_TEXT_SCALE_RANGE.default), accessibilityLabel(t('settings.chatResetSize'))]}
+            >
+              <Image systemName="arrow.counterclockwise" size={18} />
+            </SwiftButton>
+          </HStack>
+          <Picker label={t('settings.chatFontField')} selection={font} onSelectionChange={(next: string) => setFont(next)} modifiers={[pickerStyle('menu')]}>
+            {families.map((family) => (
+              <SwiftText key={family} modifiers={[tag(family)]}>
+                {family === SYSTEM_FONT ? t('chatFont.system') : family}
+              </SwiftText>
+            ))}
+          </Picker>
+          <Toggle label={t('settings.chatUserFont')} isOn={userFont} onIsOnChange={setUserFont} />
+          <Toggle label={t('settings.chatUserMarkdown')} isOn={userMarkdown} onIsOnChange={setUserMarkdown} />
+        </NativeSection>
+
+        <NativeSection title={t('settings.chatPattern')} footer={t('settings.chatBackdropHint')}>
+          <NativeHostedRow height={tilesHeight}>{tiles}</NativeHostedRow>
+          <Menu label={wallpaper?.file ? t('background.change') : t('background.choose')}>
+            <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onPickBackground('camera')} />
+            <SwiftButton label={t('imageSource.photos')} systemImage="photo.on.rectangle" onPress={() => onPickBackground('library')} />
+            <SwiftButton label={t('imageSource.files')} systemImage="folder" onPress={() => onPickBackground('files')} />
+          </Menu>
+          {wallpaper?.file ? <SwiftButton label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
+          {wallpaper?.file ? <SwiftButton label={t('background.remove')} role="destructive" onPress={onRemoveBackground} /> : null}
+          <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} />
+        </NativeSection>
+
+        <NativeSection>
+          <SwiftButton label={t('settings.chatReset')} onPress={reset} modifiers={[disabled(untouched)]} />
+        </NativeSection>
+      </NativeForm>
+    )
+  }
+
+  // The backgrounds as tiles, the picture of one's own first.
+  const tiles = (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
+      <Pressable
+        onPress={() => {
+          if (wallpaper?.file) {
+            if (pattern !== 'custom') {
+              Haptics.selectionAsync()
+              setPattern('custom')
+            } else {
+              onAdjustBackground()
+            }
+          } else {
+            onPickBackground(isWeb ? 'files' : 'library')
+          }
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ selected: pattern === 'custom' }}
+        accessibilityLabel={t('chatPattern.custom')}
+        style={styles.tileButton}
+      >
+        <View style={styles.tile}>
+          {wallpaperUri ? (
+            <ChatBackground
+              uri={wallpaperUri}
+              crop={cropFromJson(wallpaper?.crop ?? null)}
+              effect={wallpaper?.effect ?? 'blur'}
+              intensity={wallpaper?.intensity ?? 0.5}
+            />
+          ) : (
+            <View style={styles.customTileEmpty}>
+              <Icon name="add" size={24} color={colors.textFaint} />
+            </View>
+          )}
+          <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
+        </View>
+        <Text style={styles.tileLabel} numberOfLines={1}>
+          {t('chatPattern.custom')}
+        </Text>
+        <ChoiceMark selected={pattern === 'custom'} />
+      </Pressable>
+      {CHAT_PATTERNS.map((id) => {
+        const selected = id === pattern
+        return (
+          <Pressable
+            key={id}
+            onPress={() => {
+              if (!selected) Haptics.selectionAsync()
+              setPattern(id)
+            }}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            accessibilityLabel={t(`chatPattern.${id}`)}
+            style={styles.tileButton}
+          >
+            <View style={styles.tile}>
+              <Pattern id={id} scale={TILE_WIDTH / 393} />
+              <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
+            </View>
+            <Text style={styles.tileLabel} numberOfLines={1}>
+              {t(`chatPattern.${id}`)}
+            </Text>
+            <ChoiceMark selected={selected} />
+          </Pressable>
+        )
+      })}
+    </ScrollView>
+  )
+
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={padding}>
-        <ListSection header={t('settings.theme')}>
-          {THEMES.map((name) => (
-            <CheckCell
-              key={name}
-              label={t(`theme.${name}`)}
-              checked={theme === name}
-              onPress={() => setTheme(name)}
-              leading={<ThemeIcon theme={name} />}
-            />
-          ))}
-          <View style={styles.themeMode}>
-            <Segmented options={modeOptions} value={mode} onChange={setMode} />
-          </View>
-        </ListSection>
-
-        {/* A made-up exchange, so a change shows at once as it will look in a chat, in the
-            scheme the chat takes over the wallpaper. */}
-        <SchemeOverride scheme={previewScheme}>
-          <ChatPreview />
-        </SchemeOverride>
-
-        <ListSection>
-          <View style={styles.sizeRow}>
-            <Text style={styles.small}>A</Text>
-            <Slider
-              value={scale}
-              minimumValue={CHAT_TEXT_SCALE_RANGE.min}
-              maximumValue={CHAT_TEXT_SCALE_RANGE.max}
-              onValueChange={drag}
-              onSlidingComplete={(v) => setScale(snap(v))}
-              minimumTrackTintColor={colors.accent}
-              maximumTrackTintColor={colors.borderStrong}
-              thumbTintColor={ON_ACCENT}
-              accessibilityLabel={t('settings.chatTextSize')}
-              style={styles.slider}
-            />
-            <Text style={styles.large}>A</Text>
-            {/* Only the size back to the default; the button below resets everything. */}
-            <Pressable
-              onPress={resetSize}
-              disabled={scale === CHAT_TEXT_SCALE_RANGE.default}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={t('settings.chatResetSize')}
-              style={({ pressed }) => [styles.sizeReset, pressed && { opacity: 0.5 }]}
-            >
-              <SFIcon
-                name="arrow.counterclockwise"
-                fallback="refresh"
-                size={20}
-                color={scale === CHAT_TEXT_SCALE_RANGE.default ? colors.textFaint : colors.accent}
+      {nativeForm ? (
+        renderNative(nativeForm)
+      ) : (
+        <ScrollView contentContainerStyle={padding}>
+          <ListSection header={t('settings.theme')}>
+            {THEMES.map((name) => (
+              <CheckCell
+                key={name}
+                label={t(`theme.${name}`)}
+                checked={theme === name}
+                onPress={() => setTheme(name)}
+                leading={<ThemeIcon theme={name} />}
               />
-            </Pressable>
-          </View>
-          <MenuCell label={t('settings.chatFontField')} value={font === SYSTEM_FONT ? t('chatFont.system') : font} items={items} />
-          <SwitchCell label={t('settings.chatUserFont')} value={userFont} onValueChange={setUserFont} />
-          <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
-        </ListSection>
+            ))}
+            <View style={styles.themeMode}>
+              <Segmented options={modeOptions} value={mode} onChange={setMode} />
+            </View>
+          </ListSection>
 
-        <ListSection header={t('settings.chatPattern')} footer={t('settings.chatBackdropHint')}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
-            <Pressable
-              onPress={() => {
-                if (wallpaper?.file) {
-                  if (pattern !== 'custom') {
-                    Haptics.selectionAsync()
-                    setPattern('custom')
-                  } else {
-                    onAdjustBackground()
-                  }
-                } else {
-                  onPickBackground(isWeb ? 'files' : 'library')
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: pattern === 'custom' }}
-              accessibilityLabel={t('chatPattern.custom')}
-              style={styles.tileButton}
-            >
-              <View style={styles.tile}>
-                {wallpaperUri ? (
-                  <ChatBackground
-                    uri={wallpaperUri}
-                    crop={cropFromJson(wallpaper?.crop ?? null)}
-                    effect={wallpaper?.effect ?? 'blur'}
-                    intensity={wallpaper?.intensity ?? 0.5}
-                  />
-                ) : (
-                  <View style={styles.customTileEmpty}>
-                    <Icon name="add" size={24} color={colors.textFaint} />
-                  </View>
-                )}
-                <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
-              </View>
-              <Text style={styles.tileLabel} numberOfLines={1}>
-                {t('chatPattern.custom')}
-              </Text>
-              <ChoiceMark selected={pattern === 'custom'} />
-            </Pressable>
-            {CHAT_PATTERNS.map((id) => {
-              const selected = id === pattern
-              return (
-                <Pressable
-                  key={id}
-                  onPress={() => {
-                    if (!selected) Haptics.selectionAsync()
-                    setPattern(id)
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={t(`chatPattern.${id}`)}
-                  style={styles.tileButton}
-                >
-                  <View style={styles.tile}>
-                    <Pattern id={id} scale={TILE_WIDTH / 393} />
-                    <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
-                  </View>
-                  <Text style={styles.tileLabel} numberOfLines={1}>
-                    {t(`chatPattern.${id}`)}
-                  </Text>
-                  <ChoiceMark selected={selected} />
-                </Pressable>
-              )
-            })}
-          </ScrollView>
-          <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
-          {wallpaper?.file ? <ButtonCell label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
-          {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
-          <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} />
-        </ListSection>
+          {/* A made-up exchange, so a change shows at once as it will look in a chat, in the
+              scheme the chat takes over the wallpaper. */}
+          <SchemeOverride scheme={previewScheme}>
+            <ChatPreview />
+          </SchemeOverride>
 
-        <ListSection>
-          <ButtonCell label={t('settings.chatReset')} onPress={reset} disabled={untouched} />
-        </ListSection>
-      </ScrollView>
+          <ListSection>
+            <View style={styles.sizeRow}>
+              <Text style={styles.small}>A</Text>
+              <Slider
+                value={scale}
+                minimumValue={CHAT_TEXT_SCALE_RANGE.min}
+                maximumValue={CHAT_TEXT_SCALE_RANGE.max}
+                onValueChange={drag}
+                onSlidingComplete={(v) => setScale(snap(v))}
+                minimumTrackTintColor={colors.accent}
+                maximumTrackTintColor={colors.borderStrong}
+                thumbTintColor={ON_ACCENT}
+                accessibilityLabel={t('settings.chatTextSize')}
+                style={styles.slider}
+              />
+              <Text style={styles.large}>A</Text>
+              {/* Only the size back to the default; the button below resets everything. */}
+              <Pressable
+                onPress={resetSize}
+                disabled={scale === CHAT_TEXT_SCALE_RANGE.default}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.chatResetSize')}
+                style={({ pressed }) => [styles.sizeReset, pressed && { opacity: 0.5 }]}
+              >
+                <SFIcon
+                  name="arrow.counterclockwise"
+                  fallback="refresh"
+                  size={20}
+                  color={scale === CHAT_TEXT_SCALE_RANGE.default ? colors.textFaint : colors.accent}
+                />
+              </Pressable>
+            </View>
+            <MenuCell label={t('settings.chatFontField')} value={font === SYSTEM_FONT ? t('chatFont.system') : font} items={items} />
+            <SwitchCell label={t('settings.chatUserFont')} value={userFont} onValueChange={setUserFont} />
+            <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
+          </ListSection>
+
+          <ListSection header={t('settings.chatPattern')} footer={t('settings.chatBackdropHint')}>
+            {tiles}
+            <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
+            {wallpaper?.file ? <ButtonCell label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
+            {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
+            <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} />
+          </ListSection>
+
+          <ListSection>
+            <ButtonCell label={t('settings.chatReset')} onPress={reset} disabled={untouched} />
+          </ListSection>
+        </ScrollView>
+      )}
       <FormScreenHeader title={t('settings.chatFont')} />
     </View>
   )
@@ -471,6 +595,8 @@ const createStyles = (colors: Colors) =>
       paddingBottom: 12,
       marginBottom: 28,
     },
+    // In a row of the system's list, which gives the card its place and its corners.
+    cardFlush: { flex: 1, marginBottom: 0, borderRadius: 0 },
     messages: { height: 200, marginBottom: 12 },
     messagesContent: { gap: 16 },
     bubble: {
@@ -545,7 +671,7 @@ const createStyles = (colors: Colors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    tileLabel: { color: colors.text, fontSize: 13, textAlign: 'center' },
+    tileLabel: { color: colors.text, fontSize: 13, lineHeight: TILE_LABEL_LINE, textAlign: 'center' },
     themeMode: { paddingHorizontal: 16, paddingVertical: 12 },
     themeIcon: { width: 29, height: 29, borderRadius: 7, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center' },
     themeIconDot: { width: 11, height: 11, borderRadius: 5.5 },
