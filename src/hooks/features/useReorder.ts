@@ -31,17 +31,21 @@ const onDragEnd = () => {
 export function useReorder<T extends { id: number }>(
   items: T[] | null,
   setItems: (items: T[]) => void,
-  save: (ids: number[]) => Promise<unknown>
+  save: (ids: number[]) => Promise<unknown>,
+  // Off where no swipe back starts at the edge (the chat's drawer), so a row is lifted
+  // wherever it is pressed.
+  { edge = true }: { edge?: boolean } = {}
 ) {
   // The list's own pan sits over the whole screen and would swallow the system's swipe
-  // back from the left edge, so a touch that starts there is left alone.
+  // back from the left edge, so a touch that starts there is left alone. No row is lifted
+  // from there either: the list starts a drag only while its pan holds the finger.
   const panGesture = useMemo(
     () =>
       Gesture.Pan().onTouchesDown((e, manager) => {
         'worklet'
-        if (e.allTouches[0] && e.allTouches[0].absoluteX < EDGE) manager.fail()
+        if (edge && e.allTouches[0] && e.allTouches[0].absoluteX < EDGE) manager.fail()
       }),
-    []
+    [edge]
   )
 
   return {

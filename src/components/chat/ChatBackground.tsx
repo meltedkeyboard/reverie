@@ -20,6 +20,9 @@ import { FILL, paletteOf, useTheme } from '@/theme'
 const MAX_BLUR = 40
 // Pixels past each edge, so subpixel rounding on high-DPI screens never leaves a 1px gap.
 const BLEED = 2
+// Past each edge of a blurred picture: a blur goes wrong at the edge of what it blurs (a
+// light strip down the right of the menus' background), which is left outside the frame.
+const BLUR_BLEED = 24
 
 // `blurred` sets the effect aside for a full blur and a fixed dim in the effect's color
 // (the theme's for a blur), as under the drawer's list and the menus. `crop` is the frame of
@@ -46,14 +49,17 @@ export function ChatBackground({ uri, effect, intensity, blurred = false, crop =
   // A pushed screen hides a still or moving picture from the window, which stops it there;
   // a player would go on decoding behind it.
   const focused = useIsFocused()
-  const [view, setView] = useState<{ width: number; height: number } | null>(null)
+  const [layout, setLayout] = useState<{ width: number; height: number } | null>(null)
   const target = useRef<ViewRef>(null)
   const paused = reduceMotion || (moving === 'video' && !focused)
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout
-    setView({ width: width + BLEED * 2, height: height + BLEED * 2 })
+    setLayout({ width, height })
   }
+  const margin = blur > 0 ? BLUR_BLEED : BLEED
+  const bleed = blur > 0 ? styles.blurBleed : styles.bleed
+  const view = layout && { width: layout.width + margin * 2, height: layout.height + margin * 2 }
 
   const dimLayer =
     blurred || effect !== 'blur' ? (
@@ -63,7 +69,7 @@ export function ChatBackground({ uri, effect, intensity, blurred = false, crop =
   if (!moving) {
     return (
       <View style={styles.root} pointerEvents="none">
-        <Image source={{ uri }} style={styles.bleed} contentFit="cover" blurRadius={blur * MAX_BLUR} />
+        <Image source={{ uri }} style={bleed} contentFit="cover" blurRadius={blur * MAX_BLUR} />
         {dimLayer}
       </View>
     )
@@ -75,7 +81,7 @@ export function ChatBackground({ uri, effect, intensity, blurred = false, crop =
   return (
     <View style={styles.root} pointerEvents="none" onLayout={crop ? onLayout : undefined}>
       {/* Android's blur draws what is in its target; elsewhere the target is a plain view. */}
-      <BlurTargetView ref={target} style={styles.bleed}>
+      <BlurTargetView ref={target} style={bleed}>
         {crop && !placed ? null : (
           <Picture
             uri={uri}
@@ -91,7 +97,7 @@ export function ChatBackground({ uri, effect, intensity, blurred = false, crop =
           intensity={blur * 100}
           blurTarget={target}
           blurMethod="dimezisBlurViewSdk31Plus"
-          style={styles.bleed}
+          style={bleed}
         />
       ) : null}
       {dimLayer}
@@ -110,5 +116,12 @@ const styles = StyleSheet.create({
     bottom: -BLEED,
     left: -BLEED,
     right: -BLEED,
+  },
+  blurBleed: {
+    position: 'absolute',
+    top: -BLUR_BLEED,
+    bottom: -BLUR_BLEED,
+    left: -BLUR_BLEED,
+    right: -BLUR_BLEED,
   },
 })

@@ -175,7 +175,8 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
 
   const { duplicate, rename } = useChatListActions(reload)
   // A long press picks a row up to drag it to another place, as on the list of chats before.
-  const listReorder = useReorder(chats, setChats, (ids) => setChatOrder(db, ids))
+  // The stack's swipe back is off here, so the edge of the screen is the list's too.
+  const listReorder = useReorder(chats, setChats, (ids) => setChatOrder(db, ids), { edge: false })
   // While a row is in the air, a move to the left is its own, not a close of the drawer.
   const reordering = useSharedValue(false)
   // Taken out on their own: a worklet that reached them through listReorder would have to
@@ -567,6 +568,9 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
                 data={chats}
                 keyExtractor={(chat) => String(chat.id)}
                 {...reorder}
+                // Without it the list never says which row is in the air (useIsActive), and a
+                // lifted row stayed see-through over the ones it passed. Only that row renders.
+                shouldUpdateActiveItem
                 contentContainerStyle={[styles.rows, { paddingBottom: insets.bottom + 16 }]}
                 ItemSeparatorComponent={RowGap}
                 extraData={`${chatId}:${backdrop}`}

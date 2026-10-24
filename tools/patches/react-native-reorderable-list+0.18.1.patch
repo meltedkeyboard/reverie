@@ -44,7 +44,7 @@ index 8a1d860..44bf791 100644
            currentIndex.value >= 0 &&
            draggedIndex.value >= 0
 diff --git a/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx b/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
-index 81bdff2..433de86 100644
+index 81bdff2..5f5d99f 100644
 --- a/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
 +++ b/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
 @@ -5,6 +5,7 @@ import React, {
@@ -72,7 +72,7 @@ index 81bdff2..433de86 100644
    const dragXY = useSharedValue(0);
    const currentIndex = useSharedValue(-1);
    const draggedIndex = useSharedValue(-1);
-@@ -508,13 +512,33 @@ const ReorderableListCore = <T,>(
+@@ -508,13 +512,38 @@ const ReorderableListCore = <T,>(
      }
    };
  
@@ -95,7 +95,12 @@ index 81bdff2..433de86 100644
 -      markCells(fromIndex, toIndex);
 -      onReorder({from: fromIndex, to: toIndex});
 +  const reorder = (fromIndex: number, toIndex: number) => {
-+    if (fromIndex === toIndex) {
++    // Reverie: the list may have grown shorter while the item was in the air; an index past
++    // its end has no key to mark and no place to move to.
++    if (
++      fromIndex === toIndex ||
++      Math.max(fromIndex, toIndex) >= data.length
++    ) {
 +      runOnUI(resetSharedValues)();
 +      return;
      }
@@ -110,7 +115,7 @@ index 81bdff2..433de86 100644
    };
  
    const recomputeLayout = useCallback(
-@@ -566,10 +590,20 @@ const ReorderableListCore = <T,>(
+@@ -566,10 +595,20 @@ const ReorderableListCore = <T,>(
      const currentCenter = currentOffset + currentSize * 0.5;
  
      const max = itemCount.value;
@@ -133,7 +138,7 @@ index 81bdff2..433de86 100644
  
      if (currentIndex.value !== possibleIndex) {
        let possibleOffset = itemOffset.value[possibleIndex];
-@@ -880,6 +914,7 @@ const ReorderableListCore = <T,>(
+@@ -880,6 +919,7 @@ const ReorderableListCore = <T,>(
            // we let it continue (no-op).
            if (state.value !== ReorderableListState.AUTOSCROLL) {
              state.value = ReorderableListState.AUTOSCROLL;
@@ -141,7 +146,7 @@ index 81bdff2..433de86 100644
              lastAutoscrollTrigger.value = autoscrollTrigger.value;
              autoscrollTrigger.value *= -1;
            }
-@@ -897,10 +932,17 @@ const ReorderableListCore = <T,>(
+@@ -897,10 +937,17 @@ const ReorderableListCore = <T,>(
          autoscrollTrigger.value !== lastAutoscrollTrigger.value &&
          state.value === ReorderableListState.AUTOSCROLL
        ) {
@@ -160,7 +165,7 @@ index 81bdff2..433de86 100644
  
          if (autoscrollIncrement !== 0) {
            let scrollOffset = flatListScrollOffsetXY.value;
-@@ -924,7 +966,8 @@ const ReorderableListCore = <T,>(
+@@ -924,7 +971,8 @@ const ReorderableListCore = <T,>(
              listRef,
              horizontalProp.value ? scrollToValue : 0,
              horizontalProp.value ? 0 : scrollToValue,
@@ -170,6 +175,32 @@ index 81bdff2..433de86 100644
            );
          }
        }
+@@ -1007,6 +1055,17 @@ const ReorderableListCore = <T,>(
+         return;
+       }
+ 
++      // Reverie: only while the list's pan holds the finger. A pan failed as the touch came
++      // down (the edge guard of useReorder) never reports the finger lifting, so a drag begun
++      // by the row's long press then never ended: the row stayed lifted, the scroll off, and
++      // a chat deleted meanwhile left the cells shifted until the list was mounted again.
++      if (
++        gestureState.value !== State.BEGAN &&
++        gestureState.value !== State.ACTIVE
++      ) {
++        return;
++      }
++
+       // Allow new drag when item is completely released.
+       if (state.value === ReorderableListState.IDLE) {
+         // Resetting shared values again fixes a flickeing bug in nested lists where
+@@ -1036,6 +1095,7 @@ const ReorderableListCore = <T,>(
+     },
+     [
+       dragEnabledProp,
++      gestureState,
+       resetSharedValues,
+       shouldUpdateActiveItem,
+       dragInitialScrollOffsetXY,
 diff --git a/node_modules/react-native-reorderable-list/src/types/props.ts b/node_modules/react-native-reorderable-list/src/types/props.ts
 index cc69dcb..a150762 100644
 --- a/node_modules/react-native-reorderable-list/src/types/props.ts
