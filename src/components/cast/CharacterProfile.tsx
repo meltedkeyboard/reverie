@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { Pressable, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
 import type { BackgroundEffect } from '@/db/characters'
@@ -10,6 +10,8 @@ import { useColors, useStyles, type Colors } from '@/theme'
 
 import { ChatBackground } from '../chat/ChatBackground'
 import { ButtonCell, ListSection } from '../lists/GroupedList'
+import { NativeActionRow, NativeForm, NativeHostedRow, NativeSection, nativeForm } from '../lists/NativeForm'
+import { BackgroundThumbCell } from '../lists/PictureCells'
 import type { MenuItem } from '../overlays/NativeMenu'
 
 type Props = {
@@ -41,16 +43,87 @@ export function CharacterProfile({ greeting, systemPrompt, notes, params, backgr
   )
 }
 
+// The same profile on iOS 18 and later with SwiftUI, laid into the screen's scroll view under
+// the avatar: the texts are the profile's own cards, whose opening grows the page smoothly,
+// which a row of the system's list could not do (it takes its new height at once), and the
+// rest is the system's own list. The list does not scroll itself but is as tall as what it
+// holds, so the photo, the glow and the header keep following the scroll view as they did.
+// `style` takes the list out to the edges of the screen, since it keeps its own margins, and
+// `linkColor`, the color of the glow, tints "more" and "show less".
+export function NativeProfileList({ style, linkColor, ...profile }: Props & { style?: StyleProp<ViewStyle>; linkColor?: string }) {
+  const { t } = useTranslation()
+  const styles = useStyles(createStyles)
+  const { height: screenHeight } = useWindowDimensions()
+  // As tall as the screen at first, so that the list lays out its rows rather than guessing
+  // their heights; then as tall as its content, which it reports whenever that changes.
+  const [height, setHeight] = useState(screenHeight)
+  const { scrollDisabled, ignoreSafeArea, useScrollGeometryChange } = nativeForm!.modifiers
+  const measure = useScrollGeometryChange((g) => {
+    const next = Math.ceil(g.contentHeight)
+    if (next > 0) setHeight((was) => (Math.abs(was - next) > 1 ? next : was))
+  })
+  return (
+    <View>
+      <ProfileText header={t('editor.systemPromptLabel')} text={profile.systemPrompt} lines={6} system ink={linkColor} />
+      <ProfileText header={t('editor.greetingLabel')} text={profile.greeting} lines={4} system ink={linkColor} />
+      <ProfileText header={t('editor.notesLabel')} text={profile.notes} lines={4} system ink={linkColor} />
+      <View style={[styles.systemList, { height }, style]}>
+        {/* Under the status bar as the page scrolls, the list would take in the safe area and
+            move its rows down by as much. */}
+        <NativeForm clear modifiers={[scrollDisabled(true), ignoreSafeArea(), ...(measure ? [measure] : [])]}>
+          <NativeProfileRest {...profile} />
+        </NativeForm>
+      </View>
+    </View>
+  )
+}
+
+// The profile's sections under its texts in the system's list: the settings are the system's,
+// the background's thumbnail a React Native view in a row of its own.
+function NativeProfileRest({ params, background, exportItems }: Props) {
+  const { t } = useTranslation()
+  const { LabeledContent, Text } = nativeForm!.ui
+  return (
+    <>
+      {params.length ? (
+        <NativeSection title={t('editor.genParamsSection')}>
+          {params.map((param) => (
+            <LabeledContent key={param.label} label={param.label}>
+              <Text>{param.value}</Text>
+            </LabeledContent>
+          ))}
+        </NativeSection>
+      ) : null}
+      {background ? (
+        <NativeSection title={t('background.title')}>
+          <NativeHostedRow>
+            <BackgroundThumbCell uri={background.uri} crop={background.crop} effect={background.effect} intensity={background.intensity} />
+          </NativeHostedRow>
+        </NativeSection>
+      ) : null}
+      {exportItems ? (
+        <NativeSection title={t('card.export')}>
+          {exportItems.map((item) => (
+            <NativeActionRow key={item.label} label={item.label} onPress={() => item.onSelect?.()} />
+          ))}
+        </NativeSection>
+      ) : null}
+    </>
+  )
+}
+
 // The parts a profile is made of, a character's or a room's.
 
-// A long text under its header, cut to a few lines; nothing for an empty one.
-export function ProfileText({ header, text, lines }: { header: string; text: string; lines: number }) {
+// A long text under its header, cut to a few lines; nothing for an empty one. `system` draws
+// it as the sections of the system's list beside it are: the header in sentence case, the
+// text at the size of a row's; `ink` is the color of "more" and "show less".
+export function ProfileText({ header, text, lines, system = false, ink }: { header: string; text: string; lines: number; system?: boolean; ink?: string }) {
   const styles = useStyles(createStyles)
   if (!text.trim()) return null
   return (
-    <ListSection header={header}>
-      <View style={styles.textCell}>
-        <ClampedText text={text} lines={lines} />
+    <ListSection header={header} plainHeader={system}>
+      <View style={[styles.textCell, system && styles.systemTextCell]}>
+        <ClampedText text={text} lines={lines} large={system} ink={ink} />
       </View>
     </ListSection>
   )
@@ -109,6 +182,8 @@ const OPEN_MAX_MS = 760
 // A soft start and a long settle, so the text eases out of the fold instead of snapping.
 const OPEN_EASING = Easing.bezier(0.4, 0, 0.2, 1)
 const LINE_HEIGHT = 23
+// The text of a row of the system's list, for a profile beside one.
+const LARGE_LINE_HEIGHT = 22
 
 // A long text cut to a few lines with "more" at the end of the last one, over the text
 // fading out, as in the App Store. The box then springs open to the whole text, with the
@@ -116,7 +191,7 @@ const LINE_HEIGHT = 23
 // copies laid out out of sight, cut and whole, tell the heights and whether it is cut.
 // The whole text opens and closes on a tap, not only the link; a long press brings the
 // system menu with Copy.
-function ClampedText({ text, lines }: { text: string; lines: number }) {
+function ClampedText({ text, lines, large = false, ink }: { text: string; lines: number; large?: boolean; ink?: string }) {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
@@ -128,8 +203,10 @@ function ClampedText({ text, lines }: { text: string; lines: number }) {
   const progress = useSharedValue(0)
   // The line height grows with the text size, and "more" has to sit on the last line.
   const { fontScale } = useWindowDimensions()
-  const line = LINE_HEIGHT * fontScale
+  const line = (large ? LARGE_LINE_HEIGHT : LINE_HEIGHT) * fontScale
   const lessHeight = LESS_HEIGHT * fontScale
+  const textStyle = [styles.text, large && styles.large]
+  const linkStyle = [styles.link, large && styles.large, ink ? { color: ink } : null]
 
   // Opening is timed by how far the box has to grow: a spring covers any distance in the
   // same half second, so a long text jumped open. Closing keeps the spring.
@@ -152,17 +229,17 @@ function ClampedText({ text, lines }: { text: string; lines: number }) {
   const bg = colors.surface
   return (
     <View>
-      <Text style={[styles.text, styles.measure]} onLayout={(e) => setWhole(e.nativeEvent.layout.height)} {...hidden}>
+      <Text style={[textStyle, styles.measure]} onLayout={(e) => setWhole(e.nativeEvent.layout.height)} {...hidden}>
         {text}
       </Text>
-      <Text style={[styles.text, styles.measure]} numberOfLines={lines} onLayout={(e) => setCut(e.nativeEvent.layout.height)} {...hidden}>
+      <Text style={[textStyle, styles.measure]} numberOfLines={lines} onLayout={(e) => setCut(e.nativeEvent.layout.height)} {...hidden}>
         {text}
       </Text>
 
       <Animated.View style={[styles.clip, box]}>
         {/* Cut by the box once both heights are known; until then by its own lines. */}
         <Text
-          style={styles.text}
+          style={textStyle}
           numberOfLines={measured ? undefined : lines}
           onPress={long ? () => setOpen((o) => !o) : undefined}
           // The long press belongs to the system menu; handled here only so it isn't also a tap.
@@ -174,7 +251,7 @@ function ClampedText({ text, lines }: { text: string; lines: number }) {
         {long ? (
           <Animated.View style={[styles.less, { height: lessHeight }, expanded]} pointerEvents={open ? 'auto' : 'none'}>
             <Pressable onPress={() => setOpen(false)} hitSlop={8}>
-              <Text style={styles.link}>{t('profile.showLess')}</Text>
+              <Text style={linkStyle}>{t('profile.showLess')}</Text>
             </Pressable>
           </Animated.View>
         ) : null}
@@ -182,7 +259,7 @@ function ClampedText({ text, lines }: { text: string; lines: number }) {
           <Animated.View style={[styles.more, { top: cut - line, height: line }, collapsed]} pointerEvents={open ? 'none' : 'box-none'}>
             <LinearGradient colors={[`${bg}00`, bg]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.moreFade} />
             <Pressable onPress={() => setOpen(true)} hitSlop={8} style={[styles.moreButton, { backgroundColor: bg }]}>
-              <Text style={styles.link}>{t('profile.showMore')}</Text>
+              <Text style={linkStyle}>{t('profile.showMore')}</Text>
             </Pressable>
           </Animated.View>
         ) : null}
@@ -196,6 +273,11 @@ const LESS_HEIGHT = 34
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     textCell: { paddingHorizontal: 16, paddingVertical: 14 },
+    systemTextCell: { paddingVertical: 12 },
+    large: { fontSize: 17, lineHeight: LARGE_LINE_HEIGHT },
+    // The list keeps room of its own above its first section, a little less than the card's
+    // margin; together they come to the space between two of the list's sections.
+    systemList: { marginTop: -10 },
     text: { color: colors.text, fontSize: 16, lineHeight: LINE_HEIGHT },
     // Out of the flow and unseen, only to measure the text cut and whole.
     measure: { position: 'absolute', left: 0, right: 0, opacity: 0 },

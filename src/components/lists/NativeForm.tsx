@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 // A type only: the package itself is loaded through nativeUI where it is present.
-import type { ObservableState } from '@expo/ui/swift-ui/modifiers'
+import type { ObservableState, ViewModifier } from '@expo/ui/swift-ui/modifiers'
 
 import { swiftUI } from '@/lib/ui/nativeUI'
 import { useTheme } from '@/theme'
@@ -21,8 +21,19 @@ export const nativeForm = swiftUI
 // The whole screen's list, in the theme's colors: the page's background behind it and the
 // accent on its controls. It keeps the safe area, so its content starts under a native header;
 // under one the screen draws itself, the first section takes `inset`. `jumpTo`, with ids on
-// the sections, scrolls to the one it is set to.
-export function NativeForm({ jumpTo, children }: { jumpTo?: ObservableState<string | null>; children: ReactNode }) {
+// the sections, scrolls to the one it is set to. `clear` leaves out the page's background, for
+// what the screen draws behind the list, and `modifiers` go on the list after its own.
+export function NativeForm({
+  jumpTo,
+  clear = false,
+  modifiers = [],
+  children,
+}: {
+  jumpTo?: ObservableState<string | null>
+  clear?: boolean
+  modifiers?: ViewModifier[]
+  children: ReactNode
+}) {
   const { colors, scheme } = useTheme()
   const { Host, Form } = nativeForm!.ui
   const { scrollContentBackground, background, tint, scrollPosition, scrollDismissesKeyboard } = nativeForm!.modifiers
@@ -31,12 +42,13 @@ export function NativeForm({ jumpTo, children }: { jumpTo?: ObservableState<stri
       <Form
         modifiers={[
           scrollContentBackground('hidden'),
-          background(colors.bg),
+          ...(clear ? [] : [background(colors.bg)]),
           tint(colors.accent),
           // The number pad has no key to close it: the keyboard goes down with the list as
           // it is dragged, as under the old scroll view.
           scrollDismissesKeyboard('interactively'),
           ...(jumpTo ? [scrollPosition(jumpTo, { anchor: 'top' })] : []),
+          ...modifiers,
         ]}
       >
         {children}

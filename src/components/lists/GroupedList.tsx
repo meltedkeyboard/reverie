@@ -14,12 +14,14 @@ import { setTextDraft } from '@/lib/chat/textDraft'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import * as Haptics from '@/lib/ui/haptics'
 import { isDesktop, isIOS } from '@/lib/core/platform'
-import { type Colors, useColors, useStyles } from '@/theme'
+import { type Colors, useColors, useStyles, useTheme } from '@/theme'
 
 // The inset grouped list of the iOS Settings app: a small header over a rounded group of
 // rows parted by hairlines, and the explanation in grey under the group.
 
 const INSET = 16
+// The system's secondaryLabel.
+const SECONDARY_LABEL = { light: 'rgba(60, 60, 67, 0.6)', dark: 'rgba(235, 235, 245, 0.6)' } as const
 const ROW_HEIGHT = 44
 
 // Fragments are opened up and empty slots dropped, so a hairline goes only between real rows.
@@ -29,12 +31,19 @@ function rowsOf(children: ReactNode): ReactNode[] {
   )
 }
 
-export function ListSection({ header, footer, children }: { header?: string; footer?: ReactNode; children: ReactNode }) {
+// `plainHeader` draws the header as the lists of iOS 26 do, for a group that stands beside the
+// system's own: in sentence case at the size of a row's text, semibold, in the system's
+// secondary label, which is see-through and takes on what is behind it (measured off a
+// screenshot of the two side by side).
+export function ListSection({ header, footer, plainHeader = false, children }: { header?: string; footer?: ReactNode; plainHeader?: boolean; children: ReactNode }) {
   const styles = useStyles(createStyles)
+  const { scheme } = useTheme()
   const rows = rowsOf(children)
   return (
     <View style={styles.section}>
-      {header ? <Text style={styles.header}>{header}</Text> : null}
+      {header ? (
+        <Text style={[styles.header, plainHeader && [styles.plainHeader, { color: SECONDARY_LABEL[scheme] }]]}>{header}</Text>
+      ) : null}
       {rows.length > 0 ? (
         <View style={styles.group}>
           {rows.map((row, i) => (
@@ -332,6 +341,7 @@ const baseStyles = (colors: Colors) =>
       marginBottom: 7,
     },
     group: { backgroundColor: colors.surface, borderRadius: 26, borderCurve: 'continuous', overflow: 'hidden' },
+    plainHeader: { textTransform: 'none', fontSize: 17, fontWeight: '600', marginBottom: 10, paddingHorizontal: INSET + 2 * StyleSheet.hairlineWidth },
     separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong, marginLeft: INSET },
     footer: { color: colors.textMuted, fontSize: 13, lineHeight: 18, paddingHorizontal: INSET, marginTop: 7 },
     danger: { color: colors.danger },

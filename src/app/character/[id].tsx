@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
@@ -8,7 +8,7 @@ import Animated, { useAnimatedReaction, useAnimatedScrollHandler, useSharedValue
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/visuals/Avatar'
-import { CharacterProfile } from '@/components/cast/CharacterProfile'
+import { CharacterProfile, NativeProfileList } from '@/components/cast/CharacterProfile'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, BackgroundThumbCell, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
 import { NativeActionRow, NativeForm, NativeHostedRow, NativeSection, NativeSegmentRow, NativeSliderRow, NativeTextRow, nativeForm } from '@/components/lists/NativeForm'
@@ -43,6 +43,9 @@ import { countLabel } from '@/lib/core/format'
 import { alertError } from '@/lib/transfer/report'
 import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles, useTheme } from '@/theme'
 import { isAndroid } from '@/lib/core/platform'
+
+// The profile's details are the system's own list where the list can tell how tall it is (iOS 18).
+const nativeProfile = nativeForm !== null && Number.parseInt(String(Platform.Version), 10) >= 18
 
 export default function CharacterEditorScreen() {
   const { id, profile } = useLocalSearchParams<{ id: string; profile?: string }>()
@@ -746,7 +749,7 @@ export default function CharacterEditorScreen() {
                 ) : null}
               </>
             ) : (
-              <CharacterProfile
+              <ShownProfile
                 greeting={greeting}
                 systemPrompt={systemPrompt}
                 notes={notes}
@@ -761,6 +764,9 @@ export default function CharacterEditorScreen() {
                 background={backgroundUri ? { uri: backgroundUri, crop: bgSlot.shownCrop(backgroundCrop), effect: bgEffect, intensity: bgIntensity } : null}
                 // Saves the card as it is stored, so edits not yet saved are not in it.
                 exportItems={isNew ? undefined : exportTargets(() => getCharacter(db, Number(id)))}
+                // The system's list keeps margins of its own, so it is taken out to the edges.
+                style={{ marginLeft: -sideLeft, marginRight: -sideRight }}
+                linkColor={glowColor ? `#${glowColor.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}` : undefined}
               />
             )}
           </Animated.View>
@@ -805,6 +811,11 @@ const AVATAR_SIZE = 96
 // How far past the bottom of the screen the profile's glow runs out, so the details on the
 // first screen all stand in it.
 const GLOW_BELOW = 120
+
+// The profile's details, in the system's list or in the grouped look of the editor.
+function ShownProfile({ style, linkColor, ...profile }: React.ComponentProps<typeof NativeProfileList>) {
+  return nativeProfile ? <NativeProfileList {...profile} style={style} linkColor={linkColor} /> : <CharacterProfile {...profile} />
+}
 
 // Android only: carries the gesture that stands in for the overscroll pull of iOS. Elsewhere
 // it renders its children as they are.
