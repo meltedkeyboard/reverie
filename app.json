@@ -4,7 +4,7 @@
     "slug": "reverie",
     "platforms": ["ios", "android", "web"],
     "web": { "bundler": "metro", "output": "single" },
-    "version": "5.8.0",
+    "version": "6.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "reverie",

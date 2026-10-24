@@ -140,7 +140,9 @@ export function AttachMenu({
       {camera}
 
       {recents.map((item) => {
-        const isSelected = selected.some((p) => p.file === item.file)
+        // Where it stands among the ticked ones: the pictures go into the message in that order.
+        const order = selected.findIndex((p) => p.file === item.file) + 1
+        const isSelected = order > 0
         return (
           <Pressable
             key={item.file}
@@ -148,12 +150,13 @@ export function AttachMenu({
             accessibilityRole="checkbox"
             accessibilityState={{ checked: isSelected }}
             accessibilityLabel={t('attach.recent')}
+            accessibilityValue={isSelected ? { text: String(order) } : undefined}
             style={({ pressed }) => [styles.recentTile, pressed && { opacity: 0.8 }]}
           >
             <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
             {isSelected ? (
               <View style={styles.recentCheckBadge}>
-                <Icon name="checkmark" size={13} color="#FFFFFF" />
+                <Text style={styles.recentOrder}>{order}</Text>
               </View>
             ) : null}
           </Pressable>
@@ -716,8 +719,9 @@ const createStyles = (colors: Colors) =>
       position: 'absolute',
       top: 6,
       right: 6,
-      width: 22,
+      minWidth: 22,
       height: 22,
+      paddingHorizontal: 5,
       borderRadius: 11,
       backgroundColor: 'rgba(0, 0, 0, 0.65)',
       borderWidth: 1.5,
@@ -725,6 +729,7 @@ const createStyles = (colors: Colors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    recentOrder: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
     actionSlot: { marginTop: 18 },
     actionButton: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     actionBg: { borderRadius: 26 },
