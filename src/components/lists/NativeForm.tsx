@@ -235,7 +235,44 @@ export function NativeTextRow({
   )
 }
 
-// A slider in a row of its own: the name and the value over the track.
+// A field of several lines, as a note in Settings: it is `lines` tall when empty and grows
+// with what is typed up to `maxLines`, then scrolls; with `maxLines` null it grows as long as
+// the text is. The list moves the rows under it and keeps it over the keyboard. As
+// NativeTextRow, it is set from `value` only when that changes from outside (a preset picked,
+// a version switched).
+export function NativeAreaRow({
+  value,
+  onChangeText,
+  placeholder,
+  lines = 4,
+  maxLines = 10,
+}: {
+  value: string
+  onChangeText: (text: string) => void
+  placeholder?: string
+  lines?: number
+  maxLines?: number | null
+}) {
+  const { TextField, useNativeState } = nativeForm!.ui
+  const { lineLimit } = nativeForm!.modifiers
+  const text = useNativeState(value)
+  useEffect(() => {
+    if (text.get() !== value) text.set(value)
+  }, [text, value])
+  return (
+    <TextField
+      text={text}
+      axis="vertical"
+      placeholder={placeholder}
+      onTextChange={onChangeText}
+      modifiers={maxLines === null ? [] : [lineLimit({ min: lines, max: maxLines })]}
+    />
+  )
+}
+
+// A slider in a row of its own: the name and the value over the track. With `step` the
+// system's slider stops on each step and, on iOS 26, ticks under the finger as it passes one;
+// without it the track runs freely and `onChange` puts the value where it should be.
 export function NativeSliderRow({
   label,
   value,
@@ -250,7 +287,7 @@ export function NativeSliderRow({
   value: number
   min: number
   max: number
-  step: number
+  step?: number
   format?: (value: number) => string
   onChange: (value: number) => void
   tintColor?: string

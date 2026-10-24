@@ -8,7 +8,7 @@ import {
   type PersonaLength,
 } from '@/lib/chat/promptGen'
 
-import { AreaCell, ListSection, SegmentCell, SwitchCell } from '../lists/GroupedList'
+import { GenArea, GenSection, GenSegment, GenSwitch } from './GenCells'
 import { GenImageAttachments } from './GenImageAttachments'
 import { GenSheet, PresetChips } from './GenSheet'
 
@@ -41,20 +41,20 @@ export function PersonaGen({ name, currentDescription, onApply }: Props) {
   const compose = (thinkingCell: React.ReactNode) => (
     <>
       {hasCurrent ? (
-        <ListSection>
-          <SwitchCell
+        <GenSection>
+          <GenSwitch
             label={t('personaGen.improveCurrent')}
             value={improve}
             onValueChange={setImprove}
           />
-        </ListSection>
+        </GenSection>
       ) : null}
 
-      <ListSection
+      <GenSection
         header={improving ? t('promptGen.changesLabel') : t('persona.descriptionLabel')}
         footer={improving ? t('personaGen.improveHint') : t('personaGen.hint')}
       >
-        <AreaCell
+        <GenArea
           value={description}
           onChangeText={setDescription}
           placeholder={improving ? t('personaGen.changesPlaceholder') : t('personaGen.placeholder')}
@@ -66,7 +66,7 @@ export function PersonaGen({ name, currentDescription, onApply }: Props) {
             onPick={(key) => setDescription(t(key))}
           />
         ) : null}
-      </ListSection>
+      </GenSection>
 
       <GenImageAttachments
         images={images}
@@ -75,10 +75,10 @@ export function PersonaGen({ name, currentDescription, onApply }: Props) {
         footer={t('personaGen.imagesHint')}
       />
 
-      <ListSection footer={t('gen.thinkingHint')}>
+      <GenSection footer={t('gen.thinkingHint')}>
         {improving ? null : (
           <>
-            <SegmentCell
+            <GenSegment
               label={t('promptGen.lengthLabel')}
               options={[
                 { value: 'short', label: t('promptGen.lengthShort') },
@@ -88,7 +88,7 @@ export function PersonaGen({ name, currentDescription, onApply }: Props) {
               value={length}
               onChange={setLength}
             />
-            <SegmentCell
+            <GenSegment
               label={t('promptGen.formatLabel')}
               options={[
                 { value: 'prose', label: t('promptGen.formatProse') },
@@ -100,7 +100,7 @@ export function PersonaGen({ name, currentDescription, onApply }: Props) {
           </>
         )}
         {thinkingCell}
-      </ListSection>
+      </GenSection>
     </>
   )
 

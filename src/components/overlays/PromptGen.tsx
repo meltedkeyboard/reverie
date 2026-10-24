@@ -4,7 +4,7 @@ import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { buildPromptMessages, type PromptLength } from '@/lib/chat/promptGen'
 
-import { AreaCell, ListSection, SegmentCell, SwitchCell } from '../lists/GroupedList'
+import { GenArea, GenSection, GenSegment, GenSwitch } from './GenCells'
 import { GenImageAttachments } from './GenImageAttachments'
 import { GenSheet, PresetChips } from './GenSheet'
 import { formDescription, PromptForm, type PromptFormValues } from './PromptForm'
@@ -42,10 +42,10 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
   // request in one group.
   const compose = (thinkingCell: React.ReactNode) => (
     <>
-      <ListSection>
-        {hasCurrent ? <SwitchCell label={t('promptGen.improveCurrent')} value={improve} onValueChange={setImprove} /> : null}
+      <GenSection>
+        {hasCurrent ? <GenSwitch label={t('promptGen.improveCurrent')} value={improve} onValueChange={setImprove} /> : null}
         {improving ? null : (
-          <SegmentCell
+          <GenSegment
             label={t('promptGen.modeLabel')}
             options={[
               { value: 'free', label: t('promptGen.modeFree') },
@@ -55,16 +55,16 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
             onChange={setMode}
           />
         )}
-      </ListSection>
+      </GenSection>
 
       {fromForm ? (
         <PromptForm value={form} onChange={setForm} />
       ) : (
-        <ListSection
+        <GenSection
           header={improving ? t('promptGen.changesLabel') : t('promptGen.descriptionLabel')}
           footer={improving ? t('promptGen.improveHint') : t('promptGen.hint')}
         >
-          <AreaCell
+          <GenArea
             value={description}
             onChangeText={setDescription}
             placeholder={improving ? t('promptGen.changesPlaceholder') : t('promptGen.placeholder')}
@@ -73,7 +73,7 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
           {!improving && !description.trim() ? (
             <PresetChips items={IDEA_KEYS.map((key) => ({ key, label: t(`${key}.title`) }))} onPick={(key) => setDescription(t(key))} />
           ) : null}
-        </ListSection>
+        </GenSection>
       )}
 
       <GenImageAttachments
@@ -83,10 +83,10 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
         footer={t('promptGen.imagesHint')}
       />
 
-      <ListSection footer={t('gen.thinkingHint')}>
+      <GenSection footer={t('gen.thinkingHint')}>
         {/* An improvement edits the prompt as it is written, so its length stays. */}
         {improving ? null : (
-          <SegmentCell
+          <GenSegment
             label={t('promptGen.lengthLabel')}
             options={[
               { value: 'short', label: t('promptGen.lengthShort') },
@@ -98,7 +98,7 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
           />
         )}
         {thinkingCell}
-      </ListSection>
+      </GenSection>
     </>
   )
 

@@ -1,7 +1,6 @@
 import { Image } from 'expo-image'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
-import { ListSection } from '@/components/lists/GroupedList'
 import { SourceCell } from '@/components/lists/PictureCells'
 import { Icon } from '@/components/visuals/Icon'
 import type { MessageImage } from '@/db/messages'
@@ -12,13 +11,17 @@ import { isDesktop } from '@/lib/core/platform'
 import { alertError } from '@/lib/transfer/report'
 import { type Colors, useColors, useStyles } from '@/theme'
 
+import { GenRow, GenSection } from './GenCells'
+
 type Props = {
   images: MessageImage[]
   onImagesChange: (images: MessageImage[]) => void
   header?: string
-  footer?: React.ReactNode
+  footer?: string
 }
 
+// The pictures sent along with a generator's request: their thumbnails in a row, and the
+// sources to add more from.
 export function GenImageAttachments({ images, onImagesChange, header, footer }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
@@ -40,37 +43,43 @@ export function GenImageAttachments({ images, onImagesChange, header, footer }: 
   }
 
   return (
-    <ListSection header={header} footer={footer}>
+    <GenSection header={header} footer={footer}>
       {images.length > 0 ? (
-        <View style={styles.scrollWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
-          >
-            {images.map((item, index) => (
-              <View key={item.file || index} style={styles.thumbWrapper}>
-                <Image source={{ uri: pictureUri(item) }} style={styles.thumb} contentFit="cover" />
-                <Pressable
-                  onPress={() => removeAt(index)}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('promptGen.removePhoto')}
-                  style={styles.removeBtn}
-                >
-                  <Icon name="close" size={13} color={colors.text} />
-                </Pressable>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
+        <GenRow>
+          <View style={styles.scrollWrapper}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.scrollContent}
+            >
+              {images.map((item, index) => (
+                <View key={item.file || index} style={styles.thumbWrapper}>
+                  <Image source={{ uri: pictureUri(item) }} style={styles.thumb} contentFit="cover" />
+                  <Pressable
+                    onPress={() => removeAt(index)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('promptGen.removePhoto')}
+                    style={styles.removeBtn}
+                  >
+                    <Icon name="close" size={13} color={colors.text} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </GenRow>
       ) : null}
-      <SourceCell
-        label={images.length > 0 ? t('promptGen.addPhoto') : t('promptGen.attachPhoto')}
-        onPick={onPick}
-      />
-    </ListSection>
+      {/* A new row once the thumbnails come or go above it, or the system's list leaves it
+          blank (see NativeHostedRow). */}
+      <GenRow key={images.length > 0 ? 'under' : 'alone'}>
+        <SourceCell
+          label={images.length > 0 ? t('promptGen.addPhoto') : t('promptGen.attachPhoto')}
+          onPick={onPick}
+        />
+      </GenRow>
+    </GenSection>
   )
 }
 

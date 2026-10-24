@@ -32,8 +32,10 @@ import { Chip } from '../controls/Chip'
 import { PillButton } from '../controls/PillButton'
 import { Segmented } from '../controls/Segmented'
 import { FadingRow } from '../controls/ChipGroup'
-import { ListFooter, ListSection, SliderCell, SwitchCell } from '../lists/GroupedList'
+import { ListFooter, ListSection } from '../lists/GroupedList'
+import { NativeAreaRow, NativeForm, NativeHostedRow, NativeSection, nativeForm } from '../lists/NativeForm'
 import { Pager } from '../lists/Pager'
+import { GenRow, GenSection, GenSlider, GenSwitch, nativeGen } from './GenCells'
 
 export type Revision = { draft: string; note: string }
 
@@ -60,7 +62,8 @@ type Props = {
 // editor (the system prompt, the greeting), in the grouped look of the editor: what to write,
 // then the versions it wrote, each editable and comparable with the text there was, with
 // revisions under them. The sheet and its bar are the system's: a form sheet of the stack
-// with the bar buttons of UIKit, glass on iOS 26.
+// with the bar buttons of UIKit, glass on iOS 26. With SwiftUI the page is the system's own
+// list too (see GenCells), the button under it staying React Native.
 export function GenSheet({
   title,
   resultLabel,
@@ -97,20 +100,48 @@ export function GenSheet({
   const [viewMode, setViewMode] = useState<'text' | 'diff'>('text')
   const [liveThought, setLiveThought] = useState<string | null>(null)
   const task = useAbortable()
+  // A slider moved is saved once it rests: a write to the database on every step of a fast
+  // drag kept the JS thread busy, and the system's slider stuttered under the finger.
+  // Closing the sheet saves at once what is still waiting.
+  const pendingSaves = useRef<Record<string, { timer: ReturnType<typeof setTimeout>; save: () => void }>>({})
+  const saveLater = (key: string, save: () => void) => {
+    clearTimeout(pendingSaves.current[key]?.timer)
+    const timer = setTimeout(() => {
+      delete pendingSaves.current[key]
+      save()
+    }, 400)
+    pendingSaves.current[key] = { timer, save }
+  }
+  useEffect(() => {
+    const pending = pendingSaves.current
+    return () =>
+      Object.values(pending).forEach(({ timer, save }) => {
+        clearTimeout(timer)
+        save()
+      })
+  }, [])
   const versionCount = useRef(0)
 
   const busy = activity !== null
   const thinkingSecs = useElapsedSeconds(Boolean(activity?.thinking), activity?.since)
   const result = live ?? versions[index] ?? null
   const hasBefore = before.trim().length > 0
-  const diffParts = useMemo(
-    () => (hasBefore && result ? computeDiff(before, result) : []),
-    [hasBefore, before, result]
-  )
+  // The comparison's runs, a space put between a word taken out and the one put in its place
+  // where neither has it.
+  const diffParts = useMemo(() => {
+    const parts = hasBefore && result ? computeDiff(before, result) : []
+    return parts.map((part, i) => {
+      const next = parts[i + 1]
+      const needsSpace = part.type === 'removed' && next?.type === 'added' && !/\s$/.test(part.value) && !/^\s/.test(next.value)
+      return needsSpace ? { ...part, value: `${part.value} ` } : part
+    })
+  }, [hasBefore, before, result])
 
   useEffect(() => {
-    loadGenTokens(db).then(setMaxTokens)
-    loadGenReasoning(db).then(setReasoningBudget)
+    // A value kept under the steps of an earlier version is put on the nearest one of now.
+    const onStep = (limits: { min: number; step: number }) => (v: number) => limits.min + Math.round((v - limits.min) / limits.step) * limits.step
+    loadGenTokens(db).then((v) => setMaxTokens(onStep(GEN_TOKENS)(v)))
+    loadGenReasoning(db).then((v) => setReasoningBudget(onStep(GEN_REASONING)(v)))
     loadSettings(db).then((cfg) => setContextTokens(cfg.contextTokens))
   }, [db])
 
@@ -216,15 +247,15 @@ export function GenSheet({
   const wanted = maxTokens + (thinking ? reasoningBudget : 0)
   const composeView = (
     <>
-      {compose(<SwitchCell label={t('gen.thinking')} value={thinking} onValueChange={setThinking} />)}
-      <ListSection
+      {compose(<GenSwitch label={t('gen.thinking')} value={thinking} onValueChange={setThinking} />)}
+      <GenSection
         footer={
           contextTokens !== null && wanted > contextTokens
             ? t('gen.limitsOverWindow', { window: contextTokens })
             : t('gen.limitsHint')
         }
       >
-        <SliderCell
+        <GenSlider
           label={t('gen.maxTokens')}
           value={maxTokens}
           min={GEN_TOKENS.min}
@@ -232,11 +263,11 @@ export function GenSheet({
           step={GEN_TOKENS.step}
           onChange={(tokens) => {
             setMaxTokens(tokens)
-            saveGenTokens(db, tokens)
+            saveLater('tokens', () => saveGenTokens(db, tokens))
           }}
         />
         {thinking ? (
-          <SliderCell
+          <GenSlider
             label={t('editor.reasoningBudget')}
             value={reasoningBudget}
             min={GEN_REASONING.min}
@@ -244,15 +275,132 @@ export function GenSheet({
             step={GEN_REASONING.step}
             onChange={(tokens) => {
               setReasoningBudget(tokens)
-              saveGenReasoning(db, tokens)
+              saveLater('reasoning', () => saveGenReasoning(db, tokens))
             }}
           />
         ) : null}
-      </ListSection>
+      </GenSection>
     </>
   )
 
-  const resultView = (
+  const showBar = (versions.length > 1 || hasBefore) && !busy && result !== null
+  const pager =
+    versions.length > 1 ? (
+      <Pager index={index} count={versions.length} onChange={setIndex} label={t('promptGen.version', { n: index + 1, total: versions.length })} />
+    ) : null
+  // One line that scrolls sideways; the chips are not interactive glass, whose spring would
+  // pull them along with the scroll.
+  const tweakChips = (
+    <FadingRow style={styles.tweaks} fadeColor={colors.surface} inset={16}>
+      {tweaks.map((key) => (
+        <Chip key={key} label={t(key)} active={false} onPress={() => revise(t(`${key}.note`))} />
+      ))}
+    </FadingRow>
+  )
+  const sendButton = (
+    <Pressable
+      onPress={() => revise(note)}
+      disabled={!note.trim()}
+      accessibilityRole="button"
+      accessibilityLabel={t('promptGen.reviseLabel')}
+      style={[styles.sendButton, !note.trim() && { backgroundColor: colors.borderStrong }]}
+    >
+      <Icon name="arrow-up" size={18} color={note.trim() ? ON_ACCENT : colors.textFaint} />
+    </Pressable>
+  )
+  const thinkingView = (
+    <View style={styles.thinkingContainer}>
+      <ShimmerText
+        text={activity?.thinking ? t('promptGen.thinkingShort') : t('gen.writing')}
+        style={styles.resultText}
+        from={colors.textFaint}
+        to={colors.text}
+      />
+      {liveThought ? (
+        <Text style={styles.liveThoughtText} numberOfLines={5}>
+          {liveThought.trim().slice(-400)}
+        </Text>
+      ) : null}
+    </View>
+  )
+
+  // The result in the system's list: the text a field of it, which the reply is written into
+  // as it comes and which keeps over the keyboard while it is edited, the comparison its text
+  // in colors. The pager, the shimmer while the model thinks, the chips of the revisions and
+  // the send button stay React Native.
+  const renderNativeResult = () => {
+    const { HStack, Spacer, Picker, Text: SwiftText, RNHostView } = nativeForm!.ui
+    const { pickerStyle, labelsHidden, tag, foregroundStyle, textSelection } = nativeForm!.modifiers
+    return (
+      <>
+        <NativeSection
+          title={resultLabel}
+          footer={[...(status ? [{ text: status }] : []), ...(error ? [{ text: error, danger: true }] : [])]}
+        >
+          {showBar ? (
+            <HStack spacing={12}>
+              {hasBefore ? (
+                <Picker selection={viewMode} onSelectionChange={(v: 'text' | 'diff') => setViewMode(v)} modifiers={[pickerStyle('segmented'), labelsHidden()]}>
+                  <SwiftText modifiers={[tag('text')]}>{t('promptGen.text')}</SwiftText>
+                  <SwiftText modifiers={[tag('diff')]}>{t('promptGen.diff')}</SwiftText>
+                </Picker>
+              ) : (
+                <Spacer />
+              )}
+              {pager ? <RNHostView matchContents>{pager}</RNHostView> : null}
+            </HStack>
+          ) : null}
+          {busy && !result ? (
+            <NativeHostedRow>
+              <View style={styles.nativeThinking}>{thinkingView}</View>
+            </NativeHostedRow>
+          ) : busy ? (
+            <SwiftText>
+              {result}
+              <SwiftText modifiers={[foregroundStyle(colors.accent)]}>{' ' + String.fromCharCode(0x258d)}</SwiftText>
+            </SwiftText>
+          ) : result === null ? null : hasBefore && viewMode === 'diff' ? (
+            <SwiftText modifiers={[textSelection(true)]}>
+              {diffParts.map((part, i) =>
+                part.type === 'added' ? (
+                  <SwiftText key={i} modifiers={[foregroundStyle(colors.success)]}>
+                    {part.value}
+                  </SwiftText>
+                ) : part.type === 'removed' ? (
+                  // A nested text takes only colors and fonts, so the line through is Markdown's.
+                  <SwiftText key={i} markdownEnabled modifiers={[foregroundStyle(colors.danger)]}>
+                    {struckThrough(part.value)}
+                  </SwiftText>
+                ) : (
+                  <SwiftText key={i}>{part.value}</SwiftText>
+                )
+              )}
+            </SwiftText>
+          ) : (
+            <NativeAreaRow
+              value={result}
+              onChangeText={(text) => setVersions((prev) => prev.map((v, i) => (i === index ? text : v)))}
+              lines={1}
+              maxLines={null}
+            />
+          )}
+        </NativeSection>
+
+        {result !== null && !busy ? (
+          <NativeSection title={t('promptGen.reviseLabel')}>
+            <NativeHostedRow>{tweakChips}</NativeHostedRow>
+            {/* Typed like a message: the field and the send button beside it. */}
+            <HStack alignment="bottom" spacing={10}>
+              <NativeAreaRow value={note} onChangeText={setNote} placeholder={t('promptGen.revisePlaceholder')} lines={1} maxLines={5} />
+              <RNHostView matchContents>{sendButton}</RNHostView>
+            </HStack>
+          </NativeSection>
+        ) : null}
+      </>
+    )
+  }
+
+  const resultView = nativeGen ? null : (
     <>
       <ListSection
         header={resultLabel}
@@ -264,7 +412,7 @@ export function GenSheet({
         }
       >
         {/* Versions and the comparison sit on top of the text they switch. */}
-        {(versions.length > 1 || hasBefore) && !busy && result !== null ? (
+        {showBar ? (
           <View style={styles.resultBar}>
             <View style={styles.compare}>
               {hasBefore ? (
@@ -278,33 +426,14 @@ export function GenSheet({
                 />
               ) : null}
             </View>
-            {versions.length > 1 ? (
-              <Pager
-                index={index}
-                count={versions.length}
-                onChange={setIndex}
-                label={t('promptGen.version', { n: index + 1, total: versions.length })}
-              />
-            ) : null}
+            {pager}
           </View>
         ) : null}
         {result !== null || busy ? (
           <View style={styles.resultRow}>
             {busy ? (
               !result ? (
-                <View style={styles.thinkingContainer}>
-                  <ShimmerText
-                    text={activity?.thinking ? t('promptGen.thinkingShort') : t('gen.writing')}
-                    style={styles.resultText}
-                    from={colors.textFaint}
-                    to={colors.text}
-                  />
-                  {liveThought ? (
-                    <Text style={styles.liveThoughtText} numberOfLines={5}>
-                      {liveThought.trim().slice(-400)}
-                    </Text>
-                  ) : null}
-                </View>
+                thinkingView
               ) : (
                 <Text style={styles.resultText}>
                   {result}
@@ -313,30 +442,14 @@ export function GenSheet({
               )
             ) : hasBefore && viewMode === 'diff' ? (
               <Text style={styles.resultText} selectable>
-                {diffParts.map((part, i) => {
-                  const next = diffParts[i + 1]
-                  const needsSpace =
-                    part.type === 'removed' &&
-                    next?.type === 'added' &&
-                    !/\s$/.test(part.value) &&
-                    !/^\s/.test(next.value)
-                  return (
-                    <Text key={i}>
-                      <Text
-                        style={
-                          part.type === 'added'
-                            ? styles.diffAdded
-                            : part.type === 'removed'
-                              ? styles.diffRemoved
-                              : undefined
-                        }
-                      >
-                        {part.value}
-                      </Text>
-                      {needsSpace ? ' ' : null}
-                    </Text>
-                  )
-                })}
+                {diffParts.map((part, i) => (
+                  <Text
+                    key={i}
+                    style={part.type === 'added' ? styles.diffAdded : part.type === 'removed' ? styles.diffRemoved : undefined}
+                  >
+                    {part.value}
+                  </Text>
+                ))}
               </Text>
             ) : (
               <TextInput
@@ -355,13 +468,7 @@ export function GenSheet({
 
       {result !== null && !busy ? (
         <ListSection header={t('promptGen.reviseLabel')}>
-          {/* One line that scrolls sideways; the chips are not interactive glass, whose
-              spring would pull them along with the scroll. */}
-          <FadingRow style={styles.tweaks} fadeColor={colors.surface} inset={16}>
-            {tweaks.map((key) => (
-              <Chip key={key} label={t(key)} active={false} onPress={() => revise(t(`${key}.note`))} />
-            ))}
-          </FadingRow>
+          {tweakChips}
           {/* Typed like a message: the field and the send button beside it. */}
           <View style={styles.noteRow}>
             <TextInput
@@ -373,15 +480,7 @@ export function GenSheet({
               multiline
               style={styles.noteInput}
             />
-            <Pressable
-              onPress={() => revise(note)}
-              disabled={!note.trim()}
-              accessibilityRole="button"
-              accessibilityLabel={t('promptGen.reviseLabel')}
-              style={[styles.sendButton, !note.trim() && { backgroundColor: colors.borderStrong }]}
-            >
-              <Icon name="arrow-up" size={18} color={note.trim() ? ON_ACCENT : colors.textFaint} />
-            </Pressable>
+            {sendButton}
           </View>
         </ListSection>
       ) : null}
@@ -462,14 +561,18 @@ export function GenSheet({
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <KeyboardAwareScrollView
-        bottomOffset={24}
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-      >
-        {phase === 'compose' ? composeView : resultView}
-      </KeyboardAwareScrollView>
+      {nativeGen ? (
+        <NativeForm>{phase === 'compose' ? composeView : renderNativeResult()}</NativeForm>
+      ) : (
+        <KeyboardAwareScrollView
+          bottomOffset={24}
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+        >
+          {phase === 'compose' ? composeView : resultView}
+        </KeyboardAwareScrollView>
+      )}
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>{footer}</View>
     </View>
@@ -481,12 +584,23 @@ export function PresetChips({ items, onPick }: { items: { key: string; label: st
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
-    <FadingRow style={styles.presets} fadeColor={colors.surface} inset={16}>
-      {items.map((item) => (
-        <Chip key={item.key} label={item.label} active={false} onPress={() => onPick(item.key)} />
-      ))}
-    </FadingRow>
+    <GenRow>
+      <FadingRow style={styles.presets} fadeColor={colors.surface} inset={16}>
+        {items.map((item) => (
+          <Chip key={item.key} label={item.label} active={false} onPress={() => onPick(item.key)} />
+        ))}
+      </FadingRow>
+    </GenRow>
   )
+}
+
+// Text taken out, struck through by Markdown: word by word, as a line through runs only
+// between marks that touch the text, with what Markdown would read as its own marks escaped.
+function struckThrough(text: string) {
+  return text
+    .split(/(\s+)/)
+    .map((piece) => (!piece || /^\s+$/.test(piece) ? piece : `~~${piece.replace(/[\\`*_{}[\]()#+\-.!~|<>]/g, '\\$&')}~~`))
+    .join('')
 }
 
 const createStyles = (colors: Colors) =>
@@ -503,6 +617,8 @@ const createStyles = (colors: Colors) =>
     resultInput: { padding: 0, textAlignVertical: 'top' },
     placeholder: { color: colors.textFaint },
     thinkingContainer: { gap: 8 },
+    // As far in as the text of a row of the system's list.
+    nativeThinking: { paddingHorizontal: 20, paddingVertical: 11 },
     liveThoughtText: {
       color: colors.textFaint,
       fontSize: 14,

@@ -1,6 +1,7 @@
 import { useTranslation } from '@/i18n'
 
-import { AreaCell, ChipChoiceCell, InputCell, ListSection, SegmentCell } from '../lists/GroupedList'
+import { ChipChoiceCell } from '../lists/GroupedList'
+import { GenArea, GenInput, GenRow, GenSection, GenSegment } from './GenCells'
 
 // The order the facts are written in, the same as the order of the dossier.
 const FIELDS = ['age', 'gender', 'occupation', 'relation', 'world', 'appearance', 'traits', 'tone', 'swearing', 'flirting', 'nsfw', 'extra'] as const
@@ -48,21 +49,21 @@ type Props = {
 export function PromptForm({ value, onChange }: Props) {
   const { t } = useTranslation()
   const set = (field: Field) => (text: string) => onChange({ ...value, [field]: text })
-  const input = (field: Field, keyboard?: 'number-pad') => (
-    <InputCell
+  const input = (field: Field, numeric = false) => (
+    <GenInput
       label={t(`promptGen.form.${field}`)}
       value={value[field] ?? ''}
       onChangeText={set(field)}
       placeholder={t(`promptGen.form.${field}Placeholder`)}
-      keyboardType={keyboard}
+      numeric={numeric}
     />
   )
   const area = (field: Field) => (
-    <AreaCell value={value[field] ?? ''} onChangeText={set(field)} placeholder={t(`promptGen.form.${field}Placeholder`)} minHeight={66} />
+    <GenArea value={value[field] ?? ''} onChangeText={set(field)} placeholder={t(`promptGen.form.${field}Placeholder`)} minHeight={66} />
   )
   // A choice of a few is a segmented control that starts on "Any", the empty value.
   const segments = (field: Field) => (
-    <SegmentCell
+    <GenSegment
       label={t(`promptGen.form.${field}`)}
       options={[
         { value: '', label: t('promptGen.form.any') },
@@ -79,37 +80,39 @@ export function PromptForm({ value, onChange }: Props) {
     const labels = keys.map((option) => t(`promptGen.form.${field}.${option}`))
     const picked = keys.indexOf(value[field] ?? '')
     return (
-      <ChipChoiceCell
-        label={t(`promptGen.form.${field}`)}
-        options={labels}
-        value={picked < 0 ? '' : labels[picked]}
-        onChange={(label) => {
-          const key = keys[labels.indexOf(label)]
-          set(field)(key === value[field] ? '' : key)
-        }}
-      />
+      <GenRow>
+        <ChipChoiceCell
+          label={t(`promptGen.form.${field}`)}
+          options={labels}
+          value={picked < 0 ? '' : labels[picked]}
+          onChange={(label) => {
+            const key = keys[labels.indexOf(label)]
+            set(field)(key === value[field] ? '' : key)
+          }}
+        />
+      </GenRow>
     )
   }
 
   return (
     <>
-      <ListSection header={t('promptGen.form.whoHeader')}>
-        {input('age', 'number-pad')}
+      <GenSection header={t('promptGen.form.whoHeader')}>
+        {input('age', true)}
         {segments('gender')}
         {input('occupation')}
         {input('relation')}
         {input('world')}
         {input('appearance')}
-      </ListSection>
+      </GenSection>
 
-      <ListSection header={t('promptGen.form.characterHeader')} footer={t('promptGen.form.hint')}>
+      <GenSection header={t('promptGen.form.characterHeader')} footer={t('promptGen.form.hint')}>
         {area('traits')}
         {chips('tone')}
         {segments('swearing')}
         {segments('flirting')}
         {segments('nsfw')}
         {area('extra')}
-      </ListSection>
+      </GenSection>
     </>
   )
 }

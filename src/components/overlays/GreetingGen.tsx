@@ -4,7 +4,7 @@ import type { MessageImage } from '@/db/messages'
 import { useTranslation } from '@/i18n'
 import { buildGreetingMessages } from '@/lib/chat/promptGen'
 
-import { AreaCell, ListFooter, ListSection, SwitchCell } from '../lists/GroupedList'
+import { GenArea, GenSection, GenSwitch } from './GenCells'
 import { GenImageAttachments } from './GenImageAttachments'
 import { GenSheet, PresetChips } from './GenSheet'
 
@@ -48,22 +48,17 @@ export function GreetingGen({ name, systemPrompt, currentGreeting, onApply }: Pr
   // Both switches in one group, the description under them while it is wanted.
   const compose = (thinkingCell: React.ReactNode) => (
     <>
-      <ListSection
-        footer={
-          <>
-            {free ? <ListFooter>{t('greetingGen.freeHint')}</ListFooter> : null}
-            <ListFooter>{t('gen.thinkingHint')}</ListFooter>
-          </>
-        }
+      <GenSection
+        footer={[...(free ? [{ text: t('greetingGen.freeHint') }] : []), { text: t('gen.thinkingHint') }]}
       >
-        <SwitchCell label={t('greetingGen.free')} value={free} onValueChange={setFree} />
+        <GenSwitch label={t('greetingGen.free')} value={free} onValueChange={setFree} />
         {thinkingCell}
-      </ListSection>
+      </GenSection>
       {free ? null : (
-        <ListSection header={t('greetingGen.wishesLabel')} footer={t('greetingGen.wishesHint')}>
-          <AreaCell value={wishes} onChangeText={setWishes} placeholder={t('greetingGen.wishesPlaceholder')} />
+        <GenSection header={t('greetingGen.wishesLabel')} footer={t('greetingGen.wishesHint')}>
+          <GenArea value={wishes} onChangeText={setWishes} placeholder={t('greetingGen.wishesPlaceholder')} />
           <PresetChips items={PRESET_KEYS.map((key) => ({ key, label: t(key) }))} onPick={addPreset} />
-        </ListSection>
+        </GenSection>
       )}
       <GenImageAttachments
         images={images}
