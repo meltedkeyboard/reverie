@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { Suspense, useEffect, useMemo } from 'react'
+import { Suspense, useEffect, useMemo, type ReactNode } from 'react'
 import { StyleSheet, useWindowDimensions, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
@@ -51,8 +51,6 @@ export default function RootLayout() {
 function ThemedApp() {
   const db = useDatabase()
   const { fontScale } = useWindowDimensions()
-  const [theme, setTheme] = useStoredValue<ThemeName>(loadThemeName, saveThemeName, 'default')
-  const [themeMode, setThemeMode] = useStoredValue<ThemeMode>(loadThemeMode, saveThemeMode, 'system')
   const [localePreference, setLocalePreference] = useStoredValue<LocalePreference>(loadLocalePreference, saveLocalePreference, 'system')
 
   useEffect(() => {
@@ -63,7 +61,7 @@ function ThemedApp() {
 
   return (
     <LocaleContextProvider preference={localePreference} setPreference={setLocalePreference}>
-      <ThemeContextProvider theme={theme} setTheme={setTheme} mode={themeMode} setMode={setThemeMode}>
+      <StoredTheme>
         <CloudSyncProvider>
           <ChatTextProvider>
             <AppLock>
@@ -74,8 +72,20 @@ function ThemedApp() {
             <SplashOverlay />
           </ChatTextProvider>
         </CloudSyncProvider>
-      </ThemeContextProvider>
+      </StoredTheme>
     </LocaleContextProvider>
+  )
+}
+
+// The theme's state is kept apart from ThemedApp, so that a pick leaves the tree the app is
+// built from as it is and reaches only the views that read the theme.
+function StoredTheme({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useStoredValue<ThemeName>(loadThemeName, saveThemeName, 'default')
+  const [mode, setMode] = useStoredValue<ThemeMode>(loadThemeMode, saveThemeMode, 'system')
+  return (
+    <ThemeContextProvider theme={theme} setTheme={setTheme} mode={mode} setMode={setMode}>
+      {children}
+    </ThemeContextProvider>
   )
 }
 

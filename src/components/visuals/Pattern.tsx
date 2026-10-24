@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Image, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 import Svg, { Circle, Defs, G, Path, Pattern as SvgPattern, Rect } from 'react-native-svg'
@@ -94,7 +94,11 @@ function Stars({ list, fill, width, at }: { list: typeof SCATTERED; fill: string
   )
 }
 
-function Drawing({ id, fill, width, height, lead }: { id: Exclude<ChatPatternId, 'none' | 'stars'>; fill: string; width: number; height: number; lead: number }) {
+// The shapes are drawn in the Svg's `color` (`currentColor`) and kept as they are when the theme
+// changes, so a new theme reaches each drawing as one prop of its Svg instead of building every
+// path anew and handing each one its fill. The dots alone take the color itself: their tile
+// is a pattern definition, named after it so that it is made again.
+const Drawing = memo(function Drawing({ id, fill, width, height, lead }: { id: Exclude<ChatPatternId, 'none' | 'stars'>; fill: string; width: number; height: number; lead: number }) {
   const center = { dx: (width - BOARD.width) / 2, dy: (height - BOARD.height) / 2 }
   const corner = { dx: width - BOARD.width, dy: height - BOARD.height }
   switch (id) {
@@ -146,7 +150,7 @@ function Drawing({ id, fill, width, height, lead }: { id: Exclude<ChatPatternId,
       )
     }
   }
-}
+})
 
 type Props = {
   id: ChatPatternId
@@ -212,8 +216,8 @@ export function Pattern({ id, scale = 1, anchor = true, style }: Props) {
       <Animated.View style={[{ position: 'absolute', top: 0, left: -lead, ...full }, follow]}>
         {size.width && id === 'stars' ? <Tiles scheme={scheme} patternColor={colors.pattern} {...full} scale={scale} lead={lead} /> : null}
         {size.width && id !== 'stars' ? (
-          <Svg {...full} viewBox={`${-lead / scale} 0 ${width + lead / scale} ${height}`}>
-            <Drawing id={id} fill={colors.pattern} width={width} height={height} lead={lead / scale} />
+          <Svg {...full} viewBox={`${-lead / scale} 0 ${width + lead / scale} ${height}`} color={colors.pattern}>
+            <Drawing id={id} fill={id === 'dots' ? colors.pattern : 'currentColor'} width={width} height={height} lead={lead / scale} />
           </Svg>
         ) : null}
       </Animated.View>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useDeferredValue, useEffect, useMemo } from 'react'
 import { Appearance, useColorScheme } from 'react-native'
 import { applyDesktopChrome } from '@/lib/ui/desktopChrome'
 import { FONTS, isDesktop, isWeb } from '@/lib/core/platform'
@@ -326,6 +326,11 @@ type ThemeContextValue = {
 }
 
 const [ThemeContext, useThemeContext] = createRequiredContext<ThemeContextValue>('useColors/useTheme must be used within ThemeContextProvider')
+// The theme as soon as it is picked. Nearly every view of the app reads the theme, and all the
+// screens kept mounted under the one shown would repaint in one block that holds the JS thread
+// for a moment; so the app takes it deferred instead, in a render React does in the background
+// and leaves for a touch, and only the screen the theme is picked on reads it from here at once.
+const [UrgentThemeContext, useUrgentThemeContext] = createRequiredContext<ThemeContextValue>('ImmediateTheme must be used within ThemeContextProvider')
 
 export function ThemeContextProvider({
   theme,
@@ -381,6 +386,22 @@ export function ThemeContextProvider({
     () => ({ colors, scheme, theme, setTheme, mode, setMode }),
     [colors, scheme, theme, setTheme, mode, setMode]
   )
+  return (
+    <UrgentThemeContext.Provider value={value}>
+      <DeferredTheme>{children}</DeferredTheme>
+    </UrgentThemeContext.Provider>
+  )
+}
+
+function DeferredTheme({ children }: { children: React.ReactNode }) {
+  const value = useDeferredValue(useUrgentThemeContext())
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+}
+
+// The theme for the screen it is picked on, which repaints with the pick while the rest of the
+// app follows in the background.
+export function ImmediateTheme({ children }: { children: React.ReactNode }) {
+  const value = useUrgentThemeContext()
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 

@@ -38,7 +38,7 @@ import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { installedFontFamilies } from '../../modules/reverie-fonts'
-import { type Colors, FILL, ON_ACCENT, paletteOf, SchemeOverride, THEMES, type ThemeMode, type ThemeName, useColors, useStyles, useTheme } from '@/theme'
+import { type Colors, FILL, ImmediateTheme, ON_ACCENT, paletteOf, SchemeOverride, THEMES, type ThemeMode, type ThemeName, useColors, useStyles, useTheme } from '@/theme'
 
 const FIELD_HEIGHT = 48
 // A tile shows a whole 393 x 852 board, small.
@@ -173,7 +173,16 @@ function ChatPreview() {
   )
 }
 
+// The screen takes a picked theme at once; the rest of the app follows it in the background.
 export default function ChatTextScreen() {
+  return (
+    <ImmediateTheme>
+      <Appearance />
+    </ImmediateTheme>
+  )
+}
+
+function Appearance() {
   const router = useRouter()
   const db = useDatabase()
   const padding = useScreenPadding('form')
