@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/prefs/settings'
 import { t } from '@/i18n'
 import { formatContextTokens } from '@/lib/core/context'
 import { errorMessage } from '@/lib/core/errors'
+import { isIOS } from '@/lib/core/platform'
 import { confirmAsync } from '@/lib/ui/dialogs'
 
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
@@ -85,15 +86,27 @@ async function getJsonWithTimeout(cfg: ServerSettings, url: string, ms: number) 
   }
 }
 
-let localNetworkAsked = false
+let localNetwork: Promise<void> | null = null
 
 // iOS asks for local network access on the first request to a LAN address, and that
-// request fails while the alert is up. So the first test of a session sends a throwaway
-// request, and if the alert shows (the app goes inactive), waits for the answer.
-async function askLocalNetworkAccess(url: string) {
-  if (localNetworkAsked) return
-  localNetworkAsked = true
+// request fails while the alert is up. So the first request of a session is a throwaway
+// one, and if the alert shows (the app goes inactive), the real one waits for the answer.
+// Every caller waits on the same ask, so a test made while it is still up waits too.
+function askLocalNetworkAccess(url: string) {
+  localNetwork ??= probeLocalNetwork(url)
+  return localNetwork
+}
 
+// Asks ahead, from onboarding's server page, so the alert comes up as the page opens rather
+// than over the first test. No address is typed yet on a first run, and any address of a home
+// network brings the alert up.
+export function primeLocalNetworkAccess(baseUrl: string) {
+  if (!isIOS) return
+  const base = normalizeBaseUrl(baseUrl)
+  void askLocalNetworkAccess(base ? `${base}/v1/models` : 'http://192.168.1.1/')
+}
+
+async function probeLocalNetwork(url: string) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 2000)
   await fetch(url, { signal: ctrl.signal }).catch(() => null)

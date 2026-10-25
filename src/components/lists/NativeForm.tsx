@@ -401,6 +401,40 @@ export function NativeSegmentRow<T extends string>({ label, options, value, onCh
   )
 }
 
+// A picker in a row: the label at the left and the choice popped from the system's menu at the right.
+export function NativePickerRow<T extends string>({
+  label,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  label: string
+  value: T
+  options: { value: T; label: string }[] | T[]
+  placeholder?: string
+  onChange: (value: T) => void
+}) {
+  const { Picker, Text } = nativeForm!.ui
+  const { pickerStyle, tag } = nativeForm!.modifiers
+  const items = options.map((opt) => (typeof opt === 'string' ? { value: opt as T, label: opt } : opt))
+  const hasValue = items.some((item) => item.value === value)
+  return (
+    <Picker label={label} selection={value} onSelectionChange={(next: T) => onChange(next)} modifiers={[pickerStyle('menu')]}>
+      {placeholder && !hasValue ? (
+        <Text key="" modifiers={[tag('' as T)]}>
+          {placeholder}
+        </Text>
+      ) : null}
+      {items.map((item) => (
+        <Text key={item.value} modifiers={[tag(item.value)]}>
+          {item.label}
+        </Text>
+      ))}
+    </Picker>
+  )
+}
+
 const styles = StyleSheet.create({
   host: { flex: 1 },
   // The hosted view at its own height, measured, rather than stretched to the row's.

@@ -487,15 +487,17 @@ export function GenSheet({
     </>
   )
 
+  // A plain button rather than glass, as the one button at the foot of onboarding and of the
+  // app icon picker.
   const footer =
     phase === 'compose' ? (
-      <PillButton filled label={generateLabel} onPress={() => run()} disabled={!canGenerate} color={colors.accent} />
+      <PillButton flat filled label={generateLabel} onPress={() => run()} disabled={!canGenerate} color={colors.accent} />
     ) : busy ? (
-      <PillButton label={t('promptGen.stop')} onPress={task.stop} color={colors.danger} />
+      <PillButton flat label={t('promptGen.stop')} onPress={task.stop} color={colors.danger} />
     ) : result === null ? (
-      <PillButton label={t('promptGen.retry')} onPress={() => run()} color={colors.accent} />
+      <PillButton flat label={t('promptGen.retry')} onPress={() => run()} color={colors.accent} />
     ) : (
-      <PillButton label={t('promptGen.another')} onPress={() => run()} />
+      <PillButton flat label={t('promptGen.another')} onPress={() => run()} />
     )
 
   // The bar: close (or back to the settings from a result) on the left, and putting the

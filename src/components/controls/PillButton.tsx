@@ -26,6 +26,8 @@ type Props = {
   // Tints the glass with the color and turns the label white, for actions that should
   // stand out on the page: backups, deleting.
   filled?: boolean
+  // Leaves the glass out on iOS 26 too: the fill or the plain surface, as elsewhere.
+  flat?: boolean
   disabled?: boolean
   loading?: boolean
   style?: StyleProp<ViewStyle>
@@ -33,13 +35,16 @@ type Props = {
 
 // A capsule of Liquid Glass for the secondary actions of a screen, with the label in the
 // action's color. Outside iOS 26 it is the plain surface with a hairline, or a solid fill.
-export function PillButton({ label, accessibilityLabel, icon, onPress, color, filled = false, disabled, loading, style }: Props) {
+export function PillButton({ label, accessibilityLabel, icon, onPress, color, filled = false, flat = false, disabled, loading, style }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const tint = color ?? colors.accent
   const ink = filled ? ON_ACCENT : tint
   const sliding = useAtLeastOneLap(!!loading && !!icon?.slide)
   const inactive = disabled || loading || sliding
+  const glass = !!liquidGlass && !flat
+  const shape = [styles.pill, !label && styles.circle]
+  const fill = filled ? { backgroundColor: tint } : styles.solid
   return (
     <Pressable
       onPress={onPress}
@@ -47,14 +52,9 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       // Interactive glass springs under the finger by itself; a scale on top would fight it.
-      style={({ pressed }) => [style, inactive && !sliding && { opacity: 0.5 }, !liquidGlass && !isDesktop && pressed && { transform: [{ scale: 0.97 }] }, isDesktop && pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [style, inactive && !sliding && { opacity: 0.5 }, !glass && !isDesktop && pressed && { transform: [{ scale: 0.97 }] }, isDesktop && pressed && { opacity: 0.8 }]}
     >
-      <GlassSurface
-        interactive={!inactive}
-        tintColor={filled ? tint : undefined}
-        style={[styles.pill, !label && styles.circle]}
-        fallbackStyle={filled ? { backgroundColor: tint } : styles.solid}
-      >
+      <Surface flat={flat} interactive={!inactive} tintColor={filled ? tint : undefined} style={shape} fill={fill}>
         {loading && !sliding ? (
           <ActivityIndicator color={ink} />
         ) : (
@@ -75,11 +75,34 @@ export function PillButton({ label, accessibilityLabel, icon, onPress, color, fi
             ) : null}
           </View>
         )}
-      </GlassSurface>
+      </Surface>
     </Pressable>
   )
 }
 
+// The glass, or with `flat` the plain view the glass falls back to where there is none.
+function Surface({
+  flat,
+  interactive,
+  tintColor,
+  style,
+  fill,
+  children,
+}: {
+  flat: boolean
+  interactive: boolean
+  tintColor?: string
+  style: StyleProp<ViewStyle>
+  fill: StyleProp<ViewStyle>
+  children: ReactNode
+}) {
+  if (flat) return <View style={[style, fill]}>{children}</View>
+  return (
+    <GlassSurface interactive={interactive} tintColor={tintColor} style={style} fallbackStyle={fill}>
+      {children}
+    </GlassSurface>
+  )
+}
 
 // The timing of the continue button changing chats.
 const OUT_MS = 140

@@ -301,7 +301,7 @@ export default function AppIconScreen() {
           style={[styles.footer, { paddingBottom: insets.bottom + 16, paddingLeft: Math.max(24, insets.left + 16), paddingRight: Math.max(24, insets.right + 16) }]}
         >
           <Button
-            variant="glass"
+            variant="solid"
             icon={inUse ? 'checkmark' : undefined}
             label={inUse ? t('appIcon.inUse') : t('appIcon.apply')}
             onPress={apply}

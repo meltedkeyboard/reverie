@@ -18,8 +18,10 @@ import { isDesktop, isWeb } from '@/lib/core/platform'
 import { Button } from '@/components/controls/Button'
 import { Field, FieldLabel } from '@/components/controls/Field'
 import { PickerBox } from '@/components/controls/PickerBox'
+import { NativeForm, NativeHostedRow, NativePickerRow, NativeSection, NativeTextRow, nativeForm } from '@/components/lists/NativeForm'
+import { primeLocalNetworkAccess } from '@/api/llm'
 import { SFIcon } from '@/components/visuals/SFIcon'
-import { Wordmark } from '@/components/visuals/Wordmark'
+import { ThemedWordmark } from '@/components/visuals/ThemedWordmark'
 import { setOnboardingComplete } from '@/db/prefs/onboarding'
 import { useDatabase } from '@/db/provider'
 import { saveSettings } from '@/db/prefs/settings'
@@ -81,7 +83,6 @@ export default function OnboardingScreen() {
   const [onServer, setOnServer] = useState(false)
   const { cfg, update, status, models, modelItems, onTest } = useServerForm()
   const welcomeScroll = useFitScroll()
-  const serverScroll = useFitScroll()
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
@@ -97,6 +98,7 @@ export default function OnboardingScreen() {
   const toServer = () => {
     Haptics.selectionAsync()
     setOnServer(true)
+    primeLocalNetworkAccess(cfg.baseUrl)
     AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
       if (reduced) turn.setValue(1)
       else Animated.spring(turn, { toValue: 1, stiffness: 170, damping: 26, mass: 1, useNativeDriver: !isWeb }).start()
@@ -140,6 +142,18 @@ export default function OnboardingScreen() {
     },
   ]
 
+  const serverIntro = (
+    <View style={nativeForm ? styles.nativeIntro : undefined}>
+      <View style={styles.pageIcon}>
+        <SFIcon name="server.rack" fallback="server-outline" size={44} color={colors.text} />
+      </View>
+      <Text style={[styles.title, styles.pageTitle]} accessibilityRole="header">
+        {t('onboarding.serverTitle')}
+      </Text>
+      <Text style={[styles.pageText, nativeForm && styles.nativePageText]}>{t('onboarding.serverText')}</Text>
+    </View>
+  )
+
   return (
     <View style={styles.screen}>
       <Animated.View
@@ -152,7 +166,7 @@ export default function OnboardingScreen() {
         <View style={{ width }} accessibilityElementsHidden={onServer} importantForAccessibility={onServer ? 'no-hide-descendants' : 'auto'}>
           <ScrollView {...welcomeScroll.scroll} contentContainerStyle={contentPad} showsVerticalScrollIndicator={false}>
             <Animated.View onLayout={welcomeScroll.onContentLayout} style={{ opacity: appear, transform: [{ translateY: rise }] }}>
-              <Wordmark width={260} optical style={styles.wordmark} />
+              <ThemedWordmark width={260} optical style={styles.wordmark} />
               <Text style={styles.title} accessibilityRole="header">
                 {t('onboarding.welcomeTitle')}
               </Text>
@@ -173,7 +187,7 @@ export default function OnboardingScreen() {
             </Animated.View>
           </ScrollView>
           <Animated.View style={footerStyle}>
-            <Button variant="glass" label={t('onboarding.getStarted')} onPress={toServer} />
+            <Button variant="solid" label={t('onboarding.getStarted')} onPress={toServer} />
           </Animated.View>
           {/* Tucked in a corner, to tell which build is installed without drawing the eye. */}
           <Animated.Text
@@ -192,73 +206,121 @@ export default function OnboardingScreen() {
         </View>
 
         <View style={{ width }} accessibilityElementsHidden={!onServer} importantForAccessibility={onServer ? 'auto' : 'no-hide-descendants'}>
-          <KeyboardAwareScrollView
-            {...serverScroll.scroll}
-            bottomOffset={24}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-            contentContainerStyle={contentPad}
-            showsVerticalScrollIndicator={false}
-          >
-            <View onLayout={serverScroll.onContentLayout}>
-              <View style={styles.pageIcon}>
-                <SFIcon name="server.rack" fallback="server-outline" size={44} color={colors.text} />
-              </View>
-              <Text style={[styles.title, styles.pageTitle]} accessibilityRole="header">
-                {t('onboarding.serverTitle')}
-              </Text>
-              <Text style={styles.pageText}>{t('onboarding.serverText')}</Text>
-
-              {/* Straight on the page, as in Settings: glass over a filled card turns into a
-                  grey haze in the dark scheme. */}
-              <Field
-                label={t('settings.baseUrlLabel')}
-                value={cfg.baseUrl}
-                onChangeText={(baseUrl) => update({ baseUrl })}
-                placeholder={t('settings.baseUrlPlaceholder')}
-                keyboardType="url"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Field
-                label={t('settings.apiKeyLabel')}
-                hint={t('settings.apiKeyHint')}
-                value={cfg.apiKey}
-                onChangeText={(apiKey) => update({ apiKey })}
-                placeholder={t('settings.apiKeyPlaceholder')}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              {models.length > 1 ? (
-                <View style={styles.modelWrap}>
-                  <FieldLabel>{t('settings.modelLabel')}</FieldLabel>
-                  <PickerBox
-                    value={modelPicked ? cfg.model : ''}
+          {nativeForm ? (
+            // The fields as Settings has them, the system's own list (iOS with SwiftUI); the
+            // icon and the words over it stay React Native views in a clear row of their own.
+            <NativeForm modifiers={[nativeForm.modifiers.scrollDisabled(true)]}>
+              <NativeSection inset={24}>
+                <NativeHostedRow clear>{serverIntro}</NativeHostedRow>
+              </NativeSection>
+              <NativeSection
+                title={t('settings.server')}
+                footer={[
+                  { text: t('settings.baseUrlHint') },
+                  ...(status.kind === 'ok' || status.kind === 'error' ? [{ text: status.text, danger: status.kind === 'error' }] : []),
+                  { text: t('onboarding.serverLater') },
+                ]}
+              >
+                <NativeTextRow
+                  label={t('settings.baseUrlLabel')}
+                  value={cfg.baseUrl}
+                  onChangeText={(baseUrl) => update({ baseUrl })}
+                  placeholder={t('settings.baseUrlPlaceholder')}
+                  keyboard="url"
+                  plain
+                />
+                <NativeTextRow
+                  label={t('settings.apiKeyLabel')}
+                  value={cfg.apiKey}
+                  onChangeText={(apiKey) => update({ apiKey })}
+                  placeholder={t('settings.apiKeyPlaceholder')}
+                  secure
+                />
+                {/* Typed by hand until the server has listed its models, then picked from them. */}
+                {models.length > 0 ? (
+                  <NativePickerRow
+                    label={t('settings.modelLabel')}
+                    value={cfg.model}
+                    options={models}
                     placeholder={t('onboarding.pickModel')}
-                    items={modelItems(models)}
-                    accessibilityLabel={t('settings.modelLabel')}
-                    fallbackStyle={styles.modelSolid}
+                    onChange={(model) => update({ model })}
                   />
-                </View>
-              ) : null}
+                ) : (
+                  <NativeTextRow
+                    label={t('settings.modelLabel')}
+                    value={cfg.model}
+                    onChangeText={(model) => update({ model })}
+                    placeholder={t('settings.modelPlaceholder')}
+                    plain
+                  />
+                )}
+              </NativeSection>
+            </NativeForm>
+          ) : (
+            <KeyboardAwareScrollView
+              scrollEnabled={false}
+              bounces={false}
+              overScrollMode="never"
+              bottomOffset={24}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              contentContainerStyle={contentPad}
+              showsVerticalScrollIndicator={false}
+            >
+              <View>
+                {serverIntro}
 
-              {status.kind === 'ok' || status.kind === 'error' ? (
-                <Text style={styles.statusText}>{status.text}</Text>
-              ) : null}
-              <Text style={styles.later}>{t('onboarding.serverLater')}</Text>
-            </View>
-          </KeyboardAwareScrollView>
+                {/* Straight on the page, as in Settings: glass over a filled card turns into a
+                    grey haze in the dark scheme. */}
+                <Field
+                  label={t('settings.baseUrlLabel')}
+                  value={cfg.baseUrl}
+                  onChangeText={(baseUrl) => update({ baseUrl })}
+                  placeholder={t('settings.baseUrlPlaceholder')}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Field
+                  label={t('settings.apiKeyLabel')}
+                  hint={t('settings.apiKeyHint')}
+                  value={cfg.apiKey}
+                  onChangeText={(apiKey) => update({ apiKey })}
+                  placeholder={t('settings.apiKeyPlaceholder')}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                {models.length > 0 ? (
+                  <View style={styles.modelWrap}>
+                    <FieldLabel>{t('settings.modelLabel')}</FieldLabel>
+                    <PickerBox
+                      value={modelPicked ? cfg.model : ''}
+                      placeholder={t('onboarding.pickModel')}
+                      items={modelItems(models)}
+                      accessibilityLabel={t('settings.modelLabel')}
+                      fallbackStyle={styles.modelSolid}
+                    />
+                  </View>
+                ) : null}
+
+                {status.kind === 'ok' || status.kind === 'error' ? (
+                  <Text style={styles.statusText}>{status.text}</Text>
+                ) : null}
+                <Text style={styles.later}>{t('onboarding.serverLater')}</Text>
+              </View>
+            </KeyboardAwareScrollView>
+          )}
           <Animated.View style={footerStyle}>
             {/* While a model is to be picked the button is the menu's trigger, which opens on the tap. */}
             {connected && !modelPicked ? (
               <NativeMenu items={modelItems(models)}>
-                <Button variant="glass" label={mainButton.label} onPress={mainButton.onPress} />
+                <Button variant="solid" label={mainButton.label} onPress={mainButton.onPress} />
               </NativeMenu>
             ) : (
               <Button
-                variant="glass"
+                variant="solid"
                 label={mainButton.label}
                 onPress={mainButton.onPress}
                 disabled={mainButton.disabled}
@@ -324,6 +386,10 @@ const createStyles = (colors: Colors) =>
     pageIcon: { alignSelf: 'center', marginBottom: 20 },
     pageTitle: { marginBottom: 12 },
     pageText: { color: colors.textMuted, fontSize: 16, lineHeight: 22, textAlign: 'center', marginBottom: 32 },
+    // In a row of the system's list, which gives it the list's own margins and the room
+    // under it before the fields' group.
+    nativeIntro: { paddingHorizontal: 16 },
+    nativePageText: { marginBottom: 0 },
     // Laid out as a Field, so the model sits in line with the address and the key.
     modelWrap: { marginBottom: 20 },
     modelSolid: { borderRadius: isDesktop ? 8 : 14, backgroundColor: colors.surface, borderWidth: isDesktop ? 0 : 1, borderColor: colors.border },
