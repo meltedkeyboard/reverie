@@ -10,6 +10,7 @@ import { loadSettings } from '@/db/prefs/settings'
 import { longMemoryEnabled } from '@/db/prefs/memory'
 import { useConversation } from '@/hooks/chat/useConversation'
 import { useLongMemory } from '@/hooks/chat/useLongMemory'
+import { useDirection } from '@/hooks/chat/useDirection'
 import { loreFor } from '@/db/lorebooks'
 import { loreBlock } from '@/lib/chat/lore'
 import { selectHistory, turnTokens } from '@/lib/core/context'
@@ -104,6 +105,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     discard,
   } = useConversation(chat, (m) => (m.kind === 'narration' ? t('room.narrator') : nameOf(m.speakerId)))
   const memory = useLongMemory(chat)
+  const direction = useDirection(chat)
   const [draft, setDraft] = useState<RoomDraft | null>(null)
   const [phase, setPhase] = useState<RoomPhase>('idle')
   const [replacingId, setReplacingId] = useState<number | null>(null)
@@ -304,6 +306,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           state: sceneStateRef.current,
           lore,
           memory: memory.block(history),
+          direction: direction.current(),
         })
         const streamed = await runReplyStream(cfg, req, ctrl.signal, {
           onStart: () => setPhase('streaming'),
@@ -349,7 +352,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       setMessages([...messagesRef.current, added])
       return { line: added, ok }
     },
-    [db, chatId, setMessages, memory]
+    [db, chatId, setMessages, memory, direction]
   )
 
   // Asks the director only when the plan leaves the choice open and the room allows it.
@@ -683,6 +686,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
 
   return {
     memory,
+    direction,
     messages,
     loaded,
     sceneState,

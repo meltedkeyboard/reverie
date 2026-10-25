@@ -5,7 +5,8 @@ import type { Role } from '@/db/messages'
 // refine regenerates with a wish from the user, like "more surprised" or "sadder". The wish
 // shown above the reply it produced has its own: refineAgain asks with it once more,
 // editRefine asks with it changed, dropRefine forgets it. deleteVariant removes only the
-// version shown in the pager, delete the whole message.
+// version shown in the pager, delete the whole message. branch starts a new chat that goes
+// on from the message.
 export type MessageAction =
   | 'copy'
   | 'regenerate'
@@ -14,6 +15,7 @@ export type MessageAction =
   | 'editRefine'
   | 'dropRefine'
   | 'edit'
+  | 'branch'
   | 'deleteVariant'
   | 'delete'
 
@@ -47,6 +49,8 @@ export function messageActions(message: { role: Role; content: string; variants:
       items.push({ action: 'refine', label: t('action.refine'), systemImage: 'text.bubble' })
     }
     items.push({ action: 'edit', label: t('action.edit'), systemImage: 'pencil' })
+    // A new chat that goes on from here, this one left as it is.
+    items.push({ action: 'branch', label: t('action.branch'), systemImage: 'arrow.triangle.branch' })
     // With several versions Delete would be ambiguous, so both are named. Not as a submenu:
     // iOS 26 draws the destructive items of one in a darker red than their symbols. A line
     // sets them apart from the changes above.

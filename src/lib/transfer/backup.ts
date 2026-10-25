@@ -18,9 +18,10 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 14: each chat's long memory, and lorebooks. 13: a room member's secret and feelings, a room's plot twists and where each scene stands. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
+// 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
+// each chat's long memory and direction, and lorebooks. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 14
+const BACKUP_VERSION = 13
 
 type BackupCharacter = {
   id: number
@@ -69,12 +70,13 @@ type BackupChat = {
   personaId?: number | null
   // Version 13: where a scene stands now.
   sceneState?: string | null
-  // Version 14: the long memory, and the id of the last message it covers.
+  // Version 13: the long memory, the id of the last message it covers, and the direction.
   recap?: string | null
   recapUpto?: number
+  direction?: string | null
 }
 
-// Version 14.
+// Version 13.
 type BackupLorebook = {
   id: number
   name: string
@@ -290,7 +292,7 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       thinking?: ThinkingMode | null
     }>(
       `SELECT id, character_id AS characterId, room_id AS roomId, persona_id AS personaId, title, created_at AS createdAt, thinking,
-         scene_state AS sceneState, recap, recap_upto AS recapUpto
+         scene_state AS sceneState, recap, recap_upto AS recapUpto, direction
        FROM chats ORDER BY sort_order, id`
     ),
     messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
@@ -603,7 +605,7 @@ export async function importBackup(
       const characterId = chat.characterId ? characterIds.get(chat.characterId) : undefined
       if (!roomId && !characterId) continue
       const res = await db.runAsync(
-        'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           roomId ? null : characterId!,
           roomId ?? null,
@@ -612,6 +614,7 @@ export async function importBackup(
           chat.thinking ?? null,
           chat.personaId ? (personaIds.get(chat.personaId) ?? null) : null,
           roomId ? (chat.sceneState ?? null) : null,
+          chat.direction ?? null,
         ]
       )
       chatIds.set(chat.id, res.lastInsertRowId)

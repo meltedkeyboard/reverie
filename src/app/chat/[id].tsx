@@ -53,7 +53,7 @@ import { useAside } from '@/hooks/chat/useAside'
 import { useChat } from '@/hooks/chat/useChat'
 import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
-import { useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
+import { useBranch, useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useChatSwitches } from '@/hooks/util/useStoredFlag'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
 import { useTranslation } from '@/i18n'
@@ -449,6 +449,7 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
               composerHeight={composerHeight}
               scrollToNewest={scrollToNewest}
               onDeleted={replaceDeleted}
+              onShow={show}
             />
           ) : (
             <RoomController
@@ -677,12 +678,13 @@ type ChatControllerProps = {
   composerHeight: SharedValue<number>
   scrollToNewest: () => void
   onDeleted: () => void
+  onShow: (chat: Chat) => void
 }
 
 // The logic of the chat on screen, without a view of its own: it reads and writes the
 // chat and hands what it has to its thread and to the header and composer. Made anew for
 // each chat (keyed by it), which costs no layout.
-function ChatController({ chat, character, thread, chrome, focusMessageId, composerHeight, scrollToNewest, onDeleted }: ChatControllerProps) {
+function ChatController({ chat, character, thread, chrome, focusMessageId, composerHeight, scrollToNewest, onDeleted, onShow }: ChatControllerProps) {
   const chatId = chat.id
   const db = useDatabase()
   const router = useRouter()
@@ -719,6 +721,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     rename,
     autoName,
     memory,
+    direction,
   } = useChat(chat, character)
   const memoryMenu = useMemoryMenu(memory)
   const scene = useMemo(() => characterScene(character), [character])
@@ -767,7 +770,8 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     [editingRow]
   )
 
-  const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow })
+  const branch = useBranch(chatId, title, onShow)
+  const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow, branch })
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
   // Over a chat background the user's bubbles can be made see-through.
@@ -789,6 +793,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) },
+    ...direction.menu,
     ...memoryMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]

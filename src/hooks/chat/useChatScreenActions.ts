@@ -3,13 +3,13 @@ import { useRouter } from 'expo-router'
 import { useCallback } from 'react'
 
 import type { RowMessage } from '@/components/chat/MessageRow'
-import { deleteChat } from '@/db/chats'
+import { branchChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chat/chatDialogs'
 import { promptText, showMessage } from '@/lib/ui/dialogs'
 import type { MessageAction } from '@/lib/chat/messageActions'
-import { alertError } from '@/lib/transfer/report'
+import { alertError, reportError } from '@/lib/transfer/report'
 
 type MessageActionHandlers = {
   regenerate: (id: number, guidance?: string) => void
@@ -17,10 +17,11 @@ type MessageActionHandlers = {
   removeVariant: (id: number) => void
   removeMessage: (id: number) => void
   edit: (message: RowMessage) => void
+  branch: (id: number) => void
 }
 
 // What the menu on a message does, the same in a chat and in a scene.
-export function useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit }: MessageActionHandlers) {
+export function useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit, branch }: MessageActionHandlers) {
   const { t } = useTranslation()
   return useCallback(
     (message: RowMessage, action: MessageAction) => {
@@ -42,9 +43,29 @@ export function useMessageActions({ regenerate, removeRefine, removeVariant, rem
       } else if (action === 'dropRefine') removeRefine(message.id)
       else if (action === 'deleteVariant') removeVariant(message.id)
       else if (action === 'edit') edit(message)
+      else if (action === 'branch') branch(message.id)
       else removeMessage(message.id)
     },
-    [regenerate, removeRefine, removeVariant, removeMessage, edit, t]
+    [regenerate, removeRefine, removeVariant, removeMessage, edit, branch, t]
+  )
+}
+
+// A new chat that goes on from a message (branchChat), taken to at once: the chat it came
+// from stays as it was.
+export function useBranch(chatId: number, title: string | null, onShow: (chat: Chat) => void) {
+  const db = useDatabase()
+  const { t } = useTranslation()
+  return useCallback(
+    async (messageId: number) => {
+      try {
+        const id = await branchChat(db, chatId, messageId, title ? t('chat.branchTitle', { title }) : null)
+        const chat = await getChat(db, id)
+        if (chat) onShow(chat)
+      } catch (err) {
+        reportError(t('chat.branchFailed'), err)
+      }
+    },
+    [db, chatId, title, onShow, t]
   )
 }
 

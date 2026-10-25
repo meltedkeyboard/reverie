@@ -95,6 +95,12 @@ export function withReplyLimit(system: string, limit: number | null): string {
 // The same cap again as a note at the end of the last user turn. Deep into a chat the
 // rule in the system prompt is thousands of tokens back, and the model follows the length
 // of its own latest replies instead; a note right before the reply keeps it in hand.
+// A chat's direction as the model reads it, at the end of the latest turn, where it weighs
+// the most (see useDirection).
+export function directionNote(direction: string | undefined) {
+  return direction?.trim() ? `(OOC: The user's direction for the story, keep to it: ${direction.trim()})` : ''
+}
+
 export function replyLimitNote(limit: number | null) {
   return limit ? `(OOC: ${replyLimitRule(limit)})` : ''
 }

@@ -8,13 +8,14 @@ import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
 import { useConversation } from '@/hooks/chat/useConversation'
 import { useLongMemory } from '@/hooks/chat/useLongMemory'
+import { useDirection } from '@/hooks/chat/useDirection'
 import { loreFor } from '@/db/lorebooks'
 import { loreBlock } from '@/lib/chat/lore'
 import { t } from '@/i18n'
 import { selectHistory, turnTokens } from '@/lib/core/context'
 import { errorMessage } from '@/lib/core/errors'
 import * as Haptics from '@/lib/ui/haptics'
-import { CONTINUE_NOTE, emptyReplyReason, replyLimitNote, runReplyStream, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
+import { CONTINUE_NOTE, directionNote, emptyReplyReason, replyLimitNote, runReplyStream, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
 import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
 import { formatPersonaPrompt } from '@/lib/chat/persona'
 
@@ -70,6 +71,7 @@ export function useChat(chat: Chat, character: Character) {
     discard,
   } = useConversation(chat, () => characterRef.current.name)
   const memory = useLongMemory(chat)
+  const direction = useDirection(chat)
   const [draft, setDraft] = useState<string | null>(null)
   const [phase, setPhase] = useState<ChatPhase>('idle')
   // While a reply is regenerated the old one is hidden and the draft takes its place.
@@ -222,7 +224,7 @@ export function useChat(chat: Chat, character: Character) {
         keptCount = turns.length
         const streamed = await runReplyStream(
           cfg,
-          { messages: requestTurns(system, turns, guidance, target.replyLimit), ...sampling },
+          { messages: requestTurns(system, turns, guidance, target.replyLimit, direction.current()), ...sampling },
           ctrl.signal,
           {
             onStart: () => setPhase('streaming'),
@@ -279,7 +281,7 @@ export function useChat(chat: Chat, character: Character) {
         }
       }
     },
-    [db, store, setMessages, autoName, memory]
+    [db, store, setMessages, autoName, memory, direction]
   )
 
   const send = useCallback(
@@ -328,6 +330,7 @@ export function useChat(chat: Chat, character: Character) {
 
   return {
     memory,
+    direction,
     messages,
     loaded,
     draft,
@@ -364,10 +367,17 @@ export function useChat(chat: Chat, character: Character) {
 // note, a convention roleplay models know; it is sent once and never saved. It is not a
 // trailing system message because many chat templates accept the system role only first.
 // The reply limit rides along the same way on every request.
-function requestTurns(system: string, turns: ChatTurn[], guidance: string | undefined, replyLimit: number | null): ChatTurn[] {
+function requestTurns(
+  system: string,
+  turns: ChatTurn[],
+  guidance: string | undefined,
+  replyLimit: number | null,
+  direction?: string
+): ChatTurn[] {
   const limit = replyLimitNote(replyLimit)
   const wish = guidance?.trim() ? `(OOC: ${guidance.trim()})` : ''
-  const note = [wish, limit].filter(Boolean).join('\n')
+  const steer = directionNote(direction)
+  const note = [steer, wish, limit].filter(Boolean).join('\n')
   const last = turns[turns.length - 1]
   const header = system
   if (last?.role === 'user') {
@@ -383,7 +393,7 @@ function requestTurns(system: string, turns: ChatTurn[], guidance: string | unde
     // "continue"), so nothing ends in a user turn. Many chat templates then treat the
     // request as a prefill of that reply and close it at once, returning nothing. A
     // trailing user turn asks for a fresh reply instead of extending the old one.
-    turns = [...turns, { role: 'user', content: (wish || CONTINUE_NOTE) + (limit ? `\n${limit}` : '') }]
+    turns = [...turns, { role: 'user', content: [steer, wish || CONTINUE_NOTE, limit].filter(Boolean).join('\n') }]
   }
   return header ? [{ role: 'system', content: header }, ...turns] : turns
 }

@@ -20,6 +20,8 @@ export type Chat = {
   // summary covers.
   recap?: string | null
   recapUpto?: number
+  // The user's standing note to the model: where the story should go, the tone, the pace.
+  direction?: string | null
 }
 
 export type ChatPreview = Chat & {
@@ -34,7 +36,7 @@ export type ChatPreview = Chat & {
 export const PREVIEW = "CASE WHEN m.content = '' AND m.images IS NOT NULL THEN 'Фото' ELSE m.content END"
 
 export const CHAT_COLUMNS =
-  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId, ch.scene_state AS sceneState, ch.recap, ch.recap_upto AS recapUpto'
+  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId, ch.scene_state AS sceneState, ch.recap, ch.recap_upto AS recapUpto, ch.direction'
 
 export async function setChatRecap(db: SQLiteDatabase, chatId: number, recap: string, upto: number) {
   await db.runAsync('UPDATE chats SET recap = ?, recap_upto = ? WHERE id = ?', [recap.trim() || null, upto, chatId])
@@ -108,7 +110,7 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
   let chatId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state) SELECT character_id, room_id, ?, created_at, thinking, persona_id, scene_state FROM chats WHERE id = ?',
+      'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction) SELECT character_id, room_id, ?, created_at, thinking, persona_id, scene_state, direction FROM chats WHERE id = ?',
       [title, id]
     )
     chatId = res.lastInsertRowId
@@ -121,6 +123,41 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
   })
   notifyChatsChanged()
   return chatId
+}
+
+// A new chat of the same owner that goes on from a message: the messages up to it, the
+// settings of the chat, and its memory if that covers no more than they do. The copy's
+// memory then covers the same messages under their new ids.
+export async function branchChat(db: SQLiteDatabase, id: number, messageId: number, title: string | null) {
+  let chatId = 0
+  await db.withTransactionAsync(async () => {
+    const res = await db.runAsync(
+      `INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction)
+       SELECT character_id, room_id, ?, ?, thinking, persona_id, scene_state, direction FROM chats WHERE id = ?`,
+      [title, Date.now(), id]
+    )
+    chatId = res.lastInsertRowId
+    await db.runAsync(
+      `INSERT INTO messages (chat_id, ${MESSAGE_COPY_COLUMNS})
+       SELECT ?, ${MESSAGE_COPY_COLUMNS}
+       FROM messages WHERE chat_id = ? AND id <= ? ORDER BY id`,
+      [chatId, id, messageId]
+    )
+    const memory = await db.getFirstAsync<{ recap: string | null; upto: number }>('SELECT recap, recap_upto AS upto FROM chats WHERE id = ?', id)
+    if (memory?.recap && memory.upto <= messageId) {
+      const covered = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM messages WHERE chat_id = ? AND id <= ?', [id, memory.upto])
+      const upto = covered?.n
+        ? await db.getFirstAsync<{ id: number }>('SELECT id FROM messages WHERE chat_id = ? ORDER BY id LIMIT 1 OFFSET ?', [chatId, covered.n - 1])
+        : null
+      await db.runAsync('UPDATE chats SET recap = ?, recap_upto = ? WHERE id = ?', [memory.recap, upto?.id ?? 0, chatId])
+    }
+  })
+  notifyChatsChanged()
+  return chatId
+}
+
+export async function setChatDirection(db: SQLiteDatabase, chatId: number, direction: string) {
+  await db.runAsync('UPDATE chats SET direction = ? WHERE id = ?', [direction.trim() || null, chatId])
 }
 
 export async function deleteChat(db: SQLiteDatabase, id: number) {

@@ -871,5 +871,12 @@
   "lore.scanDepth": "Messages read",
   "lore.scanHint": "Messages read: how many of the latest messages are searched for the keys",
   "lore.budget": "Token budget",
-  "lore.budgetHint": "Token budget: the most the lorebook's entries may take in one request; those that don't fit wait, in their order"
+  "lore.budgetHint": "Token budget: the most the lorebook's entries may take in one request; those that don't fit wait, in their order",
+  "action.branch": "Branch from here",
+  "chat.branchTitle": "{{title}} · branch",
+  "chat.branchFailed": "Couldn't branch the chat",
+  "direction.menu": "Direction",
+  "direction.menuSet": "Change direction",
+  "direction.title": "Direction",
+  "direction.placeholder": "Where the story should go, its tone and pace. It goes with every reply until you clear it, e.g. “Keep the pace slow. It is night now and everyone is tired. Lead towards the confession.”"
 }

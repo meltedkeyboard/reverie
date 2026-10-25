@@ -336,6 +336,10 @@ const MIGRATIONS = [
         )
       )
       .join('\n'),
+  // A chat's direction: the user's standing note to the model, sent with every request.
+  `
+    ALTER TABLE chats ADD COLUMN direction TEXT;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

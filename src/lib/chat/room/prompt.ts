@@ -3,7 +3,7 @@ import type { ThinkingMode } from '@/db/characters'
 import type { Message } from '@/db/messages'
 import type { Room, RoomMember } from '@/db/rooms'
 import { selectHistory, turnTokens } from '@/lib/core/context'
-import { replyLimitNote, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
+import { directionNote, replyLimitNote, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
 import type { Persona } from '@/db/personas'
 import { formatPersonaPrompt } from '@/lib/chat/persona'
 
@@ -38,11 +38,13 @@ type Context = {
   // the window, as blocks of the system prompt.
   lore?: string
   memory?: string
+  // The scene's direction, the user's standing note.
+  direction?: string
 }
 
 // The scene as this one character lived it: their own lines as the assistant, everyone
 // else's as the user with a name in front, and nothing they could not have heard.
-export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking, persona, state, lore, memory }: Context): ChatRequest {
+export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking, persona, state, lore, memory, direction: steer }: Context): ChatRequest {
   const me = speaker.characterId
   const name = speaker.character.name
   const userName = userNameOf(room, persona)
@@ -133,16 +135,17 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
   const to = (planned.addressees ?? []).filter((id) => id !== me)
   const toWhom = to.length ? ` to ${list(to.map(nameOf))}` : ''
   const whisper = planned.audience ? ' Keep it a whisper: only those in on the secret can hear it.' : ''
-  const direction =
+  const cue =
     planned.kind === 'reaction'
       ? `(OOC: ${name} reacts briefly to what just happened, in one or two sentences. Stay in character.)`
       : planned.cue === 'turn'
         ? `(OOC: It is ${name}'s turn. Continue the scene as ${name}${toWhom}.${whisper})`
         : `(OOC: ${name} now answers${toWhom}.${whisper})`
-  // A reaction is held to its sentences by the direction itself; any other line gets the
+  // A reaction is held to its sentences by the cue itself; any other line gets the
   // reply limit again here, where the model reads it last.
   const note = [
-    direction,
+    directionNote(steer),
+    cue,
     guidance?.trim() ? `(OOC: ${guidance.trim()})` : '',
     planned.kind === 'reaction' ? '' : replyLimitNote(limit),
   ]

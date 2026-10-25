@@ -26,7 +26,7 @@ import { newMessage, type Message } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { importChatToRoom, setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
 import { useAside } from '@/hooks/chat/useAside'
-import { useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
+import { useBranch, useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useRoom, type RoomPhase } from '@/hooks/chat/useRoom'
 import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
@@ -123,6 +123,7 @@ export function RoomController({
 
   const {
     memory,
+    direction,
     messages,
     loaded,
     sceneState,
@@ -248,7 +249,8 @@ export function RoomController({
     [messages, byId]
   )
 
-  const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow })
+  const branch = useBranch(chatId, title, onShow)
+  const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow, branch })
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
   const { pattern, wallpaper } = useChatTextSettings()
@@ -408,6 +410,7 @@ export function RoomController({
     ...(canTalk ? [{ label: t('room.menuAutoplay'), systemImage: 'bubble.left.and.bubble.right', children: autoplayItems }] : []),
     { label: t('room.menuImportScene'), systemImage: 'square.and.arrow.down', onSelect: importScene },
     { label: t('chat.menuShowProfile'), systemImage: 'person.2.circle', onSelect: () => router.push(`/room/${room.id}?profile=1`) },
+    ...direction.menu,
     ...memoryMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
