@@ -32,11 +32,13 @@ type Context = {
   window: Window
   thinking?: ThinkingMode
   persona?: Persona | null
+  // Where the scene stands now, as the director last noted it.
+  state?: string | null
 }
 
 // The scene as this one character lived it: their own lines as the assistant, everyone
 // else's as the user with a name in front, and nothing they could not have heard.
-export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking, persona }: Context): ChatRequest {
+export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking, persona, state }: Context): ChatRequest {
   const me = speaker.characterId
   const name = speaker.character.name
   const userName = userNameOf(room, persona)
@@ -51,6 +53,7 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
   const group = [
     'This is a group scene with several characters.',
     room.scenario.trim() ? `Scene: ${room.scenario.trim()}` : '',
+    state?.trim() ? `Right now: ${state.trim()}` : '',
     `Present: ${list([...others, userName])}.`,
     // The director follows exits and entrances only when it is on, so only then may the
     // characters make them; otherwise the user moves people with the cast sheet.
@@ -59,6 +62,12 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
       ? `${name} may leave the scene, send someone out or let someone in when the story calls for it; show it as ${name}'s own action.`
       : '',
     `You are ${name}. Write only ${name}'s next line: what ${name} says and does. Never write lines, actions or thoughts for ${list([...others, userName])}. Do not start your reply with your name.`,
+    speaker.bonds.trim() ? `How ${name} feels about the others now: ${speaker.bonds.trim()}` : '',
+    // Told to this character alone; the others' requests never carry it, so it can only
+    // come out through what they say.
+    speaker.secret.trim()
+      ? `Only ${name} knows this, nobody else in the scene does: ${speaker.secret.trim()} ${name} keeps it to themselves unless they choose to let it out.`
+      : '',
     personaBlock ? personaBlock : '',
   ]
     .filter(Boolean)

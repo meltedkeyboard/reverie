@@ -17,9 +17,9 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
+// 13: a room member's secret and feelings, a room's plot twists and where each scene stands. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 12
+const BACKUP_VERSION = 13
 
 type BackupCharacter = {
   id: number
@@ -66,6 +66,8 @@ type BackupChat = {
   thinking?: ThinkingMode | null
   // Backups from before personas leave it out.
   personaId?: number | null
+  // Version 13: where a scene stands now.
+  sceneState?: string | null
 }
 
 type BackupPersona = {
@@ -88,6 +90,8 @@ type BackupRoom = {
   floor: FloorMode
   maxChain: number
   director: number | boolean
+  // Version 13.
+  plot?: number
   background: string | null
   backgroundOriginal?: string | null
   backgroundCrop?: string | null
@@ -107,6 +111,9 @@ type BackupMember = {
   triggers: string
   muted: number
   present: number
+  // Version 13.
+  secret?: string
+  bonds?: string
 }
 
 type BackupMessage = {
@@ -254,7 +261,7 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       `SELECT ${ROOM_COLUMNS} FROM rooms ORDER BY sort_order, id`
     ),
     roomMembers: await db.getAllAsync<{ roomId: number; characterId: number }>(
-      `SELECT room_id AS roomId, character_id AS characterId, position, talkativeness, perception, triggers, muted, present
+      `SELECT room_id AS roomId, character_id AS characterId, position, talkativeness, perception, triggers, muted, present, secret, bonds
        FROM room_members ORDER BY room_id, position`
     ),
     chats: await db.getAllAsync<{
@@ -265,7 +272,8 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       title: string | null
       thinking?: ThinkingMode | null
     }>(
-      `SELECT id, character_id AS characterId, room_id AS roomId, persona_id AS personaId, title, created_at AS createdAt, thinking
+      `SELECT id, character_id AS characterId, room_id AS roomId, persona_id AS personaId, title, created_at AS createdAt, thinking,
+         scene_state AS sceneState
        FROM chats ORDER BY sort_order, id`
     ),
     messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
@@ -525,6 +533,7 @@ export async function importBackup(
           ...DEFAULT_ROOM,
           ...room,
           director: Boolean(room.director),
+          plot: room.plot ?? 0,
           background: await importImage(room.background, 'backgrounds'),
           backgroundOriginal: await importImage(room.backgroundOriginal, 'backgrounds'),
           backgroundCrop: room.backgroundCrop ?? null,
@@ -540,8 +549,9 @@ export async function importBackup(
       const characterId = characterIds.get(member.characterId)
       if (!roomId || !characterId) continue
       await db.runAsync(
-        `INSERT OR IGNORE INTO room_members (room_id, character_id, position, talkativeness, perception, triggers, muted, present)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR IGNORE INTO room_members
+           (room_id, character_id, position, talkativeness, perception, triggers, muted, present, secret, bonds)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           roomId,
           characterId,
@@ -551,6 +561,8 @@ export async function importBackup(
           member.triggers ?? '',
           member.muted ? 1 : 0,
           member.present === 0 ? 0 : 1,
+          member.secret ?? '',
+          member.bonds ?? '',
         ]
       )
     }
@@ -559,14 +571,18 @@ export async function importBackup(
       const roomId = chat.roomId ? roomIds.get(chat.roomId) : undefined
       const characterId = chat.characterId ? characterIds.get(chat.characterId) : undefined
       if (!roomId && !characterId) continue
-      const res = await db.runAsync('INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id) VALUES (?, ?, ?, ?, ?, ?)', [
-        roomId ? null : characterId!,
-        roomId ?? null,
-        chat.title,
-        chat.createdAt,
-        chat.thinking ?? null,
-        chat.personaId ? (personaIds.get(chat.personaId) ?? null) : null,
-      ])
+      const res = await db.runAsync(
+        'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          roomId ? null : characterId!,
+          roomId ?? null,
+          chat.title,
+          chat.createdAt,
+          chat.thinking ?? null,
+          chat.personaId ? (personaIds.get(chat.personaId) ?? null) : null,
+          roomId ? (chat.sceneState ?? null) : null,
+        ]
+      )
       chatIds.set(chat.id, res.lastInsertRowId)
     }
 

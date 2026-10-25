@@ -18,6 +18,7 @@ import { GlassSurface } from '@/components/chrome/Glass'
 import { bubbleOpacityOf } from '@/components/chrome/ChatChrome'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
+import { Icon } from '@/components/visuals/Icon'
 import { useOpenViewer } from '@/components/visuals/ImageLink'
 import { getChat, listChats, type Chat } from '@/db/chats'
 import { getDraft, setDraft } from '@/db/drafts'
@@ -122,6 +123,7 @@ export function RoomController({
   const {
     messages,
     loaded,
+    sceneState,
     draft,
     phase,
     error,
@@ -469,7 +471,7 @@ export function RoomController({
           ) : null,
         accessory: asidePanel ?? (
           <View style={styles.accessory} pointerEvents="box-none">
-            {idle ? null : status}
+            {idle ? sceneState.trim() ? <SceneState text={sceneState.trim()} /> : null : status}
           </View>
         ),
         onSend: (text, images) => {
@@ -556,7 +558,9 @@ function Status({ phase, draftSpeaker, next, auto }: StatusProps) {
   const now =
     phase === 'staging'
       ? t('room.statusStaging')
-      : phase === 'directing' || !draftSpeaker
+      : phase === 'plotting'
+        ? t('room.statusPlotting')
+        : phase === 'directing' || !draftSpeaker
         ? t('room.statusDeciding')
         : t('room.statusSpeaking', { name: draftSpeaker })
   const then = next.length ? t('room.statusNext', { names: next.join(', ') }) : ''
@@ -573,6 +577,29 @@ function Status({ phase, draftSpeaker, next, auto }: StatusProps) {
         {auto ? (
           <Text style={styles.statusAuto}>{t('room.statusAuto', { done: auto.done, total: auto.total })}</Text>
         ) : null}
+      </GlassSurface>
+    </Animated.View>
+  )
+}
+
+// Where the scene stands, as the director last noted it, while nobody is talking: a quiet
+// line in the place of the status.
+function SceneState({ text }: { text: string }) {
+  const styles = useStyles(createStyles)
+  const colors = useColors()
+  const { t } = useTranslation()
+  return (
+    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(160)} style={styles.statusSlot}>
+      <GlassSurface style={styles.status} fallbackStyle={styles.statusSolid}>
+        <Icon name="location-outline" size={13} color={colors.textMuted} />
+        <Text
+          maxFontSizeMultiplier={CONTROL_FONT_SCALE}
+          style={[styles.statusText, styles.statusFaint]}
+          numberOfLines={1}
+          accessibilityLabel={t('room.sceneState', { state: text })}
+        >
+          {text}
+        </Text>
       </GlassSurface>
     </Animated.View>
   )

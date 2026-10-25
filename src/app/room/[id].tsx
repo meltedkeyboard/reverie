@@ -1,6 +1,6 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
@@ -15,7 +15,7 @@ import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell
 import { BackgroundSection, BackgroundThumbCell, SourceCell } from '@/components/lists/PictureCells'
 import { NativeActionRow, NativeForm, NativeHostedRow, NativeSection, NativeSegmentRow, NativeSliderRow, NativeTextRow, nativeForm } from '@/components/lists/NativeForm'
 import { AddCharactersSheet } from '@/components/overlays/AddCharactersSheet'
-import { listCharacters, type Character, type CharacterPreview } from '@/db/characters'
+import { insertCharacter, listCharacters, newCharacterFields, type Character, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import {
   DEFAULT_MEMBER,
@@ -81,6 +81,9 @@ export default function RoomEditorScreen() {
   const [characters, setCharacters] = useState<CharacterPreview[]>([])
   const [picking, setPicking] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
+  // Characters the setup brought in that do not exist yet go in under ids below zero, and
+  // are made when the room is saved.
+  const nextNewId = useRef(-1)
   // What the texts, or the whole room, were before the last AI result replaced them, until
   // it is put back.
   const [beforeScenario, setBeforeScenario] = useState<string | null>(null)
@@ -120,7 +123,8 @@ export default function RoomEditorScreen() {
   const pickMembers = (ids: number[]) => {
     setPicking(false)
     setMembers((list) => {
-      const kept = list.filter((m) => ids.includes(m.characterId))
+      // Characters not made yet are not in the sheet's list, so the picking leaves them be.
+      const kept = list.filter((m) => ids.includes(m.characterId) || m.characterId < 0)
       const added = ids.flatMap((characterId) => {
         if (list.some((m) => m.characterId === characterId)) return []
         const character = characters.find((c) => c.id === characterId)
@@ -185,7 +189,17 @@ export default function RoomEditorScreen() {
       const nextBackground = await bgSlot.persist(backgroundValue)
       const { file: background, original: backgroundOriginal, crop: backgroundCrop } = nextBackground
       const name = fields.name.trim() || defaultName()
-      const roomId = await saveRoom(db, isNew ? null : Number(id), { ...fields, name, background, backgroundOriginal, backgroundCrop }, members)
+      const saved: Member[] = []
+      for (const m of members) {
+        if (m.characterId >= 0) {
+          saved.push(m)
+          continue
+        }
+        const characterId = await insertCharacter(db, m.character)
+        saved.push({ ...m, characterId, character: { ...m.character, id: characterId } })
+      }
+      const roomId = await saveRoom(db, isNew ? null : Number(id), { ...fields, name, background, backgroundOriginal, backgroundCrop }, saved)
+      setMembers(saved)
       bgSlot.settle(nextBackground)
       if (isNew) return router.replace(`/chat/latest?room=${roomId}`)
       if (!asProfile) return router.back()
@@ -221,11 +235,12 @@ export default function RoomEditorScreen() {
   // The room as a setup sheet, to be improved and compared with; a room with nothing written
   // and nobody tuned yet has nothing to improve.
   const openSetupGen = () => {
-    const tuned = fields.scenario.trim() || fields.opening.trim() || members.some((m) => m.triggers.trim())
+    const tuned =
+      fields.scenario.trim() || fields.opening.trim() || members.some((m) => m.triggers.trim() || m.bonds.trim() || m.secret.trim())
     const currentSetup = tuned
       ? formatSetup(
           { ...fields, name: fields.name.trim() || defaultName() },
-          members.map((m) => ({ name: m.character.name, settings: m })),
+          members.map((m) => ({ name: m.character.name, settings: m, prompt: m.characterId < 0 ? m.character.systemPrompt : undefined })),
           locale
         )
       : ''
@@ -252,16 +267,31 @@ export default function RoomEditorScreen() {
     const setup = parseSetup(text)
     const next = [...members]
     let matched = 0
-    for (const { name, ...settings } of setup.members) {
+    for (const { name, prompt, ...settings } of setup.members) {
       const at = next.findIndex((m) => sameName(m.character.name, name))
       if (at >= 0) {
-        next[at] = { ...next[at], ...settings }
+        // A character not made yet takes the prompt as it was rewritten.
+        const character = next[at].characterId < 0 && prompt ? { ...next[at].character, systemPrompt: prompt } : next[at].character
+        next[at] = { ...next[at], ...settings, character }
         matched += 1
         continue
       }
-      const character = characters.find((c) => sameName(c.name, name))
-      if (!character) continue
-      next.push({ ...DEFAULT_MEMBER, ...settings, characterId: character.id, character })
+      const known = characters.find((c) => sameName(c.name, name))
+      if (known) {
+        next.push({ ...DEFAULT_MEMBER, ...settings, characterId: known.id, character: known })
+        matched += 1
+        continue
+      }
+      // Someone the user named who is nowhere in the list is made from the prompt the sheet
+      // wrote for them.
+      if (!prompt) continue
+      const characterId = nextNewId.current--
+      next.push({
+        ...DEFAULT_MEMBER,
+        ...settings,
+        characterId,
+        character: { ...newCharacterFields(name, prompt), id: characterId, createdAt: Date.now() },
+      })
       matched += 1
     }
     if (!matched && !Object.keys(setup.fields).length) {
@@ -370,7 +400,7 @@ export default function RoomEditorScreen() {
           {member.character.name}
         </Text>
         <Text style={styles.memberMeta} numberOfLines={1}>
-          {memberSummary(member, t)}
+          {member.characterId < 0 ? t('roomEditor.newCharacter') : memberSummary(member, t)}
         </Text>
       </View>
       <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} />
@@ -393,6 +423,27 @@ export default function RoomEditorScreen() {
       value={fields.opening}
       placeholder={t('roomEditor.openingPlaceholder')}
       onChangeText={(v) => set('opening', v)}
+    />
+  )
+
+  // What a member feels about the others and what only they know, as previews that open the
+  // editor over the whole screen.
+  const bondsText = (member: Member) => (
+    <TextCell
+      title={t('roomEditor.bonds')}
+      value={member.bonds}
+      placeholder={t('roomEditor.bondsPlaceholder')}
+      onChangeText={(v) => updateMember(member.characterId, { bonds: v })}
+      lines={2}
+    />
+  )
+  const secretText = (member: Member) => (
+    <TextCell
+      title={t('roomEditor.secret')}
+      value={member.secret}
+      placeholder={t('roomEditor.secretPlaceholder')}
+      onChangeText={(v) => updateMember(member.characterId, { secret: v })}
+      lines={2}
     />
   )
 
@@ -432,6 +483,8 @@ export default function RoomEditorScreen() {
             ? [
                 { text: t('roomEditor.perceptionHint') },
                 { text: t('roomEditor.triggersHint') },
+                { text: t('roomEditor.bondsHint') },
+                { text: t('roomEditor.secretHint') },
                 { text: t('roomEditor.presentNote') },
                 { text: t('roomEditor.mutedNote') },
               ]
@@ -474,6 +527,8 @@ export default function RoomEditorScreen() {
                     onChangeText={(v) => updateMember(member.characterId, { triggers: v })}
                     placeholder={t('roomEditor.triggersPlaceholder')}
                   />
+                  <NativeHostedRow key={`bonds${expanded}`}>{bondsText(member)}</NativeHostedRow>
+                  <NativeHostedRow key={`secret${expanded}`}>{secretText(member)}</NativeHostedRow>
                   <ui.Toggle
                     label={t('roomEditor.present')}
                     isOn={member.present}
@@ -495,11 +550,28 @@ export default function RoomEditorScreen() {
 
       <NativeSection
         title={t('roomEditor.floorSection')}
-        footer={[{ text: t(`room.floorHint.${fields.floor}`) }, { text: t('roomEditor.maxChainHint') }, { text: t('roomEditor.directorNote') }]}
+        footer={[
+          { text: t(`room.floorHint.${fields.floor}`) },
+          { text: t('roomEditor.maxChainHint') },
+          { text: t('roomEditor.directorNote') },
+          ...(fields.director ? [{ text: t('roomEditor.plotHint') }] : []),
+        ]}
       >
         <NativeSegmentRow label={t('roomEditor.floorMode')} options={FLOOR_OPTIONS} value={fields.floor} onChange={(v) => set('floor', v)} />
         <NativeSliderRow label={t('roomEditor.maxChain')} value={fields.maxChain} min={1} max={5} step={1} onChange={(v) => set('maxChain', Math.round(v))} />
         <ui.Toggle label={t('roomEditor.director')} isOn={fields.director} onIsOnChange={(v) => set('director', v)} />
+        {/* The narrator's events come from the director, so they go with it. */}
+        {fields.director ? (
+          <NativeSliderRow
+            label={t('roomEditor.plot')}
+            value={fields.plot}
+            min={0}
+            max={1}
+            step={0.1}
+            format={percent}
+            onChange={(v) => set('plot', Math.round(v * 10) / 10)}
+          />
+        ) : null}
       </NativeSection>
 
       <NativeSection title={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>
@@ -591,6 +663,8 @@ export default function RoomEditorScreen() {
                     <>
                       <ListFooter>{t('roomEditor.perceptionHint')}</ListFooter>
                       <ListFooter>{t('roomEditor.triggersHint')}</ListFooter>
+                      <ListFooter>{t('roomEditor.bondsHint')}</ListFooter>
+                      <ListFooter>{t('roomEditor.secretHint')}</ListFooter>
                       <ListFooter>{t('roomEditor.presentNote')}</ListFooter>
                       <ListFooter>{t('roomEditor.mutedNote')}</ListFooter>
                     </>
@@ -631,6 +705,8 @@ export default function RoomEditorScreen() {
                             onChangeText={(v) => updateMember(member.characterId, { triggers: v })}
                             placeholder={t('roomEditor.triggersPlaceholder')}
                           />
+                          {bondsText(member)}
+                          {secretText(member)}
                           <SwitchCell
                             label={t('roomEditor.present')}
                             value={member.present}
@@ -661,12 +737,24 @@ export default function RoomEditorScreen() {
                     <ListFooter>{t(`room.floorHint.${fields.floor}`)}</ListFooter>
                     <ListFooter>{t('roomEditor.maxChainHint')}</ListFooter>
                     <ListFooter>{t('roomEditor.directorNote')}</ListFooter>
+                    {fields.director ? <ListFooter>{t('roomEditor.plotHint')}</ListFooter> : null}
                   </>
                 }
               >
                 <SegmentCell label={t('roomEditor.floorMode')} options={FLOOR_OPTIONS} value={fields.floor} onChange={(v) => set('floor', v)} />
                 <SliderCell label={t('roomEditor.maxChain')} value={fields.maxChain} min={1} max={5} step={1} onChange={(v) => set('maxChain', v)} />
                 <SwitchCell label={t('roomEditor.director')} value={fields.director} onValueChange={(v) => set('director', v)} />
+                {fields.director ? (
+                  <SliderCell
+                    label={t('roomEditor.plot')}
+                    value={fields.plot}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    formatValue={percent}
+                    onChange={(v) => set('plot', Math.round(v * 10) / 10)}
+                  />
+                ) : null}
               </ListSection>
 
               <ListSection header={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>

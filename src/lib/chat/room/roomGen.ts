@@ -144,6 +144,10 @@ type Key =
   | 'triggers'
   | 'muted'
   | 'present'
+  | 'secret'
+  | 'bonds'
+  | 'plot'
+  | 'prompt'
 
 const LABELS: Record<Locale, Record<Key, string>> = {
   en: {
@@ -160,6 +164,10 @@ const LABELS: Record<Locale, Record<Key, string>> = {
     triggers: 'Triggers',
     muted: 'Only listens',
     present: 'In the scene',
+    secret: 'Secret',
+    bonds: 'Feelings',
+    plot: 'Plot twists',
+    prompt: 'New character',
   },
   ru: {
     name: 'Название',
@@ -175,6 +183,10 @@ const LABELS: Record<Locale, Record<Key, string>> = {
     triggers: 'Триггеры',
     muted: 'Только слушает',
     present: 'В сцене',
+    secret: 'Секрет',
+    bonds: 'Отношение к другим',
+    plot: 'Сюжетные повороты',
+    prompt: 'Новый персонаж',
   },
 }
 
@@ -190,6 +202,11 @@ const SYNONYMS: Record<string, Key> = {
   'умный режиссёр': 'director',
   character: 'member',
   персонаж: 'member',
+  тайна: 'secret',
+  feelings: 'bonds',
+  'feels about others': 'bonds',
+  prompt: 'prompt',
+  промпт: 'prompt',
 }
 
 const FLOOR_WORDS: Record<Locale, Record<FloorMode, string>> = {
@@ -199,13 +216,15 @@ const FLOOR_WORDS: Record<Locale, Record<FloorMode, string>> = {
 
 const YES_NO: Record<Locale, [string, string]> = { en: ['yes', 'no'], ru: ['да', 'нет'] }
 
-export type SetupMember = { name: string; settings: Omit<MemberSettings, 'characterId'> }
+export type SetupMember = { name: string; settings: Omit<MemberSettings, 'characterId'>; prompt?: string }
 
-export type SetupFields = Pick<RoomFields, 'name' | 'userName' | 'floor' | 'maxChain' | 'director' | 'scenario' | 'opening'>
+export type SetupFields = Pick<RoomFields, 'name' | 'userName' | 'floor' | 'maxChain' | 'director' | 'plot' | 'scenario' | 'opening'>
 
+// A member the sheet names but the app does not know comes with `prompt`, the system prompt
+// of a character to be made.
 export type Setup = {
   fields: Partial<SetupFields>
-  members: ({ name: string } & Partial<Omit<MemberSettings, 'characterId'>>)[]
+  members: ({ name: string; prompt?: string } & Partial<Omit<MemberSettings, 'characterId'>>)[]
 }
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
@@ -220,16 +239,25 @@ export function formatSetup(fields: SetupFields, members: SetupMember[], locale:
     `${L.floor}: ${FLOOR_WORDS[locale][fields.floor]}`,
     `${L.maxChain}: ${fields.maxChain}`,
     `${L.director}: ${flag(fields.director)}`,
+    `${L.plot}: ${percent(fields.plot)}`,
   ].filter(Boolean)
-  const blocks = members.map(({ name, settings }) =>
+  // A text of a member stays on its one line; an empty one leaves the label bare.
+  const line = (text: string) => text.replace(/\s*\n\s*/g, ' ').trim()
+  const pad = (text: string) => (text ? ` ${text}` : '')
+  const blocks = members.map(({ name, settings, prompt }) =>
     [
       `${L.member}: ${name}`,
       `${L.talkativeness}: ${percent(settings.talkativeness)}`,
       `${L.perception}: ${percent(settings.perception)}`,
-      `${L.triggers}: ${settings.triggers.trim()}`,
+      `${L.triggers}:${pad(settings.triggers.trim())}`,
       `${L.muted}: ${flag(settings.muted)}`,
       `${L.present}: ${flag(settings.present)}`,
-    ].join('\n')
+      `${L.bonds}:${pad(line(settings.bonds))}`,
+      `${L.secret}:${pad(line(settings.secret))}`,
+      prompt ? `${L.prompt}:\n${prompt.trim()}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
   )
   return [
     head.join('\n'),
@@ -276,26 +304,31 @@ function floor(value: string): FloorMode | undefined {
   return undefined
 }
 
-const ENDS_TEXT = new Set<Key>(['name', 'floor', 'maxChain', 'director', 'scenario', 'opening', 'member'])
+const ENDS_TEXT = new Set<Key>(['name', 'floor', 'maxChain', 'director', 'plot', 'scenario', 'opening', 'member'])
 
 export function parseSetup(text: string): Setup {
   const fields: Partial<SetupFields> = {}
   const members: Setup['members'] = []
-  // The two texts run over the lines under their label, up to the next label. One left
-  // empty keeps what the room has.
-  let block: 'scenario' | 'opening' | null = null
+  // The texts run over the lines under their label, up to the next label: the room's two,
+  // and a new character's prompt, which ends its member's block. One left empty keeps what
+  // the room has.
+  let block: 'scenario' | 'opening' | 'prompt' | null = null
   let lines: string[] = []
   const close = () => {
     const text = lines.join('\n').trim()
-    if (block && text) fields[block] = text
+    const member = members[members.length - 1]
+    if (block === 'prompt') {
+      if (member && text) member.prompt = text
+    } else if (block && text) fields[block] = text
     block = null
     lines = []
   }
   for (const line of text.split('\n')) {
     const hit = labelled(line)
-    // Inside a text only a label of the room or of a member's block ends it: a line of the
-    // scene may well begin with "In the scene:" or "Triggers:".
-    if (!hit || (block && !ENDS_TEXT.has(hit.key))) {
+    // Inside the room's texts only a label of the room or of a member's block ends them: a
+    // line of the scene may well begin with "In the scene:" or "Triggers:". A prompt comes
+    // last in its block, and any label ends it.
+    if (!hit || (block && block !== 'prompt' && !ENDS_TEXT.has(hit.key))) {
       if (block) lines.push(line)
       continue
     }
@@ -306,6 +339,11 @@ export function parseSetup(text: string): Setup {
       case 'scenario':
       case 'opening':
         block = key
+        if (value) lines.push(value)
+        break
+      case 'prompt':
+        if (!member) break
+        block = 'prompt'
         if (value) lines.push(value)
         break
       case 'member':
@@ -332,6 +370,15 @@ export function parseSetup(text: string): Setup {
         if (on !== undefined) fields.director = on
         break
       }
+      case 'plot': {
+        const n = share(value)
+        if (n !== undefined) fields.plot = n
+        break
+      }
+      case 'secret':
+      case 'bonds':
+        if (member) member[key] = value
+        break
       case 'talkativeness':
       case 'perception': {
         const n = share(value)
@@ -355,8 +402,11 @@ export function parseSetup(text: string): Setup {
 
 // The example the model is shown before the user's request: a cast, a few words about them
 // and the sheet they become, in the app's language. A local model keeps a layout it has seen
-// far better than one it was only told about.
-const EXAMPLE: Record<Locale, { cast: GenCastMember[]; description: string; fields: SetupFields; members: [string, number, number, string][] }> = {
+// far better than one it was only told about. It shows a secret, the feelings, someone who
+// comes later and a character the cast lacks.
+type ExampleMember = { name: string; talk: number; ear: number; triggers: string; bonds: string; secret?: string; away?: boolean; prompt?: string }
+
+const EXAMPLE: Record<Locale, { cast: GenCastMember[]; description: string; fields: SetupFields; members: ExampleMember[] }> = {
   en: {
     cast: [
       { name: 'Kyle', prompt: 'You are Kyle, a 25-year-old bartender. Loud, sure of himself, the life of every party.' },
@@ -366,13 +416,15 @@ const EXAMPLE: Record<Locale, { cast: GenCastMember[]; description: string; fiel
       { name: 'Lucas', prompt: "You are Lucas, Mike's coworker. Calm and thorough." },
       { name: 'Elara', prompt: 'You are Elara, an art student. Quiet and observant.' },
     ],
-    description: "We're having a party. Kyle and Radan are friends and can't stand Dylan. Mike and Lucas love talking about the weather. Elara is an introvert.",
+    description:
+      "We're having a party. Kyle and Radan are friends and can't stand Dylan. Mike and Lucas love talking about the weather. Elara is an introvert. Dylan is secretly dating Radan's ex. Later on Vera from next door drops by.",
     fields: {
       name: "Party at Kyle's",
       userName: '',
       floor: 'open',
       maxChain: 3,
       director: true,
+      plot: 0.3,
       scenario: [
         "Saturday night, a party at Kyle's flat. Loud music, a crowded kitchen, a balcony for smokers, about fifteen guests.",
         'Kyle is celebrating a new job. The user is one of the guests.',
@@ -381,6 +433,7 @@ const EXAMPLE: Record<Locale, { cast: GenCastMember[]; description: string; fiel
         "- Kyle and Radan can't stand Dylan and don't hide it. Dylan pretends not to notice.",
         '- Mike and Lucas get along easily and start talking about the weather at every pause.',
         '- Elara hardly knows anyone here.',
+        '- Vera lives next door and knows everyone a little.',
         'Here and now:',
         '- Kyle is the host: loud, always on the move, keeps an eye on Dylan.',
         '- Radan makes digs at Dylan.',
@@ -391,12 +444,29 @@ const EXAMPLE: Record<Locale, { cast: GenCastMember[]; description: string; fiel
         "The music in Kyle's flat is loud enough to rattle the glasses on the shelf. The kitchen is packed: Mike and Lucas are arguing about whether it will rain tomorrow, and Radan whispers something to Kyle, nodding at Dylan, who has just walked in with a bottle of wine. Elara stands by the window with an untouched drink, watching the drops crawl down the glass.",
     },
     members: [
-      ['Kyle', 0.8, 0.3, 'Dylan, party, music, Radan'],
-      ['Radan', 0.65, 0.35, 'Dylan, Kyle, code'],
-      ['Dylan', 0.55, 0.45, 'Kyle, Radan, wine'],
-      ['Mike', 0.7, 0.15, 'weather, rain, forecast, Lucas'],
-      ['Lucas', 0.5, 0.15, 'weather, rain, Mike'],
-      ['Elara', 0.15, 0.6, 'drawing, art, window, quiet'],
+      { name: 'Kyle', talk: 0.8, ear: 0.3, triggers: 'Dylan, party, music, Radan', bonds: "Would do anything for Radan. Can't stand Dylan and wants him gone." },
+      { name: 'Radan', talk: 0.65, ear: 0.35, triggers: 'Dylan, Kyle, code, ex', bonds: 'Trusts Kyle completely. Despises Dylan without quite knowing why.' },
+      {
+        name: 'Dylan',
+        talk: 0.55,
+        ear: 0.45,
+        triggers: 'Kyle, Radan, wine',
+        bonds: 'Afraid of Radan, wants Kyle to like him, finds Elara easy to talk to.',
+        secret: "He is dating Radan's ex and dreads the day Radan finds out.",
+      },
+      { name: 'Mike', talk: 0.7, ear: 0.15, triggers: 'weather, rain, forecast, Lucas', bonds: 'Likes everyone, Lucas most of all.' },
+      { name: 'Lucas', talk: 0.5, ear: 0.15, triggers: 'weather, rain, Mike', bonds: 'Gets on with Mike; keeps out of the others\' quarrels.' },
+      { name: 'Elara', talk: 0.15, ear: 0.6, triggers: 'drawing, art, window, quiet', bonds: 'Wary of the loud ones; Dylan seems kind to her.' },
+      {
+        name: 'Vera',
+        talk: 0.6,
+        ear: 0.5,
+        triggers: 'music, noise, Kyle, gossip',
+        bonds: 'Fond of Kyle like a younger brother; curious about the newcomers.',
+        away: true,
+        prompt:
+          'You are Vera, 34, Kyle\'s neighbor from across the landing. A nurse on night shifts.\nShort, curly red hair, always in an old cardigan.\nDirect, warm, nosy; you know all the gossip of the building and share it gladly.\nYou speak fast, with a dry laugh, and call everyone "sweetheart".\nYou came to complain about the noise and stayed.',
+      },
     ],
   },
   ru: {
@@ -408,13 +478,15 @@ const EXAMPLE: Record<Locale, { cast: GenCastMember[]; description: string; fiel
       { name: 'Лукас', prompt: 'Ты Лукас, коллега Майка. Спокойный и обстоятельный.' },
       { name: 'Элиара', prompt: 'Ты Элиара, студентка-художница. Тихая и наблюдательная.' },
     ],
-    description: 'У нас вечеринка. Кайл и Радан друзья, не терпят Дилана. Майк и Лукас любят болтать о погоде. Элиара вообще интроверт.',
+    description:
+      'У нас вечеринка. Кайл и Радан друзья, не терпят Дилана. Майк и Лукас любят болтать о погоде. Элиара вообще интроверт. Дилан тайно встречается с бывшей Радана. Ближе к ночи заглянет соседка Вера.',
     fields: {
       name: 'Вечеринка у Кайла',
       userName: '',
       floor: 'open',
       maxChain: 3,
       director: true,
+      plot: 0.3,
       scenario: [
         'Субботний вечер, вечеринка в квартире Кайла. Громкая музыка, тесная кухня, балкон для курящих, человек пятнадцать гостей.',
         'Кайл отмечает новую работу. Пользователь — один из гостей.',
@@ -423,6 +495,7 @@ const EXAMPLE: Record<Locale, { cast: GenCastMember[]; description: string; fiel
         '- Кайл и Радан не терпят Дилана и не скрывают этого. Дилан делает вид, что не замечает.',
         '- Майк и Лукас легко находят общий язык и при любой паузе заводят разговор о погоде.',
         '- Элиара почти никого здесь не знает.',
+        '- Вера живёт за стенкой и всех понемногу знает.',
         'Здесь и сейчас:',
         '- Кайл — хозяин: громкий, всё время в движении, присматривает за Диланом.',
         '- Радан отпускает колкости в адрес Дилана.',
@@ -433,12 +506,29 @@ const EXAMPLE: Record<Locale, { cast: GenCastMember[]; description: string; fiel
         'Музыка в квартире Кайла такая громкая, что звенят бокалы на полке. На кухне не протолкнуться: Майк с Лукасом спорят, пойдёт ли завтра дождь, а Радан что-то шепчет Кайлу, кивая на Дилана, который только что вошёл с бутылкой вина. Элиара стоит у окна с нетронутым стаканом и смотрит, как по стеклу ползут капли.',
     },
     members: [
-      ['Кайл', 0.8, 0.3, 'Дилан, вечеринка, музыка, Радан'],
-      ['Радан', 0.65, 0.35, 'Дилан, Кайл, код'],
-      ['Дилан', 0.55, 0.45, 'Кайл, Радан, вино'],
-      ['Майк', 0.7, 0.15, 'погода, дождь, прогноз, Лукас'],
-      ['Лукас', 0.5, 0.15, 'погода, дождь, Майк'],
-      ['Элиара', 0.15, 0.6, 'рисунок, искусство, окно, тишина'],
+      { name: 'Кайл', talk: 0.8, ear: 0.3, triggers: 'Дилан, вечеринка, музыка, Радан', bonds: 'За Радана горой. Дилана терпеть не может и ждёт, когда тот уйдёт.' },
+      { name: 'Радан', talk: 0.65, ear: 0.35, triggers: 'Дилан, Кайл, код, бывшая', bonds: 'Доверяет Кайлу во всём. Презирает Дилана, сам толком не зная за что.' },
+      {
+        name: 'Дилан',
+        talk: 0.55,
+        ear: 0.45,
+        triggers: 'Кайл, Радан, вино',
+        bonds: 'Боится Радана, хочет понравиться Кайлу, с Элиарой ему легко.',
+        secret: 'Встречается с бывшей девушкой Радана и до ужаса боится, что тот узнает.',
+      },
+      { name: 'Майк', talk: 0.7, ear: 0.15, triggers: 'погода, дождь, прогноз, Лукас', bonds: 'Любит всех, а Лукаса больше всех.' },
+      { name: 'Лукас', talk: 0.5, ear: 0.15, triggers: 'погода, дождь, Майк', bonds: 'Ладит с Майком, в чужие ссоры не лезет.' },
+      { name: 'Элиара', talk: 0.15, ear: 0.6, triggers: 'рисунок, искусство, окно, тишина', bonds: 'Сторонится шумных; Дилан кажется ей добрым.' },
+      {
+        name: 'Вера',
+        talk: 0.6,
+        ear: 0.5,
+        triggers: 'музыка, шум, Кайл, сплетни',
+        bonds: 'Любит Кайла как младшего брата; к новеньким присматривается с любопытством.',
+        away: true,
+        prompt:
+          'Ты Вера, 34 года, соседка Кайла по площадке. Медсестра, работаешь в ночные смены.\nНевысокая, рыжие кудри, вечно в старом кардигане.\nПрямая, тёплая, любопытная; знаешь все сплетни дома и охотно ими делишься.\nГоворишь быстро, с сухим смешком, всех зовёшь «солнце».\nПришла ругаться из-за шума и осталась.',
+      },
     ],
   },
 }
@@ -451,9 +541,10 @@ export function setupExample(locale: Locale) {
 
 function exampleSheet(locale: Locale) {
   const example = EXAMPLE[locale]
-  const members = example.members.map(([name, talkativeness, perception, triggers]) => ({
-    name,
-    settings: { talkativeness, perception, triggers, muted: false, present: true },
+  const members = example.members.map((m) => ({
+    name: m.name,
+    settings: { talkativeness: m.talk, perception: m.ear, triggers: m.triggers, muted: false, present: !m.away, secret: m.secret ?? '', bonds: m.bonds },
+    prompt: m.prompt,
   }))
   return formatSetup(example.fields, members, locale)
 }
@@ -471,17 +562,21 @@ function setupRules(locale: Locale) {
     `- ${L.userName}: only if the description says what the characters call the user; otherwise leave the line out.`,
     `- ${L.floor}: who may speak after the one addressed has answered. "${F.open}" when several people talk freely and cut in (a party, a quarrel, a debate); "${F.reactions}" when one leads and the others comment; "${F.addressee}" for questioning one by one or a quiet scene.`,
     `- ${L.maxChain}: 1 to 5, how many characters may speak in a row before it is the user's turn. Usually 2 or 3, 4 or 5 for a lively crowd.`,
-    `- ${L.director}: ${yes} lets the model pick the speaker when it is unclear and lets the characters come and go by themselves. Keep ${yes} unless the user asks otherwise.`,
+    `- ${L.director}: ${yes} lets the model pick the speaker when it is unclear, lets the characters come and go by themselves and keeps their feelings up to date as the story goes. Keep ${yes} unless the user asks otherwise.`,
+    `- ${L.plot}: 0-100%, how often the narrator brings in an event when the talk stalls (someone arrives, news, a twist). 0% for a quiet scene the user wants to steer alone; 20-40% usually; 60-100% for an adventure or a drama. Works only with the director on.`,
     `- ${L.scenario}: the scene description, on the lines under the label.`,
     SCENE_RULES,
     `- ${L.opening}: the narration each new scene starts with, on the lines under the label.`,
     OPENING_RULES,
-    `- ${L.member}: a block for every character of the cast, in the order of the cast, the name exactly as in the cast. Nobody outside the cast gets a block.`,
+    `- ${L.member}: a block for every character of the cast, in the order of the cast, the name exactly as in the cast.`,
     `- ${L.talkativeness}: 0-100%, how eager they are to speak up. Hosts, loudmouths, the sociable: 65-90%. Most people: 40-60%. The shy, the gloomy, introverts: 5-25%.`,
     `- ${L.perception}: 0-100%, the chance to overhear a whisper meant for someone else. 15% by default; the attentive, the nosy, the suspicious: 40-80%; the distracted, the drunk, the absorbed: 0-10%.`,
     `- ${L.triggers}: 2 to 6 topics, comma-separated, that make them want to cut in: the names of people they love or hate, their passions, their sore spots. Short words as they would be said in the chat: the app looks for them in every line.`,
     `- ${L.muted}: ${yes} only for someone the description says keeps silent unless asked; otherwise ${no}.`,
     `- ${L.present}: ${no} for someone who comes later or is away at the start; otherwise ${yes}.`,
+    `- ${L.bonds}: one or two short sentences on how they feel about the others right now, by name. The director keeps it up as the story goes.`,
+    `- ${L.secret}: what only this character knows and the others do not (a debt, a crush, a plan, a lie). Only if the description gives one or the scene clearly calls for it; otherwise leave it empty. The others never see it.`,
+    `- ${L.prompt}: only for someone the description names who must be in the scene but is not in the cast. Give them a block like everyone else and end it with this label, their system prompt on the lines under it: second person ("You are <name>, ..."), 60-150 words of plain facts, one per line: who they are, age, appearance, character, how they speak, what brings them here. The app creates the character. Never add anyone the description does not name.`,
     'Every relationship and trait the user gives is fixed: put it into the scene description and into the numbers and the triggers. Fill whatever is left out from what the cast says of the characters.',
   ].join('\n')
 }
@@ -495,13 +590,13 @@ export function buildSetupMessages(
   const rules = setupRules(input.locale)
   const context = {
     facts: castFacts(input.cast),
-    rules: `It is a setup sheet whose layout the app reads back, so keep every label as it is. Every character of the cast has a block: add one for any that lacks it.\n${rules}`,
+    rules: `It is a setup sheet whose layout the app reads back, so keep every label as it is. Every character of the cast has a block: add one for any that lacks it. A block with "${LABELS[input.locale].prompt}" is a character the app has not made yet: keep its prompt.\n${rules}`,
   }
   if (revision) return buildEditMessages('room', revision.draft, revision.note, undefined, context)
   if (input.base !== null) {
     const change =
       input.description.trim() ||
-      'fill in what is missing: the relationships and the scene, an opening, triggers for everyone, and the numbers to fit each character; keep what is written'
+      'fill in what is missing: the relationships and the scene, an opening, triggers and feelings for everyone, and the numbers to fit each character; keep what is written'
     return buildEditMessages('room', input.base, change, undefined, context)
   }
   const example = EXAMPLE[input.locale]

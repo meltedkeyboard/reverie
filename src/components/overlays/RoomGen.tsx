@@ -63,6 +63,7 @@ export function RoomSetupGen({
             ? { text: t('roomGen.castLine', { names: names.join(', ') }) }
             : { text: t('roomGen.noCast'), danger: true },
           ...(library.length ? [{ text: t('roomGen.namedHint') }] : []),
+          ...(improving ? [] : [{ text: t('roomGen.newHint') }]),
         ]}
       >
         <GenArea

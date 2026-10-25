@@ -62,6 +62,30 @@ export type CharacterPreview = Character & {
 
 export const DEFAULT_SAMPLING = { temperature: 0.8, maxTokens: 800, reasoningBudget: 2048, topP: 0.95 } as const
 
+// A character of a name and a prompt alone, everything else as a new one in the editor has
+// it: what a room's setup makes of someone the user named but has not made.
+export function newCharacterFields(name: string, systemPrompt: string): CharacterFields {
+  return {
+    name,
+    avatar: null,
+    avatarOriginal: null,
+    avatarCrop: null,
+    systemPrompt,
+    greeting: '',
+    notes: '',
+    ...DEFAULT_SAMPLING,
+    replyLimit: null,
+    thinking: 'auto',
+    background: null,
+    backgroundOriginal: null,
+    backgroundCrop: null,
+    backgroundEffect: 'blur',
+    backgroundIntensity: 0.5,
+    backgroundBubbleTransparency: 0.3,
+    backgroundTone: 'auto',
+  }
+}
+
 // Unqualified so the backup can select them too; in listCharacters the subqueries
 // qualify their own columns, so these still refer to the outer characters row.
 export const CHARACTER_COLUMNS = `

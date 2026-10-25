@@ -73,6 +73,7 @@ export function RoomProfile({ fields, members, background, exportItems, system =
     { label: t('room.floorTitle'), value: t(`room.floor.${fields.floor}`) },
     { label: t('roomEditor.maxChain'), value: String(fields.maxChain) },
     { label: t('roomEditor.director'), value: onOff(fields.director) },
+    ...(fields.director && fields.plot > 0 ? [{ label: t('roomEditor.plot'), value: percent(fields.plot) }] : []),
     ...(fields.userName.trim() ? [{ label: t('roomEditor.userName'), value: fields.userName.trim() }] : []),
   ]
   return (

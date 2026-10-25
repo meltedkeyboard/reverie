@@ -1,7 +1,8 @@
 import { completeChat } from '@/api/llm'
 import type { Message } from '@/db/messages'
-import type { RoomMember } from '@/db/rooms'
+import type { Room, RoomMember } from '@/db/rooms'
 import type { ServerSettings } from '@/db/prefs/settings'
+import { cleanGenerated } from '@/lib/chat/promptGen'
 
 import type { Ambiguity } from './floor'
 
@@ -29,7 +30,8 @@ export async function askDirector(cfg: ServerSettings, req: Request, signal: Abo
     .map((m) => {
       const about = m.character.systemPrompt.replace(/\s+/g, ' ').trim().slice(0, DESCRIPTION_CHARS)
       const topics = m.triggers.trim() ? ` Cares about: ${m.triggers.trim()}.` : ''
-      return `- ${m.character.name}: ${about}${topics}`
+      const bonds = m.bonds.trim() ? ` Feels: ${m.bonds.replace(/\s+/g, ' ').trim().slice(0, DESCRIPTION_CHARS)}` : ''
+      return `- ${m.character.name}: ${about}${topics}${bonds}`
     })
     .join('\n')
   const recent = req.history
@@ -141,6 +143,134 @@ export async function askMovement(
     clearTimeout(timer)
     signal.removeEventListener('abort', abort)
   }
+}
+
+// A short request with its own timeout, given up quietly: the director's extras never stop
+// the scene. Returns the model's raw answer, or null.
+async function ask(
+  cfg: ServerSettings,
+  system: string,
+  prompt: string,
+  options: { temperature: number; maxTokens: number; timeout?: number },
+  signal: AbortSignal
+) {
+  const ctrl = new AbortController()
+  const abort = () => ctrl.abort()
+  signal.addEventListener('abort', abort)
+  const timer = setTimeout(abort, options.timeout ?? TIMEOUT_MS)
+  try {
+    return await completeChat(
+      cfg,
+      {
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: prompt },
+        ],
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        topP: 0.95,
+        thinking: 'off',
+      },
+      ctrl.signal
+    )
+  } catch {
+    if (signal.aborted) throw new Error('Aborted')
+    return null
+  } finally {
+    clearTimeout(timer)
+    signal.removeEventListener('abort', abort)
+  }
+}
+
+function transcript(history: Message[], members: RoomMember[], userName: string, count: number, chars: number) {
+  const nameOf = (id: number | null) => members.find((m) => m.characterId === id)?.character.name ?? 'Someone'
+  return history
+    .slice(-count)
+    .map((m) => {
+      const who = m.kind === 'narration' ? 'Narration' : m.role === 'user' ? userName : nameOf(m.speakerId)
+      return `${who}: ${m.content.replace(/\s+/g, ' ').trim().slice(0, chars)}`
+    })
+    .join('\n')
+}
+
+export type Chronicle = { state: string | null; bonds: Map<number, string> }
+
+const CHRONICLE_SYSTEM =
+  'You keep the chronicle of a group roleplay scene: where things stand now and how the characters feel about each other. You note only what the lines show. Answer with JSON only, no explanations.'
+
+// Every few lines the director notes where the scene stands and whose feelings changed, so
+// the characters remember it in this scene and in the next ones of the room.
+export async function askChronicle(
+  cfg: ServerSettings,
+  req: { room: Room; members: RoomMember[]; history: Message[]; userName: string; state: string },
+  signal: AbortSignal
+): Promise<Chronicle | null> {
+  const feelings = req.members
+    .map((m) => `- ${m.character.name}: ${m.bonds.trim() || 'nothing noted yet'}`)
+    .join('\n')
+  const prompt = [
+    req.room.scenario.trim() ? `Scene: ${req.room.scenario.trim().slice(0, 800)}` : '',
+    `Where things stand: ${req.state.trim() || 'not noted yet'}`,
+    `How the characters feel about the others:\n${feelings}`,
+    `${req.userName} is the player.`,
+    `\nRecent lines:\n${transcript(req.history, req.members, req.userName, 16, 300)}`,
+    '\nUpdate the chronicle after these lines.',
+    '"state": one short line on where the scene is now: the place, the time of day, who is where and what is going on (for example "The kitchen, past midnight; Kyle and Radan on the balcony, Elara alone by the window"). Keep the old line if nothing changed.',
+    '"bonds": only for characters whose feelings toward someone changed in these lines, their whole new note: one to three short sentences on how they feel about the others now, keeping what still holds. Leave everyone else out.',
+    'Write in the language of the lines.',
+    'Answer as {"state": "...", "bonds": {"Name": "..."}}.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const raw = await ask(cfg, CHRONICLE_SYSTEM, prompt, { temperature: 0.3, maxTokens: 600, timeout: 45_000 }, signal)
+  const answer = raw ? parseJson(raw) : null
+  if (!answer) return null
+  const bonds = new Map<number, string>()
+  if (answer.bonds && typeof answer.bonds === 'object') {
+    for (const [name, text] of Object.entries(answer.bonds as Record<string, unknown>)) {
+      if (typeof text !== 'string' || !text.trim()) continue
+      const [id] = matchNames([name], req.members)
+      if (id !== undefined) bonds.set(id, text.trim())
+    }
+  }
+  const state = typeof answer.state === 'string' && answer.state.trim() ? answer.state.trim() : null
+  return { state, bonds }
+}
+
+const PLOT_LEVELS = [
+  'something small and everyday that still asks for a reaction',
+  'something noticeable that changes the mood or the plans',
+  'a real twist that turns the scene',
+]
+
+const EVENT_SYSTEM =
+  'You are the narrator of a group roleplay scene. When the talk stalls you bring in something that happens, to give the characters something to react to.'
+
+// The narrator's event, when the room asks for plot twists and the talk has run a while
+// without one: a line or two of narration, or null.
+export async function askEvent(
+  cfg: ServerSettings,
+  req: { room: Room; members: RoomMember[]; history: Message[]; userName: string; state: string },
+  signal: AbortSignal
+): Promise<string | null> {
+  const here = req.members.filter((m) => m.present).map((m) => m.character.name)
+  const away = req.members.filter((m) => !m.present).map((m) => m.character.name)
+  const level = PLOT_LEVELS[Math.min(PLOT_LEVELS.length - 1, Math.floor(req.room.plot * PLOT_LEVELS.length))]
+  const prompt = [
+    req.room.scenario.trim() ? `Scene: ${req.room.scenario.trim().slice(0, 800)}` : '',
+    req.state.trim() ? `Where things stand: ${req.state.trim()}` : '',
+    `In the scene: ${[...here, req.userName].join(', ')}.`,
+    away.length ? `Away: ${away.join(', ')}; any of them may come back.` : '',
+    `\nRecent lines:\n${transcript(req.history, req.members, req.userName, 10, 400)}`,
+    `\nWrite one event that happens now, as the narrator: ${level}. It comes from the world of the scene and touches the characters: someone arrives or calls, a sound, news, an accident, a discovery, a secret comes out. It must not repeat what already happened.`,
+    `One to three sentences, third person, present tense, plain text without asterisks or quotes. No one's speech. Never decide what ${req.userName} does, says, thinks or feels.`,
+    'Write in the language of the lines. Reply with the event only.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const raw = await ask(cfg, EVENT_SYSTEM, prompt, { temperature: 0.9, maxTokens: 250, timeout: 30_000 }, signal)
+  const text = raw ? cleanGenerated(raw) : ''
+  return text || null
 }
 
 function parseJson(raw: string): Record<string, unknown> | null {

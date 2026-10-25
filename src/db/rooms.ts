@@ -23,6 +23,9 @@ export type RoomFields = {
   maxChain: number
   // Whether an extra short request may decide who speaks when the heuristics can't.
   director: boolean
+  // 0 to 1: how often the narrator brings in an event when the talk stalls; 0 never. Only
+  // with the director on.
+  plot: number
   background: string | null
   // The uncropped picture and the frame cut from it, as for a character's background.
   backgroundOriginal: string | null
@@ -47,6 +50,11 @@ export type MemberSettings = {
   muted: boolean
   // In the scene at all. Someone out of it neither hears nor speaks until they come back.
   present: boolean
+  // What only this character knows: told to them alone, never to the others.
+  secret: string
+  // How they feel about the others now. Set by the user and kept up by the director as the
+  // story goes, for every scene of the room.
+  bonds: string
 }
 
 export type RoomMember = MemberSettings & { position: number; character: Character }
@@ -69,6 +77,7 @@ export const DEFAULT_ROOM: RoomFields = {
   floor: 'addressee',
   maxChain: 3,
   director: true,
+  plot: 0,
   background: null,
   backgroundOriginal: null,
   backgroundCrop: null,
@@ -84,10 +93,12 @@ export const DEFAULT_MEMBER: Omit<MemberSettings, 'characterId'> = {
   triggers: '',
   muted: false,
   present: true,
+  secret: '',
+  bonds: '',
 }
 
 export const ROOM_COLUMNS = `
-  id, name, scenario, opening, user_name AS userName, floor, max_chain AS maxChain, director,
+  id, name, scenario, opening, user_name AS userName, floor, max_chain AS maxChain, director, plot,
   background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
   background_effect AS backgroundEffect, background_intensity AS backgroundIntensity,
   background_bubble_transparency AS backgroundBubbleTransparency, background_tone AS backgroundTone, created_at AS createdAt
@@ -126,15 +137,24 @@ export async function getRoom(db: SQLiteDatabase, id: number) {
 
 export async function listRoomMembers(db: SQLiteDatabase, roomId: number): Promise<RoomMember[]> {
   const rows = await db.getAllAsync<
-    Character & { position: number; talkativeness: number; perception: number; triggers: string; muted: number; present: number }
+    Character & {
+      position: number
+      talkativeness: number
+      perception: number
+      triggers: string
+      muted: number
+      present: number
+      secret: string
+      bonds: string
+    }
   >(
-    `SELECT ${CHARACTER_COLUMNS}, rm.position, rm.talkativeness, rm.perception, rm.triggers, rm.muted, rm.present
+    `SELECT ${CHARACTER_COLUMNS}, rm.position, rm.talkativeness, rm.perception, rm.triggers, rm.muted, rm.present, rm.secret, rm.bonds
      FROM room_members rm JOIN characters c ON c.id = rm.character_id
      WHERE rm.room_id = ?
      ORDER BY rm.position, c.id`,
     roomId
   )
-  return rows.map(({ position, talkativeness, perception, triggers, muted, present, ...character }) => ({
+  return rows.map(({ position, talkativeness, perception, triggers, muted, present, secret, bonds, ...character }) => ({
     characterId: character.id,
     position,
     talkativeness,
@@ -142,12 +162,14 @@ export async function listRoomMembers(db: SQLiteDatabase, roomId: number): Promi
     triggers,
     muted: Boolean(muted),
     present: Boolean(present),
+    secret,
+    bonds,
     character,
   }))
 }
 
 const FIELD_COLUMNS =
-  'name, scenario, opening, user_name, floor, max_chain, director, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, background_tone'
+  'name, scenario, opening, user_name, floor, max_chain, director, plot, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, background_tone'
 
 function fieldValues(fields: RoomFields) {
   return [
@@ -158,6 +180,7 @@ function fieldValues(fields: RoomFields) {
     fields.floor,
     fields.maxChain,
     fields.director ? 1 : 0,
+    fields.plot,
     fields.background,
     fields.backgroundOriginal,
     fields.backgroundCrop,
@@ -196,9 +219,20 @@ async function writeMembers(db: SQLiteDatabase, roomId: number, members: MemberS
   await db.runAsync('DELETE FROM room_members WHERE room_id = ?', roomId)
   for (const [position, m] of members.entries()) {
     await db.runAsync(
-      `INSERT INTO room_members (room_id, character_id, position, talkativeness, perception, triggers, muted, present)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [roomId, m.characterId, position, m.talkativeness, m.perception, m.triggers.trim(), m.muted ? 1 : 0, m.present ? 1 : 0]
+      `INSERT INTO room_members (room_id, character_id, position, talkativeness, perception, triggers, muted, present, secret, bonds)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        roomId,
+        m.characterId,
+        position,
+        m.talkativeness,
+        m.perception,
+        m.triggers.trim(),
+        m.muted ? 1 : 0,
+        m.present ? 1 : 0,
+        m.secret.trim(),
+        m.bonds.trim(),
+      ]
     )
   }
 }
@@ -213,6 +247,10 @@ export async function setMemberMuted(db: SQLiteDatabase, roomId: number, charact
     roomId,
     characterId,
   ])
+}
+
+export async function setMemberBonds(db: SQLiteDatabase, roomId: number, characterId: number, bonds: string) {
+  await db.runAsync('UPDATE room_members SET bonds = ? WHERE room_id = ? AND character_id = ?', [bonds.trim(), roomId, characterId])
 }
 
 export async function setMemberPresent(db: SQLiteDatabase, roomId: number, characterId: number, present: boolean) {
@@ -245,22 +283,22 @@ export async function duplicateRoom(
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
       `INSERT INTO rooms (${FIELD_COLUMNS}, created_at)
-       SELECT ?, scenario, opening, user_name, floor, max_chain, director, ?, ?, background_crop, background_effect,
+       SELECT ?, scenario, opening, user_name, floor, max_chain, director, plot, ?, ?, background_crop, background_effect,
          background_intensity, background_bubble_transparency, background_tone, ?
        FROM rooms WHERE id = ?`,
       [name, images.background, images.backgroundOriginal, Date.now(), id]
     )
     roomId = res.lastInsertRowId
     await db.runAsync(
-      `INSERT INTO room_members (room_id, character_id, position, talkativeness, perception, triggers, muted, present)
-       SELECT ?, character_id, position, talkativeness, perception, triggers, muted, present
+      `INSERT INTO room_members (room_id, character_id, position, talkativeness, perception, triggers, muted, present, secret, bonds)
+       SELECT ?, character_id, position, talkativeness, perception, triggers, muted, present, secret, bonds
        FROM room_members WHERE room_id = ?`,
       [roomId, id]
     )
     const scenes = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE room_id = ? ORDER BY id', id)
     for (const scene of scenes) {
       const copy = await db.runAsync(
-        'INSERT INTO chats (room_id, title, created_at, thinking) SELECT ?, title, created_at, thinking FROM chats WHERE id = ?',
+        'INSERT INTO chats (room_id, title, created_at, thinking, scene_state) SELECT ?, title, created_at, thinking, scene_state FROM chats WHERE id = ?',
         [roomId, scene.id]
       )
       await db.runAsync(

@@ -86,13 +86,22 @@ export function movementCue(text: string, members: RoomMember[]) {
   )
 }
 
+// A topic is looked for by its stem, so that "дождь" finds "дождя" and "погода" finds
+// "погоде": the trailing vowels and soft signs cut while four letters are left, else the
+// last two letters of a long word, as before.
+function topicStem(topic: string) {
+  const cut = topic.replace(/[аеёиоуыэюяйьaeiouy]+$/u, '')
+  if (cut.length >= 4) return cut
+  return topic.length > 5 ? topic.slice(0, topic.length - 2) : topic
+}
+
 function triggered(text: string, triggers: string) {
-  const lower = text.toLowerCase()
+  const lower = text.toLowerCase().replace(/ё/g, 'е')
   return triggers
     .split(',')
-    .map((topic) => topic.trim().toLowerCase())
+    .map((topic) => topic.trim().toLowerCase().replace(/ё/g, 'е'))
     .filter((topic) => topic.length >= 3)
-    .some((topic) => lower.includes(topic.length > 5 ? topic.slice(0, topic.length - 2) : topic))
+    .some((topic) => lower.includes(topicStem(topic)))
 }
 
 export function scoreMembers(trigger: Message, members: RoomMember[], history: Message[]) {

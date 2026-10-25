@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { ThinkingMode } from '@/db/characters'
-import { setChatThinking, type Chat } from '@/db/chats'
+import { setChatThinking, setSceneState, type Chat } from '@/db/chats'
 import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
 import { addMessage, addVariant, listMessages, type Message, type MessageImage, type MessageKind, type Thought } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
-import { setMemberPresent, type Room, type RoomMember } from '@/db/rooms'
+import { setMemberBonds, setMemberPresent, type Room, type RoomMember } from '@/db/rooms'
 import { loadSettings } from '@/db/prefs/settings'
 import { useConversation } from '@/hooks/chat/useConversation'
 import { t } from '@/i18n'
@@ -13,7 +13,7 @@ import { errorMessage } from '@/lib/core/errors'
 import * as Haptics from '@/lib/ui/haptics'
 import { emptyReplyReason, runReplyStream } from '@/lib/chat/replyStream'
 import { absentIds, rollEavesdrop } from '@/lib/chat/room/audience'
-import { askDirector, askMovement, type Movement } from '@/lib/chat/room/director'
+import { askChronicle, askDirector, askEvent, askMovement, type Movement } from '@/lib/chat/room/director'
 import {
   applyDirector,
   detectAddressees,
@@ -28,8 +28,16 @@ import {
 import { buildRoomRequest, cleanLine, userNameOf } from '@/lib/chat/room/prompt'
 
 // 'directing' is the short wait while the director decides who speaks, 'staging' while
-// it checks whether a line walked someone out of the scene or in.
-export type RoomPhase = 'idle' | 'directing' | 'staging' | 'waiting' | 'streaming'
+// it checks whether a line walked someone out of the scene or in, 'plotting' while the
+// narrator makes up an event.
+export type RoomPhase = 'idle' | 'directing' | 'staging' | 'plotting' | 'waiting' | 'streaming'
+
+// The director notes where the scene stands and whose feelings changed every so many lines.
+const CHRONICLE_EVERY = 8
+// The narrator's event comes no sooner than this many lines after the last one, and then
+// after a turn with this chance at the room's full plot setting.
+const EVENT_GAP = 6
+const EVENT_CHANCE = 0.4
 
 export type RoomDraft = {
   speakerId: number
@@ -100,6 +108,14 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   const castRef = useRef(onMembersChange)
   castRef.current = onMembersChange
   const failure = useRef<Failure | null>(null)
+  // Where the scene stands, and how many lines it had when the director last noted it and
+  // when the narrator last brought in an event.
+  const [sceneState, setSceneStateValue] = useState(chat.sceneState ?? '')
+  const sceneStateRef = useRef(sceneState)
+  sceneStateRef.current = sceneState
+  const chronicledAt = useRef(0)
+  const eventAt = useRef(0)
+  const chronicling = useRef<AbortController | null>(null)
 
   const [chatThinking, setChatThinkingState] = useState<ThinkingMode | null>(chat.thinking ?? null)
   const chatThinkingRef = useRef(chatThinking)
@@ -161,6 +177,8 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     let alive = true
     listMessages(db, chatId).then((rows) => {
       if (!alive) return
+      chronicledAt.current = rows.length
+      eventAt.current = rows.length
       setMessages(rows)
       setLoaded(true)
     })
@@ -174,6 +192,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     async (text: string, absent: number[]) => {
       const added = await addMessage(db, chatId, 'assistant', text, { kind: 'narration', absent })
       setMessages([...messagesRef.current, added])
+      return added
     },
     [db, chatId, setMessages]
   )
@@ -266,6 +285,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           window: cfg,
           thinking: chatThinkingRef.current ?? speaker.character.thinking,
           persona: personaRef.current,
+          state: sceneStateRef.current,
         })
         const streamed = await runReplyStream(cfg, req, ctrl.signal, {
           onStart: () => setPhase('streaming'),
@@ -369,8 +389,90 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     [speak, stage, arrivals]
   )
 
+  // Every few lines, with the director on, where the scene stands and whose feelings changed
+  // are noted aside, without holding the scene up: the next line just picks them up.
+  const chronicle = useCallback(() => {
+    const all = messagesRef.current
+    if (!roomRef.current.director || chronicling.current || all.length - chronicledAt.current < CHRONICLE_EVERY) return
+    chronicledAt.current = all.length
+    const ctrl = new AbortController()
+    chronicling.current = ctrl
+    ;(async () => {
+      try {
+        const cfg = await loadSettings(db)
+        const noted = await askChronicle(
+          cfg,
+          {
+            room: roomRef.current,
+            members: membersRef.current,
+            history: all,
+            userName: userNameOf(roomRef.current, personaRef.current),
+            state: sceneStateRef.current,
+          },
+          ctrl.signal
+        )
+        if (!noted || ctrl.signal.aborted) return
+        if (noted.state && noted.state !== sceneStateRef.current) {
+          await setSceneState(db, chatId, noted.state)
+          setSceneStateValue(noted.state)
+        }
+        if (noted.bonds.size) {
+          for (const [id, bonds] of noted.bonds) await setMemberBonds(db, roomRef.current.id, id, bonds)
+          const next = membersRef.current.map((m) => (noted.bonds.has(m.characterId) ? { ...m, bonds: noted.bonds.get(m.characterId)! } : m))
+          membersRef.current = next
+          castRef.current(next)
+        }
+      } catch {
+        // The chronicle is an extra; a failed one waits for the next lines.
+      } finally {
+        if (chronicling.current === ctrl) chronicling.current = null
+      }
+    })()
+  }, [db, chatId])
+
+  useEffect(() => () => chronicling.current?.abort(), [])
+
+  // After a turn, when the room asks for plot twists and the talk has run a while without
+  // one, the narrator may bring in an event, and someone reacts to it.
+  const plot = useCallback(
+    async (ctrl: AbortController) => {
+      const room = roomRef.current
+      if (!room.director || room.plot <= 0 || ctrl.signal.aborted) return
+      if (messagesRef.current.length - eventAt.current < EVENT_GAP || Math.random() >= room.plot * EVENT_CHANCE) return
+      eventAt.current = messagesRef.current.length
+      setPhase('plotting')
+      let text: string | null = null
+      try {
+        const cfg = await loadSettings(db)
+        text = await askEvent(
+          cfg,
+          {
+            room,
+            members: membersRef.current,
+            history: messagesRef.current,
+            userName: userNameOf(room, personaRef.current),
+            state: sceneStateRef.current,
+          },
+          ctrl.signal
+        )
+      } catch {
+        return
+      }
+      if (!text || ctrl.signal.aborted || discarded.current.has(ctrl)) return
+      const event = await narrate(text, absentIds(membersRef.current))
+      eventAt.current = messagesRef.current.length
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+      const entered = await stage(ctrl, event)
+      const history = messagesRef.current
+      const planned = (await resolve(ctrl, nextSpeaker(history, membersRef.current), event)).slice(0, 1)
+      await runQueue(ctrl, [...planned, ...arrivals(entered, planned, 1)])
+    },
+    [db, narrate, stage, resolve, runQueue, arrivals]
+  )
+
   const settle = useCallback(
     (ctrl: AbortController) => {
+      chronicle()
       if (!task.finish(ctrl)) return
       setDraft(null)
       setPhase('idle')
@@ -378,7 +480,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       setReplacingId(null)
       setAuto(null)
     },
-    [task]
+    [task, chronicle]
   )
 
   const begin = useCallback(() => {
@@ -432,13 +534,13 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           maxChain: roomRef.current.maxChain,
         })
         const planned = await resolve(ctrl, plan, sent)
-        await runQueue(ctrl, [...planned, ...arrivals(entered, planned, 0)])
+        if (await runQueue(ctrl, [...planned, ...arrivals(entered, planned, 0)])) await plot(ctrl)
         maybeName()
       } finally {
         settle(ctrl)
       }
     },
-    [db, chatId, task, begin, stage, resolve, arrivals, runQueue, settle, setMessages, maybeName]
+    [db, chatId, task, begin, stage, resolve, arrivals, runQueue, plot, settle, setMessages, maybeName]
   )
 
   // With nothing typed, the scene goes on by itself for one line.
@@ -449,12 +551,12 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     try {
       const history = messagesRef.current
       const planned = await resolve(ctrl, nextSpeaker(history, membersRef.current), history[history.length - 1])
-      await runQueue(ctrl, planned.slice(0, 1))
+      if (await runQueue(ctrl, planned.slice(0, 1))) await plot(ctrl)
       maybeName()
     } finally {
       settle(ctrl)
     }
-  }, [task, begin, resolve, runQueue, settle, maybeName])
+  }, [task, begin, resolve, runQueue, plot, settle, maybeName])
 
   // This character takes the next turn, even one who only listens.
   const nudge = useCallback(
@@ -485,6 +587,8 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           const history = messagesRef.current
           const planned = await resolve(ctrl, nextSpeaker(history, membersRef.current), history[history.length - 1])
           if (!planned.length || !(await runQueue(ctrl, planned.slice(0, 1)))) break
+          // A stalled dialogue is where an event helps most.
+          await plot(ctrl)
           setAuto({ done: done + 1, total })
         }
         maybeName()
@@ -492,7 +596,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
         settle(ctrl)
       }
     },
-    [task, begin, resolve, runQueue, settle, maybeName]
+    [task, begin, resolve, runQueue, plot, settle, maybeName]
   )
 
   const regenerate = useCallback(
@@ -541,6 +645,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   return {
     messages,
     loaded,
+    sceneState,
     draft,
     phase,
     error,

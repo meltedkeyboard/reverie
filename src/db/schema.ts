@@ -280,6 +280,15 @@ const MIGRATIONS = [
     ALTER TABLE characters ADD COLUMN background_tone TEXT NOT NULL DEFAULT 'auto';
     ALTER TABLE rooms ADD COLUMN background_tone TEXT NOT NULL DEFAULT 'auto';
   `,
+  // What only one member of a room knows, how they feel about the others now (kept up by
+  // the director as the story goes), how often the narrator stirs things up, and where a
+  // scene stands now.
+  `
+    ALTER TABLE room_members ADD COLUMN secret TEXT NOT NULL DEFAULT '';
+    ALTER TABLE room_members ADD COLUMN bonds TEXT NOT NULL DEFAULT '';
+    ALTER TABLE rooms ADD COLUMN plot REAL NOT NULL DEFAULT 0;
+    ALTER TABLE chats ADD COLUMN scene_state TEXT;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

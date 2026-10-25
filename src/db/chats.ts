@@ -14,6 +14,8 @@ export type Chat = {
   createdAt: number
   thinking?: ThinkingMode | null
   personaId?: number | null
+  // Where a scene of a room stands now, kept up by the director; null for a chat.
+  sceneState?: string | null
 }
 
 export type ChatPreview = Chat & {
@@ -28,7 +30,11 @@ export type ChatPreview = Chat & {
 export const PREVIEW = "CASE WHEN m.content = '' AND m.images IS NOT NULL THEN 'Фото' ELSE m.content END"
 
 export const CHAT_COLUMNS =
-  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId'
+  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId, ch.scene_state AS sceneState'
+
+export async function setSceneState(db: SQLiteDatabase, chatId: number, state: string) {
+  await db.runAsync('UPDATE chats SET scene_state = ? WHERE id = ?', [state.trim() || null, chatId])
+}
 
 export function listChats(db: SQLiteDatabase, characterId: number) {
   return db.getAllAsync<ChatPreview>(
@@ -94,7 +100,7 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
   let chatId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id) SELECT character_id, room_id, ?, created_at, thinking, persona_id FROM chats WHERE id = ?',
+      'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state) SELECT character_id, room_id, ?, created_at, thinking, persona_id, scene_state FROM chats WHERE id = ?',
       [title, id]
     )
     chatId = res.lastInsertRowId
