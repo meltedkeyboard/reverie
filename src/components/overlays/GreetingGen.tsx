@@ -1,6 +1,5 @@
-import { useState } from 'react'
-
 import type { MessageImage } from '@/db/messages'
+import { useGenInput } from '@/hooks/features/useGenSession'
 import { useTranslation } from '@/i18n'
 import { buildGreetingMessages } from '@/lib/chat/promptGen'
 
@@ -28,9 +27,9 @@ const TWEAK_KEYS = ['greetingGen.tweakShorter', 'greetingGen.tweakVivid', 'greet
 // as the user describes it, presets filling in the description.
 export function GreetingGen({ name, systemPrompt, currentGreeting, onApply }: Props) {
   const { t, locale } = useTranslation()
-  const [free, setFree] = useState(true)
-  const [wishes, setWishes] = useState('')
-  const [images, setImages] = useState<MessageImage[]>([])
+  const [free, setFree] = useGenInput('free', true)
+  const [wishes, setWishes] = useGenInput('wishes', '')
+  const [images, setImages] = useGenInput<MessageImage[]>('images', [])
 
   // A preset is added to what is typed, so several can be put together.
   const addPreset = (key: string) => {

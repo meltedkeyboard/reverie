@@ -7,6 +7,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { ChatTurn } from '@/api/llm'
+import { clearGenSession, getGenSession, setGenSheet, type GenSheetState } from '@/db/genSessions'
 import { useDatabase } from '@/db/provider'
 import {
   GEN_REASONING,
@@ -17,11 +18,13 @@ import {
   saveGenTokens,
 } from '@/db/prefs/generation'
 import { loadSettings } from '@/db/prefs/settings'
+import { useGenSessionContext, useHasGenSession } from '@/hooks/features/useGenSession'
 import { useAbortable } from '@/hooks/util/useAbortable'
 import { useElapsedSeconds } from '@/hooks/util/useElapsedSeconds'
 import { useTranslation } from '@/i18n'
 import { errorMessage } from '@/lib/core/errors'
 import { countLabel } from '@/lib/core/format'
+import { confirmAsync } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
 import { isIOS } from '@/lib/core/platform'
 import { computeDiff } from '@/lib/chat/diff'
@@ -84,20 +87,24 @@ export function GenSheet({
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
 
-  const [phase, setPhase] = useState<'compose' | 'result'>('compose')
+  const { key: sessionKey, startOver } = useGenSessionContext()
+  const hasSession = useHasGenSession()
+  // The sheet as it was left the last time, if it was (src/db/genSessions.ts).
+  const [kept] = useState(() => keptSheet(sessionKey))
+  const [phase, setPhase] = useState<'compose' | 'result'>(kept?.phase ?? 'compose')
   // For this request only: it is not the character's own thinking mode.
-  const [thinking, setThinking] = useState(false)
+  const [thinking, setThinking] = useState(kept?.thinking ?? false)
   // The limits are kept from one opening to the next; the window only says when they are cut.
   const [maxTokens, setMaxTokens] = useState<number>(GEN_TOKENS.default)
   const [reasoningBudget, setReasoningBudget] = useState<number>(GEN_REASONING.default)
   const [contextTokens, setContextTokens] = useState<number | null>(null)
-  const [versions, setVersions] = useState<string[]>([])
-  const [index, setIndex] = useState(0)
+  const [versions, setVersions] = useState<string[]>(kept?.versions ?? [])
+  const [index, setIndex] = useState(kept?.index ?? 0)
   const [live, setLive] = useState<string | null>(null)
   const [activity, setActivity] = useState<{ thinking: boolean; since: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [note, setNote] = useState('')
-  const [viewMode, setViewMode] = useState<'text' | 'diff'>('text')
+  const [note, setNote] = useState(kept?.note ?? '')
+  const [viewMode, setViewMode] = useState<'text' | 'diff'>(kept?.viewMode ?? 'text')
   const [liveThought, setLiveThought] = useState<string | null>(null)
   const task = useAbortable()
   // A slider moved is saved once it rests: a write to the database on every step of a fast
@@ -120,7 +127,16 @@ export function GenSheet({
         save()
       })
   }, [])
-  const versionCount = useRef(0)
+  const versionCount = useRef(kept?.versions.length ?? 0)
+
+  // Everything on the sheet is kept as it changes, a reply too as it streams in, so the sheet
+  // swiped away or the app dying under it loses nothing. A sheet only opened keeps nothing.
+  const keeping = useRef(kept !== null)
+  useEffect(() => {
+    if (!keeping.current && phase === 'compose' && !thinking) return
+    keeping.current = true
+    setGenSheet(db, sessionKey, { phase, thinking, versions, index, note, viewMode, ...(live ? { partial: live } : {}) })
+  }, [db, sessionKey, phase, thinking, versions, index, note, viewMode, live])
 
   const busy = activity !== null
   const thinkingSecs = useElapsedSeconds(Boolean(activity?.thinking), activity?.since)
@@ -225,7 +241,20 @@ export function GenSheet({
   const apply = () => {
     if (result === null || busy || !result.trim()) return
     onApply(result.trim())
+    // The text is in the editor now; the next opening starts afresh.
+    clearGenSession(db, sessionKey)
     router.back()
+  }
+
+  // Forgets the fields and the versions, after asking: they are what keeping the session saves.
+  const confirmStartOver = async () => {
+    const ok = await confirmAsync({
+      title: t('promptGen.startOverTitle'),
+      message: t('promptGen.startOverText'),
+      confirmLabel: t('promptGen.startOver'),
+      destructive: true,
+    })
+    if (ok) startOver()
   }
 
   const backToCompose = () => {
@@ -324,10 +353,10 @@ export function GenSheet({
     </View>
   )
 
-  // The result in the system's list: the text a field of it, which the reply is written into
-  // as it comes and which keeps over the keyboard while it is edited, the comparison its text
-  // in colors. The pager, the shimmer while the model thinks, the chips of the revisions and
-  // the send button stay React Native.
+  // The result in the system's list: the text a field of it, which keeps over the keyboard
+  // while it is edited, the comparison its text in colors. The pager, the reply while it
+  // streams in, the shimmer while the model thinks, the chips of the revisions and the send
+  // button stay React Native.
   const renderNativeResult = () => {
     const { HStack, Spacer, Picker, Text: SwiftText, RNHostView } = nativeForm!.ui
     const { pickerStyle, labelsHidden, tag, foregroundStyle, textSelection } = nativeForm!.modifiers
@@ -350,17 +379,25 @@ export function GenSheet({
               {pager ? <RNHostView matchContents>{pager}</RNHostView> : null}
             </HStack>
           ) : null}
-          {busy && !result ? (
+          {busy ? (
+            // A React Native text while the reply streams in: a SwiftUI text of nested ones
+            // builds them together once and missed every later change, so it stopped at the
+            // first word.
             <NativeHostedRow>
-              <View style={styles.nativeThinking}>{thinkingView}</View>
+              <View style={styles.nativeThinking}>
+                {result ? (
+                  <Text style={styles.resultText}>
+                    {result}
+                    <Text style={{ color: colors.accent }}>{' ' + String.fromCharCode(0x258d)}</Text>
+                  </Text>
+                ) : (
+                  thinkingView
+                )}
+              </View>
             </NativeHostedRow>
-          ) : busy ? (
-            <SwiftText>
-              {result}
-              <SwiftText modifiers={[foregroundStyle(colors.accent)]}>{' ' + String.fromCharCode(0x258d)}</SwiftText>
-            </SwiftText>
           ) : result === null ? null : hasBefore && viewMode === 'diff' ? (
-            <SwiftText modifiers={[textSelection(true)]}>
+            // Made anew for each version, as the nested texts are put together only once.
+            <SwiftText key={index} modifiers={[textSelection(true)]}>
               {diffParts.map((part, i) =>
                 part.type === 'added' ? (
                   <SwiftText key={i} modifiers={[foregroundStyle(colors.success)]}>
@@ -512,8 +549,8 @@ export function GenSheet({
   // again only when what it shows changes. Setting the options on every render made the
   // sheet lay its bar out again after each change of state, and the switches in it sprang
   // back. The rest of the bar is set once, in the root layout.
-  const handlers = useRef({ onLeft, apply })
-  handlers.current = { onLeft, apply }
+  const handlers = useRef({ onLeft, apply, confirmStartOver })
+  handlers.current = { onLeft, apply, confirmStartOver }
   useLayoutEffect(() => {
     navigation.setOptions(
       isIOS
@@ -541,7 +578,16 @@ export function GenSheet({
                       onPress: () => handlers.current.apply(),
                     },
                   ]
-                : [],
+                : hasSession
+                  ? [
+                      {
+                        type: 'button',
+                        label: t('promptGen.startOver'),
+                        icon: { type: 'sfSymbol', name: 'arrow.counterclockwise' },
+                        onPress: () => handlers.current.confirmStartOver(),
+                      },
+                    ]
+                  : [],
           }
         : {
             title,
@@ -556,10 +602,14 @@ export function GenSheet({
                 <Pressable onPress={() => handlers.current.apply()} disabled={!canApply} hitSlop={10}>
                   <Text style={[styles.headerButton, styles.headerApply, !canApply && styles.headerDisabled]}>{applyLabel}</Text>
                 </Pressable>
+              ) : hasSession ? (
+                <Pressable onPress={() => handlers.current.confirmStartOver()} hitSlop={10}>
+                  <Text style={styles.headerButton}>{t('promptGen.startOver')}</Text>
+                </Pressable>
               ) : null,
           }
     )
-  }, [navigation, title, back, leftLabel, applyLabel, canApply, colors.accent, styles])
+  }, [navigation, title, back, leftLabel, applyLabel, canApply, hasSession, colors.accent, styles, t])
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -579,6 +629,16 @@ export function GenSheet({
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>{footer}</View>
     </View>
   )
+}
+
+// The sheet as it was left, with what a reply had written when the sheet went away in the
+// middle of it put in as the last version, as stopping it would.
+function keptSheet(key: string): GenSheetState | null {
+  const sheet = getGenSession(key)?.sheet
+  if (!sheet) return null
+  const partial = sheet.partial ? cleanGenerated(sheet.partial) : ''
+  if (!partial) return { ...sheet, partial: undefined }
+  return { ...sheet, phase: 'result', versions: [...sheet.versions, partial], index: sheet.versions.length, partial: undefined }
 }
 
 // Presets under a field: plain chips that fill it in, in one line that scrolls sideways.

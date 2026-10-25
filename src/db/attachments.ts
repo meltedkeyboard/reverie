@@ -1,6 +1,7 @@
 import { Directory, File } from 'expo-file-system'
 import type { SQLiteDatabase } from 'expo-sqlite'
 
+import { GEN_SESSION_IMAGES_SQL } from '@/db/genSessions'
 import type { MessageImage } from '@/db/messages'
 import { avatarUri, writeAvatarBase64 } from '@/lib/images/avatarStore'
 import { newAvatarName } from '@/lib/images/images'
@@ -69,9 +70,10 @@ export async function listRecentAttachments(db: SQLiteDatabase, limit: number | 
 }
 
 // Deletes the files no message points at any more (a deleted chat, a picture taken off a
-// draft). Files made in the last day are left alone: they may belong to a message not sent
-// yet. Done by sweeping instead of at every delete, since chats and characters go with
-// cascades, and a duplicated chat shares the files of the original.
+// draft), nor a generator sheet kept for later. Files made in the last day are left alone:
+// they may belong to a message not sent yet. Done by sweeping instead of at every delete,
+// since chats and characters go with cascades, and a duplicated chat shares the files of
+// the original.
 export async function pruneAttachments(db: SQLiteDatabase) {
   const dir = new Directory(dataDirectory(), 'attachments')
   if (!dir.exists) return
@@ -84,7 +86,8 @@ export async function pruneAttachments(db: SQLiteDatabase) {
      WHERE m.images IS NOT NULL AND json_valid(m.images)
      UNION SELECT json_extract(j.value, '$.moving')
      FROM messages m, json_each(m.images) j
-     WHERE m.images IS NOT NULL AND json_valid(m.images)`
+     WHERE m.images IS NOT NULL AND json_valid(m.images)
+     UNION ${GEN_SESSION_IMAGES_SQL}`
   )
   const used = new Set(rows.map((row) => row.name))
   const cutoff = Date.now() - DAY

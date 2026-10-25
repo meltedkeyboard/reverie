@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { convertLegacyAttachments, pruneAttachments } from '@/db/attachments'
 import { loadDrafts } from '@/db/drafts'
+import { loadGenSessions } from '@/db/genSessions'
 import { migrate } from '@/db/schema'
 import { databaseDirectory, discardInactiveDatabase, moveStorage } from '@/lib/core/storage'
 import { createRequiredContext } from '@/lib/core/requiredContext'
@@ -24,6 +25,7 @@ async function openReverieDatabase(newConnection = false) {
   const db = await openDatabaseAsync('reverie.db', newConnection ? { useNewConnection: true } : undefined, databaseDirectory())
   await migrate(db)
   await loadDrafts(db)
+  await loadGenSessions(db)
   // Housekeeping must never keep the app from opening.
   try {
     await convertLegacyAttachments(db)

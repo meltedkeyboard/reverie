@@ -1,6 +1,5 @@
-import { useState } from 'react'
-
 import type { MessageImage } from '@/db/messages'
+import { useGenInput } from '@/hooks/features/useGenSession'
 import { useTranslation } from '@/i18n'
 import {
   buildPersonaMessages,
@@ -30,11 +29,11 @@ const TWEAK_KEYS = [
 export function PersonaGen({ name, currentDescription, onApply }: Props) {
   const { t, locale } = useTranslation()
   const hasCurrent = currentDescription.trim().length > 0
-  const [improve, setImprove] = useState(hasCurrent)
-  const [description, setDescription] = useState('')
-  const [length, setLength] = useState<PersonaLength>('medium')
-  const [format, setFormat] = useState<PersonaFormat>('prose')
-  const [images, setImages] = useState<MessageImage[]>([])
+  const [improve, setImprove] = useGenInput('improve', hasCurrent)
+  const [description, setDescription] = useGenInput('description', '')
+  const [length, setLength] = useGenInput<PersonaLength>('length', 'medium')
+  const [format, setFormat] = useGenInput<PersonaFormat>('format', 'prose')
+  const [images, setImages] = useGenInput<MessageImage[]>('images', [])
 
   const improving = hasCurrent && improve
 

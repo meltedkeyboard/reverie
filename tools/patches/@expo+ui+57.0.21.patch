@@ -1,0 +1,48 @@
+diff --git a/node_modules/@expo/ui/ios/TextFieldView.swift b/node_modules/@expo/ui/ios/TextFieldView.swift
+index ec381d1..69713f2 100644
+--- a/node_modules/@expo/ui/ios/TextFieldView.swift
++++ b/node_modules/@expo/ui/ios/TextFieldView.swift
+@@ -257,14 +257,7 @@ private struct StatefulSelectableTextField: View {
+     }
+     .onChange(of: localSelection) { newSel in
+       let text = (state.value as? String) ?? ""
+-      var start = text.count
+-      var end = text.count
+-      if let sel = newSel, case let .selection(range) = sel.indices {
+-        let clampedLower = range.lowerBound < text.endIndex ? range.lowerBound : text.endIndex
+-        let clampedUpper = range.upperBound < text.endIndex ? range.upperBound : text.endIndex
+-        start = text.distance(from: text.startIndex, to: clampedLower)
+-        end = text.distance(from: text.startIndex, to: clampedUpper)
+-      }
++      let (start, end) = offsets(of: newSel, in: text) ?? (text.count, text.count)
+       let prevStart = extractInt(selection.value, "start")
+       let prevEnd = extractInt(selection.value, "end")
+       if prevStart == start && prevEnd == end { return }
+@@ -298,6 +291,12 @@ private struct StatefulSelectableTextField: View {
+       let text = (state.value as? String) ?? ""
+       let lower = max(0, min(min(start, end), text.count))
+       let upper = max(0, min(max(start, end), text.count))
++      // The selection the user is making in the field, reported back by the handler above.
++      // Put in again, it reset the selection under the finger, and with indices of another
++      // copy of the string (Cyrillic text) it could point past the end, which UIKit throws on.
++      if let current = offsets(of: localSelection, in: text), current.0 == lower, current.1 == upper {
++        return
++      }
+       let startIdx = text.index(text.startIndex, offsetBy: lower)
+       let endIdx = text.index(text.startIndex, offsetBy: upper)
+       let newSel = SwiftUI.TextSelection(range: startIdx..<endIdx)
+@@ -306,6 +305,14 @@ private struct StatefulSelectableTextField: View {
+       }
+     }
+   }
++
++  // A selection as character offsets in the text, clamped to it; nil when there is none.
++  private func offsets(of sel: SwiftUI.TextSelection?, in text: String) -> (Int, Int)? {
++    guard let sel = sel, case let .selection(range) = sel.indices else { return nil }
++    let lower = range.lowerBound < text.endIndex ? range.lowerBound : text.endIndex
++    let upper = range.upperBound < text.endIndex ? range.upperBound : text.endIndex
++    return (text.distance(from: text.startIndex, to: lower), text.distance(from: text.startIndex, to: upper))
++  }
+ }
+ 
+ #endif

@@ -1,6 +1,5 @@
-import { useState } from 'react'
-
 import type { MessageImage } from '@/db/messages'
+import { useGenInput } from '@/hooks/features/useGenSession'
 import { useTranslation } from '@/i18n'
 import { buildPromptMessages, type PromptLength } from '@/lib/chat/promptGen'
 
@@ -24,14 +23,14 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
   const hasCurrent = currentPrompt.trim().length > 0
   // A character that already has a prompt most likely wants that prompt improved, not
   // replaced from scratch.
-  const [improve, setImprove] = useState(hasCurrent)
-  const [description, setDescription] = useState('')
-  const [length, setLength] = useState<PromptLength>('medium')
-  const [images, setImages] = useState<MessageImage[]>([])
+  const [improve, setImprove] = useGenInput('improve', hasCurrent)
+  const [description, setDescription] = useGenInput('description', '')
+  const [length, setLength] = useGenInput<PromptLength>('length', 'medium')
+  const [images, setImages] = useGenInput<MessageImage[]>('images', [])
   // The free description and the questionnaire keep what was typed in each while the user
   // switches between them.
-  const [mode, setMode] = useState<'free' | 'form'>('free')
-  const [form, setForm] = useState<PromptFormValues>({})
+  const [mode, setMode] = useGenInput<'free' | 'form'>('mode', 'free')
+  const [form, setForm] = useGenInput<PromptFormValues>('form', {})
 
   const improving = hasCurrent && improve
   // An improvement edits the prompt there is, so the questionnaire is only for a new one.

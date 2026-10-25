@@ -176,6 +176,7 @@ export default function PersonaEditorScreen() {
   const openPersonaGen = () => {
     setGenDraft({
       kind: 'persona',
+      target: `persona:${id}`,
       name,
       currentDescription: description,
       onApply: applyGenerated,
