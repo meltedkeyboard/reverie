@@ -46,6 +46,9 @@ import {
 } from '@/db/recentAttachments'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/prefs/privateChat'
 import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
+import { listLorebooks } from '@/db/lorebooks'
+import { loadLongMemory, saveLongMemory } from '@/db/prefs/memory'
+import { useReloadOnFocus } from '@/hooks/chat/useChatListActions'
 import { useDatabase, useShowInFiles } from '@/db/provider'
 import { DEFAULT_SETTINGS, saveSettings, typedCount, type ServerSettings } from '@/db/prefs/settings'
 import {
@@ -294,6 +297,12 @@ export default function SettingsScreen() {
       unsub()
     }
   }, [db])
+
+  const [longMemory, toggleLongMemory] = useStoredFlag(loadLongMemory, saveLongMemory, false)
+  // How many lorebooks there are, counted again whenever Settings comes back into view.
+  const [lorebookCount, setLorebookCount] = useState(0)
+  const countLorebooks = useCallback(async () => setLorebookCount((await listLorebooks(db)).length), [db])
+  useReloadOnFocus(countLorebooks)
 
   const [showInFiles, setShowInFiles] = useState(isShownInFiles)
   const [movingFiles, setMovingFiles] = useState(false)
@@ -752,6 +761,25 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
+  const memoryRows = (
+    <ListSection
+      header={t('memory.section')}
+      footer={
+        <>
+          <ListFooter>{t('memory.longHint')}</ListFooter>
+          <ListFooter>{t('lore.settingsHint')}</ListFooter>
+        </>
+      }
+    >
+      <SwitchCell label={t('memory.long')} value={longMemory} onValueChange={toggleLongMemory} />
+      <LinkCell
+        label={t('lore.title')}
+        value={lorebookCount > 0 ? String(lorebookCount) : t('lore.none')}
+        onPress={() => router.push('/lorebooks')}
+      />
+    </ListSection>
+  )
+
   const privateRow = (
     <ListSection header={t('settings.chats')} footer={t('settings.privateButtonNote')}>
       <SwitchCell label={t('settings.privateButton')} value={privateButton} onValueChange={togglePrivateButton} />
@@ -1204,6 +1232,15 @@ export default function SettingsScreen() {
           {toggle(null, t('settings.privateButton'), privateButton, togglePrivateButton)}
         </NativeSection>
 
+        <NativeSection id="memory" title={t('memory.section')} footer={[{ text: t('memory.longHint') }, { text: t('lore.settingsHint') }]}>
+          {toggle(null, t('memory.long'), longMemory, toggleLongMemory)}
+          <NativeLinkRow
+            label={t('lore.title')}
+            value={lorebookCount > 0 ? String(lorebookCount) : t('lore.none')}
+            onPress={() => router.push('/lorebooks')}
+          />
+        </NativeSection>
+
         <NativeSection id="personas" title={t('persona.title')} footer={t('persona.emptyText')}>
           <NativeLinkRow
             label={t('persona.title')}
@@ -1412,6 +1449,7 @@ export default function SettingsScreen() {
           {block('language', language)}
           {block('continue', continueRows)}
           {block('private', privateRow)}
+          {block('memory', memoryRows)}
           {block('personas', personasRow)}
           {block('suggest', suggestRow)}
           {block('recents', recentRow)}

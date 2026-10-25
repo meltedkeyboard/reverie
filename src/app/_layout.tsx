@@ -16,6 +16,7 @@ import { TitleBar } from '@/components/chrome/TitleBar'
 import { ToastHost } from '@/components/overlays/ToastHost'
 import { isConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { loadFileLimits } from '@/db/prefs/fileLimits'
+import { loadLongMemory } from '@/db/prefs/memory'
 import { isHapticsEnabled } from '@/db/prefs/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemeMode, loadThemeName, saveLocalePreference, saveThemeMode, saveThemeName } from '@/db/prefs/settings'
@@ -57,6 +58,7 @@ function ThemedApp() {
     isHapticsEnabled(db)
     isConfirmDeleteEnabled(db)
     loadFileLimits(db)
+    loadLongMemory(db)
   }, [db])
 
   return (

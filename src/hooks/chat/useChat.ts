@@ -7,6 +7,9 @@ import { addVariant, type Message, type MessageImage, type Thought } from '@/db/
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
 import { useConversation } from '@/hooks/chat/useConversation'
+import { useLongMemory } from '@/hooks/chat/useLongMemory'
+import { loreFor } from '@/db/lorebooks'
+import { loreBlock } from '@/lib/chat/lore'
 import { t } from '@/i18n'
 import { selectHistory, turnTokens } from '@/lib/core/context'
 import { errorMessage } from '@/lib/core/errors'
@@ -66,6 +69,7 @@ export function useChat(chat: Chat, character: Character) {
     removeMessage,
     discard,
   } = useConversation(chat, () => characterRef.current.name)
+  const memory = useLongMemory(chat)
   const [draft, setDraft] = useState<string | null>(null)
   const [phase, setPhase] = useState<ChatPhase>('idle')
   // While a reply is regenerated the old one is hidden and the draft takes its place.
@@ -180,12 +184,25 @@ export function useChat(chat: Chat, character: Character) {
       let reply = ''
       let keptThought: Thought | null = null
       let cutoff = false
+      // How many of the latest messages the request carried, for the long memory.
+      let keptCount: number | null = null
 
       try {
         const cfg = await loadSettings(db)
         const personaBlock = formatPersonaPrompt(personaRef.current)
-        const fullSystem = [target.systemPrompt.trim(), personaBlock].filter(Boolean).join('\n\n')
-        const system = withReplyLimit(fullSystem, target.replyLimit)
+        // The character's lorebooks, by what the latest messages bring up.
+        const lore = loreBlock(await loreFor(db, { characterIds: [target.id] }), (depth) =>
+          history
+            .slice(-depth)
+            .map((m) => m.content)
+            .join('\n')
+        )
+        const recap = memory.block(history)
+        const compose = (withRecap: boolean) =>
+          withReplyLimit(
+            [target.systemPrompt.trim(), lore, personaBlock, withRecap ? recap : ''].filter(Boolean).join('\n\n'),
+            target.replyLimit
+          )
         const sampling = {
           temperature: target.temperature,
           maxTokens: target.maxTokens,
@@ -193,11 +210,16 @@ export function useChat(chat: Chat, character: Character) {
           topP: target.topP,
           thinking: chatThinkingRef.current ?? target.thinking,
         }
-        const turns = selectHistory(history.map(toTurn), turnTokens, cfg, {
-          messages: cfg.chatMessages,
-          system,
-          maxTokens: tokenLimit(sampling),
-        })
+        const pick = (system: string) =>
+          selectHistory(history.map(toTurn), turnTokens, cfg, { messages: cfg.chatMessages, system, maxTokens: tokenLimit(sampling) })
+        let system = compose(true)
+        let turns = pick(system)
+        // With the whole history in the window the summary has nothing to add.
+        if (recap && turns.length === history.length) {
+          system = compose(false)
+          turns = pick(system)
+        }
+        keptCount = turns.length
         const streamed = await runReplyStream(
           cfg,
           { messages: requestTurns(system, turns, guidance, target.replyLimit), ...sampling },
@@ -242,6 +264,11 @@ export function useChat(chat: Chat, character: Character) {
             autoName().catch(() => {})
           }
         }
+        if (reply && keptCount !== null) {
+          const name = characterRef.current.name
+          const user = personaRef.current?.name.trim() || t('memory.user')
+          memory.remember(history, keptCount, (m) => `${m.role === 'user' ? user : name}: ${m.content.replace(/\s+/g, ' ').trim()}`)
+        }
         if (task.finish(ctrl)) {
           setDraft(null)
           setReasoning(null)
@@ -252,7 +279,7 @@ export function useChat(chat: Chat, character: Character) {
         }
       }
     },
-    [db, store, setMessages, autoName]
+    [db, store, setMessages, autoName, memory]
   )
 
   const send = useCallback(
@@ -300,6 +327,7 @@ export function useChat(chat: Chat, character: Character) {
   const stop = task.stop
 
   return {
+    memory,
     messages,
     loaded,
     draft,

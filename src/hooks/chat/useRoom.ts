@@ -7,12 +7,19 @@ import { addMessage, addVariant, listMessages, type Message, type MessageImage, 
 import { useDatabase } from '@/db/provider'
 import { setMemberBonds, setMemberPresent, type Room, type RoomMember } from '@/db/rooms'
 import { loadSettings } from '@/db/prefs/settings'
+import { longMemoryEnabled } from '@/db/prefs/memory'
 import { useConversation } from '@/hooks/chat/useConversation'
+import { useLongMemory } from '@/hooks/chat/useLongMemory'
+import { loreFor } from '@/db/lorebooks'
+import { loreBlock } from '@/lib/chat/lore'
+import { selectHistory, turnTokens } from '@/lib/core/context'
+import { tokenLimit } from '@/api/llm'
+import { toTurn } from '@/lib/chat/replyStream'
 import { t } from '@/i18n'
 import { errorMessage } from '@/lib/core/errors'
 import * as Haptics from '@/lib/ui/haptics'
 import { emptyReplyReason, runReplyStream } from '@/lib/chat/replyStream'
-import { absentIds, rollEavesdrop } from '@/lib/chat/room/audience'
+import { absentIds, hearing, rollEavesdrop } from '@/lib/chat/room/audience'
 import { askChronicle, askDirector, askEvent, askMovement, type Movement } from '@/lib/chat/room/director'
 import {
   applyDirector,
@@ -96,6 +103,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     removeMessage,
     discard,
   } = useConversation(chat, (m) => (m.kind === 'narration' ? t('room.narrator') : nameOf(m.speakerId)))
+  const memory = useLongMemory(chat)
   const [draft, setDraft] = useState<RoomDraft | null>(null)
   const [phase, setPhase] = useState<RoomPhase>('idle')
   const [replacingId, setReplacingId] = useState<number | null>(null)
@@ -275,6 +283,14 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       let cutoff = false
       try {
         const cfg = await loadSettings(db)
+        // The speaker's own lorebooks and the room's, by what they heard of the latest lines.
+        const heard = history.filter((m) => hearing(m, speaker.characterId))
+        const lore = loreBlock(await loreFor(db, { characterIds: [speaker.characterId], roomId: roomRef.current.id }), (depth) =>
+          heard
+            .slice(-depth)
+            .map((m) => m.content)
+            .join('\n')
+        )
         const req = buildRoomRequest({
           speaker,
           room: roomRef.current,
@@ -286,6 +302,8 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           thinking: chatThinkingRef.current ?? speaker.character.thinking,
           persona: personaRef.current,
           state: sceneStateRef.current,
+          lore,
+          memory: memory.block(history),
         })
         const streamed = await runReplyStream(cfg, req, ctrl.signal, {
           onStart: () => setPhase('streaming'),
@@ -331,7 +349,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       setMessages([...messagesRef.current, added])
       return { line: added, ok }
     },
-    [db, chatId, setMessages]
+    [db, chatId, setMessages, memory]
   )
 
   // Asks the director only when the plan leaves the choice open and the room allows it.
@@ -470,9 +488,30 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
     [db, narrate, stage, resolve, runQueue, arrivals]
   )
 
+  // After a turn, what fell out of the window as the user sees the scene goes into the long
+  // memory: only lines everyone in the scene could hear, so the summary gives no whisper away.
+  const rememberScene = useCallback(async () => {
+    if (!longMemoryEnabled()) return
+    const all = messagesRef.current
+    const room = roomRef.current
+    const cfg = await loadSettings(db)
+    const kept = selectHistory(all, (m) => turnTokens(toTurn(m)) + 12, cfg, {
+      messages: cfg.roomMessages,
+      system: [room.scenario, memory.block(all)].join('\n'),
+      maxTokens: Math.max(0, ...membersRef.current.map((m) => tokenLimit(m.character))),
+    }).length
+    const user = userNameOf(room, personaRef.current)
+    memory.remember(all, kept, (m) => {
+      if (m.audience) return null
+      const who = m.kind === 'narration' ? t('room.narrator') : m.role === 'user' ? user : nameOf(m.speakerId)
+      return `${who}: ${m.content.replace(/\s+/g, ' ').trim()}`
+    })
+  }, [db, memory, nameOf])
+
   const settle = useCallback(
     (ctrl: AbortController) => {
       chronicle()
+      rememberScene().catch(() => {})
       if (!task.finish(ctrl)) return
       setDraft(null)
       setPhase('idle')
@@ -480,7 +519,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       setReplacingId(null)
       setAuto(null)
     },
-    [task, chronicle]
+    [task, chronicle, rememberScene]
   )
 
   const begin = useCallback(() => {
@@ -643,6 +682,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   }, [task])
 
   return {
+    memory,
     messages,
     loaded,
     sceneState,

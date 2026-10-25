@@ -33,6 +33,7 @@ const UNITS = {
   scene: { ru: ['сцена', 'сцены', 'сцен'], en: ['scene', 'scenes'] },
   message: { ru: ['сообщение', 'сообщения', 'сообщений'], en: ['message', 'messages'] },
   word: { ru: ['слово', 'слова', 'слов'], en: ['word', 'words'] },
+  entry: { ru: ['запись', 'записи', 'записей'], en: ['entry', 'entries'] },
   paragraph: { ru: ['абзац', 'абзаца', 'абзацев'], en: ['paragraph', 'paragraphs'] },
   line: { ru: ['реплика', 'реплики', 'реплик'], en: ['line', 'lines'] },
   character: { ru: ['персонаж', 'персонажа', 'персонажей'], en: ['character', 'characters'] },

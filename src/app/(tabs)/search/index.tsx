@@ -116,6 +116,7 @@ export default function SearchScreen() {
       { label: t('settings.language'), keywords: [t('language.ru'), t('language.en')], symbol: 'globe', fallback: 'globe-outline', href: settingsAt('language') },
       { label: t('settings.continueButton'), keywords: [t('settings.homeScreen')], symbol: 'play.circle', fallback: 'play-circle-outline', href: settingsAt('continue') },
       { label: t('settings.privateButton'), keywords: [t('settings.chats')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('private') },
+      { label: t('memory.long'), keywords: [t('memory.section'), t('lore.title'), t('settings.chats')], symbol: 'brain', fallback: 'book-outline', href: settingsAt('memory') },
       { label: t('settings.suggestButton'), keywords: [t('settings.chats')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
       { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: settingsAt('recents') },
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },

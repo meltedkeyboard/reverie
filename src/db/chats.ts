@@ -16,6 +16,10 @@ export type Chat = {
   personaId?: number | null
   // Where a scene of a room stands now, kept up by the director; null for a chat.
   sceneState?: string | null
+  // Long memory: what fell out of the context window, summed up, and the last message the
+  // summary covers.
+  recap?: string | null
+  recapUpto?: number
 }
 
 export type ChatPreview = Chat & {
@@ -30,7 +34,11 @@ export type ChatPreview = Chat & {
 export const PREVIEW = "CASE WHEN m.content = '' AND m.images IS NOT NULL THEN 'Фото' ELSE m.content END"
 
 export const CHAT_COLUMNS =
-  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId, ch.scene_state AS sceneState'
+  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId, ch.scene_state AS sceneState, ch.recap, ch.recap_upto AS recapUpto'
+
+export async function setChatRecap(db: SQLiteDatabase, chatId: number, recap: string, upto: number) {
+  await db.runAsync('UPDATE chats SET recap = ?, recap_upto = ? WHERE id = ?', [recap.trim() || null, upto, chatId])
+}
 
 export async function setSceneState(db: SQLiteDatabase, chatId: number, state: string) {
   await db.runAsync('UPDATE chats SET scene_state = ? WHERE id = ?', [state.trim() || null, chatId])

@@ -39,7 +39,7 @@ const MANIFEST = 'manifest.json'
 const DATABASE = 'reverie.db'
 const IMAGE_KINDS: ImageKind[] = ['avatars', 'backgrounds', 'attachments']
 // Parents first, so rows can be put back in this order and deleted in the reverse one.
-const TABLES = ['characters', 'rooms', 'room_members', 'chats', 'messages']
+const TABLES = ['characters', 'rooms', 'room_members', 'chats', 'messages', 'lorebooks', 'lore_entries', 'lorebook_links']
 // Tables whose insert trigger puts each new row on top and so scrambles a copied order.
 const ORDERED_TABLES = ['characters', 'rooms', 'chats']
 

@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker'
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { DEFAULT_SAMPLING, insertCharacter } from '@/db/characters'
+import { DEFAULT_LOREBOOK, LORE_BUDGET, LORE_SCAN, saveLorebook } from '@/db/lorebooks'
 import { t } from '@/i18n'
 import { avatarUri, persistAvatar, persistOriginal, squareAvatar } from '@/lib/images/avatars'
 import { PLACEHOLDER_PNG_BASE64 } from '@/lib/images/cardPlaceholder'
@@ -116,12 +117,12 @@ export async function importCardFile(db: SQLiteDatabase, uri: string, pictureOnl
     throw new Error(t('card.notACard'))
   }
   if (card === null) throw new Error(t('card.noCardInPng'))
-  const fields = parseCard(card)
+  const { book, ...fields } = parseCard(card)
 
   // The card's picture is kept whole beside its square, so the framing can be redone.
   const avatar = png ? await persistAvatar(await squareAvatar(file.uri)) : null
   const avatarOriginal = png ? await persistOriginal(file.uri) : null
-  await insertCharacter(db, {
+  const characterId = await insertCharacter(db, {
     ...fields,
     avatar,
     avatarOriginal,
@@ -138,5 +139,20 @@ export async function importCardFile(db: SQLiteDatabase, uri: string, pictureOnl
     backgroundBubbleTransparency: 0.3,
     backgroundTone: 'auto',
   })
+  // The card's lorebook comes in as a lorebook of its own, tied to the new character.
+  if (book) {
+    await saveLorebook(
+      db,
+      null,
+      {
+        name: book.name || fields.name,
+        description: book.description,
+        scanDepth: Math.min(LORE_SCAN.max, book.scanDepth ?? DEFAULT_LOREBOOK.scanDepth),
+        budget: Math.min(LORE_BUDGET.max, Math.max(LORE_BUDGET.min, book.budget ?? DEFAULT_LOREBOOK.budget)),
+      },
+      book.entries,
+      { characterIds: [characterId], roomIds: [] }
+    )
+  }
   return fields.name
 }

@@ -10,6 +10,7 @@ import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes,
 import { isArchive, packArchive, unpackArchive } from '@/lib/transfer/backupArchive'
 import { insertGroup } from '@/db/groups'
 import { insertPersona, notifyPersonasChanged } from '@/db/personas'
+import { dumpLorebooks, writeLorebook, type LoreEntryFields, type LoreLinks } from '@/db/lorebooks'
 import { applySelection, buildTree, type BackupTree, type Selection } from '@/lib/transfer/backupSelection'
 import { saveFile } from '@/lib/transfer/download'
 import { fromByteArray } from 'base64-js'
@@ -17,9 +18,9 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 13: a room member's secret and feelings, a room's plot twists and where each scene stands. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
+// 14: each chat's long memory, and lorebooks. 13: a room member's secret and feelings, a room's plot twists and where each scene stands. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 13
+const BACKUP_VERSION = 14
 
 type BackupCharacter = {
   id: number
@@ -68,6 +69,21 @@ type BackupChat = {
   personaId?: number | null
   // Version 13: where a scene stands now.
   sceneState?: string | null
+  // Version 14: the long memory, and the id of the last message it covers.
+  recap?: string | null
+  recapUpto?: number
+}
+
+// Version 14.
+type BackupLorebook = {
+  id: number
+  name: string
+  description: string
+  scanDepth: number
+  budget: number
+  createdAt: number
+  entries: LoreEntryFields[]
+  links: LoreLinks
 }
 
 type BackupPersona = {
@@ -151,6 +167,7 @@ type Backup = {
   chats: BackupChat[]
   messages: BackupMessage[]
   personas?: BackupPersona[]
+  lorebooks?: BackupLorebook[]
   // Only in the old single-file backups: the pictures by name, in base64.
   avatars?: Record<string, string>
   settings?: { baseUrl?: string; model?: string }
@@ -273,7 +290,7 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       thinking?: ThinkingMode | null
     }>(
       `SELECT id, character_id AS characterId, room_id AS roomId, persona_id AS personaId, title, created_at AS createdAt, thinking,
-         scene_state AS sceneState
+         scene_state AS sceneState, recap, recap_upto AS recapUpto
        FROM chats ORDER BY sort_order, id`
     ),
     messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
@@ -287,6 +304,19 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
     return group ? { ...character, group } : character
   })
   const messages = picked.messages.map((row) => (row.images ? { ...row, images: JSON.parse(row.images) } : row))
+  // The lorebooks of what goes, each with only the owners that go along; all of them in a
+  // whole backup, those used by nobody included.
+  const characterKept = new Set(characters.map((c) => c.id))
+  const roomKept = new Set(rooms.map((r) => (r as { id: number }).id))
+  const lorebooks = (await dumpLorebooks(db))
+    .map((book) => ({
+      ...book,
+      links: {
+        characterIds: book.links.characterIds.filter((id) => characterKept.has(id)),
+        roomIds: book.links.roomIds.filter((id) => roomKept.has(id)),
+      },
+    }))
+    .filter((book) => !selection || book.links.characterIds.length + book.links.roomIds.length > 0)
   const { baseUrl, model } = await loadSettings(db)
 
   // Every picture a character or a room points at, the originals too, once each.
@@ -330,6 +360,7 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
     chats: chats as { id: number; title: string | null }[],
     messages: messages as unknown as { chatId: number }[],
     personas,
+    lorebooks,
     files,
   })
 }
@@ -586,6 +617,23 @@ export async function importBackup(
       chatIds.set(chat.id, res.lastInsertRowId)
     }
 
+    for (const book of dump.lorebooks ?? []) {
+      const links = {
+        characterIds: book.links.characterIds.flatMap((id) => (characterIds.has(id) ? [characterIds.get(id)!] : [])),
+        roomIds: book.links.roomIds.flatMap((id) => (roomIds.has(id) ? [roomIds.get(id)!] : [])),
+      }
+      // Part of a backup brings only the books of what it brings.
+      if (selection && !links.characterIds.length && !links.roomIds.length) continue
+      await writeLorebook(
+        db,
+        null,
+        { name: book.name, description: book.description ?? '', scanDepth: book.scanDepth ?? 4, budget: book.budget ?? 1024 },
+        book.entries ?? [],
+        links,
+        book.createdAt
+      )
+    }
+
     // The message's pictures as the JSON the database keeps, whichever way the backup held
     // them: files of the zip, or base64 in the row (older backups).
     const importImages = async (message: BackupMessage) => {
@@ -608,10 +656,11 @@ export async function importBackup(
       return kept.length ? JSON.stringify(kept) : null
     }
 
+    const messageIds = new Map<number, number>()
     for (const message of dump.messages ?? []) {
       const chatId = chatIds.get(message.chatId)
       if (!chatId) continue
-      await db.runAsync(
+      const inserted = await db.runAsync(
         `INSERT INTO messages (chat_id, role, content, images, variants, variant, thoughts, refines, created_at,
            speaker_id, kind, addressees, audience, overheard, absent)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -633,6 +682,16 @@ export async function importBackup(
           remapIds(message.absent),
         ]
       )
+      messageIds.set(message.id, inserted.lastInsertRowId)
+    }
+
+    // A chat's memory covers its messages up to one of them, which has a new id now.
+    for (const chat of dump.chats ?? []) {
+      const chatId = chatIds.get(chat.id)
+      if (!chatId || !chat.recap?.trim()) continue
+      const covered = (dump.messages ?? []).filter((m) => m.chatId === chat.id && m.id <= (chat.recapUpto ?? 0))
+      const upto = covered.length ? (messageIds.get(covered[covered.length - 1].id) ?? 0) : 0
+      await db.runAsync('UPDATE chats SET recap = ?, recap_upto = ? WHERE id = ?', [chat.recap, upto, chatId])
     }
   })
 
@@ -651,7 +710,7 @@ export async function importBackup(
 // clearing by hand.
 export async function wipeAllData(db: SQLiteDatabase) {
   await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM rooms; DELETE FROM characters; DELETE FROM character_groups; DELETE FROM personas; DELETE FROM app_settings;')
+    await db.execAsync('DELETE FROM rooms; DELETE FROM characters; DELETE FROM character_groups; DELETE FROM personas; DELETE FROM lorebooks; DELETE FROM app_settings;')
   })
   removeAllAvatars()
   notifyPersonasChanged()

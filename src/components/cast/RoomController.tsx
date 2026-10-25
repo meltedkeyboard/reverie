@@ -28,6 +28,7 @@ import { importChatToRoom, setMemberMuted, setRoomFloor, type FloorMode, type Ro
 import { useAside } from '@/hooks/chat/useAside'
 import { useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useRoom, type RoomPhase } from '@/hooks/chat/useRoom'
+import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
 import { useChatSwitches } from '@/hooks/util/useStoredFlag'
 import { useTranslation } from '@/i18n'
@@ -121,6 +122,7 @@ export function RoomController({
   const floor = room.floor
 
   const {
+    memory,
     messages,
     loaded,
     sceneState,
@@ -155,6 +157,7 @@ export function RoomController({
     autoName,
   } = useRoom(chat, room, members, onMembersChange)
 
+  const memoryMenu = useMemoryMenu(memory)
   const [editingRow, setEditingRow] = useState<RowMessage | null>(null)
   const [addressees, setAddressees] = useState<number[]>([])
   const [whisper, setWhisper] = useState(false)
@@ -405,6 +408,7 @@ export function RoomController({
     ...(canTalk ? [{ label: t('room.menuAutoplay'), systemImage: 'bubble.left.and.bubble.right', children: autoplayItems }] : []),
     { label: t('room.menuImportScene'), systemImage: 'square.and.arrow.down', onSelect: importScene },
     { label: t('chat.menuShowProfile'), systemImage: 'person.2.circle', onSelect: () => router.push(`/room/${room.id}?profile=1`) },
+    ...memoryMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 

@@ -8,6 +8,16 @@ export type CardFields = {
   name: string
   systemPrompt: string
   greeting: string
+  // The card's lorebook (`character_book` of V2 and V3), when it has one with entries.
+  book?: CardBook | null
+}
+
+export type CardBook = {
+  name: string
+  description: string
+  scanDepth: number | null
+  budget: number | null
+  entries: { keys: string; content: string; always: boolean; enabled: boolean }[]
 }
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
@@ -173,5 +183,31 @@ export function parseCard(card: unknown): CardFields {
     str(data.scenario) && `Scenario: ${str(data.scenario)}`,
   ].filter(Boolean)
 
-  return { name, systemPrompt: fill(parts.join('\n\n')), greeting: fill(str(data.first_mes)) }
+  return { name, systemPrompt: fill(parts.join('\n\n')), greeting: fill(str(data.first_mes)), book: parseBook(data.character_book, fill) }
+}
+
+// Entries are kept in their insertion order; the secondary keys and positions of other apps
+// have nothing to map to here, so an entry comes in with its main keys.
+function parseBook(value: unknown, fill: (text: string) => string): CardBook | null {
+  if (typeof value !== 'object' || value === null) return null
+  const book = value as Record<string, unknown>
+  const raw = Array.isArray(book.entries) ? book.entries : typeof book.entries === 'object' && book.entries ? Object.values(book.entries) : []
+  const entries = raw
+    .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+    .map((e, i) => ({
+      order: typeof e.insertion_order === 'number' ? e.insertion_order : i,
+      keys: (Array.isArray(e.keys) ? e.keys : Array.isArray(e.key) ? e.key : [])
+        .filter((k): k is string => typeof k === 'string' && k.trim().length > 0)
+        .map((k) => k.trim())
+        .join(', '),
+      content: fill(str(e.content)),
+      always: e.constant === true,
+      enabled: e.enabled !== false && e.disable !== true,
+    }))
+    .filter((e) => e.content)
+    .sort((a, b) => a.order - b.order)
+    .map(({ order: _order, ...entry }) => entry)
+  if (!entries.length) return null
+  const number = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : null)
+  return { name: str(book.name), description: str(book.description), scanDepth: number(book.scan_depth), budget: number(book.token_budget), entries }
 }

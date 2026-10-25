@@ -51,6 +51,7 @@ import { useDatabase } from '@/db/provider'
 import { createRoomChat, getLatestRoomChatId, getRoom, listRoomMembers } from '@/db/rooms'
 import { useAside } from '@/hooks/chat/useAside'
 import { useChat } from '@/hooks/chat/useChat'
+import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useChatSwitches } from '@/hooks/util/useStoredFlag'
@@ -717,7 +718,9 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     discard,
     rename,
     autoName,
+    memory,
   } = useChat(chat, character)
+  const memoryMenu = useMemoryMenu(memory)
   const scene = useMemo(() => characterScene(character), [character])
   const aside = useAside(scene, messages)
 
@@ -786,6 +789,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) },
+    ...memoryMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 

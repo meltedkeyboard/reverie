@@ -289,6 +289,53 @@ const MIGRATIONS = [
     ALTER TABLE rooms ADD COLUMN plot REAL NOT NULL DEFAULT 0;
     ALTER TABLE chats ADD COLUMN scene_state TEXT;
   `,
+  // Long memory: a summary of what fell out of a chat's context window, and the last message
+  // it covers. Lorebooks: entries put into the prompt when their keys come up, tied to the
+  // characters and rooms that use them.
+  `
+    ALTER TABLE chats ADD COLUMN recap TEXT;
+    ALTER TABLE chats ADD COLUMN recap_upto INTEGER NOT NULL DEFAULT 0;
+    CREATE TABLE lorebooks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      scan_depth INTEGER NOT NULL DEFAULT 4,
+      budget INTEGER NOT NULL DEFAULT 1024,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE lore_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lorebook_id INTEGER NOT NULL REFERENCES lorebooks(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL DEFAULT 0,
+      keys TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      always INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE INDEX idx_lore_entries_book ON lore_entries(lorebook_id);
+    CREATE TABLE lorebook_links (
+      lorebook_id INTEGER NOT NULL REFERENCES lorebooks(id) ON DELETE CASCADE,
+      character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+      room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
+      CHECK ((character_id IS NULL) <> (room_id IS NULL))
+    );
+    CREATE UNIQUE INDEX idx_lorebook_links ON lorebook_links(lorebook_id, COALESCE(character_id, 0), COALESCE(room_id, 0));
+    CREATE INDEX idx_lorebook_links_character ON lorebook_links(character_id);
+    CREATE INDEX idx_lorebook_links_room ON lorebook_links(room_id);
+  ` +
+    // The new tables are synced as the others are.
+    ['lorebooks', 'lore_entries', 'lorebook_links']
+      .flatMap((table) =>
+        ['INSERT', 'UPDATE', 'DELETE'].map(
+          (op) => `
+    CREATE TRIGGER ${table}_${op.toLowerCase()}_sync AFTER ${op} ON ${table}
+      WHEN (SELECT value FROM app_settings WHERE key = 'sync_dirty') IS NOT '1'
+    BEGIN
+      INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_dirty', '1');
+    END;`
+        )
+      )
+      .join('\n'),
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

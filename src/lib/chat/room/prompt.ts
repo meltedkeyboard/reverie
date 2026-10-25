@@ -34,11 +34,15 @@ type Context = {
   persona?: Persona | null
   // Where the scene stands now, as the director last noted it.
   state?: string | null
+  // The entries of the lorebooks the talk brought up, and the summary of what fell out of
+  // the window, as blocks of the system prompt.
+  lore?: string
+  memory?: string
 }
 
 // The scene as this one character lived it: their own lines as the assistant, everyone
 // else's as the user with a name in front, and nothing they could not have heard.
-export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking, persona, state }: Context): ChatRequest {
+export function buildRoomRequest({ speaker, room, members, history, planned, guidance, window, thinking, persona, state, lore, memory }: Context): ChatRequest {
   const me = speaker.characterId
   const name = speaker.character.name
   const userName = userNameOf(room, persona)
@@ -72,8 +76,9 @@ export function buildRoomRequest({ speaker, room, members, history, planned, gui
   ]
     .filter(Boolean)
     .join('\n')
+  const extra = [lore ?? '', memory ?? ''].filter(Boolean).join('\n\n')
   const limit = planned.kind === 'reaction' ? 1 : speaker.character.replyLimit
-  const system = withReplyLimit([speaker.character.systemPrompt.trim(), group].filter(Boolean).join('\n\n'), limit)
+  const system = withReplyLimit([speaker.character.systemPrompt.trim(), group, extra].filter(Boolean).join('\n\n'), limit)
 
   const turns: ChatTurn[] = []
   const push = (turn: ChatTurn) => {
