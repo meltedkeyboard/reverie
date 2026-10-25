@@ -69,25 +69,45 @@ function systemRules(input: PromptGenInput) {
     .join('\n')
 }
 
-function languageRule(locale: Locale) {
+export function languageRule(locale: Locale) {
   const fallback = locale === 'en' ? 'English' : 'Russian'
   return `Write in the same language as the user's text. If that is unclear, write in ${fallback}.`
 }
 
-type TextKind = 'prompt' | 'greeting' | 'persona'
+type TextKind = 'prompt' | 'greeting' | 'persona' | 'scenario' | 'opening' | 'room'
 
 const KIND_NAME: Record<TextKind, string> = {
   prompt: 'system prompt of a roleplay character',
   greeting: 'opening message of a roleplay character',
   persona: 'user persona description for roleplay',
+  scenario: 'scene description of a roleplay group room',
+  opening: 'opening narration of a roleplay group scene',
+  room: 'setup sheet of a roleplay group room',
+}
+
+const KIND_TARGET: Record<TextKind, string> = {
+  prompt: 'prompt',
+  greeting: 'message',
+  persona: 'description',
+  scenario: 'description',
+  opening: 'narration',
+  room: 'sheet',
 }
 
 // A change to a text that is already there is an edit, not a new text: asked from scratch
 // with the rules of length and format, the model wrote it over in its own way and lost the
 // details, the sample lines and the layout. So the edit is a request of its own, with
-// nothing but the text and the change.
-function buildEditMessages(kind: TextKind, text: string, change: string, images?: MessageImage[]): ChatTurn[] {
-  const userText = `The text:\n\n${text.trim()}\n\nThe change: ${change.trim()}`
+// nothing but the text and the change, and what the model must know to make it (`context`:
+// the cast of a room, which the text names but does not describe).
+export function buildEditMessages(
+  kind: TextKind,
+  text: string,
+  change: string,
+  images?: MessageImage[],
+  context?: { rules?: string; facts?: string }
+): ChatTurn[] {
+  const facts = context?.facts?.trim() ? `${context.facts.trim()}\n\n` : ''
+  const userText = `${facts}The text:\n\n${text.trim()}\n\nThe change: ${change.trim()}`
   let content: string | ContentPart[] = userText
   if (images && images.length > 0) {
     const pictures: ContentPart[] = images.map((image) => ({
@@ -96,7 +116,7 @@ function buildEditMessages(kind: TextKind, text: string, change: string, images?
     }))
     content = [...pictures, { type: 'text' as const, text: userText }]
   }
-  const kindTarget = kind === 'prompt' ? 'prompt' : kind === 'greeting' ? 'message' : 'description'
+  const kindTarget = KIND_TARGET[kind]
   return [
     {
       role: 'system',
@@ -108,6 +128,7 @@ function buildEditMessages(kind: TextKind, text: string, change: string, images?
         images && images.length > 0
           ? 'Visual references (images) are attached. Incorporate visual details and situation context from the images into the requested changes. If multiple characters are present, follow instructions on which character is being edited.'
           : '',
+        context?.rules ?? '',
         'Keep the language of the text.',
         `Reply with the whole edited ${kindTarget} only: no preface, no comments, no quotes or code fences around it.`,
       ]

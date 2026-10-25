@@ -31,6 +31,8 @@ import {
 import { useImageSlot } from '@/hooks/features/useImageSlot'
 import { useRoomActions } from '@/hooks/features/useRoomActions'
 import { useTranslation } from '@/i18n'
+import { setGenDraft } from '@/lib/chat/genDraft'
+import { formatSetup, parseSetup, sameName, type GenCastMember } from '@/lib/chat/room/roomGen'
 import { avatarUri, pickBackground, type CropRect } from '@/lib/images/avatars'
 import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
 import { avatarTint } from '@/lib/images/initial'
@@ -39,6 +41,7 @@ import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
+import { showToast } from '@/lib/ui/toast'
 import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles, useTheme } from '@/theme'
 
 type Member = MemberSettings & { character: Character }
@@ -62,7 +65,7 @@ export default function RoomEditorScreen() {
   const colors = useColors()
   const { scheme } = useTheme()
   const styles = useStyles(createStyles)
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const { exportFile } = useRoomActions(() => {})
 
   const FLOOR_OPTIONS: { value: FloorMode; label: string }[] = [
@@ -78,6 +81,11 @@ export default function RoomEditorScreen() {
   const [characters, setCharacters] = useState<CharacterPreview[]>([])
   const [picking, setPicking] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
+  // What the texts, or the whole room, were before the last AI result replaced them, until
+  // it is put back.
+  const [beforeScenario, setBeforeScenario] = useState<string | null>(null)
+  const [beforeOpening, setBeforeOpening] = useState<string | null>(null)
+  const [beforeSetup, setBeforeSetup] = useState<{ fields: RoomFields; members: Member[] } | null>(null)
   const bgSlot = useImageSlot('backgrounds')
 
   const set = <K extends keyof RoomFields>(key: K, value: RoomFields[K]) => setFields((f) => ({ ...f, [key]: value }))
@@ -191,6 +199,98 @@ export default function RoomEditorScreen() {
       setSaving(false)
       alertError(t('editor.saveFailedTitle'), err)
     }
+  }
+
+  // The generators open as a form sheet of the stack, app/generate.tsx, and see the cast by
+  // the head of each member's prompt.
+  const genCast: GenCastMember[] = members.map((m) => ({ name: m.character.name, prompt: m.character.systemPrompt }))
+  const canSetUp = members.length > 0 || characters.length > 0
+  // The opening is written from the scene or at least from who is in it.
+  const canOpen = members.length > 0 || fields.scenario.trim().length > 0
+
+  const openScenarioGen = () => {
+    setGenDraft({ kind: 'scenario', target: `room:${id}`, cast: genCast, currentScenario: fields.scenario, onApply: applyScenario })
+    router.push('/generate')
+  }
+
+  const openOpeningGen = () => {
+    setGenDraft({ kind: 'opening', target: `room:${id}`, cast: genCast, scenario: fields.scenario, currentOpening: fields.opening, onApply: applyOpening })
+    router.push('/generate')
+  }
+
+  // The room as a setup sheet, to be improved and compared with; a room with nothing written
+  // and nobody tuned yet has nothing to improve.
+  const openSetupGen = () => {
+    const tuned = fields.scenario.trim() || fields.opening.trim() || members.some((m) => m.triggers.trim())
+    const currentSetup = tuned
+      ? formatSetup(
+          { ...fields, name: fields.name.trim() || defaultName() },
+          members.map((m) => ({ name: m.character.name, settings: m })),
+          locale
+        )
+      : ''
+    const library = characters
+      .filter((c) => !members.some((m) => m.characterId === c.id))
+      .map((c) => ({ name: c.name, prompt: c.systemPrompt }))
+    setGenDraft({ kind: 'room', target: `room:${id}`, cast: genCast, library, currentSetup, onApply: applySetup })
+    router.push('/generate')
+  }
+
+  const applyScenario = (text: string) => {
+    setBeforeScenario(fields.scenario)
+    set('scenario', text)
+  }
+
+  const applyOpening = (text: string) => {
+    setBeforeOpening(fields.opening)
+    set('opening', text)
+  }
+
+  // The sheet read back: the room's fields, and each member's numbers by name. A character of
+  // the user's list the sheet names joins the room after those already in it.
+  const applySetup = (text: string) => {
+    const setup = parseSetup(text)
+    const next = [...members]
+    let matched = 0
+    for (const { name, ...settings } of setup.members) {
+      const at = next.findIndex((m) => sameName(m.character.name, name))
+      if (at >= 0) {
+        next[at] = { ...next[at], ...settings }
+        matched += 1
+        continue
+      }
+      const character = characters.find((c) => sameName(c.name, name))
+      if (!character) continue
+      next.push({ ...DEFAULT_MEMBER, ...settings, characterId: character.id, character })
+      matched += 1
+    }
+    if (!matched && !Object.keys(setup.fields).length) {
+      showToast({ tone: 'error', title: t('roomGen.parseFailed'), message: t('roomGen.parseFailedText') })
+      return
+    }
+    setBeforeSetup({ fields, members })
+    setFields((f) => ({ ...f, ...setup.fields }))
+    setMembers(next)
+    setExpanded(null)
+  }
+
+  const undoScenario = () => {
+    if (beforeScenario === null) return
+    set('scenario', beforeScenario)
+    setBeforeScenario(null)
+  }
+
+  const undoOpening = () => {
+    if (beforeOpening === null) return
+    set('opening', beforeOpening)
+    setBeforeOpening(null)
+  }
+
+  const undoSetup = () => {
+    if (!beforeSetup) return
+    setFields(beforeSetup.fields)
+    setMembers(beforeSetup.members)
+    setBeforeSetup(null)
   }
 
   const confirmDelete = () => {
@@ -320,6 +420,11 @@ export default function RoomEditorScreen() {
         />
       </NativeSection>
 
+      <NativeSection footer={t('roomEditor.autoSetupHint')}>
+        <NativeActionRow label={t('roomEditor.autoSetup')} onPress={openSetupGen} disabled={!canSetUp} />
+        {beforeSetup ? <NativeActionRow label={t('roomEditor.undoSetup')} onPress={undoSetup} /> : null}
+      </NativeSection>
+
       <NativeSection
         title={t('roomEditor.membersSection')}
         footer={
@@ -399,10 +504,14 @@ export default function RoomEditorScreen() {
 
       <NativeSection title={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>
         <NativeHostedRow>{scenarioText}</NativeHostedRow>
+        <NativeActionRow label={fields.scenario.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')} onPress={openScenarioGen} />
+        {beforeScenario !== null ? <NativeActionRow label={t('editor.undoGenerated')} onPress={undoScenario} /> : null}
       </NativeSection>
 
       <NativeSection title={t('roomEditor.opening')} footer={t('roomEditor.openingHint')}>
         <NativeHostedRow>{openingText}</NativeHostedRow>
+        <NativeActionRow label={t('roomEditor.generateOpening')} onPress={openOpeningGen} disabled={!canOpen} />
+        {beforeOpening !== null ? <NativeActionRow label={t('editor.undoGenerated')} onPress={undoOpening} /> : null}
       </NativeSection>
 
       <NativeSection footer={t('roomEditor.userNameHint')}>
@@ -468,6 +577,11 @@ export default function RoomEditorScreen() {
                   placeholder={defaultName() || t('roomEditor.namePlaceholder')}
                   autoCapitalize="sentences"
                 />
+              </ListSection>
+
+              <ListSection footer={t('roomEditor.autoSetupHint')}>
+                <ButtonCell label={t('roomEditor.autoSetup')} onPress={openSetupGen} disabled={!canSetUp} />
+                {beforeSetup ? <ButtonCell label={t('roomEditor.undoSetup')} onPress={undoSetup} /> : null}
               </ListSection>
 
               <ListSection
@@ -557,10 +671,14 @@ export default function RoomEditorScreen() {
 
               <ListSection header={t('roomEditor.scenario')} footer={t('roomEditor.scenarioHint')}>
                 {scenarioText}
+                <ButtonCell label={fields.scenario.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')} onPress={openScenarioGen} />
+                {beforeScenario !== null ? <ButtonCell label={t('editor.undoGenerated')} onPress={undoScenario} /> : null}
               </ListSection>
 
               <ListSection header={t('roomEditor.opening')} footer={t('roomEditor.openingHint')}>
                 {openingText}
+                <ButtonCell label={t('roomEditor.generateOpening')} onPress={openOpeningGen} disabled={!canOpen} />
+                {beforeOpening !== null ? <ButtonCell label={t('editor.undoGenerated')} onPress={undoOpening} /> : null}
               </ListSection>
 
               <ListSection footer={t('roomEditor.userNameHint')}>
