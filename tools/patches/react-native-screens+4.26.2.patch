@@ -1,0 +1,57 @@
+diff --git a/node_modules/react-native-screens/ios/RNSScreen.mm b/node_modules/react-native-screens/ios/RNSScreen.mm
+index 9b66012..2728c9a 100644
+--- a/node_modules/react-native-screens/ios/RNSScreen.mm
++++ b/node_modules/react-native-screens/ios/RNSScreen.mm
+@@ -845,6 +845,44 @@ RNS_IGNORE_SUPER_CALL_END
+   }
+ }
+ 
++// A sheet below the full height is interactive Liquid Glass on iOS 26 and later: the whole
++// sheet squeezes and flares under any touch on it. A color effect in place of the glass
++// makes it a plain solid sheet, in the color of what the screen paints, or the system's.
++- (void)setSolidBackgroundForSheet:(UISheetPresentationController *)sheet
++{
++#if RNS_IPHONE_OS_VERSION_AVAILABLE(26_1)
++  if (@available(iOS 26.1, *)) {
++    UIColor *color = [self opaqueContentColorIn:self depth:4] ?: UIColor.systemBackgroundColor;
++    UIColorEffect *current = [sheet.backgroundEffect isKindOfClass:UIColorEffect.class]
++        ? (UIColorEffect *)sheet.backgroundEffect
++        : nil;
++    if (current == nil || ![current.color isEqual:color]) {
++      sheet.backgroundEffect = [UIColorEffect effectWithColor:color];
++    }
++  }
++#endif
++}
++
++// The first opaque fill as large as the screen in the views under it, what contentStyle sets.
++- (nullable UIColor *)opaqueContentColorIn:(UIView *)view depth:(int)depth
++{
++  CGColorRef cg = view.backgroundColor.CGColor;
++  if (view != self && cg != nil && CGColorGetAlpha(cg) == 1.0 && !CGRectIsEmpty(self.bounds) &&
++      CGSizeEqualToSize(view.bounds.size, self.bounds.size)) {
++    return view.backgroundColor;
++  }
++  if (depth == 0) {
++    return nil;
++  }
++  for (UIView *child in view.subviews) {
++    UIColor *found = [self opaqueContentColorIn:child depth:depth - 1];
++    if (found != nil) {
++      return found;
++    }
++  }
++  return nil;
++}
++
+ - (void)setLargestUndimmedDetentForSheet:(UISheetPresentationController *)sheet
+                                       to:(UISheetPresentationControllerDetentIdentifier)detent
+                                  animate:(BOOL)animate
+@@ -993,6 +1031,7 @@ RNS_IGNORE_SUPER_CALL_END
+   sheet.prefersScrollingExpandsWhenScrolledToEdge = _sheetExpandsWhenScrolledToEdge;
+   [self setGrabberVisibleForSheet:sheet to:_sheetGrabberVisible animate:YES];
+   [self setCornerRadiusForSheet:sheet to:_sheetCornerRadius animate:YES];
++  [self setSolidBackgroundForSheet:sheet];
+ 
+   // lud - largest undimmed detent
+   // First we try to take value from the prop or default.
