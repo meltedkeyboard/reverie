@@ -283,25 +283,27 @@ export function NativeTextRow({
 // NativeTextRow, it is set from `value` only when that changes from outside (a preset picked,
 // a version switched).
 export function NativeAreaRow({
+  label,
   value,
   onChangeText,
   placeholder,
   lines = 4,
   maxLines = 10,
 }: {
+  label?: string
   value: string
   onChangeText: (text: string) => void
   placeholder?: string
   lines?: number
   maxLines?: number | null
 }) {
-  const { TextField, useNativeState } = nativeForm!.ui
+  const { TextField, Text, VStack, useNativeState } = nativeForm!.ui
   const { lineLimit } = nativeForm!.modifiers
   const text = useNativeState(value)
   useEffect(() => {
     if (text.get() !== value) text.set(value)
   }, [text, value])
-  return (
+  const field = (
     <TextField
       text={text}
       axis="vertical"
@@ -309,6 +311,13 @@ export function NativeAreaRow({
       onTextChange={onChangeText}
       modifiers={maxLines === null ? [] : [lineLimit({ min: lines, max: maxLines })]}
     />
+  )
+  if (!label) return field
+  return (
+    <VStack alignment="leading" spacing={6}>
+      <Text>{label}</Text>
+      {field}
+    </VStack>
   )
 }
 

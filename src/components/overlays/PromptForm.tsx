@@ -58,8 +58,14 @@ export function PromptForm({ value, onChange }: Props) {
       numeric={numeric}
     />
   )
-  const area = (field: Field) => (
-    <GenArea value={value[field] ?? ''} onChangeText={set(field)} placeholder={t(`promptGen.form.${field}Placeholder`)} minHeight={66} />
+  const area = (field: Field, withLabel = false) => (
+    <GenArea
+      label={withLabel ? t(`promptGen.form.${field}`) : undefined}
+      value={value[field] ?? ''}
+      onChangeText={set(field)}
+      placeholder={t(`promptGen.form.${field}Placeholder`)}
+      minHeight={55}
+    />
   )
   // A choice of a few is a segmented control that starts on "Any", the empty value.
   const segments = (field: Field) => (
@@ -99,19 +105,19 @@ export function PromptForm({ value, onChange }: Props) {
       <GenSection header={t('promptGen.form.whoHeader')}>
         {input('age', true)}
         {segments('gender')}
-        {input('occupation')}
-        {input('relation')}
-        {input('world')}
-        {input('appearance')}
+        {area('occupation', true)}
+        {area('relation', true)}
+        {area('world', true)}
+        {area('appearance', true)}
       </GenSection>
 
       <GenSection header={t('promptGen.form.characterHeader')} footer={t('promptGen.form.hint')}>
-        {area('traits')}
+        {area('traits', true)}
         {chips('tone')}
         {segments('swearing')}
         {segments('flirting')}
         {segments('nsfw')}
-        {area('extra')}
+        {area('extra', true)}
       </GenSection>
     </>
   )

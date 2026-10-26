@@ -228,11 +228,17 @@ export function ButtonCell({
 
 // Text typed over several lines right in the group, as a note in a form; it grows with the
 // text up to `maxHeight`, then scrolls.
-export function AreaCell({ minHeight = 88, maxHeight = 220, ...input }: Omit<TextInputProps, 'style' | 'multiline'> & { minHeight?: number; maxHeight?: number }) {
+export function AreaCell({
+  label,
+  minHeight = 88,
+  maxHeight = 220,
+  ...input
+}: Omit<TextInputProps, 'style' | 'multiline'> & { label?: string; minHeight?: number; maxHeight?: number }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
     <View style={styles.areaRow}>
+      {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
       <TextInput
         {...input}
         multiline
@@ -360,7 +366,7 @@ const baseStyles = (colors: Colors) =>
     choiceLabel: { paddingHorizontal: INSET },
     // The caps label of ParamSlider, for the rows that stand beside sliders.
     capsLabel: { color: colors.textFaint, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
-    areaRow: { paddingHorizontal: INSET, paddingVertical: 12 },
+    areaRow: { paddingHorizontal: INSET, paddingVertical: 12, gap: 6 },
     area: { color: colors.text, fontSize: 17, lineHeight: 22, padding: 0, textAlignVertical: 'top' },
     // The text starts where the label of a one-line row does; the right side keeps room
     // for the expand mark in the corner.

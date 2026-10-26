@@ -58,9 +58,21 @@ export function GenSegment<T extends string>({ label, options, value, onChange }
 
 // A field of several lines; `minHeight` is the height of the empty one, in lines of the
 // system's field.
-export function GenArea({ value, onChangeText, placeholder, minHeight = 88 }: { value: string; onChangeText: (text: string) => void; placeholder?: string; minHeight?: number }) {
-  if (nativeGen) return <NativeAreaRow value={value} onChangeText={onChangeText} placeholder={placeholder} lines={Math.round(minHeight / 22)} />
-  return <AreaCell value={value} onChangeText={onChangeText} placeholder={placeholder} minHeight={minHeight} />
+export function GenArea({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  minHeight = 88,
+}: {
+  label?: string
+  value: string
+  onChangeText: (text: string) => void
+  placeholder?: string
+  minHeight?: number
+}) {
+  if (nativeGen) return <NativeAreaRow label={label} value={value} onChangeText={onChangeText} placeholder={placeholder} lines={Math.round(minHeight / 22)} />
+  return <AreaCell label={label} value={value} onChangeText={onChangeText} placeholder={placeholder} minHeight={minHeight} />
 }
 
 export function GenInput({
