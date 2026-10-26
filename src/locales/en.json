@@ -878,5 +878,6 @@
   "direction.menu": "Direction",
   "direction.menuSet": "Change direction",
   "direction.title": "Direction",
+  "direction.clear": "Clear direction",
   "direction.placeholder": "Where the story should go, its tone and pace. It goes with every reply until you clear it, e.g. “Keep the pace slow. It is night now and everyone is tired. Lead towards the confession.”"
 }

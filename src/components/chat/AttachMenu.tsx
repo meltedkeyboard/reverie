@@ -3,13 +3,14 @@ import { Image } from 'expo-image'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useRouter } from 'expo-router'
 import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
 import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, type ChatLook } from '@/components/chrome/ChatChrome'
 import { Button } from '@/components/controls/Button'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { NativeHostedRow, NativeLinkRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
+import { NativeActionRow, NativeAreaRow, NativeHostedRow, NativeLinkRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { Avatar } from '@/components/visuals/Avatar'
 import { Star } from '@/components/visuals/motifs/Star'
@@ -25,7 +26,7 @@ import { pictureUri } from '@/lib/images/attachments'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
-import { type Colors, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
+import { type Colors, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles, useTheme } from '@/theme'
 
 import { GlassButton } from '../chrome/Glass'
 import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
@@ -60,16 +61,20 @@ export function AttachMenu({
   session,
   onClose,
   onOpenPersonas,
+  onOpenDirection,
   scrollStyle,
 }: {
   session: AttachSession
   onClose: Close
   onOpenPersonas: () => void
+  onOpenDirection?: () => void
   scrollStyle?: StyleProp<ViewStyle>
 }) {
   const colors = useColors()
+  const { scheme } = useTheme()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
+  const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const db = useDatabase()
   const [thinking, setThinking] = useState(!!session.thinking)
@@ -103,18 +108,25 @@ export function AttachMenu({
     onClose()
   }
 
-  const armed = useSharedValue(0)
+  const hasSelection = selected.length > 0
+  const footerProgress = useSharedValue(0)
   useEffect(() => {
-    armed.value = withTiming(selected.length > 0 ? 1 : 0, { duration: 220 })
-  }, [selected.length, armed])
-  const armedStyle = useAnimatedStyle(() => ({ opacity: armed.value }))
+    footerProgress.value = withSpring(hasSelection ? 1 : 0, { stiffness: 300, damping: 28, mass: 0.8 })
+  }, [hasSelection, footerProgress])
+
+  const [footerHeight, setFooterHeight] = useState(0)
+  const animatedFooterStyle = useAnimatedStyle(() => {
+    const travel = footerHeight || 120
+    return {
+      transform: [{ translateY: (1 - footerProgress.value) * travel }],
+      opacity: footerProgress.value > 0.01 ? 1 : 0,
+    }
+  })
 
   const actionLabel =
-    selected.length === 0
-      ? t('attach.attachAction')
-      : selected.length === 1
-        ? t('attach.attachSingle')
-        : t('attach.attachMultiple', { count: selected.length })
+    selected.length === 1
+      ? t('attach.attachSingle')
+      : t('attach.attachMultiple', { count: selected.length })
 
   const camera = !isWeb ? (
     <Pressable
@@ -151,7 +163,7 @@ export function AttachMenu({
             accessibilityState={{ checked: isSelected }}
             accessibilityLabel={t('attach.recent')}
             accessibilityValue={isSelected ? { text: String(order) } : undefined}
-            style={({ pressed }) => [styles.recentTile, pressed && { opacity: 0.8 }]}
+            style={styles.recentTile}
           >
             <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
             {isSelected ? (
@@ -165,18 +177,15 @@ export function AttachMenu({
     </ScrollView>
   ) : null
 
-  // Gray and idle until a picture in the row is ticked; gone with the row.
   const action = showRow ? (
     <Pressable
       onPress={confirmRecents}
-      disabled={selected.length === 0}
       accessibilityRole="button"
       accessibilityLabel={actionLabel}
-      style={({ pressed }) => [styles.actionButton, pressed && selected.length > 0 && { opacity: 0.85 }]}
+      style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.85 }]}
     >
-      <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.surfaceRaised }]} />
-      <Animated.View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }, armedStyle]} />
-      <Text style={[styles.actionText, { color: selected.length > 0 ? ON_ACCENT : colors.textMuted }]}>{actionLabel}</Text>
+      <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }]} />
+      <Text style={[styles.actionText, { color: ON_ACCENT }]}>{actionLabel}</Text>
     </Pressable>
   ) : null
 
@@ -189,6 +198,10 @@ export function AttachMenu({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onOpenPersonas()
   }
+  const openDirection = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    onOpenDirection?.()
+  }
 
   // The same menu as the system's own list (iOS with SwiftUI), over the chat's picture as the
   // app's cards are. The row of the camera and the latest pictures and the button that attaches
@@ -198,116 +211,186 @@ export function AttachMenu({
     const { Button: SwiftButton, Toggle } = nativeForm.ui
     const { tint } = nativeForm.modifiers
     return (
-      <NativeSheetForm>
-        {tiles ? (
-          <NativeSection fill={CLEAR} top>
-            <NativeHostedRow clear>{tiles}</NativeHostedRow>
-          </NativeSection>
-        ) : null}
-        <NativeSection fill={tones.card} top={!tiles} footer={recents === null ? t('attach.recentsOff') : undefined}>
-          {!showRow ? (
-            <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onClose(() => session.onPick('camera'))} modifiers={[tint(colors.text)]} />
+      <View style={[styles.menuContainer, scrollStyle]}>
+        <NativeSheetForm>
+          {tiles ? (
+            <NativeSection fill={CLEAR} top>
+              <NativeHostedRow clear>{tiles}</NativeHostedRow>
+            </NativeSection>
           ) : null}
-          <SwiftButton label={t('attach.addFiles')} systemImage="doc" onPress={() => onClose(() => session.onPick('files'))} modifiers={[tint(colors.text)]} />
-          <NativeLinkRow
-            label={t('attach.persona')}
-            symbol="person"
-            value={session.persona?.name ? session.persona.name : t('attach.personaNone')}
-            onPress={openPersonas}
-          />
-        </NativeSection>
-        {session.onToggleThinking ? (
-          <NativeSection fill={tones.card}>
-            <Toggle label={t('chat.thinking')} systemImage="brain" isOn={thinking} onIsOnChange={toggleThinking} />
+          <NativeSection fill={tones.card} top={!tiles} footer={recents === null ? t('attach.recentsOff') : undefined}>
+            {!showRow ? (
+              <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onClose(() => session.onPick('camera'))} modifiers={[tint(colors.text)]} />
+            ) : null}
+            <SwiftButton label={t('attach.addFiles')} systemImage="doc" onPress={() => onClose(() => session.onPick('files'))} modifiers={[tint(colors.text)]} />
+            <NativeLinkRow
+              label={t('attach.persona')}
+              symbol="person"
+              value={session.persona?.name ? session.persona.name : t('attach.personaNone')}
+              onPress={openPersonas}
+            />
+            {onOpenDirection ? (
+              <NativeLinkRow
+                label={t('direction.title')}
+                symbol="signpost.right"
+                value={session.direction?.trim() || undefined}
+                onPress={openDirection}
+              />
+            ) : null}
           </NativeSection>
-        ) : null}
+          {session.onToggleThinking ? (
+            <NativeSection fill={tones.card}>
+              <Toggle label={t('chat.thinking')} systemImage="brain" isOn={thinking} onIsOnChange={toggleThinking} />
+            </NativeSection>
+          ) : null}
+          {showRow ? (
+            <NativeSection fill={CLEAR}>
+              <NativeHostedRow clear height={Math.max(76, insets.bottom + 68)}>
+                <View />
+              </NativeHostedRow>
+            </NativeSection>
+          ) : null}
+        </NativeSheetForm>
         {action ? (
-          <NativeSection fill={CLEAR}>
-            <NativeHostedRow clear>{action}</NativeHostedRow>
-          </NativeSection>
+          <Animated.View
+            onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
+            pointerEvents={hasSelection ? 'auto' : 'none'}
+            style={[
+              styles.actionFooter,
+              {
+                paddingBottom: Math.max(16, insets.bottom + 4),
+                backgroundColor: tones.sheet,
+                borderTopColor: colors.border,
+              },
+              animatedFooterStyle,
+            ]}
+          >
+            {action}
+          </Animated.View>
         ) : null}
-      </NativeSheetForm>
+      </View>
     )
   }
 
   return (
-    <ScrollView
-      style={[styles.scroll, scrollStyle]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      {tiles}
+    <View style={[styles.menuContainer, scrollStyle]}>
+      <ScrollView
+        style={[styles.scroll, scrollStyle]}
+        contentContainerStyle={[styles.content, showRow ? { paddingBottom: Math.max(76, insets.bottom + 68) } : null]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {tiles}
 
-      <View style={[styles.card, { backgroundColor: tones.card }]}>
-        {/* Without the pictures row, the camera is a row of its own here. */}
-        {!showRow && !isWeb ? (
-          <>
-            <Pressable
-              onPress={() => onClose(() => session.onPick('camera'))}
-              accessibilityRole="button"
-              accessibilityLabel={t('imageSource.camera')}
-              style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
-            >
-              <Icon name="camera-outline" size={22} color={colors.text} />
-              <Text style={styles.cardLabel}>{t('imageSource.camera')}</Text>
-            </Pressable>
+        <View style={[styles.card, { backgroundColor: tones.card }]}>
+          {/* Without the pictures row, the camera is a row of its own here. */}
+          {!showRow && !isWeb ? (
+            <>
+              <Pressable
+                onPress={() => onClose(() => session.onPick('camera'))}
+                accessibilityRole="button"
+                accessibilityLabel={t('imageSource.camera')}
+                style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+              >
+                <Icon name="camera-outline" size={22} color={colors.text} />
+                <Text style={styles.cardLabel}>{t('imageSource.camera')}</Text>
+              </Pressable>
 
-            <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
-          </>
-        ) : null}
+              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+            </>
+          ) : null}
 
-        <Pressable
-          onPress={() => onClose(() => session.onPick('files'))}
-          accessibilityRole="button"
-          accessibilityLabel={t('attach.addFiles')}
-          style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
-        >
-          <Icon name="document-outline" size={22} color={colors.text} />
-          <Text style={styles.cardLabel}>{t('attach.addFiles')}</Text>
-        </Pressable>
+          <Pressable
+            onPress={() => onClose(() => session.onPick('files'))}
+            accessibilityRole="button"
+            accessibilityLabel={t('attach.addFiles')}
+            style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+          >
+            <Icon name="document-outline" size={22} color={colors.text} />
+            <Text style={styles.cardLabel}>{t('attach.addFiles')}</Text>
+          </Pressable>
 
-        <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+          <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
 
-        <Pressable
-          onPress={openPersonas}
-          accessibilityRole="button"
-          accessibilityLabel={t('attach.persona')}
-          style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
-        >
-          <Icon name="person-outline" size={22} color={colors.text} />
-          <Text style={styles.cardLabel}>{t('attach.persona')}</Text>
-          <View style={styles.cardTrailing}>
-            <Text style={styles.cardTrailingText} numberOfLines={1}>
-              {session.persona?.name ? session.persona.name : t('attach.personaNone')}
-            </Text>
-            <Icon name="chevron-forward" size={17} color={colors.textFaint} />
-          </View>
-        </Pressable>
-      </View>
-      {recents === null ? <Text style={styles.recentsOff}>{t('attach.recentsOff')}</Text> : null}
-
-      {session.onToggleThinking ? (
-        <View style={[styles.card, styles.cardSecondary, { backgroundColor: tones.card }]}>
-          <View style={[styles.cardRow, styles.thinkingRow]}>
-            <View style={styles.thinkingLeft}>
-              <SFIcon name="brain" fallback="sparkles-outline" size={22} color={colors.text} />
-              <Text style={styles.cardLabel}>{t('chat.thinking')}</Text>
+          <Pressable
+            onPress={openPersonas}
+            accessibilityRole="button"
+            accessibilityLabel={t('attach.persona')}
+            style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+          >
+            <Icon name="person-outline" size={22} color={colors.text} />
+            <Text style={styles.cardLabel}>{t('attach.persona')}</Text>
+            <View style={styles.cardTrailing}>
+              <Text style={styles.cardTrailingText} numberOfLines={1}>
+                {session.persona?.name ? session.persona.name : t('attach.personaNone')}
+              </Text>
+              <Icon name="chevron-forward" size={17} color={colors.textFaint} />
             </View>
-            <Switch
-              value={thinking}
-              onValueChange={toggleThinking}
-              accessibilityLabel={t('chat.thinking')}
-              trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
-              {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
-              style={styles.nativeSwitch}
-            />
-          </View>
-        </View>
-      ) : null}
+          </Pressable>
 
-      {action ? <View style={styles.actionSlot}>{action}</View> : null}
-    </ScrollView>
+          {onOpenDirection ? (
+            <>
+              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+
+              <Pressable
+                onPress={openDirection}
+                accessibilityRole="button"
+                accessibilityLabel={t('direction.title')}
+                style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+              >
+                <SFIcon name="signpost.right" fallback="compass-outline" size={22} color={colors.text} />
+                <Text style={styles.cardLabel}>{t('direction.title')}</Text>
+                <View style={styles.cardTrailing}>
+                  {session.direction?.trim() ? (
+                    <Text style={styles.cardTrailingText} numberOfLines={1}>
+                      {session.direction.trim()}
+                    </Text>
+                  ) : null}
+                  <Icon name="chevron-forward" size={17} color={colors.textFaint} />
+                </View>
+              </Pressable>
+            </>
+          ) : null}
+        </View>
+        {recents === null ? <Text style={styles.recentsOff}>{t('attach.recentsOff')}</Text> : null}
+
+        {session.onToggleThinking ? (
+          <View style={[styles.card, styles.cardSecondary, { backgroundColor: tones.card }]}>
+            <View style={[styles.cardRow, styles.thinkingRow]}>
+              <View style={styles.thinkingLeft}>
+                <SFIcon name="brain" fallback="sparkles-outline" size={22} color={colors.text} />
+                <Text style={styles.cardLabel}>{t('chat.thinking')}</Text>
+              </View>
+              <Switch
+                value={thinking}
+                onValueChange={toggleThinking}
+                accessibilityLabel={t('chat.thinking')}
+                trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
+                {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
+                style={styles.nativeSwitch}
+              />
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
+      {action ? (
+        <Animated.View
+          onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
+          pointerEvents={hasSelection ? 'auto' : 'none'}
+          style={[
+            styles.actionFooter,
+            {
+              paddingBottom: Math.max(16, insets.bottom + 4),
+              backgroundColor: tones.sheet,
+              borderTopColor: colors.border,
+            },
+            animatedFooterStyle,
+          ]}
+        >
+          {action}
+        </Animated.View>
+      ) : null}
+    </View>
   )
 }
 
@@ -326,8 +409,10 @@ export function PersonaPicker({
   scrollStyle?: StyleProp<ViewStyle>
 }) {
   const colors = useColors()
+  const { scheme } = useTheme()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
+  const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const db = useDatabase()
   const router = useRouter()
@@ -504,6 +589,91 @@ export function PersonaPicker({
   )
 }
 
+// The direction editor, inside the attach sheet.
+export function DirectionEditor({
+  session,
+  onDone,
+  scrollStyle,
+}: {
+  session: AttachSession
+  onDone?: () => void
+  scrollStyle?: StyleProp<ViewStyle>
+}) {
+  const colors = useColors()
+  const { scheme } = useTheme()
+  const tones = useSheetTones({ noGlass: true })
+  const styles = useStyles(createStyles)
+  const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
+  const [value, setValue] = useState(session.direction ?? '')
+
+  const handleChange = (text: string) => {
+    setValue(text)
+    session.direction = text
+    session.onSetDirection?.(text)
+  }
+
+  const handleClear = () => {
+    Haptics.selectionAsync()
+    setValue('')
+    session.direction = ''
+    session.onSetDirection?.('')
+  }
+
+  if (nativeForm) {
+    return (
+      <NativeSheetForm>
+        <NativeSection fill={tones.card} top>
+          <NativeAreaRow
+            value={value}
+            onChangeText={handleChange}
+            placeholder={t('direction.placeholder')}
+            lines={6}
+            maxLines={15}
+          />
+        </NativeSection>
+        {value.trim() ? (
+          <NativeSection fill={tones.card}>
+            <NativeActionRow label={t('direction.clear')} destructive onPress={handleClear} />
+          </NativeSection>
+        ) : null}
+      </NativeSheetForm>
+    )
+  }
+
+  return (
+    <ScrollView
+      style={[styles.scroll, scrollStyle]}
+      contentContainerStyle={[styles.content, styles.personaContent]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={[styles.card, { backgroundColor: tones.card }]}>
+        <TextInput
+          value={value}
+          onChangeText={handleChange}
+          placeholder={t('direction.placeholder')}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.accent}
+          multiline
+          style={[styles.directionInput, { color: colors.text }]}
+        />
+      </View>
+      {value.trim() ? (
+        <View style={[styles.card, styles.cardSecondary, { backgroundColor: tones.card }]}>
+          <Pressable
+            onPress={handleClear}
+            style={({ pressed }) => [styles.cardRow, pressed && { backgroundColor: tones.pressed }]}
+          >
+            <Icon name="trash-outline" size={20} color={colors.danger} />
+            <Text style={[styles.cardLabel, { color: colors.danger }]}>{t('direction.clear')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </ScrollView>
+  )
+}
+
 // The whole stack of the system sheet (iOS, app/attach), which its screens measure the bar against.
 export const AttachStackContext = createContext<RefObject<View | null> | null>(null)
 
@@ -569,21 +739,23 @@ export function AttachSheet(props: AttachSheetProps) {
 
 function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheetProps) {
   const colors = useColors()
+  const { scheme } = useTheme()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
+  const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const router = useRouter()
   const { width } = useWindowDimensions()
-  const [screen, setScreen] = useState<'attach' | 'persona'>('attach')
+  const [screen, setScreen] = useState<'attach' | 'persona' | 'direction'>('attach')
   const [attachHeight, setAttachHeight] = useState<number | undefined>(undefined)
   const progress = useSharedValue(0)
   // Over the chat's background the main screen fades out under the picker instead of
   // being covered by the sheet's color, which would hide the background.
   const backdrop = useChatBackdrop(session?.look)
 
-  const go = (to: 'attach' | 'persona') => {
+  const go = (to: 'attach' | 'persona' | 'direction') => {
     setScreen(to)
-    progress.value = withSpring(to === 'persona' ? 1 : 0, { stiffness: 280, damping: 28, mass: 0.9 })
+    progress.value = withSpring(to === 'attach' ? 0 : 1, { stiffness: 280, damping: 28, mass: 0.9 })
   }
 
   const attachPaneStyle = useAnimatedStyle(() => ({
@@ -609,8 +781,14 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
         progress.value = 0
         onDismissed()
       }}
-      title={screen === 'persona' ? t('persona.pickerTitle') : t('attach.addToChat')}
-      onBack={screen === 'persona' ? () => go('attach') : undefined}
+      title={
+        screen === 'direction'
+          ? t('direction.title')
+          : screen === 'persona'
+            ? t('persona.pickerTitle')
+            : t('attach.addToChat')
+      }
+      onBack={screen !== 'attach' ? () => go('attach') : undefined}
       compactHeader
       noGlass
       glassButtons
@@ -658,7 +836,13 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
               if (h > 0) setAttachHeight(h)
             }}
           >
-            <AttachMenu key={session.opened} session={session} onClose={onClose} onOpenPersonas={() => go('persona')} />
+            <AttachMenu
+              key={session.opened}
+              session={session}
+              onClose={onClose}
+              onOpenPersonas={() => go('persona')}
+              onOpenDirection={() => go('direction')}
+            />
           </Animated.View>
 
           {/* Keeps the height of the main screen, so the sheet does not jump as it slides. */}
@@ -681,6 +865,23 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
               scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 380) } : null}
             />
           </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.pane,
+              screen === 'direction' ? styles.paneActive : styles.paneAbsolute,
+              attachHeight ? { minHeight: attachHeight } : null,
+              { backgroundColor: backdrop ? 'transparent' : tones.sheet },
+              personaPaneStyle,
+            ]}
+            pointerEvents={screen === 'direction' ? 'auto' : 'none'}
+          >
+            <DirectionEditor
+              session={session}
+              onDone={() => go('attach')}
+              scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 380) } : null}
+            />
+          </Animated.View>
         </View>
       ) : null}
     </BottomSheet>
@@ -689,6 +890,17 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
+    menuContainer: { flex: 1, position: 'relative' },
+    actionFooter: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 20,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+    },
     photosHeaderBtn: { paddingHorizontal: 8, paddingVertical: 4 },
     photosHeaderText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
     headerIconBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -737,6 +949,14 @@ const createStyles = (colors: Colors) =>
     card: { borderRadius: 24, overflow: 'hidden' },
     cardSecondary: { marginTop: 14 },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+    directionInput: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 16,
+      lineHeight: 22,
+      minHeight: 120,
+      textAlignVertical: 'top',
+    },
     separator: { height: StyleSheet.hairlineWidth, marginLeft: 52 },
     cardLabel: { flex: 1, color: colors.text, fontSize: 17 },
     cardTrailing: { flexDirection: 'row', alignItems: 'center', gap: 6 },

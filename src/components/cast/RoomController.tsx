@@ -410,7 +410,6 @@ export function RoomController({
     ...(canTalk ? [{ label: t('room.menuAutoplay'), systemImage: 'bubble.left.and.bubble.right', children: autoplayItems }] : []),
     { label: t('room.menuImportScene'), systemImage: 'square.and.arrow.down', onSelect: importScene },
     { label: t('chat.menuShowProfile'), systemImage: 'person.2.circle', onSelect: () => router.push(`/room/${room.id}?profile=1`) },
-    ...direction.menu,
     ...memoryMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
@@ -468,6 +467,8 @@ export function RoomController({
         persona: asideOpen ? undefined : persona,
         personaId: asideOpen ? undefined : personaId,
         onSelectPersona: asideOpen ? undefined : selectPersona,
+        direction: asideOpen ? undefined : direction.text,
+        onSetDirection: asideOpen ? undefined : direction.set,
         hushed: asideOpen || (whisper && addressees.length > 0 && !narration),
         toolbar:
           members.length && !asideOpen ? (

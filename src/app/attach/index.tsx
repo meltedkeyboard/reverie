@@ -52,7 +52,13 @@ export default function AttachScreen() {
   if (!session) return null
   return (
     <AttachScreenFrame look={session.look}>
-      <AttachMenu session={session} onClose={close} onOpenPersonas={() => router.push('/attach/persona')} scrollStyle={fillScreen} />
+      <AttachMenu
+        session={session}
+        onClose={close}
+        onOpenPersonas={() => router.push('/attach/persona')}
+        onOpenDirection={() => router.push('/attach/direction')}
+        scrollStyle={fillScreen}
+      />
     </AttachScreenFrame>
   )
 }

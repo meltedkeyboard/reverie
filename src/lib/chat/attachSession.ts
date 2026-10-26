@@ -13,8 +13,8 @@ const WITHOUT_RECENTS = 128
 const RECENTS_OFF_NOTE = 24
 
 // What the attach menu of the composer works with and where its choices go: the field's
-// pictures, the chat's thinking switch and persona. On iOS the menu is a form sheet of the
-// stack (app/attach), so it is passed around the router like the generator's draft.
+// pictures, the chat's thinking switch, persona and direction. On iOS the menu is a form sheet
+// of the stack (app/attach), so it is passed around the router like the generator's draft.
 export type AttachSession = {
   // Tells one opening from the next, so the app's own sheet starts its menu afresh.
   opened: number
@@ -31,6 +31,8 @@ export type AttachSession = {
   recents?: MessageImage[] | null
   personaId?: number | null
   onSelectPersona?: (personaId: number | null) => void
+  direction?: string | null
+  onSetDirection?: (direction: string) => void
   onPick: (source: ImageSource) => void
   onAttach: (pictures: MessageImage[]) => void
   // The menu is gone and nothing was chosen to follow it: the field may take the keyboard back.

@@ -793,7 +793,6 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) },
-    ...direction.menu,
     ...memoryMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
@@ -841,6 +840,8 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
         persona: asideOpen ? undefined : persona,
         personaId: asideOpen ? undefined : personaId,
         onSelectPersona: asideOpen ? undefined : selectPersona,
+        direction: asideOpen ? undefined : direction.text,
+        onSetDirection: asideOpen ? undefined : direction.set,
         onSend: (text, image) => {
           if (asideOpen) return void aside.ask(text, image)
           send(text, image)
