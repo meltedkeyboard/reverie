@@ -1,4 +1,5 @@
 import { Icon } from '@/components/visuals/Icon'
+import { BlurView } from 'expo-blur'
 import { Image } from 'expo-image'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useRouter } from 'expo-router'
@@ -76,6 +77,7 @@ export function AttachMenu({
   const styles = useStyles(createStyles)
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const backdrop = useContext(SheetBackdropContext)
   const db = useDatabase()
   const [thinking, setThinking] = useState(!!session.thinking)
   // undefined while being read, null when the row is switched off in Settings.
@@ -189,6 +191,27 @@ export function AttachMenu({
     </Pressable>
   ) : null
 
+  // Over the chat's background the bar under the button is frosted over it, as the rest of
+  // the menu shows it, instead of the sheet's own color.
+  const footer = action ? (
+    <Animated.View
+      onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
+      pointerEvents={hasSelection ? 'auto' : 'none'}
+      style={[
+        styles.actionFooter,
+        {
+          paddingBottom: Math.max(16, insets.bottom + 4),
+          backgroundColor: backdrop ? 'transparent' : tones.sheet,
+          borderTopColor: colors.border,
+        },
+        animatedFooterStyle,
+      ]}
+    >
+      {backdrop ? <BlurView tint={scheme} intensity={55} style={FILL} /> : null}
+      {action}
+    </Animated.View>
+  ) : null
+
   const toggleThinking = (value: boolean) => {
     Haptics.selectionAsync()
     setThinking(value)
@@ -251,23 +274,7 @@ export function AttachMenu({
             </NativeSection>
           ) : null}
         </NativeSheetForm>
-        {action ? (
-          <Animated.View
-            onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
-            pointerEvents={hasSelection ? 'auto' : 'none'}
-            style={[
-              styles.actionFooter,
-              {
-                paddingBottom: Math.max(16, insets.bottom + 4),
-                backgroundColor: tones.sheet,
-                borderTopColor: colors.border,
-              },
-              animatedFooterStyle,
-            ]}
-          >
-            {action}
-          </Animated.View>
-        ) : null}
+        {footer}
       </View>
     )
   }
@@ -373,23 +380,7 @@ export function AttachMenu({
           </View>
         ) : null}
       </ScrollView>
-      {action ? (
-        <Animated.View
-          onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
-          pointerEvents={hasSelection ? 'auto' : 'none'}
-          style={[
-            styles.actionFooter,
-            {
-              paddingBottom: Math.max(16, insets.bottom + 4),
-              backgroundColor: tones.sheet,
-              borderTopColor: colors.border,
-            },
-            animatedFooterStyle,
-          ]}
-        >
-          {action}
-        </Animated.View>
-      ) : null}
+      {footer}
     </View>
   )
 }

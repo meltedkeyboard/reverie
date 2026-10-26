@@ -164,7 +164,7 @@ export default function ServersScreen() {
 
   const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
     const { List, HStack, VStack, Spacer, Text: SwiftText, Button: SwiftButton, Image, Toggle, SwipeActions, ContextMenu } = ui
-    const { environment, tint, foregroundStyle, lineLimit, font, opacity, buttonStyle, labelStyle, accessibilityValue } = modifiers
+    const { environment, tint, foregroundStyle, lineLimit, font, opacity, buttonStyle, labelStyle, accessibilityValue, moveDisabled } = modifiers
     const secondary = { type: 'hierarchical', style: 'secondary' } as const
     return (
       <NativeForm modifiers={[environment('editMode', editing ? 'active' : 'inactive')]}>
@@ -176,42 +176,49 @@ export default function ServersScreen() {
               rest.splice(destination - sources.filter((i) => i < destination).length, 0, ...moved)
               reorder(rest)
             }}
+            onDelete={(indices) => list[indices[0]] && confirmDelete(list[indices[0]])}
           >
             {list.map((server) => {
               const current = server.id === activeId
               const status = stateLabel(server)
+              const row = (key?: string) => (
+                <HStack key={key} spacing={10}>
+                  {/* The whole row is this button; the info button keeps its own touch, being borderless. */}
+                  {/* The button paints its whole label in its tint, so the tone goes there: the
+                      name in it, the line under it a lighter shade of it. */}
+                  <SwiftButton onPress={() => use(server)} modifiers={[tint(toneOf(server) ?? colors.text), ...(status ? [accessibilityValue(status)] : [])]}>
+                    <HStack spacing={12}>
+                      <Image systemName="checkmark" size={15} color={colors.accent} modifiers={[opacity(current ? 1 : 0)]} />
+                      <VStack alignment="leading" spacing={2}>
+                        <SwiftText modifiers={[lineLimit(1)]}>{nameOf(server)}</SwiftText>
+                        {subtitle(server) ? (
+                          <SwiftText modifiers={[font({ textStyle: 'subheadline' }), foregroundStyle(secondary), lineLimit(1)]}>
+                            {subtitle(server)}
+                          </SwiftText>
+                        ) : null}
+                      </VStack>
+                    </HStack>
+                  </SwiftButton>
+                  <Spacer />
+                  <SwiftButton
+                    label={t('servers.open')}
+                    systemImage="info.circle"
+                    onPress={() => open(server)}
+                    modifiers={[buttonStyle('borderless'), labelStyle('iconOnly'), tint(colors.accent)]}
+                  />
+                </HStack>
+              )
+              // In Edit the row is only itself: the long press of a context menu lifts the
+              // row's preview as a drag of its own, which the list does not take as a move,
+              // so the row followed the finger and could not be put down anywhere.
+              if (editing) return row(server.id)
               return (
-                <SwipeActions key={server.id}>
+                // Out of Edit a long press is the menu, not the list's own drag.
+                <SwipeActions key={server.id} modifiers={[moveDisabled(true)]}>
                   {/* The long press is the list's own menu of the row, as in the cast sheet. */}
                   <ContextMenu>
                     <ContextMenu.Items>{menuItemViews(menuOf(server))}</ContextMenu.Items>
-                    <ContextMenu.Trigger>
-                      <HStack spacing={10}>
-                        {/* The whole row is this button; the info button keeps its own touch, being borderless. */}
-                        {/* The button paints its whole label in its tint, so the tone goes there: the
-                            name in it, the line under it a lighter shade of it. */}
-                        <SwiftButton onPress={() => use(server)} modifiers={[tint(toneOf(server) ?? colors.text), ...(status ? [accessibilityValue(status)] : [])]}>
-                          <HStack spacing={12}>
-                            <Image systemName="checkmark" size={15} color={colors.accent} modifiers={[opacity(current ? 1 : 0)]} />
-                            <VStack alignment="leading" spacing={2}>
-                              <SwiftText modifiers={[lineLimit(1)]}>{nameOf(server)}</SwiftText>
-                              {subtitle(server) ? (
-                                <SwiftText modifiers={[font({ textStyle: 'subheadline' }), foregroundStyle(secondary), lineLimit(1)]}>
-                                  {subtitle(server)}
-                                </SwiftText>
-                              ) : null}
-                            </VStack>
-                          </HStack>
-                        </SwiftButton>
-                        <Spacer />
-                        <SwiftButton
-                          label={t('servers.open')}
-                          systemImage="info.circle"
-                          onPress={() => open(server)}
-                          modifiers={[buttonStyle('borderless'), labelStyle('iconOnly'), tint(colors.accent)]}
-                        />
-                      </HStack>
-                    </ContextMenu.Trigger>
+                    <ContextMenu.Trigger>{row()}</ContextMenu.Trigger>
                   </ContextMenu>
                   {/* Not the destructive role: with it the row leaves the list before the question
                       is answered. */}

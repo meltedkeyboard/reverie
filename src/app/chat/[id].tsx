@@ -65,6 +65,7 @@ import { formatWhen } from '@/lib/core/format'
 import { isAndroid } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
+import { holdToastScheme } from '@/lib/ui/toast'
 import { FILL, fonts, HEADER_FONT_SCALE, SchemeOverride, useColors, useStyles, type Colors, type Scheme } from '@/theme'
 
 type Loaded = { chat: Chat; owner: Owner }
@@ -475,9 +476,11 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
 }
 
 // The status bar in the chat's scheme while the chat is on top; the app's comes back with
-// the screen pushed over it, as the bar mounted last is the one shown.
+// the screen pushed over it, as the bar mounted last is the one shown. A toast takes the
+// chat's scheme for as long, being drawn from the root.
 function ChatStatusBar({ scheme }: { scheme: Scheme }) {
   const focused = useIsFocused()
+  useEffect(() => (focused ? holdToastScheme(scheme) : undefined), [focused, scheme])
   return focused ? <StatusBar style={scheme === 'light' ? 'dark' : 'light'} /> : null
 }
 

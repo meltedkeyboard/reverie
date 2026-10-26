@@ -6,8 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { GlassSurface, useGlassStyles } from '../chrome/Glass'
-import { dismissToast, getToast, subscribeToast } from '@/lib/ui/toast'
-import { type Colors, FILL, fonts, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
+import { dismissToast, getToast, getToastScheme, subscribeToast, subscribeToastScheme } from '@/lib/ui/toast'
+import { type Colors, FILL, fonts, HEADER_ROW_HEIGHT, SchemeOverride, useColors, useStyles } from '@/theme'
 
 const SWIPE_AWAY = 28
 // Past the top edge by the card's own height, its distance from the edge and its shadow.
@@ -15,8 +15,17 @@ const SHADOW_ROOM = 24
 
 // Draws the toast from lib/toast over the screen, just under the header: it drops in from
 // above on a spring, and goes back up by itself, on a tap or on a swipe upwards. The last one stays
-// drawn while it leaves.
+// drawn while it leaves. Over a chat it takes the chat's scheme (`holdToastScheme`).
 export function ToastHost() {
+  const scheme = useSyncExternalStore(subscribeToastScheme, getToastScheme)
+  return (
+    <SchemeOverride scheme={scheme}>
+      <ToastCard />
+    </SchemeOverride>
+  )
+}
+
+function ToastCard() {
   const colors = useColors()
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
