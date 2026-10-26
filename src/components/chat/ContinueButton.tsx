@@ -11,6 +11,7 @@ import type { ContinueKind } from '@/db/prefs/continue'
 import { useLastChatContext } from '@/hooks/chat/useLastChat'
 import { useTranslation } from '@/i18n'
 import { formatWhen } from '@/lib/core/format'
+import { isIOS } from '@/lib/core/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
@@ -33,6 +34,10 @@ const ON_ACCENT_MUTED = 'rgba(255, 255, 255, 0.75)'
 const ON_ACCENT_FAINT = 'rgba(255, 255, 255, 0.6)'
 
 const HEIGHT = 56
+
+// The floating Liquid Glass tab bar of iOS 26 stands this far from the sides of the screen,
+// and the button lines up with it, so the two read as one column.
+const SIDE = isIOS ? 21 : 16
 
 // How much room the list leaves under its last card for the button.
 export const CONTINUE_BUTTON_SPACE = HEIGHT + 20
@@ -129,8 +134,8 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
         styles.slot,
         {
           bottom: bottom + 8,
-          left: Math.max(16, insets.left + 8),
-          right: Math.max(16, insets.right + 8),
+          left: Math.max(SIDE, insets.left + 8),
+          right: Math.max(SIDE, insets.right + 8),
         },
       ]}
       pointerEvents="box-none"
@@ -170,8 +175,6 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     slot: {
       position: 'absolute',
-      left: 16,
-      right: 16,
       maxWidth: 720,
       alignSelf: 'center',
     },

@@ -209,8 +209,9 @@ export function NativeActionRow({
   destructive?: boolean
   onPress: () => void
 }) {
+  const { colors } = useTheme()
   const { Button, useNativeState } = nativeForm!.ui
-  const { disabled: off, symbolEffect } = nativeForm!.modifiers
+  const { disabled: off, symbolEffect, tint } = nativeForm!.modifiers
   const running = useNativeState(busy)
   useEffect(() => {
     running.set(busy)
@@ -221,7 +222,8 @@ export function NativeActionRow({
       systemImage={symbol as never}
       role={destructive ? 'destructive' : undefined}
       onPress={onPress}
-      modifiers={[off(disabled || busy), ...(symbol ? [symbolEffect(effect, { isActive: running, options: { repeat: 'continuous' } })] : [])]}
+      // The destructive role reddens only the name: the symbol keeps the form's accent tint.
+      modifiers={[off(disabled || busy), ...(destructive ? [tint(colors.danger)] : []), ...(symbol ? [symbolEffect(effect, { isActive: running, options: { repeat: 'continuous' } })] : [])]}
     />
   )
 }

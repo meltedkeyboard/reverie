@@ -15,38 +15,65 @@ import {
 import { FONTS } from '@/lib/core/platform'
 import { THEMES, type Scheme, type ThemeMode, type ThemeName } from '@/theme'
 
-export type ServerSettings = {
+// One server the app can talk to. The context window is the server's: it is set to what its
+// model is loaded with, and every server has a model of its own.
+export type ServerProfile = {
+  id: string
+  name: string
   baseUrl: string
   apiKey: string
   model: string
-  // The model's context window, as set by hand: it changes with the model, so it is not per character.
   contextTokens: number
+}
+
+// What a request is made with: the current server, the limits on history that hold for every
+// server, and the servers to try in turn when the current one does not answer (none while
+// switching over is off).
+export type ServerSettings = ServerProfile & {
   // Whether to limit history by message count in addition to the token window.
   limitMessages: boolean
   // How many of the latest messages to send when limitMessages is on, in chats and in rooms separately.
   chatMessages: number
   roomMessages: number
+  fallbacks: ServerProfile[]
 }
 
-export const DEFAULT_SETTINGS: ServerSettings = {
+export const DEFAULT_SERVER: ServerProfile = {
+  id: '',
+  name: '',
   baseUrl: '',
   apiKey: '',
   model: '',
   contextTokens: DEFAULT_CONTEXT_TOKENS,
+}
+
+export const DEFAULT_SETTINGS: ServerSettings = {
+  ...DEFAULT_SERVER,
   limitMessages: false,
   chatMessages: CHAT_MESSAGES,
   roomMessages: ROOM_MESSAGES,
+  fallbacks: [],
 }
 
+export type ContextLimits = Pick<ServerSettings, 'limitMessages' | 'chatMessages' | 'roomMessages'>
+
 const KEYS = {
-  baseUrl: 'base_url',
-  apiKey: 'api_key',
-  model: 'model',
-  contextTokens: 'context_tokens',
   limitMessages: 'context_limit_messages',
   chatMessages: 'context_chat_messages',
   roomMessages: 'context_room_messages',
 } as const
+
+// The one server of the versions before the list, read once into its first entry.
+const LEGACY_SERVER_KEYS = {
+  baseUrl: 'base_url',
+  apiKey: 'api_key',
+  model: 'model',
+  contextTokens: 'context_tokens',
+} as const
+
+const SERVERS_KEY = 'servers'
+const ACTIVE_SERVER_KEY = 'active_server'
+const FAILOVER_KEY = 'server_failover'
 
 export async function getSetting(db: SQLiteDatabase, key: string) {
   const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', key)
@@ -128,23 +155,31 @@ function storedContext(value: string | undefined) {
     : DEFAULT_SETTINGS.contextTokens
 }
 
-export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> {
-  const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM app_settings')
-  const stored = new Map(rows.map((r) => [r.key, r.value]))
+function limitsOf(stored: Map<string, string>): ContextLimits {
   const rawLimit = stored.get(KEYS.limitMessages)
   const limitMessages =
     rawLimit !== undefined
       ? rawLimit === '1' || rawLimit === 'true'
       : stored.get('context_mode') === 'messages'
-
   return {
-    baseUrl: stored.get(KEYS.baseUrl) ?? DEFAULT_SETTINGS.baseUrl,
-    apiKey: stored.get(KEYS.apiKey) ?? DEFAULT_SETTINGS.apiKey,
-    model: stored.get(KEYS.model) ?? DEFAULT_SETTINGS.model,
-    contextTokens: storedContext(stored.get(KEYS.contextTokens)),
     limitMessages,
     chatMessages: positiveInt(stored.get(KEYS.chatMessages), DEFAULT_SETTINGS.chatMessages),
     roomMessages: positiveInt(stored.get(KEYS.roomMessages), DEFAULT_SETTINGS.roomMessages),
+  }
+}
+
+// The current server with the history limits, and the others in their order behind it when
+// switching over is on. A request made with it needs nothing else from the database.
+export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> {
+  const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM app_settings')
+  const stored = new Map(rows.map((r) => [r.key, r.value]))
+  const servers = await loadServers(db)
+  const active = servers.find((s) => s.id === stored.get(ACTIVE_SERVER_KEY)) ?? servers[0] ?? DEFAULT_SERVER
+  const failover = stored.get(FAILOVER_KEY) !== '0'
+  return {
+    ...active,
+    ...limitsOf(stored),
+    fallbacks: failover ? servers.filter((s) => s.id !== active.id && s.baseUrl.trim()) : [],
   }
 }
 
@@ -153,18 +188,165 @@ export async function loadSettings(db: SQLiteDatabase): Promise<ServerSettings> 
 // transaction" and the later keystrokes are lost. Saves are chained to run one at a time.
 let saveQueue: Promise<void> = Promise.resolve()
 
-export function saveSettings(db: SQLiteDatabase, settings: ServerSettings) {
-  const next = saveQueue.then(() =>
+function queued<T>(run: () => Promise<T>) {
+  const next = saveQueue.then(run)
+  saveQueue = next.then(
+    () => {},
+    () => {}
+  )
+  return next
+}
+
+export function saveContextLimits(db: SQLiteDatabase, limits: ContextLimits) {
+  return queued(() =>
     db.withTransactionAsync(async () => {
-      for (const field of Object.keys(KEYS) as (keyof typeof KEYS)[]) {
-        const val = field === 'limitMessages' ? (settings.limitMessages ? '1' : '0') : String(settings[field])
-        await setSetting(db, KEYS[field], val)
-      }
-      await setSetting(db, 'context_mode', settings.limitMessages ? 'messages' : 'tokens')
+      await setSetting(db, KEYS.limitMessages, limits.limitMessages ? '1' : '0')
+      await setSetting(db, KEYS.chatMessages, String(limits.chatMessages))
+      await setSetting(db, KEYS.roomMessages, String(limits.roomMessages))
+      await setSetting(db, 'context_mode', limits.limitMessages ? 'messages' : 'tokens')
     })
   )
-  saveQueue = next.catch(() => {})
-  return next
+}
+
+// The list of servers is kept as one JSON value in app_settings, which never leaves the
+// device: the folder sync copies the database without that table, so the keys stay here.
+const serverListeners = new Set<() => void>()
+
+export function onServersChanged(fn: () => void) {
+  serverListeners.add(fn)
+  return () => {
+    serverListeners.delete(fn)
+  }
+}
+
+function notifyServersChanged() {
+  serverListeners.forEach((fn) => fn())
+}
+
+function newServerId() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+}
+
+// The host of an address, the name a server goes by until it is given one.
+export function serverHost(baseUrl: string) {
+  return baseUrl.trim().replace(/^[a-z]+:\/\//i, '').replace(/\/.*$/, '')
+}
+
+export function serverName(server: Pick<ServerProfile, 'name' | 'baseUrl'>) {
+  return server.name.trim() || serverHost(server.baseUrl)
+}
+
+function profileOf(raw: unknown): ServerProfile | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (typeof r.id !== 'string' || !r.id) return null
+  const text = (v: unknown) => (typeof v === 'string' ? v : '')
+  return {
+    id: r.id,
+    name: text(r.name),
+    baseUrl: text(r.baseUrl),
+    apiKey: text(r.apiKey),
+    model: text(r.model),
+    contextTokens: storedContext(String(r.contextTokens)),
+  }
+}
+
+export async function loadServers(db: SQLiteDatabase): Promise<ServerProfile[]> {
+  const value = await getSetting(db, SERVERS_KEY)
+  if (value !== null) {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) return parsed.map(profileOf).filter((s): s is ServerProfile => s !== null)
+    } catch {
+      // A broken value reads as no servers rather than locking the app out of its settings.
+    }
+    return []
+  }
+  // Several screens read the settings as the app starts; they all wait on the one move.
+  legacyMove ??= moveLegacyServer(db).finally(() => {
+    legacyMove = null
+  })
+  return legacyMove
+}
+
+let legacyMove: Promise<ServerProfile[]> | null = null
+
+async function moveLegacyServer(db: SQLiteDatabase): Promise<ServerProfile[]> {
+  const value = await getSetting(db, SERVERS_KEY)
+  if (value !== null) return loadServers(db)
+  const baseUrl = (await getSetting(db, LEGACY_SERVER_KEYS.baseUrl)) ?? ''
+  if (!baseUrl.trim()) return []
+  const first: ServerProfile = {
+    id: newServerId(),
+    name: '',
+    baseUrl,
+    apiKey: (await getSetting(db, LEGACY_SERVER_KEYS.apiKey)) ?? '',
+    model: (await getSetting(db, LEGACY_SERVER_KEYS.model)) ?? '',
+    contextTokens: storedContext((await getSetting(db, LEGACY_SERVER_KEYS.contextTokens)) ?? undefined),
+  }
+  await setSetting(db, SERVERS_KEY, JSON.stringify([first]))
+  await setSetting(db, ACTIVE_SERVER_KEY, first.id)
+  return [first]
+}
+
+// Every change reads the list, changes it and writes it back in the queue, so two quick
+// keystrokes on two fields cannot write over each other.
+function changeServers(db: SQLiteDatabase, change: (servers: ServerProfile[]) => ServerProfile[]) {
+  return queued(async () => {
+    const next = change(await loadServers(db))
+    await setSetting(db, SERVERS_KEY, JSON.stringify(next))
+    notifyServersChanged()
+    return next
+  })
+}
+
+export async function loadActiveServerId(db: SQLiteDatabase) {
+  const servers = await loadServers(db)
+  const id = await getSetting(db, ACTIVE_SERVER_KEY)
+  return (servers.find((s) => s.id === id) ?? servers[0])?.id ?? null
+}
+
+export async function setActiveServer(db: SQLiteDatabase, id: string) {
+  await queued(() => setSetting(db, ACTIVE_SERVER_KEY, id))
+  notifyServersChanged()
+}
+
+// A new server at the end of the list; the first one is made the current one.
+export async function addServer(db: SQLiteDatabase, fields: Omit<ServerProfile, 'id'>) {
+  const server = { ...fields, id: newServerId() }
+  const list = await changeServers(db, (servers) => [...servers, server])
+  if (list.length === 1) await setActiveServer(db, server.id)
+  return server
+}
+
+export function updateServer(db: SQLiteDatabase, id: string, patch: Partial<Omit<ServerProfile, 'id'>>) {
+  return changeServers(db, (servers) => servers.map((s) => (s.id === id ? { ...s, ...patch } : s)))
+}
+
+// When the current server goes, the first of those left takes its place.
+export async function deleteServer(db: SQLiteDatabase, id: string) {
+  const active = await loadActiveServerId(db)
+  const list = await changeServers(db, (servers) => servers.filter((s) => s.id !== id))
+  if (active === id && list[0]) await setActiveServer(db, list[0].id)
+}
+
+// The order the servers take over in, given as their ids; one not named keeps its place at the end.
+export function orderServers(db: SQLiteDatabase, ids: string[]) {
+  return changeServers(db, (servers) => {
+    const rank = (s: ServerProfile) => {
+      const i = ids.indexOf(s.id)
+      return i < 0 ? ids.length : i
+    }
+    return [...servers].sort((a, b) => rank(a) - rank(b))
+  })
+}
+
+// Whether a server that does not answer hands the reply to the next one in the list.
+const failover = defineFlag(FAILOVER_KEY, true)
+export const loadFailover = failover.load
+export async function saveFailover(db: SQLiteDatabase, on: boolean) {
+  await failover.save(db, on)
+  notifyServersChanged()
 }
 
 // theme_preference once held the whole look ('warm', 'black', ...); it now holds only the

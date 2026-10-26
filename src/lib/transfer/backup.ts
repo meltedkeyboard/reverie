@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 import { backgroundToneOf, CHARACTER_COLUMNS, DEFAULT_SAMPLING, insertCharacter, type BackgroundEffect, type BackgroundTone, type ThinkingMode } from '@/db/characters'
 import { MESSAGE_COLUMNS } from '@/db/messages'
 import { DEFAULT_MEMBER, DEFAULT_ROOM, insertRoom, ROOM_COLUMNS, type FloorMode } from '@/db/rooms'
-import { loadSettings, saveSettings } from '@/db/prefs/settings'
+import { addServer, DEFAULT_SERVER, loadServers, loadSettings } from '@/db/prefs/settings'
 import { t } from '@/i18n'
 import { pickBackupFile } from '@/lib/transfer/pickBackup'
 import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/images/avatars'
@@ -701,8 +701,10 @@ export async function importBackup(
   if (personaIds.size) notifyPersonasChanged()
 
   if (dump.settings?.baseUrl) {
-    const current = await loadSettings(db)
-    if (!current.baseUrl) await saveSettings(db, { ...current, baseUrl: dump.settings.baseUrl, model: dump.settings.model ?? current.model })
+    // Brought in only onto a device that has no server yet; the key never travels in a backup.
+    if (!(await loadServers(db)).length) {
+      await addServer(db, { ...DEFAULT_SERVER, baseUrl: dump.settings.baseUrl, model: dump.settings.model ?? '' })
+    }
   }
 
   return { characters: characterIds.size, rooms: roomIds.size, chats: chatIds.size, personas: personaIds.size }

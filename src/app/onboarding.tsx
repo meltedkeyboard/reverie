@@ -24,7 +24,7 @@ import { SFIcon } from '@/components/visuals/SFIcon'
 import { ThemedWordmark } from '@/components/visuals/ThemedWordmark'
 import { setOnboardingComplete } from '@/db/prefs/onboarding'
 import { useDatabase } from '@/db/provider'
-import { saveSettings } from '@/db/prefs/settings'
+import { addServer, setActiveServer } from '@/db/prefs/settings'
 import { useServerForm } from '@/hooks/features/useServerForm'
 import { useTranslation } from '@/i18n'
 import { NativeMenu } from '@/components/overlays/NativeMenu'
@@ -107,7 +107,11 @@ export default function OnboardingScreen() {
 
   const finish = async (saveServer: boolean) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    if (saveServer) await saveSettings(db, { ...cfg, baseUrl: cfg.baseUrl.trim() })
+    if (saveServer) {
+      const { id: _id, ...fields } = cfg
+      const added = await addServer(db, { ...fields, baseUrl: cfg.baseUrl.trim() })
+      await setActiveServer(db, added.id)
+    }
     await setOnboardingComplete(db, true)
     router.replace('/')
   }

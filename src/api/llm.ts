@@ -2,12 +2,16 @@ import { fetch } from 'expo/fetch'
 import { AppState } from 'react-native'
 
 import type { ThinkingMode } from '@/db/characters'
-import { DEFAULT_SETTINGS, type ServerSettings } from '@/db/prefs/settings'
+import { DEFAULT_SETTINGS, serverName, type ServerProfile, type ServerSettings } from '@/db/prefs/settings'
 import { t } from '@/i18n'
 import { formatContextTokens } from '@/lib/core/context'
 import { errorMessage } from '@/lib/core/errors'
 import { isIOS } from '@/lib/core/platform'
 import { confirmAsync } from '@/lib/ui/dialogs'
+import { showToast } from '@/lib/ui/toast'
+
+// What a call to one server needs of it.
+type Server = Pick<ServerProfile, 'baseUrl' | 'apiKey' | 'model' | 'contextTokens'>
 
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 
@@ -38,7 +42,7 @@ export function normalizeBaseUrl(raw: string) {
   return withScheme.replace(/\/v1$/i, '')
 }
 
-function requestHeaders(cfg: ServerSettings) {
+function requestHeaders(cfg: Server) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (cfg.apiKey.trim()) headers.Authorization = `Bearer ${cfg.apiKey.trim()}`
   return headers
@@ -46,7 +50,11 @@ function requestHeaders(cfg: ServerSettings) {
 
 // Marks errors that already describe a server-side failure, so callers don't wrap
 // them again as "unreachable" -- independent of the message's language.
-class ServerError extends Error {}
+class ServerError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+  }
+}
 
 // The server answered, but with an error, as opposed to not answering at all.
 export function isServerError(err: unknown) {
@@ -58,21 +66,24 @@ async function readServerError(res: Awaited<ReturnType<typeof fetch>>) {
   try {
     const parsed = JSON.parse(body)
     const msg = typeof parsed.error === 'string' ? parsed.error : parsed.error?.message
-    if (msg) return new ServerError(t('llm.serverError', { status: res.status, msg }))
+    if (msg) return new ServerError(t('llm.serverError', { status: res.status, msg }), res.status)
   } catch {
     // Body is not JSON, fall through to the raw text.
   }
-  return new ServerError(t('llm.serverErrorNoMsg', { status: res.status, body: body ? `: ${body.slice(0, 200)}` : '' }))
+  return new ServerError(t('llm.serverErrorNoMsg', { status: res.status, body: body ? `: ${body.slice(0, 200)}` : '' }), res.status)
 }
 
+// The server did not answer at all, which is what makes another one take over.
+class UnreachableError extends Error {}
+
 function unreachable(err: unknown) {
-  return new Error(t('llm.unreachable', { detail: errorMessage(err) }))
+  return new UnreachableError(t('llm.unreachable', { detail: errorMessage(err) }))
 }
 
 class TimeoutError extends Error {}
 
 // A GET that gives up after ms, with the body read inside the same deadline.
-async function getJsonWithTimeout(cfg: ServerSettings, url: string, ms: number) {
+async function getJsonWithTimeout(cfg: Server, url: string, ms: number) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), ms)
   try {
@@ -123,7 +134,7 @@ async function probeLocalNetwork(url: string) {
   })
 }
 
-export async function testConnection(cfg: ServerSettings) {
+export async function testConnection(cfg: Server) {
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) throw new Error(t('llm.setBaseUrl'))
 
@@ -157,11 +168,11 @@ type ServerKind = { kind: 'lmstudio'; models: NativeModel[] } | { kind: 'ollama'
 const serverKinds = new Map<string, { at: number; server: ServerKind }>()
 const SERVER_KIND_TTL = 60_000
 
-function probeJson(cfg: ServerSettings, url: string) {
+function probeJson(cfg: Server, url: string) {
   return getJsonWithTimeout(cfg, url, 3000).catch(() => null)
 }
 
-async function detectServer(cfg: ServerSettings, base: string) {
+async function detectServer(cfg: Server, base: string) {
   const cached = serverKinds.get(base)
   if (cached && Date.now() - cached.at < SERVER_KIND_TTL) return cached.server
 
@@ -192,7 +203,7 @@ export type LoadedModelEntry = {
   paramSize?: string
 }
 
-export async function listLoadedModels(cfg: ServerSettings, fresh = false): Promise<LoadedModelEntry[]> {
+export async function listLoadedModels(cfg: Server, fresh = false): Promise<LoadedModelEntry[]> {
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) return []
 
@@ -234,7 +245,7 @@ export async function listLoadedModels(cfg: ServerSettings, fresh = false): Prom
 }
 
 export async function unloadSingleModel(
-  cfg: ServerSettings,
+  cfg: Server,
   target: string | { id?: string; key?: string },
 ): Promise<void> {
   const base = normalizeBaseUrl(cfg.baseUrl)
@@ -292,7 +303,7 @@ export async function unloadSingleModel(
   }
 }
 
-export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Promise<LoadedModelInfo> {
+export async function inspectLoadedModel(cfg: Server, fresh = false): Promise<LoadedModelInfo> {
   const base = normalizeBaseUrl(cfg.baseUrl)
   const modelName = cfg.model.trim()
   if (!base) return { isLoaded: false }
@@ -385,7 +396,7 @@ export async function inspectLoadedModel(cfg: ServerSettings, fresh = false): Pr
 // against the model first. LM Studio also cuts the thought off at thinking_budget_tokens
 // and lets the model answer, so the budget holds there whatever the model's habits;
 // elsewhere it is only the share of max_tokens set aside for thinking.
-async function reasoningFields(cfg: ServerSettings, base: string, mode: ThinkingMode, budget?: number) {
+async function reasoningFields(cfg: Server, base: string, mode: ThinkingMode, budget?: number) {
   if (mode === 'auto' && !budget) return {}
   const server = await detectServer(cfg, base)
   const capped = server.kind === 'lmstudio' && mode !== 'off' && budget ? { thinking_budget_tokens: budget } : {}
@@ -451,7 +462,7 @@ export function resetSkippedModelMismatch() {
 // If the server already has an active model with matching configuration, it does NOT reload it.
 // If there is a mismatch and options.interactive is true, it prompts the user with a modal dialog.
 export async function ensureModelLoaded(
-  cfg: ServerSettings,
+  cfg: Server,
   options?: EnsureLoadedOptions,
 ): Promise<{ loadedContextLength?: number } | null> {
   const base = normalizeBaseUrl(cfg.baseUrl)
@@ -532,7 +543,7 @@ export type LoadModelOptions = {
 }
 
 // Unloads active models from server memory (LM Studio and Ollama).
-export async function unloadModel(cfg: ServerSettings): Promise<void> {
+export async function unloadModel(cfg: Server): Promise<void> {
   const base = normalizeBaseUrl(cfg.baseUrl)
   if (!base) return
   serverKinds.delete(base)
@@ -627,7 +638,7 @@ export const unloadAllModels = unloadModel
 // LM Studio and Ollama have a call for it; llama.cpp and vLLM serve the model they were
 // started with, so there is nothing to load and the connection is all that is checked.
 export async function loadModel(
-  cfg: ServerSettings,
+  cfg: Server,
   options?: LoadModelOptions,
 ): Promise<{ loadedContextLength?: number }> {
   skippedMismatchKey = null
@@ -679,8 +690,102 @@ export async function loadModel(
   return { loadedContextLength: loadedContextLength ?? contextLength }
 }
 
+// Switching over. A server that did not answer is passed over for a minute and then tried first
+// again, which is how the replies come back to it once it is up. One that answered in the last
+// half a minute is not checked before a request, so while things work a message costs nothing
+// more; the check is there because a request to a LAN address that is down hangs for a long
+// time before it fails.
+const DOWN_FOR = 60_000
+const UP_FOR = 30_000
+const PROBE_MS = 4000
+const downUntil = new Map<string, number>()
+const upAt = new Map<string, number>()
+// Who answered last in place of each current server, so a switch is told once, not per reply.
+const answering = new Map<string, string>()
+
+// Only a server that is not there hands the reply on: one that answered with an error (no such
+// model, a bad request) would answer the next one the same way.
+function isOutage(err: unknown) {
+  return (
+    err instanceof UnreachableError ||
+    err instanceof TimeoutError ||
+    (err instanceof ServerError && (err.status === 502 || err.status === 503 || err.status === 504))
+  )
+}
+
+// Whether the server answers at all: an error it sends back still counts as an answer.
+export async function probeServer(cfg: Server) {
+  const base = normalizeBaseUrl(cfg.baseUrl)
+  if (!base) return false
+  await askLocalNetworkAccess(`${base}/v1/models`)
+  try {
+    await getJsonWithTimeout(cfg, `${base}/v1/models`, PROBE_MS)
+  } catch (err) {
+    if (!(err instanceof ServerError) || isOutage(err)) return false
+  }
+  upAt.set(base, Date.now())
+  return true
+}
+
+function answersLately(base: string) {
+  return Date.now() - (upAt.get(base) ?? 0) < UP_FOR
+}
+
+function tellSwitch(current: ServerProfile, server: ServerProfile) {
+  const own = normalizeBaseUrl(current.baseUrl)
+  const base = normalizeBaseUrl(server.baseUrl)
+  const before = answering.get(own) ?? own
+  answering.set(own, base)
+  if (before === base) return
+  if (base === own) {
+    showToast({ tone: 'info', title: t('servers.backTitle', { name: serverName(current) }) })
+  } else {
+    showToast({
+      tone: 'info',
+      title: t('servers.switchedTitle', { name: serverName(server) }),
+      message: t('servers.switchedMessage', { name: serverName(current) }),
+    })
+  }
+}
+
+// The current server first and the others in their order, those that just failed last. A
+// reply that has begun to come is not moved: only a server that gave no answer is passed by.
 async function requestCompletion(
   cfg: ServerSettings,
+  req: ChatRequest,
+  stream: boolean,
+  signal?: AbortSignal,
+  options?: EnsureLoadedOptions,
+) {
+  if (!cfg.fallbacks.length) return requestFrom(cfg, req, stream, signal, options)
+
+  const now = Date.now()
+  const isDown = (s: ServerProfile) => (downUntil.get(normalizeBaseUrl(s.baseUrl)) ?? 0) > now
+  const all: ServerProfile[] = [cfg, ...cfg.fallbacks]
+  const order = [...all.filter((s) => !isDown(s)), ...all.filter(isDown)]
+  let failure: unknown
+  for (const server of order) {
+    if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
+    const base = normalizeBaseUrl(server.baseUrl)
+    try {
+      if (!answersLately(base) && !(await probeServer(server))) throw new UnreachableError(t('servers.noAnswer'))
+      const res = await requestFrom(server, req, stream, signal, options)
+      downUntil.delete(base)
+      upAt.set(base, Date.now())
+      tellSwitch(cfg, server)
+      return res
+    } catch (err) {
+      if (signal?.aborted || !isOutage(err)) throw err
+      downUntil.set(base, Date.now() + DOWN_FOR)
+      upAt.delete(base)
+      failure ??= err
+    }
+  }
+  throw failure
+}
+
+async function requestFrom(
+  cfg: Server,
   req: ChatRequest,
   stream: boolean,
   signal?: AbortSignal,
