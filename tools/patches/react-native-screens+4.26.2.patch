@@ -1,8 +1,14 @@
 diff --git a/node_modules/react-native-screens/ios/RNSScreen.mm b/node_modules/react-native-screens/ios/RNSScreen.mm
-index 9b66012..2728c9a 100644
+index 9b66012..e859170 100644
 --- a/node_modules/react-native-screens/ios/RNSScreen.mm
 +++ b/node_modules/react-native-screens/ios/RNSScreen.mm
-@@ -845,6 +845,44 @@ RNS_IGNORE_SUPER_CALL_END
+@@ -1,4 +1,5 @@
+ #import <UIKit/UIKit.h>
++#import <objc/runtime.h>
+ 
+ #import "RNSModalScreen.h"
+ #import "RNSScreen.h"
+@@ -845,6 +846,44 @@ RNS_IGNORE_SUPER_CALL_END
    }
  }
  
@@ -14,11 +20,11 @@ index 9b66012..2728c9a 100644
 +#if RNS_IPHONE_OS_VERSION_AVAILABLE(26_1)
 +  if (@available(iOS 26.1, *)) {
 +    UIColor *color = [self opaqueContentColorIn:self depth:4] ?: UIColor.systemBackgroundColor;
-+    UIColorEffect *current = [sheet.backgroundEffect isKindOfClass:UIColorEffect.class]
-+        ? (UIColorEffect *)sheet.backgroundEffect
-+        : nil;
-+    if (current == nil || ![current.color isEqual:color]) {
++    // UIColorEffect does not say its color, so the one set last is kept on the sheet.
++    UIColor *current = objc_getAssociatedObject(sheet, @selector(setSolidBackgroundForSheet:));
++    if (![sheet.backgroundEffect isKindOfClass:UIColorEffect.class] || ![current isEqual:color]) {
 +      sheet.backgroundEffect = [UIColorEffect effectWithColor:color];
++      objc_setAssociatedObject(sheet, @selector(setSolidBackgroundForSheet:), color, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 +    }
 +  }
 +#endif
@@ -47,7 +53,7 @@ index 9b66012..2728c9a 100644
  - (void)setLargestUndimmedDetentForSheet:(UISheetPresentationController *)sheet
                                        to:(UISheetPresentationControllerDetentIdentifier)detent
                                   animate:(BOOL)animate
-@@ -993,6 +1031,7 @@ RNS_IGNORE_SUPER_CALL_END
+@@ -993,6 +1032,7 @@ RNS_IGNORE_SUPER_CALL_END
    sheet.prefersScrollingExpandsWhenScrolledToEdge = _sheetExpandsWhenScrolledToEdge;
    [self setGrabberVisibleForSheet:sheet to:_sheetGrabberVisible animate:YES];
    [self setCornerRadiusForSheet:sheet to:_sheetCornerRadius animate:YES];

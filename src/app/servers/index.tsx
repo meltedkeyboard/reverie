@@ -29,7 +29,7 @@ type Reach = 'up' | 'down'
 const PROBE_EVERY = 10_000
 
 // Where a server's answer is kept: by its address too, so an address changed on its screen
-// is not shown with the old one's dot.
+// is not shown in the old one's color.
 const reachKey = (s: ServerProfile) => `${s.id} ${s.baseUrl.trim()}`
 
 // The servers, opened from Settings, as the networks of the Wi-Fi settings: a tap uses one,
@@ -111,7 +111,20 @@ export default function ServersScreen() {
     { label: t('common.delete'), systemImage: 'trash', destructive: true, separated: true, onSelect: () => confirmDelete(server) },
   ]
 
-  const subtitle = (server: ServerProfile) => [server.baseUrl.trim(), server.model.trim()].filter(Boolean).join(' · ')
+  // A server with no name of its own goes by its address already, so the line under it has only the model.
+  // A server's name is green while it answers and red while it does not; before the first
+  // answer, or with no address, it is in the text's own color.
+  const toneOf = (server: ServerProfile) => {
+    const state = reach[reachKey(server)]
+    return state ? (state === 'up' ? colors.success : colors.danger) : undefined
+  }
+  const stateLabel = (server: ServerProfile) => {
+    const state = reach[reachKey(server)]
+    return state ? t(state === 'up' ? 'servers.up' : 'servers.down') : undefined
+  }
+
+  const subtitle = (server: ServerProfile) =>
+    [server.name.trim() ? server.baseUrl.trim() : '', server.model.trim()].filter(Boolean).join(' · ')
 
   // The bar's buttons: Edit while there is an order to change, and the plus. Edit is left
   // when the list falls to one server, so the list is not stuck in it.
@@ -151,7 +164,7 @@ export default function ServersScreen() {
 
   const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
     const { List, HStack, VStack, Spacer, Text: SwiftText, Button: SwiftButton, Image, Toggle, SwipeActions, ContextMenu } = ui
-    const { environment, tint, foregroundStyle, lineLimit, font, opacity, buttonStyle, labelStyle, accessibilityLabel } = modifiers
+    const { environment, tint, foregroundStyle, lineLimit, font, opacity, buttonStyle, labelStyle, accessibilityValue } = modifiers
     const secondary = { type: 'hierarchical', style: 'secondary' } as const
     return (
       <NativeForm modifiers={[environment('editMode', editing ? 'active' : 'inactive')]}>
@@ -166,7 +179,7 @@ export default function ServersScreen() {
           >
             {list.map((server) => {
               const current = server.id === activeId
-              const state = reach[reachKey(server)]
+              const status = stateLabel(server)
               return (
                 <SwipeActions key={server.id}>
                   {/* The long press is the list's own menu of the row, as in the cast sheet. */}
@@ -175,7 +188,9 @@ export default function ServersScreen() {
                     <ContextMenu.Trigger>
                       <HStack spacing={10}>
                         {/* The whole row is this button; the info button keeps its own touch, being borderless. */}
-                        <SwiftButton onPress={() => use(server)} modifiers={[tint(colors.text)]}>
+                        {/* The button paints its whole label in its tint, so the tone goes there: the
+                            name in it, the line under it a lighter shade of it. */}
+                        <SwiftButton onPress={() => use(server)} modifiers={[tint(toneOf(server) ?? colors.text), ...(status ? [accessibilityValue(status)] : [])]}>
                           <HStack spacing={12}>
                             <Image systemName="checkmark" size={15} color={colors.accent} modifiers={[opacity(current ? 1 : 0)]} />
                             <VStack alignment="leading" spacing={2}>
@@ -189,14 +204,6 @@ export default function ServersScreen() {
                           </HStack>
                         </SwiftButton>
                         <Spacer />
-                        {state ? (
-                          <Image
-                            systemName="circle.fill"
-                            size={8}
-                            color={state === 'up' ? colors.success : colors.textFaint}
-                            modifiers={[accessibilityLabel(t(state === 'up' ? 'servers.up' : 'servers.down'))]}
-                          />
-                        ) : null}
                         <SwiftButton
                           label={t('servers.open')}
                           systemImage="info.circle"
@@ -260,27 +267,22 @@ export default function ServersScreen() {
       }
       renderItem={({ item: server }) => {
         const current = server.id === activeId
-        const state = reach[reachKey(server)]
+        const tone = toneOf(server)
+        const status = stateLabel(server)
         return (
           <ListCard onOpen={() => use(server)} onDelete={() => confirmDelete(server)} menu={menuOf(server)} menuTitle={nameOf(server)}>
-            <View style={styles.row}>
+            <View style={styles.row} accessibilityValue={status ? { text: status } : undefined}>
               <View style={styles.check}>{current ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} /> : null}</View>
               <View style={styles.info}>
-                <Text style={styles.name} numberOfLines={1}>
+                <Text style={[styles.name, tone && { color: tone }]} numberOfLines={1}>
                   {nameOf(server)}
                 </Text>
                 {subtitle(server) ? (
-                  <Text style={styles.subtitle} numberOfLines={1}>
+                  <Text style={[styles.subtitle, tone && { color: tone, opacity: 0.7 }]} numberOfLines={1}>
                     {subtitle(server)}
                   </Text>
                 ) : null}
               </View>
-              {state ? (
-                <View
-                  style={[styles.dot, { backgroundColor: state === 'up' ? colors.success : colors.textFaint }]}
-                  accessibilityLabel={t(state === 'up' ? 'servers.up' : 'servers.down')}
-                />
-              ) : null}
               <Pressable onPress={() => open(server)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('servers.open')}>
                 <SFIcon name="info.circle" fallback="information-circle-outline" size={22} color={colors.accent} />
               </Pressable>
@@ -307,6 +309,5 @@ const createStyles = (colors: Colors) =>
     info: { flex: 1, gap: 2 },
     name: { fontSize: 16, fontWeight: '600', color: colors.text },
     subtitle: { fontSize: 13, color: colors.textMuted },
-    dot: { width: 8, height: 8, borderRadius: 4 },
     footer: { marginTop: 24 },
   })
