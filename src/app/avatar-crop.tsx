@@ -3,7 +3,7 @@ import { Image } from 'expo-image'
 import { ImageManipulator } from 'expo-image-manipulator'
 import { useNavigation, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { StyleSheet, Text, View, type LayoutChangeEvent, type ViewInstance } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -165,7 +165,7 @@ export default function AvatarCropScreen() {
     })
   // A mouse cannot pinch: on the desktop the wheel (and a trackpad pinch, which arrives as a
   // wheel with ctrl held) zooms around the cursor. Taken in the capture phase, like the chat list.
-  const screen = useRef<View>(null)
+  const screen = useRef<ViewInstance>(null)
   useEffect(() => {
     const node = screen.current as unknown as HTMLElement | null
     if (!isWeb || !node) return

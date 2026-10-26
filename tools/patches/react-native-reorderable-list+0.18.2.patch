@@ -1,8 +1,43 @@
+diff --git a/node_modules/react-native-reorderable-list/lib/typescript/components/ReorderableListCore.d.ts b/node_modules/react-native-reorderable-list/lib/typescript/components/ReorderableListCore.d.ts
+index 9cbaddd..0627cd4 100644
+--- a/node_modules/react-native-reorderable-list/lib/typescript/components/ReorderableListCore.d.ts
++++ b/node_modules/react-native-reorderable-list/lib/typescript/components/ReorderableListCore.d.ts
+@@ -1,6 +1,8 @@
+ import React, { Dispatch, RefObject, SetStateAction } from 'react';
+ import { FlatList, ScrollView } from 'react-native';
+-import { NativeGesture } from 'react-native-gesture-handler';
++import {Gesture} from 'react-native-gesture-handler';
++// The gesture-handler 3 type of Gesture.Native(); its NativeGesture is the new API's.
++type NativeGesture = ReturnType<typeof Gesture.Native>;
+ import { SharedValue } from 'react-native-reanimated';
+ import { ReorderableListProps } from '../types';
+ interface ReorderableListCoreProps<T> extends ReorderableListProps<T> {
+diff --git a/node_modules/react-native-reorderable-list/lib/typescript/contexts/ScrollViewContainerContext.d.ts b/node_modules/react-native-reorderable-list/lib/typescript/contexts/ScrollViewContainerContext.d.ts
+index 588f8fb..f4623d0 100644
+--- a/node_modules/react-native-reorderable-list/lib/typescript/contexts/ScrollViewContainerContext.d.ts
++++ b/node_modules/react-native-reorderable-list/lib/typescript/contexts/ScrollViewContainerContext.d.ts
+@@ -1,6 +1,8 @@
+ import React, { Dispatch, SetStateAction } from 'react';
+ import { ScrollView } from 'react-native';
+-import { NativeGesture } from 'react-native-gesture-handler';
++import {Gesture} from 'react-native-gesture-handler';
++// The gesture-handler 3 type of Gesture.Native(); its NativeGesture is the new API's.
++type NativeGesture = ReturnType<typeof Gesture.Native>;
+ import { SharedValue } from 'react-native-reanimated';
+ interface ScrollViewContainerContextData {
+     scrollViewContainerRef: React.RefObject<ScrollView>;
 diff --git a/node_modules/react-native-reorderable-list/lib/typescript/types/props.d.ts b/node_modules/react-native-reorderable-list/lib/typescript/types/props.d.ts
-index 3512a7a..5b26262 100644
+index 009f1a7..8e12b76 100644
 --- a/node_modules/react-native-reorderable-list/lib/typescript/types/props.d.ts
 +++ b/node_modules/react-native-reorderable-list/lib/typescript/types/props.d.ts
-@@ -75,6 +75,10 @@ export interface ReorderableListProps<T> extends Omit<FlatListProps<T>, OmittedP
+@@ -1,5 +1,5 @@
+ import type { FlatListProps, MatrixTransform, PerspectiveTransform, RotateTransform, RotateXTransform, RotateYTransform, RotateZTransform, ScaleTransform, ScaleXTransform, ScaleYTransform, ScrollViewProps, SkewXTransform, SkewYTransform, TranslateXTransform, TranslateYTransform, ViewStyle } from 'react-native';
+-import { PanGesture } from 'react-native-gesture-handler';
++import { LegacyPanGesture as PanGesture } from 'react-native-gesture-handler';
+ import { SharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
+ import { ItemLayoutAnimation, MaximumOneOf, SharedValueOrType } from './misc';
+ export interface ReorderableListReorderEvent {
+@@ -74,6 +74,10 @@ export interface ReorderableListProps<T> extends Omit<FlatListProps<T>, OmittedP
       * Scales the autoscroll spreed at which the list scrolls when an item is dragged to the scroll areas. Default: `1`.
       */
      autoscrollSpeedScale?: number;
@@ -44,7 +79,7 @@ index 8a1d860..44bf791 100644
            currentIndex.value >= 0 &&
            draggedIndex.value >= 0
 diff --git a/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx b/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
-index 81bdff2..5f5d99f 100644
+index 7f1ca89..0ec0cf6 100644
 --- a/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
 +++ b/node_modules/react-native-reorderable-list/src/components/ReorderableListCore.tsx
 @@ -5,6 +5,7 @@ import React, {
@@ -72,7 +107,7 @@ index 81bdff2..5f5d99f 100644
    const dragXY = useSharedValue(0);
    const currentIndex = useSharedValue(-1);
    const draggedIndex = useSharedValue(-1);
-@@ -508,13 +512,38 @@ const ReorderableListCore = <T,>(
+@@ -504,13 +508,38 @@ const ReorderableListCore = <T,>(
      }
    };
  
@@ -115,7 +150,7 @@ index 81bdff2..5f5d99f 100644
    };
  
    const recomputeLayout = useCallback(
-@@ -566,10 +595,20 @@ const ReorderableListCore = <T,>(
+@@ -562,10 +591,20 @@ const ReorderableListCore = <T,>(
      const currentCenter = currentOffset + currentSize * 0.5;
  
      const max = itemCount.value;
@@ -138,7 +173,7 @@ index 81bdff2..5f5d99f 100644
  
      if (currentIndex.value !== possibleIndex) {
        let possibleOffset = itemOffset.value[possibleIndex];
-@@ -880,6 +919,7 @@ const ReorderableListCore = <T,>(
+@@ -876,6 +915,7 @@ const ReorderableListCore = <T,>(
            // we let it continue (no-op).
            if (state.value !== ReorderableListState.AUTOSCROLL) {
              state.value = ReorderableListState.AUTOSCROLL;
@@ -146,7 +181,7 @@ index 81bdff2..5f5d99f 100644
              lastAutoscrollTrigger.value = autoscrollTrigger.value;
              autoscrollTrigger.value *= -1;
            }
-@@ -897,10 +937,17 @@ const ReorderableListCore = <T,>(
+@@ -893,10 +933,17 @@ const ReorderableListCore = <T,>(
          autoscrollTrigger.value !== lastAutoscrollTrigger.value &&
          state.value === ReorderableListState.AUTOSCROLL
        ) {
@@ -165,7 +200,7 @@ index 81bdff2..5f5d99f 100644
  
          if (autoscrollIncrement !== 0) {
            let scrollOffset = flatListScrollOffsetXY.value;
-@@ -924,7 +971,8 @@ const ReorderableListCore = <T,>(
+@@ -920,7 +967,8 @@ const ReorderableListCore = <T,>(
              listRef,
              horizontalProp.value ? scrollToValue : 0,
              horizontalProp.value ? 0 : scrollToValue,
@@ -175,7 +210,7 @@ index 81bdff2..5f5d99f 100644
            );
          }
        }
-@@ -1007,6 +1055,17 @@ const ReorderableListCore = <T,>(
+@@ -1003,6 +1051,17 @@ const ReorderableListCore = <T,>(
          return;
        }
  
@@ -193,7 +228,7 @@ index 81bdff2..5f5d99f 100644
        // Allow new drag when item is completely released.
        if (state.value === ReorderableListState.IDLE) {
          // Resetting shared values again fixes a flickeing bug in nested lists where
-@@ -1036,6 +1095,7 @@ const ReorderableListCore = <T,>(
+@@ -1032,6 +1091,7 @@ const ReorderableListCore = <T,>(
      },
      [
        dragEnabledProp,
@@ -201,10 +236,34 @@ index 81bdff2..5f5d99f 100644
        resetSharedValues,
        shouldUpdateActiveItem,
        dragInitialScrollOffsetXY,
+diff --git a/node_modules/react-native-reorderable-list/src/contexts/ScrollViewContainerContext.ts b/node_modules/react-native-reorderable-list/src/contexts/ScrollViewContainerContext.ts
+index f3d6fcb..5c069ab 100644
+--- a/node_modules/react-native-reorderable-list/src/contexts/ScrollViewContainerContext.ts
++++ b/node_modules/react-native-reorderable-list/src/contexts/ScrollViewContainerContext.ts
+@@ -1,7 +1,9 @@
+ import React, {Dispatch, SetStateAction} from 'react';
+ import {ScrollView} from 'react-native';
+ 
+-import {NativeGesture} from 'react-native-gesture-handler';
++import {Gesture} from 'react-native-gesture-handler';
++// The gesture-handler 3 type of Gesture.Native(); its NativeGesture is the new API's.
++type NativeGesture = ReturnType<typeof Gesture.Native>;
+ import {SharedValue} from 'react-native-reanimated';
+ 
+ interface ScrollViewContainerContextData {
 diff --git a/node_modules/react-native-reorderable-list/src/types/props.ts b/node_modules/react-native-reorderable-list/src/types/props.ts
-index cc69dcb..a150762 100644
+index cc69dcb..2d20dde 100644
 --- a/node_modules/react-native-reorderable-list/src/types/props.ts
 +++ b/node_modules/react-native-reorderable-list/src/types/props.ts
+@@ -17,7 +17,7 @@ import type {
+   ViewStyle,
+ } from 'react-native';
+ 
+-import {PanGesture} from 'react-native-gesture-handler';
++import {LegacyPanGesture as PanGesture} from 'react-native-gesture-handler';
+ import {SharedValue, useAnimatedScrollHandler} from 'react-native-reanimated';
+ 
+ import {ItemLayoutAnimation, MaximumOneOf, SharedValueOrType} from './misc';
 @@ -112,6 +112,11 @@ export interface ReorderableListProps<T>
     * Scales the autoscroll spreed at which the list scrolls when an item is dragged to the scroll areas. Default: `1`.
     */

@@ -67,11 +67,11 @@ export async function readAvatarBytes(name: string, kind: ImageKind = 'avatars')
 }
 
 export function writeAvatarBytes(name: string, bytes: Uint8Array, kind: ImageKind = 'avatars') {
-  new File(writableFolder(kind), name).write(bytes)
+  new File(writableFolder(kind), name).writeSync(bytes)
 }
 
 export async function writeAvatarBase64(name: string, base64: string, kind: ImageKind = 'avatars') {
-  new File(writableFolder(kind), name).write(toByteArray(base64))
+  new File(writableFolder(kind), name).writeSync(toByteArray(base64))
 }
 
 export function removeAllAvatars() {

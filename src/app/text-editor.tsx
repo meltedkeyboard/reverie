@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, TextInput, View } from 'react-native'
+import { StyleSheet, TextInput, View, type TextInputInstance } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -21,7 +21,7 @@ export default function TextEditorScreen() {
   const styles = useStyles(createStyles)
   const inputColors = useInputColors()
   const { t } = useTranslation()
-  const input = useRef<TextInput>(null)
+  const input = useRef<TextInputInstance>(null)
   // Read once: the draft may be replaced under a screen still closing.
   const [draft] = useState(textDraft)
   const [text, setText] = useState(draft?.value ?? '')

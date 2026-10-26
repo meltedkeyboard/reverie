@@ -1,6 +1,6 @@
 import { Stack, ThemeProvider, useTheme as useNavigationTheme } from 'expo-router'
 import { useEffect, useMemo, useRef } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, View, type ViewInstance } from 'react-native'
 
 import { AttachStackContext } from '@/components/chat/AttachMenu'
 import { useStore } from '@/components/chat/thread/store'
@@ -35,7 +35,7 @@ function CastStack() {
   // Over the room's background the bar is see-through and the screen draws the background
   // from under it (AttachScreenFrame).
   const backdrop = useChatBackdrop(cast?.look)
-  const root = useRef<View>(null)
+  const root = useRef<ViewInstance>(null)
 
   // The root layout tells the scene once the sheet has finished going away; should that
   // report never come, the scene still hears it a moment after the sheet is gone.

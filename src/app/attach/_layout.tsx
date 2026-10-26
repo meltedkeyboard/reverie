@@ -1,6 +1,6 @@
 import { Stack, ThemeProvider, useTheme as useNavigationTheme } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, View, type ViewInstance } from 'react-native'
 
 import { AttachStackContext } from '@/components/chat/AttachMenu'
 import { ChatBackdrop, useChatBackdrop, useChatBackdropTone } from '@/components/chrome/ChatChrome'
@@ -36,7 +36,7 @@ function AttachStack({ session }: { session: AttachSession | null }) {
   // from under it (AttachScreenFrame); the one under the stack shows should a screen be
   // clipped to its own frame.
   const backdrop = useChatBackdrop(session?.look)
-  const root = useRef<View>(null)
+  const root = useRef<ViewInstance>(null)
 
   // The root layout runs what follows the menu once the sheet has finished going away;
   // should that report never come, the menu still lets go a moment after it is gone.

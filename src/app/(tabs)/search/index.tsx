@@ -226,7 +226,7 @@ export default function SearchScreen() {
     ) : (
       <EmptyState title={t('search.emptyTitle')} text={t('search.emptyText')} />
     )
-  ) : null
+  ) : undefined
 
   const listHeader = isWeb ? (
     <TextInput
@@ -239,7 +239,7 @@ export default function SearchScreen() {
       autoCapitalize="none"
       style={styles.field}
     />
-  ) : null
+  ) : undefined
 
   const list = (contentStyle: object) => (
     <SectionList

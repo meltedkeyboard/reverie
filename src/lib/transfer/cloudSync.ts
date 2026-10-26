@@ -133,7 +133,7 @@ async function makeSnapshot(db: SQLiteDatabase, snapshot: File) {
     try {
       await copy.execAsync('DELETE FROM app_settings')
       const images = await referencedImages(copy, 'main')
-      snapshot.write(await copy.serializeAsync('main'))
+      snapshot.writeSync(await copy.serializeAsync('main'))
       return images
     } finally {
       await copy.closeAsync()
@@ -170,7 +170,7 @@ async function push(db: SQLiteDatabase) {
     const manifest: Manifest = { app: 'reverie', rev: newRev(), schema: SCHEMA_VERSION, savedAt: Date.now() }
     const manifestFile = workFile(MANIFEST)
     manifestFile.create({ overwrite: true })
-    manifestFile.write(JSON.stringify(manifest))
+    manifestFile.writeSync(JSON.stringify(manifest))
     await folder().copyOut(manifestFile.uri, MANIFEST)
     await markSynced(db, manifest.rev)
     snapshot.delete()

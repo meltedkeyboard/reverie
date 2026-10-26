@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BackHandler, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { BackHandler, StyleSheet, Text, View, type ViewStyle, type ViewInstance } from 'react-native'
 import Animated, { ZoomIn, ZoomOut } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -41,7 +41,7 @@ export default function ViewerScreen() {
   const source = pending?.sources[index] ?? null
   const [chrome, setChrome] = useState(true)
   const [frame, setFrame] = useState<Frame | null>(null)
-  const root = useRef<View>(null)
+  const root = useRef<ViewInstance>(null)
   const gallery = useRef<GalleryHandle>(null)
 
   const leave = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/')), [router])

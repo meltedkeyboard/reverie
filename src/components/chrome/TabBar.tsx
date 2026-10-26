@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View, type ViewInstance } from 'react-native'
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 
 import { Avatar } from '@/components/visuals/Avatar'
@@ -135,7 +135,7 @@ export function wantsNewTab(event: unknown) {
 
 // The middle button gives no click on the web, only auxclick, which RN doesn't pass on.
 export function useMiddleClick(onMiddle: () => void) {
-  const ref = useRef<View>(null)
+  const ref = useRef<ViewInstance>(null)
   const latest = useRef(onMiddle)
   latest.current = onMiddle
   useEffect(() => {

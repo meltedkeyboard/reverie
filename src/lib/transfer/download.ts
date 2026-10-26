@@ -28,7 +28,7 @@ export async function saveFile(
   if (saveAsSheet) {
     const draft = new File(Paths.cache, fileName)
     draft.create({ overwrite: true })
-    draft.write(contents)
+    draft.writeSync(contents)
     try {
       return await saveAsSheet.saveAs(draft.uri)
     } finally {
@@ -52,7 +52,7 @@ async function saveToPickedFolder(fileName: string, contents: string | Uint8Arra
   }
   const taken = new Set(dir.list().map((item) => item.name))
   const name = freeName(taken, fileName)
-  dir.createFile(name, mimeType).write(contents)
+  dir.createFile(name, mimeType).writeSync(contents)
   return { name, folder: dir.name }
 }
 
@@ -70,7 +70,7 @@ export async function saveImageBytes(bytes: Uint8Array, extension: string) {
   await requireAddPermission()
   const out = new File(Paths.cache, `image-${Date.now()}.${extension}`)
   out.create({ overwrite: true })
-  out.write(bytes)
+  out.writeSync(bytes)
   try {
     await MediaLibrary.saveToLibraryAsync(out.uri)
   } finally {

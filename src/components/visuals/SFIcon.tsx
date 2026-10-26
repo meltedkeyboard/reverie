@@ -33,7 +33,7 @@ type Props = {
 export const SFIcon = swiftUI ? NativeIcon : FallbackIcon
 
 function FallbackIcon({ fallback, size, color }: Props) {
-  return <Icon name={fallback} size={size} color={color} />
+  return <Icon name={fallback} size={size} color={color as string} />
 }
 
 function NativeIcon({ name, size, color, effect, trigger, active, animateChange, changeResponse = 0.35, onAccent = false }: Props) {
@@ -67,8 +67,8 @@ function NativeIcon({ name, size, color, effect, trigger, active, animateChange,
       {/* Inside the composer a transform lifts the icon above the keyboard, but SwiftUI
           still sees its untransformed frame under the keyboard and would push the
           symbol up out of the safe area. */}
-      <Host style={{ width: box, height: box }} ignoreSafeArea="all" colorScheme={scheme}>
-        <Image systemName={name} size={size} color={color} modifiers={modifiers} />
+      <Host style={{ width: box, height: box }} alignment="center" ignoreSafeArea="all" colorScheme={scheme}>
+        <Image systemName={name} size={size} color={color as string} modifiers={modifiers} />
       </Host>
     </View>
   )

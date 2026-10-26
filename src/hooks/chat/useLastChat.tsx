@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useWindowDimensions, type View } from 'react-native'
+import { useWindowDimensions, type ViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { getLastChat, type LastChat } from '@/db/chats'
@@ -86,7 +86,7 @@ export function useContinueAnchor() {
   const { setBottom } = useLastChatContext()
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
-  const ref = useRef<View>(null)
+  const ref = useRef<ViewInstance>(null)
   const focused = useRef(false)
   // Read at measuring time, so the timers never use values from an older render.
   const latest = useRef({ inset: insets.bottom, height })

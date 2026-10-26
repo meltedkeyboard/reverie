@@ -1,6 +1,6 @@
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list'
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, type ReactElement, type Ref } from 'react'
-import { StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps } from 'react-native'
+import { StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps, type ScrollViewInstance } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import Animated, { scrollTo, useAnimatedRef, useAnimatedStyle, useScrollOffset, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -99,7 +99,7 @@ export function ChatThread({
   // FlashList hands its own ref to the scroll component, which gets both.
   const listScroll = useRef<Ref<unknown>>(null)
   const scrollRefs = useCallback(
-    (node: Animated.ScrollView | null) => {
+    (node: ScrollViewInstance | null) => {
       scrollRef(node)
       const theirs = listScroll.current
       if (typeof theirs === 'function') theirs(node)
@@ -114,7 +114,8 @@ export function ChatThread({
   // stop. FlashList's scrollToEnd from far away went in steps over several renders that
   // nothing could stop, and pulled the list on from under the finger.
   const glideToEnd = useCallback(() => {
-    const scroller = listRef.current?.getNativeScrollRef()
+    // FlashList types it as the ScrollView component rather than its instance.
+    const scroller = listRef.current?.getNativeScrollRef() as ScrollViewInstance | null | undefined
     if (!scroller) return
     // From further than two screens it starts two screens short, as FlashList did, so the
     // list does not draw every row on the way.

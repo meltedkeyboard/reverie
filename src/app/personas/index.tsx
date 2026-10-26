@@ -77,7 +77,7 @@ export default function PersonasScreen() {
                 </Link>
               }
             />
-          ) : null
+          ) : undefined
         }
         renderItem={({ item: persona }) => {
           const menu: MenuItem[] = [

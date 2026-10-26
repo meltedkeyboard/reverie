@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useId, useRef, useSyncExternalStore, type RefObject } from 'react'
-import { Dimensions, Keyboard, Pressable, type StyleProp, type View, type ViewStyle } from 'react-native'
+import { Dimensions, Keyboard, Pressable, type StyleProp, type ViewStyle, type ViewInstance } from 'react-native'
 
 import { PRESS_ANYWHERE } from '@/lib/ui/press'
 import {
@@ -15,7 +15,7 @@ import {
 
 type Box = { x: number; y: number; width: number; height: number }
 
-type GroupMember = { id: string; node: RefObject<View | null>; image: ViewerImage; corners: Corners }
+type GroupMember = { id: string; node: RefObject<ViewInstance | null>; image: ViewerImage; corners: Corners }
 
 // Pictures shown together, as those of one message, which the viewer swipes through from the
 // one tapped. Each link of the group puts itself in at its place.
@@ -77,7 +77,7 @@ export function ImageLink({
   children,
 }: Props) {
   const openViewer = useOpenViewer()
-  const self = useRef<View>(null)
+  const self = useRef<ViewInstance>(null)
   const id = useId()
   // Away while its picture is up in the viewer, which puts it back here on closing.
   const lifted = useLifted(id)
@@ -132,7 +132,7 @@ export function ImageLink({
 }
 
 // Where a thumbnail sits in the window, or null for one off the screen.
-function placeOf(node: View | null, corners: Corners) {
+function placeOf(node: ViewInstance | null, corners: Corners) {
   return new Promise<ViewerOrigin | null>((resolve) => {
     if (!node) return resolve(null)
     node.measureInWindow((x, y, width, height) => {

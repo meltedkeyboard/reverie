@@ -86,7 +86,7 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
   const Block = selectable ? SelectableText : PlainText
   const styles = useStyles(createStyles)
   const tokens = useMemo(() => lex(text, streaming), [text, streaming])
-  const size = StyleSheet.flatten(style).fontSize ?? 17
+  const size = StyleSheet.flatten(style)?.fontSize ?? 17
   const em = emStyle ?? styles.em
 
   const inline = (list: Token[]): ReactNode[] =>

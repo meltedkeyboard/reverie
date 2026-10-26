@@ -1,8 +1,8 @@
 diff --git a/node_modules/@expo/ui/ios/TextFieldView.swift b/node_modules/@expo/ui/ios/TextFieldView.swift
-index ec381d1..69713f2 100644
+index 3461009..b299bcf 100644
 --- a/node_modules/@expo/ui/ios/TextFieldView.swift
 +++ b/node_modules/@expo/ui/ios/TextFieldView.swift
-@@ -257,14 +257,7 @@ private struct StatefulSelectableTextField: View {
+@@ -261,14 +261,7 @@ private struct StatefulSelectableTextField: View {
      }
      .onChange(of: localSelection) { newSel in
        let text = (state.value as? String) ?? ""
@@ -18,7 +18,7 @@ index ec381d1..69713f2 100644
        let prevStart = extractInt(selection.value, "start")
        let prevEnd = extractInt(selection.value, "end")
        if prevStart == start && prevEnd == end { return }
-@@ -298,6 +291,12 @@ private struct StatefulSelectableTextField: View {
+@@ -302,6 +295,12 @@ private struct StatefulSelectableTextField: View {
        let text = (state.value as? String) ?? ""
        let lower = max(0, min(min(start, end), text.count))
        let upper = max(0, min(max(start, end), text.count))
@@ -31,7 +31,7 @@ index ec381d1..69713f2 100644
        let startIdx = text.index(text.startIndex, offsetBy: lower)
        let endIdx = text.index(text.startIndex, offsetBy: upper)
        let newSel = SwiftUI.TextSelection(range: startIdx..<endIdx)
-@@ -306,6 +305,14 @@ private struct StatefulSelectableTextField: View {
+@@ -310,6 +309,14 @@ private struct StatefulSelectableTextField: View {
        }
      }
    }

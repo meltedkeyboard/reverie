@@ -221,12 +221,13 @@ function SymbolOrIonicon(props: Props) {
   // SFIcon), so white ones are hosted in the dark scheme.
   const light = /^(#fff(fff)?|white|rgba?\(255, ?255, ?255)/i.test(String(color))
   // A symbol at a point size is about as tall as an Ionicons glyph of that size, but some
-  // overhang it, so the host is larger than the box the layout sees and centered on it.
+  // overhang it, so the host is larger than the box the layout sees and centered on it. The
+  // symbol is centered in the host too: since SDK 58 a host puts its content top leading.
   const host = Math.round(size * 1.4)
   const offset = (size - host) / 2
   return (
     <View pointerEvents="none" style={[{ width: size, height: size }, style as StyleProp<ViewStyle>]}>
-      <Host style={{ position: 'absolute', width: host, height: host, top: offset, left: offset }} ignoreSafeArea="all" colorScheme={light ? 'dark' : scheme}>
+      <Host style={{ position: 'absolute', width: host, height: host, top: offset, left: offset }} alignment="center" ignoreSafeArea="all" colorScheme={light ? 'dark' : scheme}>
         <Image systemName={forms[outline ? 0 : 1] as never} size={size * 0.85} color={color as string} />
       </Host>
     </View>

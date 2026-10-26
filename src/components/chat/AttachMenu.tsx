@@ -4,7 +4,7 @@ import { Image } from 'expo-image'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useRouter } from 'expo-router'
 import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions, type StyleProp, type ViewStyle, type ViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
@@ -666,7 +666,7 @@ export function DirectionEditor({
 }
 
 // The whole stack of the system sheet (iOS, app/attach), which its screens measure the bar against.
-export const AttachStackContext = createContext<RefObject<View | null> | null>(null)
+export const AttachStackContext = createContext<RefObject<ViewInstance | null> | null>(null)
 
 // A screen of the system sheet (the attach menu's, the cast's). Over the chat's background the bar is see-through and the
 // screen draws the background itself, so a screen pushed covers the one under it as it
@@ -676,7 +676,7 @@ export const AttachStackContext = createContext<RefObject<View | null> | null>(n
 export function AttachScreenFrame({ look, children }: { look: ChatLook | null | undefined; children: React.ReactNode }) {
   const backdrop = useChatBackdrop(look)
   const stack = useContext(AttachStackContext)
-  const self = useRef<View>(null)
+  const self = useRef<ViewInstance>(null)
   const [bar, setBar] = useState(0)
   const measure = () =>
     stack?.current?.measureInWindow((_x, top) =>

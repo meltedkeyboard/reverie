@@ -3,7 +3,7 @@ import { Image } from 'expo-image'
 import { Icon } from '@/components/visuals/Icon'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View, type ViewInstance } from 'react-native'
 import Animated, { useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -143,7 +143,7 @@ export function Sidebar() {
   }, [collapsed, progress])
   // In the rail a row under the pointer shows its name beside it. The root clips what is
   // past its width, so the label is drawn by the shell around it.
-  const shellRef = useRef<View>(null)
+  const shellRef = useRef<ViewInstance>(null)
   const [tip, setTip] = useState<{ label: string; top: number } | null>(null)
   const tipFor = (label: string) => (target: HTMLElement | null) => {
     const shell = shellRef.current as unknown as HTMLElement | null

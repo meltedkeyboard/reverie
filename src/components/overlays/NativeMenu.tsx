@@ -118,7 +118,7 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
       {size ? (
         // A transform moves the composer above the keyboard, but SwiftUI keeps seeing
         // the untransformed frame under the keyboard and would shift its content up.
-        <Host style={StyleSheet.absoluteFill} ignoreSafeArea="all" colorScheme={scheme}>
+        <Host style={StyleSheet.absoluteFill} alignment="center" ignoreSafeArea="all" colorScheme={scheme}>
           <Menu
             modifiers={[m.disabled(disabled)]}
             label={

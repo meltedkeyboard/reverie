@@ -190,9 +190,14 @@ export class File {
     this.store(new Uint8Array(0))
   }
 
-  write(content: string | Uint8Array) {
+  writeSync(content: string | Uint8Array) {
     makeDirs(parentOf(this.path))
     this.store(encode(content))
+  }
+
+  // The native write is asynchronous since SDK 58; the store here is not.
+  async write(content: string | Uint8Array) {
+    this.writeSync(content)
   }
 
   private store(bytes: Uint8Array) {
@@ -244,14 +249,14 @@ export class File {
   copy(to: File | Directory): void | Promise<void> {
     const target = to instanceof Directory ? new File(to, this.name) : to
     if (this.external) {
-      return this.bytes().then((bytes) => target.write(bytes))
+      return this.bytes().then((bytes) => target.writeSync(bytes))
     }
-    target.write(this.read().slice())
+    target.writeSync(this.read().slice())
   }
 
   move(to: File | Directory) {
     const target = to instanceof Directory ? new File(to, this.name) : to
-    target.write(this.read())
+    target.writeSync(this.read())
     this.delete()
     this.path = target.path
   }
@@ -267,12 +272,18 @@ export class File {
       get size() { return bytes.length },
       get offset() { return offset },
       set offset(value: number) { offset = value },
-      readBytes(length: number) {
+      readBytesSync(length: number) {
         const out = bytes.slice(offset, offset + length)
         offset += out.length
         return out
       },
-      writeBytes() {
+      async readBytes(length: number) {
+        return this.readBytesSync(length)
+      },
+      writeBytesSync() {
+        throw new Error('Not supported on the web')
+      },
+      async writeBytes() {
         throw new Error('Not supported on the web')
       },
       close() {},

@@ -2,7 +2,7 @@
 
 Where things live and how they connect. For setup and features see the [README](README.md).
 
-Stack: Expo 57, React Native 0.86, expo-router, expo-sqlite, TypeScript (strict). iOS and Android. Path alias `@/*` points to `src/`.
+Stack: Expo 58, React Native 0.88, expo-router, expo-sqlite, TypeScript (strict). iOS and Android. Path alias `@/*` points to `src/`.
 
 ## Find it fast
 

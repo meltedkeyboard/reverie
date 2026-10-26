@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, View, type ViewInstance } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
@@ -871,7 +871,7 @@ export function Gallery({
 
   // The wheel and the touchpad on the desktop. A sideways swipe of the touchpad, unzoomed,
   // turns to the picture beside, once a swipe.
-  const surface = useRef<View>(null)
+  const surface = useRef<ViewInstance>(null)
   useEffect(() => {
     if (!isWeb) return
     const node = surface.current as unknown as HTMLElement | null

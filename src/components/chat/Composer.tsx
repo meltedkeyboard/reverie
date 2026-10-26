@@ -3,12 +3,14 @@ import NativeMaskedView from '@react-native-masked-view/masked-view'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native'
+import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type LayoutChangeEvent, type TextInputInstance, type ViewProps } from 'react-native'
 
 // The isWeb has no native mask: the package paints the mask element itself, a black slab
 // over the field. There the field is shown as it is, without the fade at its edges.
-const MaskedView: typeof NativeMaskedView =
-  isWeb ? (({ children }: { children?: React.ReactNode }) => <>{children}</>) as never : NativeMaskedView
+// The package's class type no longer fits React Native 0.88's, so it is used by its props.
+const MaskedView = (
+  isWeb ? ({ children }: { children?: React.ReactNode }) => <>{children}</> : NativeMaskedView
+) as unknown as React.ComponentType<ViewProps & { maskElement: React.ReactElement }>
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import ReorderableList, { reorderItems, useReorderableDrag } from 'react-native-reorderable-list'
 import { KeyboardController, KeyboardStickyView } from 'react-native-keyboard-controller'
@@ -154,7 +156,7 @@ export function Composer({
     if (!editing) onTextChange?.(text)
   }, [text])
   const stash = useRef('')
-  const inputRef = useRef<TextInput>(null)
+  const inputRef = useRef<TextInputInstance>(null)
   const [focused, setFocused] = useState(false)
   // Which edges of the field's scrolling text have more beyond them, to fade those out
   // instead of cutting the lines off.

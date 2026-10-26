@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useId, useRef } from 'react'
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Pressable, StyleSheet, View, useWindowDimensions, type ViewInstance } from 'react-native'
 import Animated, {
   interpolate,
   useAnimatedReaction,
@@ -138,7 +138,7 @@ export function ExpandingAvatar({ name, uri, file, scrollY, dragging, progress, 
   // The viewer grows the photo out of where it is, round or spread, and puts it back there.
   // The photo moves by transforms on the UI thread, so its place is worked out from its
   // block's by the same sums as its style.
-  const block = useRef<View>(null)
+  const block = useRef<ViewInstance>(null)
   const id = useId()
   const lifted = useLifted(id)
   const openPhoto = () => {

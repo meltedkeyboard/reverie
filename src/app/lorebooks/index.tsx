@@ -62,7 +62,7 @@ export default function LorebooksScreen() {
                 </Link>
               }
             />
-          ) : null
+          ) : undefined
         }
         renderItem={({ item: book }) => {
           const menu: MenuItem[] = [

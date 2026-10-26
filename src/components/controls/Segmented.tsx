@@ -38,7 +38,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Props<
     return (
       <View style={styles.host} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
         {width > 0 ? (
-          <Host key={`${width}:${generation}`} style={styles.host} ignoreSafeArea="all" colorScheme={scheme}>
+          <Host key={`${width}:${generation}`} style={styles.host} alignment="center" ignoreSafeArea="all" colorScheme={scheme}>
             <Picker
               selection={value}
               onSelectionChange={(next: T) => {

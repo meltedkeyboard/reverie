@@ -186,7 +186,7 @@ export default function GroupScreen() {
       const bytes = kind === 'card' ? await buildCardPng(character) : await buildBackupArchive(db, await characterSelection(db, character.id))
       const file = new File(Paths.cache, cardFileName(character.name, kind === 'card' ? 'png' : 'reverie'))
       file.create({ overwrite: true })
-      file.write(bytes)
+      file.writeSync(bytes)
       dragModule.fulfill(token, file.uri)
     } catch (err) {
       dragModule.fulfill(token, null)
@@ -225,7 +225,7 @@ export default function GroupScreen() {
                 />
               }
             />
-          ) : null
+          ) : undefined
         }
         renderItem={({ item: character }) => (
           <CharacterCard

@@ -228,7 +228,7 @@ export async function keepCopy(db: SQLiteDatabase) {
   shelf.create({ intermediates: true, idempotent: true })
   // On the web the database is not a file SQLite can write to, so its bytes are saved.
   if (isWeb) {
-    new File(shelf, DATABASE_NAME).write(await db.serializeAsync('main'))
+    new File(shelf, DATABASE_NAME).writeSync(await db.serializeAsync('main'))
     return
   }
   const path = `${plainPath(shelf)}/${DATABASE_NAME}`

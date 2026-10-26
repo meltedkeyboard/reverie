@@ -38,7 +38,7 @@ export function NativeForm({
   const { Host, Form } = nativeForm!.ui
   const { scrollContentBackground, background, tint, scrollPosition, scrollDismissesKeyboard } = nativeForm!.modifiers
   return (
-    <Host style={styles.host} colorScheme={scheme} seedColor={colors.accent}>
+    <Host style={styles.host} alignment="center" colorScheme={scheme} seedColor={colors.accent}>
       <Form
         modifiers={[
           scrollContentBackground('hidden'),

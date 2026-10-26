@@ -2,7 +2,7 @@ import { BlurTargetView, BlurView } from 'expo-blur'
 import { Image } from 'expo-image'
 import { useIsFocused } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
-import { StyleSheet, View, type LayoutChangeEvent, type View as ViewRef } from 'react-native'
+import { StyleSheet, View, type LayoutChangeEvent, type ViewInstance } from 'react-native'
 import { useReducedMotion } from 'react-native-reanimated'
 
 import { Picture } from '@/components/visuals/Picture'
@@ -50,7 +50,7 @@ export function ChatBackground({ uri, effect, intensity, blurred = false, crop =
   // a player would go on decoding behind it.
   const focused = useIsFocused()
   const [layout, setLayout] = useState<{ width: number; height: number } | null>(null)
-  const target = useRef<ViewRef>(null)
+  const target = useRef<ViewInstance>(null)
   const paused = reduceMotion || (moving === 'video' && !focused)
 
   const onLayout = (event: LayoutChangeEvent) => {

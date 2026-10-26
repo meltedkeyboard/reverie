@@ -27,7 +27,7 @@ export function movingFormat(uri: string): 'gif' | 'webp' | 'png' | null {
   try {
     const handle = new File(uri).open()
     try {
-      const bytes = handle.readBytes(4096)
+      const bytes = handle.readBytesSync(4096)
       const head = String.fromCharCode(...bytes)
       if (head.startsWith('GIF8')) return 'gif'
       if (head.startsWith('RIFF') && head.slice(8, 12) === 'WEBP') return head.includes('ANIM') ? 'webp' : null

@@ -1,7 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import { Image } from 'expo-image'
 import { useEffect, useMemo, useRef } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, {
   useAnimatedStyle,
@@ -73,7 +73,7 @@ export function AsidePanel({ turns, pending, draft, phase, error, composerHeight
   const headerHeight = useHeaderHeight()
   const { height: screenHeight } = useWindowDimensions()
   const keyboard = useReanimatedKeyboardAnimation()
-  const scrollRef = useRef<ScrollView>(null)
+  const scrollRef = useRef<ScrollViewInstance>(null)
   // The thread follows a streaming answer only while the user stays at its end: once
   // they scroll up to read, it lets them be until they come back down.
   const atEnd = useRef(true)

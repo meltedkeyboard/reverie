@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Reverie is a roleplay chat client (Expo 57, React Native 0.86 New Architecture, expo-router, expo-sqlite, TypeScript strict) for iOS, Android and a desktop build (react-native-web in Electron). It talks to a local OpenAI-compatible model server; all data stays on the device. `@/*` maps to `src/`.
+Reverie is a roleplay chat client (Expo 58, React Native 0.88 New Architecture, expo-router, expo-sqlite, TypeScript strict) for iOS, Android and a desktop build (react-native-web in Electron). It talks to a local OpenAI-compatible model server; all data stays on the device. `@/*` maps to `src/`.
 
 **Read [CODEBASE.md](CODEBASE.md) first.** It is the detailed map: a "Find it fast" table (what to change → which file), the screens, the data flow of a chat, rooms, the database, folder sync, Liquid Glass, Android differences and the conventions. Keep it up to date in the same change when you move or add something it describes.
 

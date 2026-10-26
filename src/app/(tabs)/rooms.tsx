@@ -129,7 +129,7 @@ export default function RoomsScreen() {
                 ) : undefined
               }
             />
-          ) : null
+          ) : undefined
         }
         onScrollBeginDrag={createMenu.close}
         renderItem={({ item: room }) => (

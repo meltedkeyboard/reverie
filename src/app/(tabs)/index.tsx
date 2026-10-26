@@ -189,7 +189,7 @@ export default function CharactersScreen() {
       const bytes = kind === 'card' ? await buildCardPng(character) : await buildBackupArchive(db, await characterSelection(db, character.id))
       const file = new File(Paths.cache, cardFileName(character.name, kind === 'card' ? 'png' : 'reverie'))
       file.create({ overwrite: true })
-      file.write(bytes)
+      file.writeSync(bytes)
       dragModule.fulfill(token, file.uri)
     } catch (err) {
       dragModule.fulfill(token, null)
@@ -397,7 +397,7 @@ export default function CharactersScreen() {
               </View>
               <SFIcon name="chevron.right" fallback="chevron-forward" size={14} color={colors.textFaint} />
             </Pressable>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           characters ? (
@@ -412,7 +412,7 @@ export default function CharactersScreen() {
                 </Link>
               }
             />
-          ) : null
+          ) : undefined
         }
         renderItem={({ item: row }) => {
           if (row.kind === 'group') {

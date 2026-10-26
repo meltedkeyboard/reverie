@@ -261,7 +261,7 @@ export default function ServersScreen() {
             text={t('servers.emptyText')}
             action={<Button variant="glass" label={t('servers.add')} style={emptyButtonStyle} onPress={add} />}
           />
-        ) : null
+        ) : undefined
       }
       ListFooterComponent={
         canEdit ? (
@@ -270,7 +270,7 @@ export default function ServersScreen() {
               <SwitchCell label={t('servers.failover')} value={failover} onValueChange={toggleFailover} />
             </ListSection>
           </View>
-        ) : null
+        ) : undefined
       }
       renderItem={({ item: server }) => {
         const current = server.id === activeId
