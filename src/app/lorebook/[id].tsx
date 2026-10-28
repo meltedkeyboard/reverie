@@ -34,7 +34,7 @@ import { listRooms } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { alertError } from '@/lib/transfer/report'
-import { type Colors, useColors, useStyles } from '@/theme'
+import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 
 // An entry being edited, with a key of its own for the list while it has no id.
 type Entry = LoreEntryFields & { key: number }
@@ -169,7 +169,7 @@ export default function LorebookEditorScreen() {
 
   const renderNative = ({ ui }: NonNullable<typeof nativeForm>) => (
     <NativeForm>
-      <NativeSection>
+      <NativeSection inset={HEADER_ROW_HEIGHT}>
         <NativeTextRow label={t('lore.name')} value={fields.name} onChangeText={(v) => set('name', v)} placeholder={t('lore.namePlaceholder')} />
       </NativeSection>
 
