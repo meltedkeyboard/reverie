@@ -9,7 +9,7 @@ import { defineChoice, defineNumber } from '@/db/prefs/settings'
 export type ListSpacing = 'compact' | 'roomy'
 
 // The corners of a picture in hundredths of its side: 50 is a circle, 0 a square.
-export const LIST_CORNER_RANGE = { min: 10, max: 50, default: 50 } as const
+export const LIST_CORNER_RANGE = { min: 0, max: 50, default: 50 } as const
 
 export type ListLook = { corner: number; spacing: ListSpacing }
 

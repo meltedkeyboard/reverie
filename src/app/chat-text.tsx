@@ -49,9 +49,6 @@ const TILE_WIDTH = 84
 const TILE_HEIGHT = (TILE_WIDTH * 852) / 393
 const MARK_SIZE = 22
 const TILE_LABEL_LINE = 16
-// The slider of the lists' corners stops every this many hundredths of a picture's side.
-const CORNER_STEP = 5
-
 // The preview card's set height: its padding, the messages and the composer.
 const PREVIEW_HEIGHT = 20 + 200 + 12 + FIELD_HEIGHT + 12
 
@@ -312,9 +309,18 @@ function Appearance() {
     setScale(next, false)
   }
 
-  // How round the pictures of the lists are, in steps the slider ticks at; written once let go.
+  // How round the pictures of the lists are: the slider runs freely, the lists and the preview
+  // follow it as it moves, and it is written once let go. Round again is felt, as the regular
+  // text size is.
   const listLook = useListLook()
   const cornerDragged = useRef(listLook.corner)
+  const dragCorner = (value: number) => {
+    const next = Math.round(value)
+    cornerDragged.current = next
+    if (next === listLook.corner) return
+    if (next === LIST_CORNER_RANGE.default) Haptics.selectionAsync()
+    setListCorner(db, next, false)
+  }
   const resetCorner = () => {
     Haptics.selectionAsync()
     setListCorner(db, LIST_CORNER_RANGE.default)
@@ -437,12 +443,7 @@ function Appearance() {
                 value={listLook.corner}
                 min={LIST_CORNER_RANGE.min}
                 max={LIST_CORNER_RANGE.max}
-                step={CORNER_STEP}
-                onValueChange={(value) => {
-                  const next = Math.round(value / CORNER_STEP) * CORNER_STEP
-                  cornerDragged.current = next
-                  if (next !== listLook.corner) setListCorner(db, next, false)
-                }}
+                onValueChange={dragCorner}
                 onEditingChanged={(editing) => {
                   if (!editing) setListCorner(db, cornerDragged.current)
                 }}

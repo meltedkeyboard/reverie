@@ -406,82 +406,46 @@ final class CardRowBehavior: NSObject, PickableCard, UIDragInteractionDelegate, 
   }
 }
 
-// MARK: - Avatars of the rows
+// MARK: - Faces of the rows
 
-// The picture at the start of a row, as the list shows it: a face in a circle, or up to three
-// of a group's, overlapping as a group's in Messages. Drawn once at the row's size and kept in
-// the caches, since the list's Image reads its file whole each time it draws.
+// One face at the start of a row, square: the photo covering it, or the initial on its tint.
+// The list cuts it to the corners set and lays a group's faces over each other itself, so a
+// change of the corners is drawn at once, while each face is drawn here only once, at the
+// row's size, and kept in the caches: the list's Image reads its file whole each time it draws.
 struct RowFace {
   let uri: String?
   let letter: String
   let tint: String
 }
 
-// `corner` is the radius of each face over its side: a half is a circle.
-func rowAvatar(faces: [RowFace], side: Double, scale: Double, ring: String, corner: Double) throws -> String {
-  let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("row-avatars", isDirectory: true)
+func rowFace(_ face: RowFace, side: Double, scale: Double) throws -> String {
+  let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("row-faces", isDirectory: true)
   try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
   // A new picture of the same name is still told apart by its date.
-  let described = faces.map { face -> String in
-    let date = face.uri.flatMap { URL(string: $0) }.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.modificationDate] as? Date }
-    return "\(face.uri ?? "")|\(date?.timeIntervalSince1970 ?? 0)|\(face.letter)|\(face.tint)"
-  }.joined(separator: ";") + "|\(side)|\(scale)|\(ring)|\(corner)"
-  let file = dir.appendingPathComponent("\(stableHash(described)).png")
+  let date = face.uri.flatMap { URL(string: $0) }.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.modificationDate] as? Date }
+  let described = "\(face.uri ?? "")|\(date?.timeIntervalSince1970 ?? 0)|\(face.letter)|\(face.tint)|\(side)|\(scale)"
+  let file = dir.appendingPathComponent("\(stableHash(described)).jpg")
   if FileManager.default.fileExists(atPath: file.path) { return file.absoluteString }
 
   let size = CGFloat(side)
+  let rect = CGRect(x: 0, y: 0, width: size, height: size)
   let format = UIGraphicsImageRendererFormat()
   format.scale = CGFloat(scale)
-  format.opaque = false
-  let ringColor = UIColor(hex: ring)
-  let png = UIGraphicsImageRenderer(size: CGSize(width: size, height: size), format: format).pngData { ctx in
-    let rects = faceRects(count: min(faces.count, 3), side: size)
-    for (index, face) in faces.prefix(3).enumerated() {
-      let rect = rects[index]
-      // A face over another stands off it by a thin ring of the screen's background.
-      if index > 0 {
-        ringColor.setFill()
-        facePath(rect.insetBy(dx: -size * 0.03, dy: -size * 0.03), corner: corner).fill()
-      }
-      ctx.cgContext.saveGState()
-      facePath(rect, corner: corner).addClip()
-      if let image = face.uri.flatMap({ loadImage($0, side: rect.width * CGFloat(scale)) }) {
-        image.draw(in: aspectFill(image.size, in: rect))
-      } else {
-        UIColor(hex: face.tint).setFill()
-        ctx.fill(rect)
-        let font = UIFont(name: "Georgia", size: rect.width * 0.42) ?? .systemFont(ofSize: rect.width * 0.42)
-        let text = NSAttributedString(string: face.letter, attributes: [.font: font, .foregroundColor: UIColor(white: 1, alpha: 0.85)])
-        let box = text.size()
-        text.draw(at: CGPoint(x: rect.midX - box.width / 2, y: rect.midY - box.height / 2))
-      }
-      ctx.cgContext.restoreGState()
+  format.opaque = true
+  let jpeg = UIGraphicsImageRenderer(size: rect.size, format: format).jpegData(withCompressionQuality: 0.9) { ctx in
+    if let image = face.uri.flatMap({ loadImage($0, side: size * CGFloat(scale)) }) {
+      image.draw(in: aspectFill(image.size, in: rect))
+    } else {
+      UIColor(hex: face.tint).setFill()
+      ctx.fill(rect)
+      let font = UIFont(name: "Georgia", size: size * 0.42) ?? .systemFont(ofSize: size * 0.42)
+      let text = NSAttributedString(string: face.letter, attributes: [.font: font, .foregroundColor: UIColor(white: 1, alpha: 0.85)])
+      let box = text.size()
+      text.draw(at: CGPoint(x: rect.midX - box.width / 2, y: rect.midY - box.height / 2))
     }
   }
-  try png.write(to: file, options: .atomic)
+  try jpeg.write(to: file, options: .atomic)
   return file.absoluteString
-}
-
-// A circle, or a square with iOS's continuous corners, whose radius is never quite a circle's.
-private func facePath(_ rect: CGRect, corner: Double) -> UIBezierPath {
-  corner >= 0.5 ? UIBezierPath(ovalIn: rect) : UIBezierPath(roundedRect: rect, cornerRadius: rect.width * CGFloat(corner))
-}
-
-private func faceRects(count: Int, side: CGFloat) -> [CGRect] {
-  switch count {
-  case 2:
-    let d = side * 0.66
-    return [CGRect(x: 0, y: 0, width: d, height: d), CGRect(x: side - d, y: side - d, width: d, height: d)]
-  case 3:
-    let d = side * 0.56
-    return [
-      CGRect(x: (side - d) / 2, y: 0, width: d, height: d),
-      CGRect(x: 0, y: side - d, width: d, height: d),
-      CGRect(x: side - d, y: side - d, width: d, height: d),
-    ]
-  default:
-    return [CGRect(x: 0, y: 0, width: side, height: side)]
-  }
 }
 
 private func aspectFill(_ size: CGSize, in rect: CGRect) -> CGRect {

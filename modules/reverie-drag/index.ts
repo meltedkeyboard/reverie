@@ -10,7 +10,7 @@ export type RowFace = { uri?: string | null; letter: string; tint: string }
 type DragModule = {
   fulfill(token: string, uri: string | null): void
   renderInitial(letter: string, tint: string, size: number): string
-  rowAvatar(faces: RowFace[], side: number, scale: number, ring: string, corner: number): Promise<string>
+  rowFace(face: RowFace, side: number, scale: number): Promise<string>
 }
 
 type DragCardProps = ViewProps & {

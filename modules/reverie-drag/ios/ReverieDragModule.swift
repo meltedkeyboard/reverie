@@ -30,16 +30,13 @@ public class ReverieDragModule: Module {
       unregisterCardRow()
     }
 
-    // The picture at the start of a row of that list, a PNG in the caches: faces are
-    // `{ uri?, letter, tint }`, `ring` the screen's background between faces that overlap,
-    // `corner` the radius of a face over its side (a half for a circle).
-    AsyncFunction("rowAvatar") { (faces: [[String: Any]], side: Double, scale: Double, ring: String, corner: Double) -> String in
-      try rowAvatar(
-        faces: faces.map { RowFace(uri: $0["uri"] as? String, letter: $0["letter"] as? String ?? "?", tint: $0["tint"] as? String ?? "#40406B") },
+    // One face at the start of a row of that list, square, a JPEG in the caches: `face` is
+    // `{ uri?, letter, tint }`.
+    AsyncFunction("rowFace") { (face: [String: Any], side: Double, scale: Double) -> String in
+      try rowFace(
+        RowFace(uri: face["uri"] as? String, letter: face["letter"] as? String ?? "?", tint: face["tint"] as? String ?? "#40406B"),
         side: side,
-        scale: scale,
-        ring: ring,
-        corner: corner
+        scale: scale
       )
     }
 
