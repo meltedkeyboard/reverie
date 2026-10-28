@@ -6,6 +6,7 @@ import type { RowMessage } from '@/components/chat/MessageRow'
 import { branchChat, deleteChat, getChat, type Chat } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
+import { useTheme } from '@/theme'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chat/chatDialogs'
 import { promptText, showMessage } from '@/lib/ui/dialogs'
 import type { MessageAction } from '@/lib/chat/messageActions'
@@ -23,6 +24,8 @@ type MessageActionHandlers = {
 // What the menu on a message does, the same in a chat and in a scene.
 export function useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit, branch }: MessageActionHandlers) {
   const { t } = useTranslation()
+  // The chat's scheme over its background, which the system's alert would not take by itself.
+  const { scheme } = useTheme()
   return useCallback(
     (message: RowMessage, action: MessageAction) => {
       const wish = message.refines[message.variant] ?? undefined
@@ -34,6 +37,7 @@ export function useMessageActions({ regenerate, removeRefine, removeVariant, rem
           message: t('chat.refineMessage'),
           initial: action === 'editRefine' ? wish : undefined,
           confirmLabel: t('chat.refineConfirm'),
+          scheme,
           onSubmit: (text) => {
             if (text.trim()) regenerate(message.id, text)
           },
@@ -46,7 +50,7 @@ export function useMessageActions({ regenerate, removeRefine, removeVariant, rem
       else if (action === 'branch') branch(message.id)
       else removeMessage(message.id)
     },
-    [regenerate, removeRefine, removeVariant, removeMessage, edit, branch, t]
+    [regenerate, removeRefine, removeVariant, removeMessage, edit, branch, t, scheme]
   )
 }
 
@@ -84,6 +88,7 @@ export function useChatMenuActions({ chatId, title, rename, autoName, discard, o
   const db = useDatabase()
   const router = useRouter()
   const { t } = useTranslation()
+  const { scheme } = useTheme()
 
   const confirmDelete = () => {
     confirmDeleteChat(async () => {
@@ -94,7 +99,7 @@ export function useChatMenuActions({ chatId, title, rename, autoName, discard, o
     })
   }
 
-  const promptRename = () => promptRenameChat(title, rename)
+  const promptRename = () => promptRenameChat(title, rename, scheme)
 
   const suggestName = async () => {
     try {

@@ -14,9 +14,9 @@ import { characterRow, NativeCardList, nativeCardList, type NativeCardRow } from
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
+import { HomeBackground, useHomeScheme } from '@/components/chrome/ChatChrome'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
 import { Icon } from '@/components/visuals/Icon'
-import { Pattern } from '@/components/visuals/Pattern'
 import { deleteCharacter, listCharacters, listGroupCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
 import { addToGroup, deleteGroup, getGroup, removeFromGroup, renameGroup, ungroup, type CharacterGroup } from '@/db/groups'
 import { useDatabase } from '@/db/provider'
@@ -32,7 +32,7 @@ import { promptText } from '@/lib/ui/dialogs'
 import { buildBackupArchive, characterSelection, exportBackup } from '@/lib/transfer/backup'
 import { buildCardPng, cardFileName } from '@/lib/transfer/importCard'
 import { reportError } from '@/lib/transfer/report'
-import { fonts, HEADER_FONT_SCALE, useStyles, useColors, type Colors } from '@/theme'
+import { fonts, HEADER_FONT_SCALE, SchemeOverride, useStyles, useColors, type Colors } from '@/theme'
 
 import { dragModule, DropTargetView } from '../../../modules/reverie-drag'
 
@@ -51,6 +51,8 @@ export default function GroupScreen() {
   const colors = useColors()
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  // Over the chats' wallpaper, when the home tabs have it behind them, so does a group.
+  const homeScheme = useHomeScheme()
 
   const [group, setGroup] = useState<CharacterGroup | null>(null)
   const [members, setMembers] = useState<CharacterPreview[] | null>(null)
@@ -222,7 +224,7 @@ export default function GroupScreen() {
 
   const screen = (
     <View style={styles.screen}>
-      <Pattern id="two-stars" />
+      <HomeBackground pattern="two-stars" />
       {native ? (
         <NativeCardList
           rows={nativeRows}
@@ -362,17 +364,21 @@ export default function GroupScreen() {
 
   // When the native drag module is present: a character dragged off any card and dropped on
   // the list background (not on another card) leaves the group and reappears on the home list.
-  return DropTargetView ? (
-    <DropTargetView
-      style={styles.screen}
-      groupedIds={groupedIds}
-      onDropFiles={() => {}}
-      onDropCards={({ nativeEvent }) => removeFromGroup(db, nativeEvent.ids).then(reload)}
-    >
-      {screen}
-    </DropTargetView>
-  ) : (
-    screen
+  return (
+    <SchemeOverride scheme={homeScheme}>
+      {DropTargetView ? (
+        <DropTargetView
+          style={styles.screen}
+          groupedIds={groupedIds}
+          onDropFiles={() => {}}
+          onDropCards={({ nativeEvent }) => removeFromGroup(db, nativeEvent.ids).then(reload)}
+        >
+          {screen}
+        </DropTargetView>
+      ) : (
+        screen
+      )}
+    </SchemeOverride>
   )
 }
 

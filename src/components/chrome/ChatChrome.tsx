@@ -42,6 +42,16 @@ export function pictureOf(owner: ChatLook, wallpaper: ChatWallpaper | null | und
   return null
 }
 
+// A chat with no picture of its own: what it shows is the wallpaper or the pattern.
+export const NO_PICTURE: ChatLook = {
+  background: null,
+  backgroundCrop: null,
+  backgroundEffect: 'blur',
+  backgroundIntensity: 0.5,
+  backgroundBubbleTransparency: 0.3,
+  backgroundTone: 'auto',
+}
+
 // What is behind the messages: the owner's own picture, else the custom wallpaper or pattern chosen in Settings.
 // `anchor` is the pattern's, off in a sheet. `blurred` is ChatBackground's.
 export function ChatSurface({ owner, anchor, blurred }: { owner: ChatLook; anchor?: boolean; blurred?: boolean }) {
@@ -116,6 +126,26 @@ export const bubbleOpacityOf = (
   if (owner.background) return 1 - owner.backgroundBubbleTransparency
   if (pattern === 'custom' && wallpaper?.file) return 1 - wallpaper.bubbleTransparency
   return 1
+}
+
+// The scheme of the Characters and Rooms tabs and of a group's screen: with the chats' background behind them
+// (Appearance), the one a chat takes over that wallpaper, set by its Chat colors; else null,
+// the theme's own, as over a pattern.
+export function useHomeScheme(): Scheme | null {
+  const { homeBackground } = useChatTextSettings()
+  return useChatScheme(homeBackground ? NO_PICTURE : null)
+}
+
+// Behind the lists of those screens: the chats' wallpaper or pattern as a chat with no picture
+// of its own shows it, when switched on, or else the tab's own pattern.
+export function HomeBackground({ pattern }: { pattern: React.ComponentProps<typeof Pattern>['id'] }) {
+  const { homeBackground } = useChatTextSettings()
+  if (!homeBackground) return <Pattern id={pattern} />
+  return (
+    <View pointerEvents="none" style={styles.backdrop}>
+      <ChatSurface owner={NO_PICTURE} />
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({

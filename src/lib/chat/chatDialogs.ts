@@ -3,8 +3,10 @@ import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import { promptText } from '@/lib/ui/dialogs'
 
 // Asked the same way from inside a chat and from the character's list of chats.
-export function promptRenameChat(initial: string | null, onSubmit: (title: string) => void) {
+// `scheme` is the chat's, when asked from inside it (see TextPrompt).
+export function promptRenameChat(initial: string | null, onSubmit: (title: string) => void, scheme?: 'light' | 'dark' | null) {
   promptText({
+    scheme,
     title: t('chat.renameChatTitle'),
     message: t('chat.renameChatMessage'),
     initial: initial ?? '',

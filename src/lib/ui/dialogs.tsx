@@ -30,6 +30,9 @@ export type TextPrompt = {
   initial?: string
   confirmLabel: string
   onSubmit: (text: string) => void
+  // The scheme of the screen it is asked over, where that is not the app's: a chat over its
+  // background. The system's alert otherwise takes the app's.
+  scheme?: 'light' | 'dark' | null
 }
 
 export type SheetOptions = {
@@ -107,7 +110,7 @@ export function confirmAsync(options: {
 
 export function promptText(prompt: TextPrompt) {
   if (!isIOS) return openDialog({ kind: 'prompt', prompt })
-  const { title, message, initial, confirmLabel, onSubmit } = prompt
+  const { title, message, initial, confirmLabel, onSubmit, scheme } = prompt
   Alert.prompt(
     title,
     message,
@@ -116,7 +119,9 @@ export function promptText(prompt: TextPrompt) {
       { text: confirmLabel, onPress: (text?: string) => onSubmit(text ?? '') },
     ],
     'plain-text',
-    initial
+    initial,
+    undefined,
+    scheme ? { userInterfaceStyle: scheme } : undefined
   )
 }
 

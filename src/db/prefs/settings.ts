@@ -430,6 +430,11 @@ const chatBackdrop = defineFlag('chat_backdrop', true)
 export const loadChatBackdrop = chatBackdrop.load
 export const saveChatBackdrop = chatBackdrop.save
 
+// The chats' background behind the Characters and Rooms tabs as well, off by default.
+const homeBackground = defineFlag('home_background', false)
+export const loadHomeBackground = homeBackground.load
+export const saveHomeBackground = homeBackground.save
+
 // The pattern behind a chat that has no picture of its own, from the Penpot page
 // "Background Pattern"; 'none' is the plain theme background.
 export const CHAT_PATTERNS = ['none', 'stars', 'two-stars', 'big-star', 'diagonal', 'scattered', 'rings', 'rings-centered', 'dots'] as const

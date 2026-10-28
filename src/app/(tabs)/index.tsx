@@ -18,9 +18,9 @@ import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassGroup, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
+import { HomeBackground, useHomeScheme } from '@/components/chrome/ChatChrome'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { PopoverMenu, usePopoverMenu } from '@/components/overlays/PopoverMenu'
-import { Pattern } from '@/components/visuals/Pattern'
 import { Icon } from '@/components/visuals/Icon'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { withAlpha } from '@/lib/core/color'
@@ -47,7 +47,7 @@ import { buildCardPng, cardFileName, importCardFile, importCharacterCard, type C
 import { swiftUI } from '@/lib/ui/nativeUI'
 import { showToast } from '@/lib/ui/toast'
 import { reportError } from '@/lib/transfer/report'
-import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { type Colors, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
 
 import { dragModule, DropTargetView, type DropFile } from '../../../modules/reverie-drag'
 
@@ -90,6 +90,8 @@ export default function CharactersScreen() {
   const createMenu = usePopoverMenu()
 
   const anchor = useContinueAnchor()
+  // Over the chats' wallpaper, when it is behind the list, the list takes the scheme a chat takes there.
+  const homeScheme = useHomeScheme()
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
@@ -396,7 +398,7 @@ export default function CharactersScreen() {
       anchor.onLayout()
       fill.onLayout(e)
     }}>
-      <Pattern id="stars" />
+      <HomeBackground pattern="stars" />
       {native ? (
         <NativeCardList
           rows={nativeRows}
@@ -589,17 +591,21 @@ export default function CharactersScreen() {
     </View>
   )
 
-  return DropTargetView ? (
-    <DropTargetView
-      style={styles.screen}
-      groupedIds={groupedIds}
-      onDropFiles={({ nativeEvent }) => importFiles(nativeEvent.files)}
-      onDropCards={({ nativeEvent }) => run(removeFromGroup(db, nativeEvent.ids))}
-    >
-      {screen}
-    </DropTargetView>
-  ) : (
-    screen
+  return (
+    <SchemeOverride scheme={homeScheme}>
+      {DropTargetView ? (
+        <DropTargetView
+          style={styles.screen}
+          groupedIds={groupedIds}
+          onDropFiles={({ nativeEvent }) => importFiles(nativeEvent.files)}
+          onDropCards={({ nativeEvent }) => run(removeFromGroup(db, nativeEvent.ids))}
+        >
+          {screen}
+        </DropTargetView>
+      ) : (
+        screen
+      )}
+    </SchemeOverride>
   )
 }
 

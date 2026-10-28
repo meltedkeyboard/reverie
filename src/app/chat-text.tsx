@@ -7,7 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 
 import { ChatBackground } from '@/components/chat/ChatBackground'
 import { Pattern } from '@/components/visuals/Pattern'
-import { useChatScheme, type ChatLook } from '@/components/chrome/ChatChrome'
+import { NO_PICTURE, useChatScheme } from '@/components/chrome/ChatChrome'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { ButtonCell, CheckCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
@@ -92,16 +92,6 @@ function ChoiceMark({ selected }: { selected: boolean }) {
       ) : null}
     </View>
   )
-}
-
-// A chat with no picture of its own: what it shows is the wallpaper or the pattern.
-const NO_PICTURE: ChatLook = {
-  background: null,
-  backgroundCrop: null,
-  backgroundEffect: 'blur',
-  backgroundIntensity: 0.5,
-  backgroundBubbleTransparency: 0.3,
-  backgroundTone: 'auto',
 }
 
 // The preview card, a component of its own so that it reads the colors of the scheme set
@@ -217,6 +207,8 @@ function Appearance() {
     setWallpaper,
     backdrop,
     setBackdrop,
+    homeBackground,
+    setHomeBackground,
     scale,
     setFont,
     setScale,
@@ -479,6 +471,7 @@ function Appearance() {
           {wallpaper?.file ? <SwiftButton label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
           {wallpaper?.file ? <SwiftButton label={t('background.remove')} role="destructive" onPress={onRemoveBackground} /> : null}
           <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} />
+          <Toggle label={t('settings.homeBackground')} isOn={homeBackground} onIsOnChange={setHomeBackground} />
         </NativeSection>
 
         <NativeSection>
@@ -628,6 +621,7 @@ function Appearance() {
             {wallpaper?.file ? <ButtonCell label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
             {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
             <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} />
+            <SwitchCell label={t('settings.homeBackground')} value={homeBackground} onValueChange={setHomeBackground} />
           </ListSection>
 
           <ListSection>
