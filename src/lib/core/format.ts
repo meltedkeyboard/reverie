@@ -12,6 +12,17 @@ export function formatWhen(timestamp: number, locale: Locale) {
   return date.getFullYear() === now.getFullYear() ? day : `${day} ${date.getFullYear()}`
 }
 
+// As short as the date at the end of a row in Messages: the time today, "Yesterday", then the day.
+export function formatShortWhen(timestamp: number, locale: Locale) {
+  const date = new Date(timestamp)
+  const now = new Date()
+  if (sameDay(date, now)) return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+  if (sameDay(date, new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))) return t('format.yesterday')
+  const month = new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', { month: 'short' }).format(date)
+  const day = `${date.getDate()} ${month}`
+  return date.getFullYear() === now.getFullYear() ? day : `${day} ${date.getFullYear()}`
+}
+
 function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }

@@ -25,7 +25,7 @@ export type DragCardProps = {
 // as it is and the caller gives the long press something to do itself.
 export const systemCardMenu = DragCardView !== null
 
-const toEntries = (items: MenuItem[]): DragMenuEntry[] =>
+export const toEntries = (items: MenuItem[]): DragMenuEntry[] =>
   items.map(({ label, systemImage, destructive, children }) => ({ label, systemImage, destructive, children: children && toEntries(children) }))
 
 // On iOS a long press on a card is the system's: the menu, and moving the finger lifts the

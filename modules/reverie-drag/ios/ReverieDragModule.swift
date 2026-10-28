@@ -21,6 +21,26 @@ public class ReverieDragModule: Module {
   public func definition() -> ModuleDefinition {
     Name("ReverieDrag")
 
+    // The rows of the system list of characters (see CardRow), registered before any list is drawn.
+    OnCreate {
+      registerCardRow()
+    }
+
+    OnDestroy {
+      unregisterCardRow()
+    }
+
+    // The picture at the start of a row of that list, a PNG in the caches: faces are
+    // `{ uri?, letter, tint }`, `ring` the screen's background between faces that overlap.
+    AsyncFunction("rowAvatar") { (faces: [[String: Any]], side: Double, scale: Double, ring: String) -> String in
+      try rowAvatar(
+        faces: faces.map { RowFace(uri: $0["uri"] as? String, letter: $0["letter"] as? String ?? "?", tint: $0["tint"] as? String ?? "#40406B") },
+        side: side,
+        scale: scale,
+        ring: ring
+      )
+    }
+
     // Null when JS could not build the file; the drop then fails on its own.
     Function("fulfill") { (token: String, uri: String?) in
       guard let done = takePending(token) else { return }
@@ -106,14 +126,20 @@ public class ReverieDragModule: Module {
   }
 }
 
+// What a character is lifted from: a card of the list, or a row of the system list. It dims
+// where it stood while the drag goes on.
+protocol PickableCard: AnyObject {
+  func setPicked(_ on: Bool)
+}
+
 // One dragged character, and the card it was lifted from.
 final class DragPayload {
   let id: Int
-  weak var card: DragCardView?
+  weak var card: PickableCard?
   // Lifted with its whole group, on the group's card: it stays in the group wherever it lands.
   let withGroup: Bool
 
-  init(id: Int, card: DragCardView, withGroup: Bool) {
+  init(id: Int, card: PickableCard, withGroup: Bool) {
     self.id = id
     self.card = card
     self.withGroup = withGroup
@@ -125,11 +151,52 @@ func draggedIds(_ session: UIDropSession) -> [Int] {
   session.localDragSession?.items.compactMap { ($0.localObject as? DragPayload)?.id } ?? []
 }
 
+// A character in the air: the archive and the card PNG are made by JS only when a drop asks
+// for one, through `provide` and then `fulfill` with the token.
+func characterDragItem(id: Int, name: String, card: PickableCard, withGroup: Bool, provide: @escaping (_ token: String, _ kind: String, _ id: Int) -> Void) -> UIDragItem {
+  let provider = NSItemProvider()
+  provider.suggestedName = name
+  // The archive first: Files keeps the first type it can, Photos only takes the picture.
+  for (type, kind) in [(characterType, "archive"), (UTType.png.identifier, "card")] {
+    provider.registerFileRepresentation(forTypeIdentifier: type, fileOptions: [], visibility: .all) { [weak card] done in
+      let token = UUID().uuidString
+      pendingLock.lock()
+      pending[token] = done
+      pendingLock.unlock()
+      DispatchQueue.main.async {
+        guard card != nil else {
+          takePending(token)?(nil, false, NSError(domain: "ReverieDrag", code: 2))
+          return
+        }
+        provide(token, kind, id)
+      }
+      return nil
+    }
+  }
+  let item = UIDragItem(itemProvider: provider)
+  item.localObject = DragPayload(id: id, card: card, withGroup: withGroup)
+  return item
+}
+
+// The menu JS describes, as the system's; `select` hears the path of the item picked.
+func buildCardMenu(_ items: [[String: Any]], path: [Int] = [], select: @escaping ([Int]) -> Void) -> [UIMenuElement] {
+  items.enumerated().map { index, entry in
+    let title = entry["label"] as? String ?? ""
+    let image = (entry["systemImage"] as? String).flatMap { UIImage(systemName: $0) }
+    if let children = entry["children"] as? [[String: Any]] {
+      return UIMenu(title: title, image: image, children: buildCardMenu(children, path: path + [index], select: select))
+    }
+    let action = UIAction(title: title, image: image) { _ in select(path + [index]) }
+    if entry["destructive"] as? Bool == true { action.attributes = .destructive }
+    return action
+  }
+}
+
 // How far the target's dashed outline stands off the card.
 private let RING_OUTSET: CGFloat = 4
 private let RING_WIDTH: CGFloat = 1.5
 
-class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractionDelegate, UIDropInteractionDelegate {
+class DragCardView: ExpoView, PickableCard, UIDragInteractionDelegate, UIContextMenuInteractionDelegate, UIDropInteractionDelegate {
   let onMenuSelect = EventDispatcher()
   let onProvide = EventDispatcher()
   let onDragState = EventDispatcher()
@@ -239,30 +306,11 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     items.map { dragItem(id: $0.id, name: $0.name) }
   }
 
+  // Only a group's card carries more than one character.
   private func dragItem(id: Int, name: String) -> UIDragItem {
-    let provider = NSItemProvider()
-    provider.suggestedName = name
-    // The archive first: Files keeps the first type it can, Photos only takes the picture.
-    for (type, kind) in [(characterType, "archive"), (UTType.png.identifier, "card")] {
-      provider.registerFileRepresentation(forTypeIdentifier: type, fileOptions: [], visibility: .all) { [weak self] done in
-        let token = UUID().uuidString
-        pendingLock.lock()
-        pending[token] = done
-        pendingLock.unlock()
-        DispatchQueue.main.async {
-          guard let self else {
-            takePending(token)?(nil, false, NSError(domain: "ReverieDrag", code: 2))
-            return
-          }
-          self.onProvide(["token": token, "kind": kind, "id": id])
-        }
-        return nil
-      }
+    characterDragItem(id: id, name: name, card: self, withGroup: items.count > 1) { [weak self] token, kind, id in
+      self?.onProvide(["token": token, "kind": kind, "id": id])
     }
-    let item = UIDragItem(itemProvider: provider)
-    // Only a group's card carries more than one character.
-    item.localObject = DragPayload(id: id, card: self, withGroup: items.count > 1)
-    return item
   }
 
   private func roundedPreview() -> UITargetedPreview {
@@ -312,7 +360,7 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
     if !menuEnabled || menuItems.isEmpty { return nil }
     return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
       guard let self else { return nil }
-      return UIMenu(children: self.buildMenu(self.menuItems, path: []))
+      return UIMenu(children: buildCardMenu(self.menuItems) { [weak self] path in self?.onMenuSelect(["path": path]) })
     }
   }
 
@@ -376,21 +424,6 @@ class DragCardView: ExpoView, UIDragInteractionDelegate, UIContextMenuInteractio
 
   func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
     onDropCards(["ids": draggedIds(session)])
-  }
-
-  private func buildMenu(_ items: [[String: Any]], path: [Int]) -> [UIMenuElement] {
-    items.enumerated().map { index, entry in
-      let title = entry["label"] as? String ?? ""
-      let image = (entry["systemImage"] as? String).flatMap { UIImage(systemName: $0) }
-      if let children = entry["children"] as? [[String: Any]] {
-        return UIMenu(title: title, image: image, children: buildMenu(children, path: path + [index]))
-      }
-      let action = UIAction(title: title, image: image) { [weak self] _ in
-        self?.onMenuSelect(["path": path + [index]])
-      }
-      if entry["destructive"] as? Bool == true { action.attributes = .destructive }
-      return action
-    }
   }
 }
 
@@ -464,7 +497,7 @@ class DropTargetView: ExpoView, UIDropInteractionDelegate {
   }
 }
 
-private extension UIColor {
+extension UIColor {
   convenience init(hex: String) {
     let value = UInt32(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) ?? 0
     self.init(

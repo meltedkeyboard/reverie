@@ -13,6 +13,7 @@ import { Button } from '@/components/controls/Button'
 import { IconButton } from '@/components/controls/IconButton'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { GroupCard } from '@/components/lists/GroupCard'
+import { NativeCharacterList, nativeCharacterList, type HomeRow } from '@/components/lists/NativeCharacterList'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassGroup, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
@@ -52,20 +53,15 @@ import { dragModule, DropTargetView, type DropFile } from '../../../modules/reve
 // The server notice above the list: its height and the margin under it.
 const NOTICE_HEIGHT = 74
 
-// A row of the home list: a group, or a character standing alone.
-type Row =
-  | { kind: 'group'; key: string; group: CharacterGroup; members: CharacterPreview[] }
-  | { kind: 'character'; key: string; character: CharacterPreview }
-
 // Groups and lone characters share one order, highest first; on a tie a group comes first.
-function buildRows(characters: CharacterPreview[], groups: CharacterGroup[]): Row[] {
+function buildRows(characters: CharacterPreview[], groups: CharacterGroup[]): HomeRow[] {
   const members = new Map<number, CharacterPreview[]>()
   for (const c of characters) if (c.groupId !== null) members.set(c.groupId, [...(members.get(c.groupId) ?? []), c])
   const top = [
     ...groups.filter((g) => members.has(g.id)).map((g) => ({ order: g.sortOrder, tie: 1, id: g.id, group: g as CharacterGroup | undefined, character: undefined })),
     ...characters.filter((c) => c.groupId === null).map((c) => ({ order: c.sortOrder, tie: 0, id: c.id, group: undefined, character: c as CharacterPreview | undefined })),
   ].sort((a, b) => b.order - a.order || b.tie - a.tie || b.id - a.id)
-  return top.map((entry): Row => {
+  return top.map((entry): HomeRow => {
     if (entry.character) return { kind: 'character', key: `c${entry.id}`, character: entry.character }
     const list = members.get(entry.id)!
     return { kind: 'group', key: `g${entry.id}`, group: entry.group!, members: list }
@@ -335,7 +331,9 @@ export default function CharactersScreen() {
     padding,
     (lastChat ? CONTINUE_BUTTON_SPACE : 0) + (serverSet ? 0 : NOTICE_HEIGHT)
   )
-  const fillHeight = editing ? undefined : fill.height
+  // The system's list on iOS has no card over the whole screen: a lone character is a row.
+  const native = !!nativeCharacterList && rows.length > 0
+  const fillHeight = editing || native ? undefined : fill.height
   const featured = fillHeight !== undefined
   // The continue button is gone while editing; the edit bar takes its place.
   const barBottom = insets.bottom + 12
@@ -360,92 +358,110 @@ export default function CharactersScreen() {
       fill.onLayout(e)
     }}>
       <Pattern id="stars" />
-      <ReorderableList
-        data={rows}
-        keyExtractor={(row) => row.key}
-        {...reorder}
-        onReorder={onReorder}
-        onScrollBeginDrag={createMenu.close}
-        // The list runs under the floating header and the tab bar, where the edge zones that
-        // scroll it would hide: they start where the cards can be seen.
-        autoscrollThreshold={0.15}
-        autoscrollThresholdOffset={{ start: padding.paddingTop, end: padding.paddingBottom }}
-        // A step every frame without the scroll animation (see the patch of the list), 12 pt to
-        // begin with and speeding up while the card is held at the edge.
-        autoscrollDelay={16}
-        autoscrollSpeedScale={0.12}
-        // About 20 characters fit a few screens, where the full speed-up overshoots: it grows
-        // from two thirds there to all of it at 50.
-        autoscrollAcceleration={Math.min(Math.max((visibleCount - 20) / 30, 0), 1) / 3 + 2 / 3}
-        scrollEnabled={editing || fill.scroll}
-        contentContainerStyle={[
-          padding,
-          { paddingBottom: padding.paddingBottom + bottomSpace },
-        ]}
-        ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}
-        ListHeaderComponent={
-          !serverSet && characters ? (
-            // A row like the "finish setting up" one in iOS Settings: a glyph on a
-            // colored tile, the text, and a chevron to where it is fixed.
-            <Pressable onPress={() => router.navigate('/settings')} style={({ pressed }) => [styles.notice, pressed && { opacity: 0.6 }]}>
-              <View style={styles.noticeTile}>
-                <SFIcon name="server.rack" fallback="server" size={15} color={ON_ACCENT} />
-              </View>
-              <View style={styles.noticeBody}>
-                <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
-                <Text style={styles.noticeText}>{t('characters.serverNotSetText')}</Text>
-              </View>
-              <SFIcon name="chevron.right" fallback="chevron-forward" size={14} color={colors.textFaint} />
-            </Pressable>
-          ) : undefined
-        }
-        ListEmptyComponent={
-          characters ? (
-            <EmptyState
-              title={t('characters.emptyTitle')}
-              text={t('characters.emptyText')}
-              action={
-                <Link href="/character/new" asChild>
-                  <Link.AppleZoom>
-                    <Button variant="glass" label={t('characters.createCharacter')} style={emptyButtonStyle} />
-                  </Link.AppleZoom>
-                </Link>
-              }
-            />
-          ) : undefined
-        }
-        renderItem={({ item: row }) => {
-          if (row.kind === 'group') {
-            const ids = row.members.map((m) => m.id)
+      {native ? (
+        <NativeCharacterList
+          rows={rows}
+          editing={editing}
+          checked={checked}
+          onCheck={setChecked}
+          notice={serverSet ? null : { title: t('characters.serverNotSetTitle'), text: t('characters.serverNotSetText'), onPress: () => router.navigate('/settings') }}
+          bottomInset={bottomSpace}
+          onOpen={(row) => (row.kind === 'group' ? router.push(`/groups/${row.group.id}`) : router.push(`/chat/latest?character=${row.character.id}`))}
+          menuOf={(row) => (row.kind === 'group' ? groupMenu(row.group, row.members) : menuItems(row.character))}
+          onDelete={(row) => (row.kind === 'group' ? deleteWholeGroup(row.group, row.members) : confirmDelete(row.character))}
+          onUngroup={(group) => run(ungroup(db, group.id))}
+          onMove={(from, to) => onReorder({ from, to })}
+          onDrop={(row, ids) => (row.kind === 'group' ? run(addToGroup(db, row.group.id, ids)) : dropOnCharacter(row.character, ids))}
+          onProvide={provide}
+        />
+      ) : (
+        <ReorderableList
+          data={rows}
+          keyExtractor={(row) => row.key}
+          {...reorder}
+          onReorder={onReorder}
+          onScrollBeginDrag={createMenu.close}
+          // The list runs under the floating header and the tab bar, where the edge zones that
+          // scroll it would hide: they start where the cards can be seen.
+          autoscrollThreshold={0.15}
+          autoscrollThresholdOffset={{ start: padding.paddingTop, end: padding.paddingBottom }}
+          // A step every frame without the scroll animation (see the patch of the list), 12 pt to
+          // begin with and speeding up while the card is held at the edge.
+          autoscrollDelay={16}
+          autoscrollSpeedScale={0.12}
+          // About 20 characters fit a few screens, where the full speed-up overshoots: it grows
+          // from two thirds there to all of it at 50.
+          autoscrollAcceleration={Math.min(Math.max((visibleCount - 20) / 30, 0), 1) / 3 + 2 / 3}
+          scrollEnabled={editing || fill.scroll}
+          contentContainerStyle={[
+            padding,
+            { paddingBottom: padding.paddingBottom + bottomSpace },
+          ]}
+          ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}
+          ListHeaderComponent={
+            !serverSet && characters ? (
+              // A row like the "finish setting up" one in iOS Settings: a glyph on a
+              // colored tile, the text, and a chevron to where it is fixed.
+              <Pressable onPress={() => router.navigate('/settings')} style={({ pressed }) => [styles.notice, pressed && { opacity: 0.6 }]}>
+                <View style={styles.noticeTile}>
+                  <SFIcon name="server.rack" fallback="server" size={15} color={ON_ACCENT} />
+                </View>
+                <View style={styles.noticeBody}>
+                  <Text style={styles.noticeTitle}>{t('characters.serverNotSetTitle')}</Text>
+                  <Text style={styles.noticeText}>{t('characters.serverNotSetText')}</Text>
+                </View>
+                <SFIcon name="chevron.right" fallback="chevron-forward" size={14} color={colors.textFaint} />
+              </Pressable>
+            ) : undefined
+          }
+          ListEmptyComponent={
+            characters ? (
+              <EmptyState
+                title={t('characters.emptyTitle')}
+                text={t('characters.emptyText')}
+                action={
+                  <Link href="/character/new" asChild>
+                    <Link.AppleZoom>
+                      <Button variant="glass" label={t('characters.createCharacter')} style={emptyButtonStyle} />
+                    </Link.AppleZoom>
+                  </Link>
+                }
+              />
+            ) : undefined
+          }
+          renderItem={({ item: row }) => {
+            if (row.kind === 'group') {
+              const ids = row.members.map((m) => m.id)
+              return (
+                <GroupCard
+                  group={row.group}
+                  members={row.members}
+                  onOpen={() => router.push(`/groups/${row.group.id}`)}
+                  onDelete={() => deleteWholeGroup(row.group, row.members)}
+                  onUngroup={() => run(ungroup(db, row.group.id))}
+                  menu={groupMenu(row.group, row.members)}
+                  editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), motion: editMotion }}
+                  onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
+                  onProvide={provide}
+                />
+              )
+            }
+            const { character } = row
             return (
-              <GroupCard
-                group={row.group}
-                members={row.members}
-                onOpen={() => router.push(`/groups/${row.group.id}`)}
-                onDelete={() => deleteWholeGroup(row.group, row.members)}
-                onUngroup={() => run(ungroup(db, row.group.id))}
-                menu={groupMenu(row.group, row.members)}
-                editing={{ active: editing, checked: ids.every((id) => checked.has(id)), onToggle: () => toggleChecked(ids), motion: editMotion }}
-                onDropCards={(dropped) => run(addToGroup(db, row.group.id, dropped))}
+              <CharacterCard
+                character={character}
+                onOpen={() => router.push(`/chat/latest?character=${character.id}`)}
+                onDelete={() => confirmDelete(character)}
+                menu={menuItems(character)}
+                fillHeight={fillHeight}
+                editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]), motion: editMotion }}
                 onProvide={provide}
+                onDropCards={(dropped) => dropOnCharacter(character, dropped)}
               />
             )
-          }
-          const { character } = row
-          return (
-            <CharacterCard
-              character={character}
-              onOpen={() => router.push(`/chat/latest?character=${character.id}`)}
-              onDelete={() => confirmDelete(character)}
-              menu={menuItems(character)}
-              fillHeight={fillHeight}
-              editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]), motion: editMotion }}
-              onProvide={provide}
-              onDropCards={(dropped) => dropOnCharacter(character, dropped)}
-            />
-          )
-        }}
-      />
+          }}
+        />
+      )}
       {editing ? (
         <Animated.View
           entering={FadeInDown.springify().duration(350).dampingRatio(1)}

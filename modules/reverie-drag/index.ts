@@ -5,9 +5,12 @@ import type { ViewProps } from 'react-native'
 export type DragMenuEntry = { label: string; systemImage?: string; destructive?: boolean; children?: DragMenuEntry[] }
 export type DropFile = { uri: string; kind: 'archive' | 'card' }
 
+export type RowFace = { uri?: string | null; letter: string; tint: string }
+
 type DragModule = {
   fulfill(token: string, uri: string | null): void
   renderInitial(letter: string, tint: string, size: number): string
+  rowAvatar(faces: RowFace[], side: number, scale: number, ring: string): Promise<string>
 }
 
 type DragCardProps = ViewProps & {
@@ -44,3 +47,30 @@ export const DropTargetView: ComponentType<DropTargetProps> | null = dragModule 
 // Whether cards are in the air: a tap on a card then adds it to the drag, not opens it.
 // Whether a card's menu is up: the touch that opened it must not open the card too.
 export const dragSession = { active: false, menuOpen: false }
+
+export type CardRowEvent =
+  | { event: 'menu'; path: number[] }
+  | { event: 'provide'; token: string; kind: 'archive' | 'card'; id: number }
+  | { event: 'dragState'; active: boolean }
+  | { event: 'menuState'; open: boolean }
+  | { event: 'drop'; ids: number[] }
+
+type CardRowParams = {
+  items: { id: number; name: string }[]
+  menu: DragMenuEntry[]
+  enabled: boolean
+  acceptsCards: boolean
+  groupIds: number[]
+  accentColor: string
+  shadeColor: string
+}
+
+// The modifier that makes a row of the system list a character's card: the menu, the drag
+// and the drop of DragCardView, on the list's own cell (see CardRow.swift). It is a modifier
+// config of @expo/ui built by hand, as `createModifierWithEventListener` would, so that this
+// file does not load @expo/ui where it is missing.
+export const cardRow = (params: CardRowParams, onEvent: (event: CardRowEvent) => void) => ({
+  $type: 'reverieCardRow',
+  ...params,
+  eventListener: onEvent as (args: unknown) => void,
+})

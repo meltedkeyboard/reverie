@@ -12,6 +12,8 @@ Pod::Spec.new do |s|
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
+  # The rows of the system list of characters are a modifier of @expo/ui's SwiftUI views.
+  s.dependency 'ExpoUI'
 
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES'
