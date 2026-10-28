@@ -11,14 +11,63 @@ import UIKit
 // in (a UICollectionViewCell since iOS 16) and the UIKit interactions go on that cell.
 let cardRowType = "reverieCardRow"
 
+// A tap on a row's picture, which opens it in the viewer rather than the row: the place it
+// is tapped at goes along, in the window's points, for the viewer to grow the picture out of.
+let pictureTapType = "reveriePictureTap"
+
 func registerCardRow() {
   ViewModifierRegistry.register(cardRowType) { params, _, dispatcher in
     CardRowModifier(config: CardRowConfig(params: params, dispatcher: dispatcher))
+  }
+  ViewModifierRegistry.register(pictureTapType) { _, _, dispatcher in
+    PictureTapModifier(dispatcher: dispatcher)
   }
 }
 
 func unregisterCardRow() {
   ViewModifierRegistry.unregister(cardRowType)
+  ViewModifierRegistry.unregister(pictureTapType)
+}
+
+struct PictureTapModifier: ViewModifier {
+  let dispatcher: EventDispatcher
+
+  func body(content: Content) -> some View {
+    content.overlay(PictureTapArea(dispatcher: dispatcher))
+  }
+}
+
+// A UIKit view over the picture: its tap is the picture's alone, so the row's button under it
+// does not open the row too, while a long press still reaches the cell's menu and drag.
+private struct PictureTapArea: UIViewRepresentable {
+  let dispatcher: EventDispatcher
+
+  func makeUIView(context: Context) -> PictureTapView {
+    let view = PictureTapView()
+    view.dispatcher = dispatcher
+    return view
+  }
+
+  func updateUIView(_ view: PictureTapView, context: Context) {
+    view.dispatcher = dispatcher
+  }
+}
+
+final class PictureTapView: UIView {
+  var dispatcher: EventDispatcher?
+
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    backgroundColor = .clear
+    addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
+  }
+
+  required init?(coder: NSCoder) { fatalError() }
+
+  @objc private func tapped() {
+    let box = convert(bounds, to: nil)
+    dispatcher?([pictureTapType: ["x": box.minX, "y": box.minY, "width": box.width, "height": box.height]])
+  }
 }
 
 struct CardRowConfig {
@@ -190,8 +239,10 @@ final class CardRowBehavior: NSObject, PickableCard, UIDragInteractionDelegate, 
     refresh()
   }
 
+  // A row with nothing to drag out (a room's) keeps only its menu, as a card does with
+  // `draggable` off.
   func refresh() {
-    drag.isEnabled = config?.enabled ?? false
+    drag.isEnabled = (config?.enabled ?? false) && !(config?.items.isEmpty ?? true)
   }
 
   private func restyle() {

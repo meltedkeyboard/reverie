@@ -74,3 +74,9 @@ export const cardRow = (params: CardRowParams, onEvent: (event: CardRowEvent) =>
   ...params,
   eventListener: onEvent as (args: unknown) => void,
 })
+
+// A tap on a row's picture alone, with where it sits in the window (see PictureTapView).
+export const pictureTap = (onTap: (box: { x: number; y: number; width: number; height: number }) => void) => ({
+  $type: 'reveriePictureTap',
+  eventListener: onTap as (args: unknown) => void,
+})

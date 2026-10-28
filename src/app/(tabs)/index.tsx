@@ -13,7 +13,7 @@ import { Button } from '@/components/controls/Button'
 import { IconButton } from '@/components/controls/IconButton'
 import { CharacterCard } from '@/components/lists/CharacterCard'
 import { GroupCard } from '@/components/lists/GroupCard'
-import { NativeCharacterList, nativeCharacterList, type HomeRow } from '@/components/lists/NativeCharacterList'
+import { characterRow, NativeCardList, nativeCardList, type NativeCardRow } from '@/components/lists/NativeCardList'
 import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassGroup, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
@@ -24,6 +24,7 @@ import { Pattern } from '@/components/visuals/Pattern'
 import { Icon } from '@/components/visuals/Icon'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { withAlpha } from '@/lib/core/color'
+import { countLabel } from '@/lib/core/format'
 import * as Haptics from '@/lib/ui/haptics'
 import { deleteCharacter, listCharacters, mergeCharacters, sameCharacter, type CharacterPreview } from '@/db/characters'
 import { addToGroup, createGroup, deleteGroup, listGroups, pruneGroups, removeFromGroup, renameGroup, saveHomeOrder, ungroup, type CharacterGroup } from '@/db/groups'
@@ -53,6 +54,11 @@ import { dragModule, DropTargetView, type DropFile } from '../../../modules/reve
 // The server notice above the list: its height and the margin under it.
 const NOTICE_HEIGHT = 74
 
+// A row of the home list: a group, or a character standing alone.
+type HomeRow =
+  | { kind: 'group'; key: string; group: CharacterGroup; members: CharacterPreview[] }
+  | { kind: 'character'; key: string; character: CharacterPreview }
+
 // Groups and lone characters share one order, highest first; on a tie a group comes first.
 function buildRows(characters: CharacterPreview[], groups: CharacterGroup[]): HomeRow[] {
   const members = new Map<number, CharacterPreview[]>()
@@ -75,7 +81,7 @@ export default function CharactersScreen() {
   const padding = useScreenPadding('list')
   const styles = useStyles(createStyles)
   const colors = useColors()
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
   const [groups, setGroups] = useState<CharacterGroup[]>([])
   const [serverSet, setServerSet] = useState(true)
@@ -332,7 +338,7 @@ export default function CharactersScreen() {
     (lastChat ? CONTINUE_BUTTON_SPACE : 0) + (serverSet ? 0 : NOTICE_HEIGHT)
   )
   // The system's list on iOS has no card over the whole screen: a lone character is a row.
-  const native = !!nativeCharacterList && rows.length > 0
+  const native = !!nativeCardList && rows.length > 0
   const fillHeight = editing || native ? undefined : fill.height
   const featured = fillHeight !== undefined
   // The continue button is gone while editing; the edit bar takes its place.
@@ -352,6 +358,39 @@ export default function CharactersScreen() {
     },
   ]
 
+  // The rows of the system's list: a group shows its members' faces and names, and a drag
+  // lifts them all; a character lifted alone can be dropped on another to make a group.
+  const nativeRows: NativeCardRow[] = native
+    ? rows.map((row) => {
+        if (row.kind === 'group') {
+          const names = row.members.map((c) => c.name).join(', ')
+          const ids = row.members.map((c) => c.id)
+          return {
+            key: row.key,
+            people: row.members,
+            title: row.group.name ?? names,
+            date: null,
+            line: row.group.name ? names : countLabel(row.members.length, 'character', locale),
+            menu: groupMenu(row.group, row.members),
+            ids,
+            drags: row.members.map((c) => ({ id: c.id, name: c.name })),
+            onDrop: (dropped) => run(addToGroup(db, row.group.id, dropped)),
+            own: ids,
+            onOpen: () => router.push(`/groups/${row.group.id}`),
+            onDelete: () => deleteWholeGroup(row.group, row.members),
+            leading: { label: t('groups.ungroup'), systemImage: 'rectangle.stack.badge.minus', onAction: () => run(ungroup(db, row.group.id)) },
+          }
+        }
+        return characterRow(row.character, {
+          key: row.key,
+          menu: menuItems(row.character),
+          onDrop: (dropped) => dropOnCharacter(row.character, dropped),
+          onOpen: () => router.push(`/chat/latest?character=${row.character.id}`),
+          onDelete: () => confirmDelete(row.character),
+        })
+      })
+    : []
+
   const screen = (
     <View style={styles.screen} ref={anchor.ref} onLayout={(e) => {
       anchor.onLayout()
@@ -359,19 +398,14 @@ export default function CharactersScreen() {
     }}>
       <Pattern id="stars" />
       {native ? (
-        <NativeCharacterList
-          rows={rows}
+        <NativeCardList
+          rows={nativeRows}
           editing={editing}
           checked={checked}
           onCheck={setChecked}
-          notice={serverSet ? null : { title: t('characters.serverNotSetTitle'), text: t('characters.serverNotSetText'), onPress: () => router.navigate('/settings') }}
+          notice={serverSet ? null : { title: t('characters.serverNotSetTitle'), text: t('characters.serverNotSetText'), symbol: 'server.rack', onPress: () => router.navigate('/settings') }}
           bottomInset={bottomSpace}
-          onOpen={(row) => (row.kind === 'group' ? router.push(`/groups/${row.group.id}`) : router.push(`/chat/latest?character=${row.character.id}`))}
-          menuOf={(row) => (row.kind === 'group' ? groupMenu(row.group, row.members) : menuItems(row.character))}
-          onDelete={(row) => (row.kind === 'group' ? deleteWholeGroup(row.group, row.members) : confirmDelete(row.character))}
-          onUngroup={(group) => run(ungroup(db, group.id))}
           onMove={(from, to) => onReorder({ from, to })}
-          onDrop={(row, ids) => (row.kind === 'group' ? run(addToGroup(db, row.group.id, ids)) : dropOnCharacter(row.character, ids))}
           onProvide={provide}
         />
       ) : (

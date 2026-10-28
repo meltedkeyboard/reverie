@@ -15,7 +15,8 @@ import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/Gla
 import { Pattern } from '@/components/visuals/Pattern'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { PopoverMenu, usePopoverMenu } from '@/components/overlays/PopoverMenu'
-import { RoomCard } from '@/components/lists/RoomCard'
+import { NativeCardList, nativeCardList, type NativeCardRow } from '@/components/lists/NativeCardList'
+import { RoomCard, roomPreview } from '@/components/lists/RoomCard'
 import { listCharacters } from '@/db/characters'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
@@ -66,7 +67,9 @@ export default function RoomsScreen() {
   // A lone room is one card over the whole screen, and the list does not scroll. Not while
   // editing: the check and the handle sit on a row.
   const fill = useFeaturedFill(rooms?.length ?? 0, padding, lastChat ? CONTINUE_BUTTON_SPACE : 0)
-  const fillHeight = editing ? undefined : fill.height
+  // The system's list on iOS has no card over the whole screen: a lone room is a row.
+  const native = !!nativeCardList && !!rooms?.length
+  const fillHeight = editing || native ? undefined : fill.height
   const featured = fillHeight !== undefined
   // The continue button is gone while editing; the edit bar takes its place.
   const bottomSpace = editing ? EDIT_BAR_SPACE : lastChat ? CONTINUE_BUTTON_SPACE : 0
@@ -101,48 +104,76 @@ export default function RoomsScreen() {
     { label: t('rooms.importRoom'), systemImage: 'square.and.arrow.down', onSelect: backupImport.pick },
   ]
 
+  // A room's row shows its cast's faces and the last line said in it; there is nothing in it to
+  // drag out, so a long press is only its menu.
+  const nativeRows: NativeCardRow[] = native
+    ? (rooms ?? []).map((room) => ({
+        key: String(room.id),
+        people: room.cast.length ? room.cast : [{ name: room.name, avatar: null }],
+        title: room.name,
+        date: room.chatCount > 0 && room.lastMessage ? room.lastActivity : null,
+        line: roomPreview(room, t('rooms.noMembers')),
+        menu: menuItems(room),
+        ids: [room.id],
+        drags: [],
+        onOpen: () => router.push(`/chat/latest?room=${room.id}`),
+        onDelete: () => confirmDelete(room),
+      }))
+    : []
+
   return (
     <View style={styles.screen} ref={anchor.ref} onLayout={(e) => {
       anchor.onLayout()
       fill.onLayout(e)
     }}>
       <Pattern id="stars" />
-      <ReorderableList
-        data={rooms ?? []}
-        keyExtractor={(r) => String(r.id)}
-        {...reorder}
-        scrollEnabled={editing || fill.scroll}
-        contentContainerStyle={[padding, { paddingBottom: padding.paddingBottom + bottomSpace }]}
-        ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}
-        ListEmptyComponent={
-          rooms ? (
-            <EmptyState
-              title={t('rooms.emptyTitle')}
-              text={characterCount < 2 ? t('rooms.emptyTextFew') : t('rooms.emptyText')}
-              action={
-                characterCount >= 2 ? (
-                  <Link href="/room/new" asChild>
-                    <Link.AppleZoom>
-                      <Button variant="glass" label={t('rooms.createRoom')} style={emptyButtonStyle} />
-                    </Link.AppleZoom>
-                  </Link>
-                ) : undefined
-              }
+      {native ? (
+        <NativeCardList
+          rows={nativeRows}
+          editing={editing}
+          checked={checked}
+          onCheck={setChecked}
+          bottomInset={bottomSpace}
+          onMove={(from, to) => reorder.onReorder({ from, to })}
+        />
+      ) : (
+        <ReorderableList
+          data={rooms ?? []}
+          keyExtractor={(r) => String(r.id)}
+          {...reorder}
+          scrollEnabled={editing || fill.scroll}
+          contentContainerStyle={[padding, { paddingBottom: padding.paddingBottom + bottomSpace }]}
+          ItemSeparatorComponent={featured ? FeaturedSeparator : ListSeparator}
+          ListEmptyComponent={
+            rooms ? (
+              <EmptyState
+                title={t('rooms.emptyTitle')}
+                text={characterCount < 2 ? t('rooms.emptyTextFew') : t('rooms.emptyText')}
+                action={
+                  characterCount >= 2 ? (
+                    <Link href="/room/new" asChild>
+                      <Link.AppleZoom>
+                        <Button variant="glass" label={t('rooms.createRoom')} style={emptyButtonStyle} />
+                      </Link.AppleZoom>
+                    </Link>
+                  ) : undefined
+                }
+              />
+            ) : undefined
+          }
+          onScrollBeginDrag={createMenu.close}
+          renderItem={({ item: room }) => (
+            <RoomCard
+              room={room}
+              onOpen={() => router.push(`/chat/latest?room=${room.id}`)}
+              onDelete={() => confirmDelete(room)}
+              menu={menuItems(room)}
+              fillHeight={fillHeight}
+              editing={{ active: editing, checked: checked.has(room.id), onToggle: () => toggleChecked([room.id]), motion }}
             />
-          ) : undefined
-        }
-        onScrollBeginDrag={createMenu.close}
-        renderItem={({ item: room }) => (
-          <RoomCard
-            room={room}
-            onOpen={() => router.push(`/chat/latest?room=${room.id}`)}
-            onDelete={() => confirmDelete(room)}
-            menu={menuItems(room)}
-            fillHeight={fillHeight}
-            editing={{ active: editing, checked: checked.has(room.id), onToggle: () => toggleChecked([room.id]), motion }}
-          />
-        )}
-      />
+          )}
+        />
+      )}
       {editing ? (
         <Animated.View
           entering={FadeInDown.springify().duration(350).dampingRatio(1)}

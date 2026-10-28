@@ -10,6 +10,7 @@ import ReorderableList from 'react-native-reorderable-list'
 import { Avatar } from '@/components/visuals/Avatar'
 import { Button } from '@/components/controls/Button'
 import { CharacterCard } from '@/components/lists/CharacterCard'
+import { characterRow, NativeCardList, nativeCardList, type NativeCardRow } from '@/components/lists/NativeCardList'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
@@ -198,58 +199,91 @@ export default function GroupScreen() {
   const barBottom = insets.bottom + 12
   const bottomSpace = editing ? EDIT_BAR_SPACE : 0
 
+  // The members as the rows of the system's list on iOS; another character dropped on one
+  // joins the group, and a member swiped from the other edge leaves it.
+  const native = !!nativeCardList && !!members?.length
+  const nativeRows: NativeCardRow[] = native
+    ? (members ?? []).map((character) =>
+        characterRow(character, {
+          key: String(character.id),
+          menu: menuItems(character),
+          own: groupedIds,
+          onDrop: (dropped) => addToGroup(db, parsedGroupId, dropped).then(reload),
+          onOpen: () => router.push(`/chat/latest?character=${character.id}`),
+          onDelete: () => confirmDelete(character),
+          leading: {
+            label: t('groups.removeFromGroup'),
+            systemImage: 'rectangle.stack.badge.minus',
+            onAction: () => removeFromGroup(db, [character.id]).then(reload),
+          },
+        })
+      )
+    : []
+
   const screen = (
     <View style={styles.screen}>
       <Pattern id="two-stars" />
-      <ReorderableList
-        data={members ?? []}
-        keyExtractor={(c) => String(c.id)}
-        {...reorder}
-        scrollEnabled={editing || Boolean(members?.length)}
-        contentContainerStyle={[
-          padding,
-          { paddingBottom: padding.paddingBottom + bottomSpace },
-        ]}
-        ItemSeparatorComponent={ListSeparator}
-        ListEmptyComponent={
-          members ? (
-            <EmptyState
-              title={t('groups.emptyTitle')}
-              text={t('groups.emptyText')}
-              action={
-                <Button
-                  variant="glass"
-                  label={t('groups.addCharacter')}
-                  style={emptyButtonStyle}
-                  onPress={chooseCharacterToAdd}
-                />
+      {native ? (
+        <NativeCardList
+          rows={nativeRows}
+          editing={editing}
+          checked={checked}
+          onCheck={setChecked}
+          bottomInset={bottomSpace}
+          onMove={(from, to) => reorder.onReorder({ from, to })}
+          onProvide={provide}
+        />
+      ) : (
+        <ReorderableList
+          data={members ?? []}
+          keyExtractor={(c) => String(c.id)}
+          {...reorder}
+          scrollEnabled={editing || Boolean(members?.length)}
+          contentContainerStyle={[
+            padding,
+            { paddingBottom: padding.paddingBottom + bottomSpace },
+          ]}
+          ItemSeparatorComponent={ListSeparator}
+          ListEmptyComponent={
+            members ? (
+              <EmptyState
+                title={t('groups.emptyTitle')}
+                text={t('groups.emptyText')}
+                action={
+                  <Button
+                    variant="glass"
+                    label={t('groups.addCharacter')}
+                    style={emptyButtonStyle}
+                    onPress={chooseCharacterToAdd}
+                  />
+                }
+              />
+            ) : undefined
+          }
+          renderItem={({ item: character }) => (
+            <CharacterCard
+              character={character}
+              onOpen={() => router.push(`/chat/latest?character=${character.id}`)}
+              onDelete={() => confirmDelete(character)}
+              menu={menuItems(character)}
+              // All member ids: no card in the group becomes a drop target for another member.
+              groupIds={groupedIds}
+              editing={
+                editing
+                  ? {
+                      active: true,
+                      checked: checked.has(character.id),
+                      onToggle: () => toggleChecked([character.id]),
+                      motion,
+                    }
+                  : undefined
               }
+              onProvide={provide}
+              onDropCards={(dropped) => addToGroup(db, parsedGroupId, dropped).then(reload)}
             />
-          ) : undefined
-        }
-        renderItem={({ item: character }) => (
-          <CharacterCard
-            character={character}
-            onOpen={() => router.push(`/chat/latest?character=${character.id}`)}
-            onDelete={() => confirmDelete(character)}
-            menu={menuItems(character)}
-            // All member ids: no card in the group becomes a drop target for another member.
-            groupIds={groupedIds}
-            editing={
-              editing
-                ? {
-                    active: true,
-                    checked: checked.has(character.id),
-                    onToggle: () => toggleChecked([character.id]),
-                    motion,
-                  }
-                : undefined
-            }
-            onProvide={provide}
-            onDropCards={(dropped) => addToGroup(db, parsedGroupId, dropped).then(reload)}
-          />
-        )}
-      />
+          )}
+        />
+      )}
       {editing ? (
         <Animated.View
           entering={FadeInDown.springify().duration(350).dampingRatio(1)}

@@ -27,12 +27,7 @@ type Props = {
 function RoomCardContent({ room, onOpen, onDelete, menu, fillHeight, editing }: Props) {
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
-  const last = plainPreview(room.lastMessage ?? '')
-  const preview = last
-    ? room.lastSpeaker
-      ? `${room.lastSpeaker}: ${last}`
-      : last
-    : plainPreview(room.scenario) || room.cast.map((m) => m.name).join(', ') || t('rooms.noMembers')
+  const preview = roomPreview(room, t('rooms.noMembers'))
   const scenes = room.chatCount
   if (fillHeight !== undefined) {
     return (
@@ -62,6 +57,14 @@ function RoomCardContent({ room, onOpen, onDelete, menu, fillHeight, editing }: 
       </View>
     </ListCard>
   )
+}
+
+// The line under a room's name: who said what last, or else the scenario, the cast's names,
+// or `empty` for a room with nobody in it.
+export function roomPreview(room: RoomPreview, empty: string) {
+  const last = plainPreview(room.lastMessage ?? '')
+  if (last) return room.lastSpeaker ? `${room.lastSpeaker}: ${last}` : last
+  return plainPreview(room.scenario) || room.cast.map((m) => m.name).join(', ') || empty
 }
 
 // The cast fills the card's left edge from top to bottom, as a character's avatar does on
