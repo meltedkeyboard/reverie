@@ -11,12 +11,14 @@ import { useChatScheme, type ChatLook } from '@/components/chrome/ChatChrome'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { ButtonCell, CheckCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
-import { nativeForm, NativeForm, NativeHostedRow, NativeSection } from '@/components/lists/NativeForm'
+import { nativeCardList, NativeListPreview } from '@/components/lists/NativeCardList'
+import { nativeForm, NativeForm, NativeHostedRow, NativeSection, NativeSegmentRow } from '@/components/lists/NativeForm'
 import { Segmented } from '@/components/controls/Segmented'
 import { SourceCell } from '@/components/lists/PictureCells'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Markdown } from '@/components/chat/Markdown'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
+import { LIST_CORNER_RANGE, setListCorner, setListSpacing, useListLook, type ListSpacing } from '@/db/prefs/listLook'
 import { CHAT_PATTERNS, CHAT_TEXT_SCALE_RANGE, DEFAULT_CHAT_FONT, SYSTEM_FONT } from '@/db/prefs/settings'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
@@ -47,6 +49,9 @@ const TILE_WIDTH = 84
 const TILE_HEIGHT = (TILE_WIDTH * 852) / 393
 const MARK_SIZE = 22
 const TILE_LABEL_LINE = 16
+// The slider of the lists' corners stops every this many hundredths of a picture's side.
+const CORNER_STEP = 5
+
 // The preview card's set height: its padding, the messages and the composer.
 const PREVIEW_HEIGHT = 20 + 200 + 12 + FIELD_HEIGHT + 12
 
@@ -307,6 +312,18 @@ function Appearance() {
     setScale(next, false)
   }
 
+  // How round the pictures of the lists are, in steps the slider ticks at; written once let go.
+  const listLook = useListLook()
+  const cornerDragged = useRef(listLook.corner)
+  const resetCorner = () => {
+    Haptics.selectionAsync()
+    setListCorner(db, LIST_CORNER_RANGE.default)
+  }
+  const spacingOptions: { value: ListSpacing; label: string }[] = [
+    { value: 'compact', label: t('settings.listSpacingCompact') },
+    { value: 'roomy', label: t('settings.listSpacingRoomy') },
+  ]
+
   // Everything installed, the system font first. Without the native module (Expo Go,
   // and Android always) a few that every device has.
   const families = useMemo(() => {
@@ -409,6 +426,48 @@ function Appearance() {
           <Toggle label={t('settings.chatUserFont')} isOn={userFont} onIsOnChange={setUserFont} />
           <Toggle label={t('settings.chatUserMarkdown')} isOn={userMarkdown} onIsOnChange={setUserMarkdown} />
         </NativeSection>
+
+        {/* The look of the system's lists of characters, groups and rooms, which only iOS has. */}
+        {nativeCardList ? (
+          <NativeSection title={t('settings.listLook')} footer={t('settings.listLookHint')}>
+            <NativeListPreview />
+            <HStack spacing={12}>
+              <Image systemName="square" size={17} color={colors.textMuted} />
+              <SwiftSlider
+                value={listLook.corner}
+                min={LIST_CORNER_RANGE.min}
+                max={LIST_CORNER_RANGE.max}
+                step={CORNER_STEP}
+                onValueChange={(value) => {
+                  const next = Math.round(value / CORNER_STEP) * CORNER_STEP
+                  cornerDragged.current = next
+                  if (next !== listLook.corner) setListCorner(db, next, false)
+                }}
+                onEditingChanged={(editing) => {
+                  if (!editing) setListCorner(db, cornerDragged.current)
+                }}
+                modifiers={[accessibilityLabel(t('settings.listCorners'))]}
+              />
+              <Image systemName="circle" size={17} color={colors.textMuted} />
+              {/* As the text size's: only the corners back to round. */}
+              <SwiftButton
+                onPress={resetCorner}
+                modifiers={[buttonStyle('borderless'), disabled(listLook.corner === LIST_CORNER_RANGE.default), accessibilityLabel(t('settings.listResetCorners'))]}
+              >
+                <Image systemName="arrow.counterclockwise" size={18} />
+              </SwiftButton>
+            </HStack>
+            <NativeSegmentRow
+              label={t('settings.listSpacing')}
+              options={spacingOptions}
+              value={listLook.spacing}
+              onChange={(next) => {
+                Haptics.selectionAsync()
+                setListSpacing(db, next)
+              }}
+            />
+          </NativeSection>
+        ) : null}
 
         <NativeSection title={t('settings.chatPattern')} footer={t('settings.chatBackdropHint')}>
           <NativeHostedRow height={tilesHeight}>{tiles}</NativeHostedRow>

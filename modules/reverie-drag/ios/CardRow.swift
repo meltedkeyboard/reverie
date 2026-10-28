@@ -417,14 +417,15 @@ struct RowFace {
   let tint: String
 }
 
-func rowAvatar(faces: [RowFace], side: Double, scale: Double, ring: String) throws -> String {
+// `corner` is the radius of each face over its side: a half is a circle.
+func rowAvatar(faces: [RowFace], side: Double, scale: Double, ring: String, corner: Double) throws -> String {
   let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("row-avatars", isDirectory: true)
   try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
   // A new picture of the same name is still told apart by its date.
   let described = faces.map { face -> String in
     let date = face.uri.flatMap { URL(string: $0) }.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.modificationDate] as? Date }
     return "\(face.uri ?? "")|\(date?.timeIntervalSince1970 ?? 0)|\(face.letter)|\(face.tint)"
-  }.joined(separator: ";") + "|\(side)|\(scale)|\(ring)"
+  }.joined(separator: ";") + "|\(side)|\(scale)|\(ring)|\(corner)"
   let file = dir.appendingPathComponent("\(stableHash(described)).png")
   if FileManager.default.fileExists(atPath: file.path) { return file.absoluteString }
 
@@ -440,10 +441,10 @@ func rowAvatar(faces: [RowFace], side: Double, scale: Double, ring: String) thro
       // A face over another stands off it by a thin ring of the screen's background.
       if index > 0 {
         ringColor.setFill()
-        UIBezierPath(ovalIn: rect.insetBy(dx: -size * 0.03, dy: -size * 0.03)).fill()
+        facePath(rect.insetBy(dx: -size * 0.03, dy: -size * 0.03), corner: corner).fill()
       }
       ctx.cgContext.saveGState()
-      UIBezierPath(ovalIn: rect).addClip()
+      facePath(rect, corner: corner).addClip()
       if let image = face.uri.flatMap({ loadImage($0, side: rect.width * CGFloat(scale)) }) {
         image.draw(in: aspectFill(image.size, in: rect))
       } else {
@@ -459,6 +460,11 @@ func rowAvatar(faces: [RowFace], side: Double, scale: Double, ring: String) thro
   }
   try png.write(to: file, options: .atomic)
   return file.absoluteString
+}
+
+// A circle, or a square with iOS's continuous corners, whose radius is never quite a circle's.
+private func facePath(_ rect: CGRect, corner: Double) -> UIBezierPath {
+  corner >= 0.5 ? UIBezierPath(ovalIn: rect) : UIBezierPath(roundedRect: rect, cornerRadius: rect.width * CGFloat(corner))
 }
 
 private func faceRects(count: Int, side: CGFloat) -> [CGRect] {

@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { PixelRatio, StyleSheet } from 'react-native'
 
 import type { CharacterPreview } from '@/db/characters'
+import { useListLook, type ListLook } from '@/db/prefs/listLook'
 import { useTranslation } from '@/i18n'
 import { formatShortWhen } from '@/lib/core/format'
 import { characterPreview } from '@/lib/chat/roleplay'
@@ -66,17 +67,74 @@ type Props = {
 
 type Person = { name: string; avatar: string | null }
 
-const AVATAR = 56
 const CLEAR = '#00000000'
+
+// The sizes of a row in each spacing: the compact one of the app, and the roomy one of Messages,
+// a smaller face further in, more room above and below, and always room for two lines.
+function rowMetrics(look: ListLook) {
+  return look.spacing === 'roomy'
+    ? { avatar: 44, gap: 14, vertical: 13, leading: 26, textHeight: 62 }
+    : { avatar: 56, gap: 12, vertical: 8, leading: 16, textHeight: 0 }
+}
+
+type ContentProps = {
+  title: string
+  date: number | null
+  line: string
+  // The picture drawn by rowAvatar, or null while it is drawn.
+  picture: string | null
+  tint: string
+  chevron: boolean
+  pictureModifiers?: ReturnType<NonNullable<typeof nativeCardList>['modifiers']['opacity']>[]
+}
+
+// What a row shows, in the look set under Appearance: the face, the name with the date, and
+// the line under it. The lists draw it, and so does the preview of Appearance.
+export function useRowContent() {
+  const { colors } = useTheme()
+  const { locale } = useTranslation()
+  const look = useListLook()
+  const metrics = rowMetrics(look)
+  const { HStack, VStack, Spacer, Text, Image, Circle, RoundedRectangle } = nativeCardList!.ui
+  const m = nativeCardList!.modifiers
+  const secondary = { type: 'hierarchical', style: 'secondary' } as const
+  const side = metrics.avatar
+  const render = ({ title, date, line, picture, tint, chevron, pictureModifiers = [] }: ContentProps) => (
+    <HStack spacing={metrics.gap}>
+      {picture ? (
+        <Image uiImage={picture} modifiers={[m.resizable(), m.frame({ width: side, height: side }), ...pictureModifiers]} />
+      ) : look.corner >= 50 ? (
+        // No text in it: the list starts the separator under the row's first text, and keeps
+        // it there once the picture comes.
+        <Circle modifiers={[m.foregroundStyle(tint), m.frame({ width: side, height: side })]} />
+      ) : (
+        <RoundedRectangle cornerRadius={(side * look.corner) / 100} modifiers={[m.foregroundStyle(tint), m.frame({ width: side, height: side })]} />
+      )}
+      <VStack alignment="leading" spacing={3} modifiers={metrics.textHeight ? [m.frame({ minHeight: metrics.textHeight, alignment: 'topLeading' })] : []}>
+        <HStack spacing={6}>
+          <Text modifiers={[m.font({ textStyle: 'body', weight: 'semibold' }), m.lineLimit(1)]}>{title}</Text>
+          <Spacer />
+          {date !== null ? (
+            <Text modifiers={[m.font({ textStyle: 'subheadline' }), m.foregroundStyle(secondary), m.lineLimit(1)]}>{formatShortWhen(date, locale)}</Text>
+          ) : null}
+          {chevron ? <Image systemName="chevron.right" size={13} color={colors.textFaint} /> : null}
+        </HStack>
+        <Text modifiers={[m.font({ textStyle: 'subheadline' }), m.foregroundStyle(secondary), m.lineLimit(2)]}>{line}</Text>
+      </VStack>
+    </HStack>
+  )
+  return { look, metrics, render }
+}
 
 export function NativeCardList({ rows, editing, checked, onCheck, notice, bottomInset, onMove, onProvide }: Props) {
   const { colors, scheme } = useTheme()
-  const { t, locale } = useTranslation()
-  const avatars = useRowAvatars(rows, colors.bg)
+  const { t } = useTranslation()
+  const { look, metrics, render } = useRowContent()
+  const avatars = useRowAvatars(rows.map((row) => row.people), colors.bg)
   const openViewer = useOpenViewer()
   // The row whose picture is up in the viewer hides its own, which the photo lands back in.
   const lifted = useSyncExternalStore(subscribeLifted, liftedSource, () => null)
-  const { Host, List, HStack, VStack, ZStack, Spacer, Text, Image, Button, SwipeActions, Circle } = nativeCardList!.ui
+  const { Host, List, HStack, VStack, ZStack, Spacer, Text, Image, Button, SwipeActions } = nativeCardList!.ui
   const m = nativeCardList!.modifiers
   const secondary = { type: 'hierarchical', style: 'secondary' } as const
   // Rows of the list's own that are not cards: no separator, nothing behind them, never moved.
@@ -124,38 +182,20 @@ export function NativeCardList({ rows, editing, checked, onCheck, notice, bottom
         const spot = spots[shown.findIndex((p) => p.avatar === image.avatar)]
         if (!spot) return null
         const side = spot.size * box.width
-        return { x: box.x + spot.x * box.width, y: box.y + spot.y * box.height, width: side, height: side, radii: [side / 2, side / 2, side / 2, side / 2], continuous: false }
+        const radius = (side * look.corner) / 100
+        return { x: box.x + spot.x * box.width, y: box.y + spot.y * box.height, width: side, height: side, radii: [radius, radius, radius, radius], continuous: look.corner < 50 }
       })
       openViewer(gallery, 0, origins, origins.map((origin) => (origin ? row.key : null)))
     }
-    const pictureModifiers = [
-      m.resizable(),
-      m.frame({ width: AVATAR, height: AVATAR }),
-      ...(lifted === row.key ? [m.opacity(0)] : []),
-      ...(gallery.length && !editing ? [pictureTap(openPictures)] : []),
-    ]
-    const content = (
-      <HStack spacing={12}>
-        {avatar ? (
-          <Image uiImage={avatar} modifiers={pictureModifiers} />
-        ) : (
-          // No text in it: the list starts the separator under the row's first text, and keeps
-          // it there once the picture comes.
-          <Circle modifiers={[m.foregroundStyle(faces[0]?.tint ?? colors.surface), m.frame({ width: AVATAR, height: AVATAR })]} />
-        )}
-        <VStack alignment="leading" spacing={3}>
-          <HStack spacing={6}>
-            <Text modifiers={[m.font({ textStyle: 'body', weight: 'semibold' }), m.lineLimit(1)]}>{row.title}</Text>
-            <Spacer />
-            {row.date !== null ? (
-              <Text modifiers={[m.font({ textStyle: 'subheadline' }), m.foregroundStyle(secondary), m.lineLimit(1)]}>{formatShortWhen(row.date, locale)}</Text>
-            ) : null}
-            {editing ? null : <Image systemName="chevron.right" size={13} color={colors.textFaint} />}
-          </HStack>
-          <Text modifiers={[m.font({ textStyle: 'subheadline' }), m.foregroundStyle(secondary), m.lineLimit(2)]}>{row.line}</Text>
-        </VStack>
-      </HStack>
-    )
+    const content = render({
+      title: row.title,
+      date: row.date,
+      line: row.line,
+      picture: avatar ?? null,
+      tint: faces[0]?.tint ?? colors.surface,
+      chevron: !editing,
+      pictureModifiers: [...(lifted === row.key ? [m.opacity(0)] : []), ...(gallery.length && !editing ? [pictureTap(openPictures)] : [])],
+    })
 
     // A long press, the drag and a drop belong to the row's cell (see CardRow.swift).
     const behavior = cardRow(
@@ -170,7 +210,7 @@ export function NativeCardList({ rows, editing, checked, onCheck, notice, bottom
       },
       onEvent(row)
     )
-    const rowModifiers = [m.listRowBackground(CLEAR), m.listRowInsets({ top: 8, leading: 16, bottom: 8, trailing: 16 })]
+    const rowModifiers = [m.listRowBackground(CLEAR), m.listRowInsets({ top: metrics.vertical, leading: metrics.leading, bottom: metrics.vertical, trailing: 16 })]
 
     // In edit mode a tap ticks the row, so it is not a button, and the list's own drag moves it.
     if (editing) {
@@ -283,30 +323,67 @@ function faceSpots(count: number) {
 const faceKey = (faces: RowFace[]) => faces.map((f) => `${f.uri ?? ''}|${f.letter}|${f.tint}`).join(';')
 
 // The rows' pictures, drawn natively at the row's size the first time they are needed and
-// then taken from the caches; a row without its picture yet keeps the room for it.
-function useRowAvatars(rows: NativeCardRow[], ring: string) {
-  const [ready, setReady] = useState<Record<string, string>>({})
+// then taken from the caches; a row without its picture yet keeps the room for it. Keyed by
+// the faces in it. While the look changes, a face keeps its picture in the look before until
+// the new one is drawn, rather than going blank under the slider.
+export function useRowAvatars(people: Person[][], ring: string) {
+  const look = useListLook()
+  const side = rowMetrics(look).avatar
+  const [shown, setShown] = useState<Record<string, { uri: string; look: string }>>({})
+  const lookKey = `${side}|${look.corner}|${ring}`
+  const faceSets = people.map(rowFaces)
+  const wanted = faceSets.map(faceKey).join(';;')
   useEffect(() => {
     let alive = true
     const scale = PixelRatio.get()
-    for (const row of rows) {
-      const faces = rowFaces(row.people)
+    for (const faces of faceSets) {
       const key = faceKey(faces)
-      if (ready[key]) continue
+      if (shown[key]?.look === lookKey) continue
       dragModule!
-        .rowAvatar(faces, AVATAR, scale, ring)
+        .rowAvatar(faces, side, scale, ring, look.corner / 100)
         .then((uri) => {
-          if (alive) setReady((prev) => ({ ...prev, [key]: uri }))
+          if (alive) setShown((prev) => ({ ...prev, [key]: { uri, look: lookKey } }))
         })
         .catch(() => {})
     }
     return () => {
       alive = false
     }
-  }, [rows, ring])
-  return ready
+  }, [wanted, lookKey])
+  return Object.fromEntries(Object.entries(shown).map(([key, value]) => [key, value.uri])) as Record<string, string>
+}
+
+// Two rows as the lists draw them, a character and a group, for Appearance: rows of the
+// settings' own list, in the look set there.
+export function NativeListPreview() {
+  const { colors } = useTheme()
+  const { t } = useTranslation()
+  const { metrics, render } = useRowContent()
+  const { HStack } = nativeCardList!.ui
+  const { listRowInsets } = nativeCardList!.modifiers
+  const now = Date.now()
+  const samples = [
+    { key: 'one', people: [{ name: t('listPreview.name'), avatar: null }], title: t('listPreview.name'), line: t('listPreview.line'), date: now },
+    {
+      key: 'group',
+      people: [{ name: t('listPreview.member1'), avatar: null }, { name: t('listPreview.member2'), avatar: null }],
+      title: t('listPreview.groupName'),
+      line: `${t('listPreview.member1')}, ${t('listPreview.member2')}`,
+      date: null,
+    },
+  ]
+  const pictures = useRowAvatars(samples.map((sample) => sample.people), colors.surface)
+  return samples.map((sample) => {
+    const faces = rowFaces(sample.people)
+    return (
+      <HStack key={sample.key} modifiers={[listRowInsets({ top: metrics.vertical, leading: metrics.leading, bottom: metrics.vertical, trailing: 16 })]}>
+        {render({ title: sample.title, date: sample.date, line: sample.line, picture: pictures[faceKey(faces)] ?? null, tint: faces[0].tint, chevron: true })}
+      </HStack>
+    )
+  })
 }
 
 const styles = StyleSheet.create({
   host: { flex: 1 },
 })
+
