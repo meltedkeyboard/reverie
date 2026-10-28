@@ -340,6 +340,31 @@ const MIGRATIONS = [
   `
     ALTER TABLE chats ADD COLUMN direction TEXT;
   `,
+  // A character's gallery: pictures and videos of its own, in the order the user put them.
+  // The size is kept so the viewer can lay a picture out before it loads; a video picked
+  // from Files has none until its first frame is shown.
+  `
+    CREATE TABLE character_gallery (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL DEFAULT 0,
+      file TEXT NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX idx_character_gallery ON character_gallery(character_id, position);
+  ` +
+    ['INSERT', 'UPDATE', 'DELETE']
+      .map(
+        (op) => `
+    CREATE TRIGGER character_gallery_${op.toLowerCase()}_sync AFTER ${op} ON character_gallery
+      WHEN (SELECT value FROM app_settings WHERE key = 'sync_dirty') IS NOT '1'
+    BEGIN
+      INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_dirty', '1');
+    END;`
+      )
+      .join('\n'),
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

@@ -9,6 +9,7 @@ import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate'
 //   lorebooks/<id>-<name>.json  a lorebook with its entries and the characters and rooms using it
 //   avatars/<file>, backgrounds/<file>   the pictures as they are, originals included
 //   attachments/<file>   the pictures attached to messages (a message lists their names)
+//   gallery/<file>       the pictures and videos of characters' galleries (a character lists them)
 // Only the folders matter to the reader; the names after the id are there for people.
 
 type WithId = { id: number }

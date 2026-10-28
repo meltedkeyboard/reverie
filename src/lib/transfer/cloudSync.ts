@@ -37,9 +37,9 @@ type Manifest = { app: 'reverie'; rev: string; schema: number; savedAt: number }
 
 const MANIFEST = 'manifest.json'
 const DATABASE = 'reverie.db'
-const IMAGE_KINDS: ImageKind[] = ['avatars', 'backgrounds', 'attachments']
+const IMAGE_KINDS: ImageKind[] = ['avatars', 'backgrounds', 'attachments', 'gallery']
 // Parents first, so rows can be put back in this order and deleted in the reverse one.
-const TABLES = ['characters', 'rooms', 'room_members', 'chats', 'messages', 'lorebooks', 'lore_entries', 'lorebook_links']
+const TABLES = ['characters', 'character_gallery', 'rooms', 'room_members', 'chats', 'messages', 'lorebooks', 'lore_entries', 'lorebook_links']
 // Tables whose insert trigger puts each new row on top and so scrambles a copied order.
 const ORDERED_TABLES = ['characters', 'rooms', 'chats']
 
@@ -91,6 +91,7 @@ async function referencedImages(db: SQLiteDatabase, schema: string) {
      UNION SELECT avatar_original, 'avatars' FROM ${schema}.characters WHERE avatar_original IS NOT NULL
      UNION SELECT background, 'backgrounds' FROM ${schema}.characters WHERE background IS NOT NULL
      UNION SELECT background_original, 'backgrounds' FROM ${schema}.characters WHERE background_original IS NOT NULL
+     UNION SELECT file, 'gallery' FROM ${schema}.character_gallery
      UNION SELECT background, 'backgrounds' FROM ${schema}.rooms WHERE background IS NOT NULL
      UNION SELECT background_original, 'backgrounds' FROM ${schema}.rooms WHERE background_original IS NOT NULL
      UNION SELECT json_extract(j.value, '$.file'), 'attachments'
@@ -98,7 +99,7 @@ async function referencedImages(db: SQLiteDatabase, schema: string) {
      UNION SELECT json_extract(j.value, '$.moving'), 'attachments'
        FROM ${schema}.messages m, json_each(m.images) j WHERE m.images IS NOT NULL AND json_valid(m.images)`
   )
-  const images: Record<ImageKind, Set<string>> = { avatars: new Set(), backgrounds: new Set(), attachments: new Set() }
+  const images: Record<ImageKind, Set<string>> = { avatars: new Set(), backgrounds: new Set(), attachments: new Set(), gallery: new Set() }
   // A message of an older database has base64 in its row and no file yet.
   for (const row of rows) if (row.name) images[row.kind].add(row.name)
   return images

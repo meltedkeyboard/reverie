@@ -5,8 +5,9 @@ import { newAvatarName } from '@/lib/images/images'
 import { extensionOf, movingFormat, movingKind } from '@/lib/images/media'
 import { dataDirectory } from '@/lib/core/storage'
 
-// `attachments` holds the pictures sent in messages.
-export type ImageKind = 'avatars' | 'backgrounds' | 'attachments'
+// `attachments` holds the pictures sent in messages, `gallery` the pictures and videos of
+// characters' galleries.
+export type ImageKind = 'avatars' | 'backgrounds' | 'attachments' | 'gallery'
 
 // Only the file name goes into the database. The absolute path of the app
 // container changes between installs and updates, so it is resolved on read.
@@ -75,7 +76,7 @@ export async function writeAvatarBase64(name: string, base64: string, kind: Imag
 }
 
 export function removeAllAvatars() {
-  for (const kind of ['avatars', 'backgrounds', 'attachments'] as const) {
+  for (const kind of ['avatars', 'backgrounds', 'attachments', 'gallery'] as const) {
     if (folder(kind).exists) folder(kind).delete()
   }
 }

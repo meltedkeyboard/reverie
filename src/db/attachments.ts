@@ -93,7 +93,8 @@ export async function pruneAttachments(db: SQLiteDatabase) {
   const cutoff = Date.now() - DAY
   for (const item of dir.list()) {
     if (!(item instanceof File) || used.has(item.name)) continue
-    // Names start with the time they were made.
-    if (Number(item.name.split('-')[0]) < cutoff) item.delete()
+    // Names start with the time they were made; those brought in by a backup before had
+    // `import-` in front of it.
+    if (Number(item.name.replace(/^import-/, '').split('-')[0]) < cutoff) item.delete()
   }
 }

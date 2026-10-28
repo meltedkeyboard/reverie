@@ -8,6 +8,7 @@ import { t } from '@/i18n'
 import { pickBackupFile } from '@/lib/transfer/pickBackup'
 import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/images/avatars'
 import { isArchive, packArchive, unpackArchive } from '@/lib/transfer/backupArchive'
+import { addToGallery, type NewGalleryItem } from '@/db/gallery'
 import { insertGroup } from '@/db/groups'
 import { insertPersona, notifyPersonasChanged } from '@/db/personas'
 import { dumpLorebooks, writeLorebook, type LoreEntryFields, type LoreLinks } from '@/db/lorebooks'
@@ -18,10 +19,10 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
+// 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
 // each chat's long memory and direction, and lorebooks. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 13
+const BACKUP_VERSION = 14
 
 type BackupCharacter = {
   id: number
@@ -54,7 +55,11 @@ type BackupCharacter = {
   // The group the character was in and its place there, top down. Backups from before
   // groups leave it out.
   group?: BackupGroupSlot
+  // Version 14: the pictures and videos of its gallery, in their order.
+  gallery?: BackupGalleryItem[]
 }
+
+type BackupGalleryItem = { file: string; width: number | null; height: number | null }
 
 type BackupGroupSlot = { id: number; name: string | null; position: number }
 
@@ -301,9 +306,11 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
   const picked = selection ? applySelection(all, selection) : all
   const { rooms = [], roomMembers = [], chats, personas = [] } = picked
   const groupSlots = selection?.keepGroups === false ? new Map<number, BackupGroupSlot>() : await loadGroupSlots(db)
+  const galleries = await loadGalleries(db)
   const characters = picked.characters.map(({ groupId: _groupId, sortOrder: _sortOrder, ...character }) => {
     const group = groupSlots.get(character.id)
-    return group ? { ...character, group } : character
+    const gallery = galleries.get(character.id)
+    return { ...character, ...(group ? { group } : null), ...(gallery ? { gallery } : null) }
   })
   const messages = picked.messages.map((row) => (row.images ? { ...row, images: JSON.parse(row.images) } : row))
   // The lorebooks of what goes, each with only the owners that go along; all of them in a
@@ -331,6 +338,7 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
     want(character.avatarOriginal, 'avatars')
     want(character.background, 'backgrounds')
     want(character.backgroundOriginal, 'backgrounds')
+    for (const item of character.gallery ?? []) want(item.file, 'gallery')
   }
   for (const persona of personas) {
     want(persona.avatar, 'avatars')
@@ -365,6 +373,20 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
     lorebooks,
     files,
   })
+}
+
+// The gallery of every character that has one, in its order.
+async function loadGalleries(db: SQLiteDatabase) {
+  const rows = await db.getAllAsync<BackupGalleryItem & { characterId: number }>(
+    'SELECT character_id AS characterId, file, width, height FROM character_gallery ORDER BY character_id, position, id'
+  )
+  const galleries = new Map<number, BackupGalleryItem[]>()
+  for (const { characterId, ...item } of rows) {
+    const list = galleries.get(characterId) ?? []
+    list.push(item)
+    galleries.set(characterId, list)
+  }
+  return galleries
 }
 
 // Each grouped character's group and place in it, the top member first.
@@ -483,7 +505,9 @@ export async function importBackup(
       if (!name || !data) return null
       let stored = avatarNames.get(`${kind}/${name}`) ?? null
       if (!stored) {
-        stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.${extensionOf(name) || 'jpg'}`
+        // The time goes first, as in every stored name: the sweeps of attachments and the
+        // gallery read a file's age from it.
+        stored = `${Date.now()}-import-${Math.round(Math.random() * 1e6)}.${extensionOf(name) || 'jpg'}`
         if (typeof data === 'string') await writeAvatarBase64(stored, data, kind)
         else writeAvatarBytes(stored, data, kind)
         avatarNames.set(`${kind}/${name}`, stored)
@@ -543,6 +567,12 @@ export async function importBackup(
         character.createdAt
       )
       characterIds.set(character.id, id)
+      const gallery: NewGalleryItem[] = []
+      for (const item of character.gallery ?? []) {
+        const file = await importImage(item.file, 'gallery')
+        if (file) gallery.push({ file, width: item.width ?? null, height: item.height ?? null })
+      }
+      await addToGallery(db, id, gallery)
     }
 
     // The groups come back with whichever of their characters came along, if two or more did.
@@ -649,7 +679,7 @@ export async function importBackup(
         let stored: string | null = null
         if (name) stored = await importImage(name, 'attachments')
         else if (base64) {
-          stored = `import-${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
+          stored = `${Date.now()}-import-${Math.round(Math.random() * 1e6)}.jpg`
           await writeAvatarBase64(stored, base64, 'attachments')
         }
         if (!stored) continue

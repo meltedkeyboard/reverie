@@ -9,6 +9,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/visuals/Avatar'
 import { CharacterProfile, NativeProfileList } from '@/components/cast/CharacterProfile'
+import { ProfileGallery } from '@/components/cast/ProfileGallery'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, BackgroundThumbCell, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
 import { NativeActionRow, NativeForm, NativeHostedRow, NativeSection, NativeSegmentRow, NativeSliderRow, NativeTextRow, nativeForm } from '@/components/lists/NativeForm'
@@ -764,6 +765,7 @@ export default function CharacterEditorScreen() {
                 background={backgroundUri ? { uri: backgroundUri, crop: bgSlot.shownCrop(backgroundCrop), effect: bgEffect, intensity: bgIntensity } : null}
                 // Saves the card as it is stored, so edits not yet saved are not in it.
                 exportItems={isNew ? undefined : exportTargets(() => getCharacter(db, Number(id)))}
+                gallery={isNew ? null : <ProfileGallery characterId={Number(id)} system={nativeProfile} />}
                 // The system's list keeps margins of its own, so it is taken out to the edges.
                 style={{ marginLeft: -sideLeft, marginRight: -sideRight }}
                 linkColor={glowColor ? `#${glowColor.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}` : undefined}

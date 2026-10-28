@@ -8,7 +8,7 @@ import { isAndroid, isWeb } from '@/lib/core/platform'
 // Files once Documents is empty, so moving the data out is enough to make it vanish.
 const DATABASE_FOLDER = 'SQLite'
 const DATABASE_NAME = 'reverie.db'
-const IMAGE_FOLDERS = ['avatars', 'backgrounds', 'attachments']
+const IMAGE_FOLDERS = ['avatars', 'backgrounds', 'attachments', 'gallery']
 
 const library = new Directory(Paths.document.parentDirectory, 'Library')
 

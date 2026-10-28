@@ -2,6 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { convertLegacyAttachments, pruneAttachments } from '@/db/attachments'
+import { pruneGallery } from '@/db/gallery'
 import { loadDrafts } from '@/db/drafts'
 import { loadGenSessions } from '@/db/genSessions'
 import { migrate } from '@/db/schema'
@@ -30,6 +31,7 @@ async function openReverieDatabase(newConnection = false) {
   try {
     await convertLegacyAttachments(db)
     await pruneAttachments(db)
+    await pruneGallery(db)
   } catch (err) {
     console.warn('Attachments housekeeping failed', err)
   }

@@ -23,12 +23,14 @@ type Props = {
   background: { uri: string; crop: CropRect | null; effect: BackgroundEffect; intensity: number } | null
   // The choices of the export button at the bottom; without them there is no button.
   exportItems?: MenuItem[]
+  // The character's gallery, under its texts.
+  gallery?: React.ReactNode
 }
 
 // A character to look at rather than to edit, as a Telegram profile: under the avatar
 // what the character is, and how it answers, in the grouped look of the editor. The name stays in the header, from where it
 // moves onto the photo when the avatar spreads. Empty parts are left out.
-export function CharacterProfile({ greeting, systemPrompt, notes, params, background, exportItems }: Props) {
+export function CharacterProfile({ greeting, systemPrompt, notes, params, background, exportItems, gallery }: Props) {
   const { t } = useTranslation()
 
   return (
@@ -36,6 +38,7 @@ export function CharacterProfile({ greeting, systemPrompt, notes, params, backgr
       <ProfileText header={t('editor.systemPromptLabel')} text={systemPrompt} lines={6} />
       <ProfileText header={t('editor.greetingLabel')} text={greeting} lines={4} />
       <ProfileText header={t('editor.notesLabel')} text={notes} lines={4} />
+      {gallery}
       <ProfileParams header={t('editor.genParamsSection')} params={params} />
       <ProfileBackground background={background} />
       {exportItems ? <ProfileActions header={t('card.export')} items={exportItems} /> : null}
@@ -57,6 +60,7 @@ export function NativeProfileList({ style, linkColor, ...profile }: Props & { st
       <ProfileText header={t('editor.systemPromptLabel')} text={profile.systemPrompt} lines={6} system ink={linkColor} />
       <ProfileText header={t('editor.greetingLabel')} text={profile.greeting} lines={4} system ink={linkColor} />
       <ProfileText header={t('editor.notesLabel')} text={profile.notes} lines={4} system ink={linkColor} />
+      {profile.gallery}
       <SystemProfileRest
         paramsHeader={t('editor.genParamsSection')}
         params={profile.params}

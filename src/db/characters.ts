@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { PREVIEW } from '@/db/chats'
+import { copyGallery } from '@/db/gallery'
 import { MESSAGE_COPY_COLUMNS } from '@/db/messages'
 
 export type CharacterFields = {
@@ -230,6 +231,7 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
       [name, images.avatar, images.avatarOriginal, images.background, images.backgroundOriginal, Date.now(), id]
     )
     characterId = res.lastInsertRowId
+    await copyGallery(db, id, characterId)
     const chats = await db.getAllAsync<{ id: number }>('SELECT id FROM chats WHERE character_id = ? ORDER BY id', id)
     for (const chat of chats) {
       const copy = await db.runAsync(
@@ -263,6 +265,9 @@ export function sameCharacter(a: CharacterFields, b: CharacterFields) {
 export async function mergeCharacters(db: SQLiteDatabase, keepId: number, dropId: number) {
   await db.withTransactionAsync(async () => {
     await db.runAsync('UPDATE chats SET character_id = ? WHERE character_id = ?', [keepId, dropId])
+    // The dropped one's gallery goes after the kept one's.
+    const last = await db.getFirstAsync<{ position: number | null }>('SELECT MAX(position) AS position FROM character_gallery WHERE character_id = ?', keepId)
+    await db.runAsync('UPDATE character_gallery SET character_id = ?, position = position + ? WHERE character_id = ?', [keepId, (last?.position ?? -1) + 1, dropId])
 
     const inRooms = await db.getFirstAsync('SELECT 1 FROM room_members WHERE character_id = ?', dropId)
     if (inRooms) {
