@@ -20,7 +20,7 @@ import { pictureUri } from '@/lib/images/attachments'
 import type { Corners } from '@/lib/images/viewer'
 import { CHAT_METRICS, useChatText } from '@/lib/chat/chatText'
 import { menuItems, messageActions, type MessageAction } from '@/lib/chat/messageActions'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, useTheme, type Colors } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
 import { IconButton } from '../controls/IconButton'
@@ -76,6 +76,7 @@ function textSize({ fontFamily, scaled }: ReturnType<typeof useChatText>, metric
 const LONG_PRESS_MS = 350
 
 function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1, scene, hydrate = 'off' }: Props) {
+  const { scheme } = useTheme()
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
@@ -95,10 +96,8 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
   const openSheet = () => {
     if (message.streaming) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    showSheet(
-      undefined,
-      menuItems(actions, (action) => onAction(message, action))
-    )
+    // In the chat's scheme over its background, which the system's sheet would not take by itself.
+    showSheet(undefined, menuItems(actions, (action) => onAction(message, action)), { scheme })
   }
 
   const bar = message.streaming ? null : (
@@ -287,6 +286,7 @@ type RefineNoteProps = {
 // version reads as it does. It is the user's own words, so a tap offers what their message
 // has: copy, ask again with it, change it and ask again, or forget it (the reply stays).
 function RefineNote({ text, live, locked, canRegenerate, rich, onAction }: RefineNoteProps) {
+  const { scheme } = useTheme()
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -327,7 +327,7 @@ function RefineNote({ text, live, locked, canRegenerate, rich, onAction }: Refin
       {body}
     </NativeMenu>
   ) : (
-    <TapTrigger onPress={() => showSheet(undefined, items)} style={styles.refineTrigger}>
+    <TapTrigger onPress={() => showSheet(undefined, items, { scheme })} style={styles.refineTrigger}>
       {body}
     </TapTrigger>
   )
@@ -346,6 +346,7 @@ type ActionBarProps = {
 // The main action gets its own button next to copy: regenerating for a reply, editing
 // for the user's own message. Everything else goes into the ellipsis menu.
 function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }: ActionBarProps) {
+  const { scheme } = useTheme()
   const colors = useColors()
   const styles = useStyles(createStyles)
   const [copied, setCopied] = useState(false)
@@ -441,7 +442,7 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }
           <Icon name="ellipsis-horizontal" size={17} color={colors.textFaint} />
         </NativeMenu>
       ) : menu.length ? (
-        <TapTrigger onPress={() => showSheet(undefined, menu)} style={styles.barButton}>
+        <TapTrigger onPress={() => showSheet(undefined, menu, { scheme })} style={styles.barButton}>
           <PlainSymbol name="ellipsis" fallback="ellipsis-horizontal" size={ICON_SYMBOL * 17} box={17} color={colors.textFaint} />
         </TapTrigger>
       ) : null}

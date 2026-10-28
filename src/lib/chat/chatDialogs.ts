@@ -15,8 +15,9 @@ export function promptRenameChat(initial: string | null, onSubmit: (title: strin
   })
 }
 
-export function confirmDeleteChat(onConfirm: () => void) {
+export function confirmDeleteChat(onConfirm: () => void, scheme?: 'light' | 'dark' | null) {
   confirmDeletion({
+    scheme,
     title: t('chat.deleteChatTitle'),
     message: t('chat.deleteChatMessage'),
     onConfirm,

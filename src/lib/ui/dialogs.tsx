@@ -22,6 +22,8 @@ export type Confirmation = {
   destructive?: boolean
   onConfirm: () => void
   onCancel?: () => void
+  // As a TextPrompt's.
+  scheme?: 'light' | 'dark' | null
 }
 
 export type TextPrompt = {
@@ -38,6 +40,8 @@ export type TextPrompt = {
 export type SheetOptions = {
   message?: string
   onCancel?: () => void
+  // As a TextPrompt's.
+  scheme?: 'light' | 'dark' | null
 }
 
 export function showSheet(
@@ -70,6 +74,7 @@ export function showSheet(
       options: [...actions.map((action) => action.label), t('common.cancel')],
       destructiveButtonIndex: destructive >= 0 ? destructive : undefined,
       cancelButtonIndex: actions.length,
+      ...(options?.scheme ? { userInterfaceStyle: options.scheme } : {}),
     },
     (index) => {
       if (index === actions.length) {
@@ -81,15 +86,20 @@ export function showSheet(
   )
 }
 
-export function confirm({ title, message, confirmLabel, cancelLabel, destructive, onConfirm, onCancel }: Confirmation) {
+export function confirm({ title, message, confirmLabel, cancelLabel, destructive, onConfirm, onCancel, scheme }: Confirmation) {
   // Alert.alert does nothing on the web, so the question is a sheet with one answer.
   if (isWeb) {
     return openDialog({ kind: 'confirm', title, message, confirmLabel, cancelLabel, destructive, cancelable: true, onConfirm, onCancel })
   }
-  Alert.alert(title, message, [
-    { text: cancelLabel ?? t('common.cancel'), style: 'cancel', onPress: onCancel },
-    { text: confirmLabel, style: destructive ? 'destructive' : 'default', onPress: onConfirm },
-  ])
+  Alert.alert(
+    title,
+    message,
+    [
+      { text: cancelLabel ?? t('common.cancel'), style: 'cancel', onPress: onCancel },
+      { text: confirmLabel, style: destructive ? 'destructive' : 'default', onPress: onConfirm },
+    ],
+    scheme ? { userInterfaceStyle: scheme } : undefined
+  )
 }
 
 export function confirmAsync(options: {

@@ -96,7 +96,7 @@ export function useChatMenuActions({ chatId, title, rename, autoName, discard, o
       await deleteChat(db, chatId)
       if (onDeleted) onDeleted()
       else router.back()
-    })
+    }, scheme)
   }
 
   const promptRename = () => promptRenameChat(title, rename, scheme)

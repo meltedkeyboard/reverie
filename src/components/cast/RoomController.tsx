@@ -40,7 +40,7 @@ import { countLabel, formatWhen } from '@/lib/core/format'
 import { showMessage, showSheet } from '@/lib/ui/dialogs'
 import { reportError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
-import { CONTROL_FONT_SCALE, fonts, useColors, useStyles, type Colors } from '@/theme'
+import { CONTROL_FONT_SCALE, fonts, useColors, useStyles, useTheme, type Colors } from '@/theme'
 
 const FLOORS: FloorMode[] = ['addressee', 'reactions', 'open']
 const AUTOPLAY_LENGTHS = [3, 5, 10]
@@ -119,6 +119,8 @@ export function RoomController({
   const openViewer = useOpenViewer()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
+  // The chat's scheme over its background, for the system's sheets asked from the scene.
+  const { scheme } = useTheme()
   const floor = room.floor
 
   const {
@@ -364,7 +366,7 @@ export function RoomController({
   // For the long press on Continue, which has no menu of its own to grow out of.
   const chooseAutoplay = () => {
     if (!idle || !canTalk) return
-    showSheet(t('room.autoplayTitle'), autoplayItems)
+    showSheet(t('room.autoplayTitle'), autoplayItems, { scheme })
   }
 
   // Any one-on-one chat of someone in the room can seed a new scene here; the original
@@ -391,7 +393,8 @@ export function RoomController({
             reportError(t('rooms.importFailed'), err)
           }
         },
-      }))
+      })),
+      { scheme }
     )
   }
 

@@ -398,11 +398,12 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
   }
 
   const remove = (chat: ChatPreview) => {
+    // Over the chat's background the drawer's list is in its tone, and so is the question.
     confirmDeleteChat(async () => {
       await deleteChat(db, chat.id)
       if (chat.id === chatId) onCurrentDeleted()
       reload()
-    })
+    }, backdrop ?? scheme)
   }
 
   // The chat is copied into the room, as from the old list of chats; see importChatToRoom.
@@ -657,7 +658,7 @@ const DrawerRow = memo(function DrawerRow({ chat, active, tone, menuFor, onTouch
             </NativeMenu>
           </View>
         ) : (
-          <IconButton name="ellipsis-horizontal" size={16} color={colors.textFaint} onPress={() => showSheet(chat.title ?? when, menu)} />
+          <IconButton name="ellipsis-horizontal" size={16} color={colors.textFaint} onPress={() => showSheet(chat.title ?? when, menu, { scheme: tone })} />
         )}
       </Pressable>
     </GestureDetector>
