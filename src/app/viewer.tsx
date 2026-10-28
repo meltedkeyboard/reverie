@@ -8,11 +8,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GlassButton } from '@/components/chrome/Glass'
 import { TITLE_BAR_HEIGHT } from '@/components/chrome/TitleBar'
 import { Gallery, type GalleryHandle } from '@/components/viewer/Gallery'
+import { RemoveButton } from '@/components/viewer/RemoveButton'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { useDatabase } from '@/db/provider'
 import { isKey, useWindowKey } from '@/hooks/util/useWindowKey'
 import { useTranslation } from '@/i18n'
 import { isElectron, isWeb } from '@/lib/core/platform'
+import { isVideo } from '@/lib/images/media'
 import { findOriginal, setLifted, viewerImages, type ViewerOrigin, type ViewerOriginal } from '@/lib/images/viewer'
 import { saveImage } from '@/lib/transfer/download'
 import { alertError } from '@/lib/transfer/report'
@@ -31,8 +33,9 @@ export default function ViewerScreen() {
   const { colors, scheme } = useTheme()
   const { t } = useTranslation()
   const styles = useStyles(createStyles)
-  // Read once: the stored pictures may change under a screen still closing.
-  const [pending] = useState(viewerImages)
+  // Read once: the stored pictures may change under a screen still closing. Only a picture
+  // deleted here changes them.
+  const [pending, setPending] = useState(viewerImages)
   const images = pending?.images ?? []
   const origins = pending?.origins ?? NO_ORIGINS
   const [initialIndex] = useState(pending?.index ?? 0)
@@ -69,6 +72,21 @@ export default function ViewerScreen() {
     setLifted(null)
     setTimeout(leave, 60)
   }, [leave])
+
+  // The picture deleted has faded out: it goes from where it came from, and the viewer goes on
+  // with the rest, which now land back in their own places; the last one gone, it closes.
+  const removed = useCallback(
+    (at: number) => {
+      if (!pending?.remove) return
+      const origins = pending.remove(at)
+      const images = pending.images.filter((_, i) => i !== at)
+      if (!images.length) return closed()
+      const next = Math.min(at, images.length - 1)
+      setPending({ ...pending, images, origins, sources: pending.sources.filter((_, i) => i !== at), index: next })
+      setIndex(next)
+    },
+    [pending, closed]
+  )
 
   // The back key on Android and Escape on the desktop close it as the button does; the arrows
   // turn the pictures.
@@ -134,6 +152,8 @@ export default function ViewerScreen() {
   }
 
   const current = images[index]
+  const removable = pending?.remove !== undefined
+  const video = current ? isVideo(current.uri) : false
   // The button turns into a checkmark for a moment, since Photos gives no sign of its own.
   const [saved, setSaved] = useState(false)
   useEffect(() => {
@@ -166,11 +186,13 @@ export default function ViewerScreen() {
           originals={originals}
           frame={frame}
           topTravel={insets.top + 64}
+          bottomTravel={insets.bottom + 64}
           onIndexChange={setIndex}
           onChromeChange={setChrome}
           onOriginalLoad={originalLoaded}
           onOriginalChange={setOriginalShown}
           onClosed={closed}
+          onRemoved={removed}
           top={
             <View
               style={[styles.bar, { paddingTop: insets.top + 4, paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }]}
@@ -218,11 +240,27 @@ export default function ViewerScreen() {
             </View>
           }
           bottom={
-            images.length > 1 ? (
-              <View style={[styles.counter, { marginBottom: insets.bottom + 16 }]}>
-                <Text style={styles.counterText}>
-                  {index + 1} / {images.length}
-                </Text>
+            images.length > 1 || removable ? (
+              // The counter in the middle and, for the pictures of a gallery, the bin at the
+              // trailing edge, as the bottom bar of Photos has it.
+              <View style={[styles.bottomBar, { marginBottom: insets.bottom + 4 }]} pointerEvents="box-none">
+                {images.length > 1 ? (
+                  <View style={styles.counter} pointerEvents="none">
+                    <Text style={styles.counterText}>
+                      {index + 1} / {images.length}
+                    </Text>
+                  </View>
+                ) : null}
+                {removable && current ? (
+                  <View style={[styles.trailing, { right: insets.right + 12 }]}>
+                    <RemoveButton
+                      message={t(video ? 'gallery.deleteVideoMessage' : 'gallery.deletePictureMessage')}
+                      action={t(video ? 'gallery.deleteVideo' : 'gallery.deletePicture')}
+                      accessibilityLabel={t('common.delete')}
+                      onConfirm={() => gallery.current?.remove()}
+                    />
+                  </View>
+                ) : null}
               </View>
             ) : null
           }
@@ -243,6 +281,9 @@ const createStyles = (colors: Colors) =>
     root: { ...WINDOW, overflow: 'hidden' },
     bar: { flexDirection: 'row', justifyContent: 'space-between' },
     actions: { flexDirection: 'row', gap: 8 },
+    // As tall as the glass buttons, the counter in its middle.
+    bottomBar: { height: 44, alignItems: 'center', justifyContent: 'center' },
+    trailing: { position: 'absolute', top: 0 },
     counter: {
       paddingHorizontal: 12,
       paddingVertical: 5,

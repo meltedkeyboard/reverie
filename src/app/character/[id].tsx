@@ -71,6 +71,8 @@ export default function CharacterEditorScreen() {
   ]
 
   const [ready, setReady] = useState(isNew)
+  // While a tile of the gallery is in the air, the page holds still under the finger.
+  const [galleryDrag, setGalleryDrag] = useState(false)
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
@@ -612,6 +614,7 @@ export default function CharacterEditorScreen() {
           keyboardDismissMode="interactive"
           contentContainerStyle={scrollRoom}
           onScroll={onScroll}
+          scrollEnabled={!galleryDrag}
           // Over the open photo a further pull scrolls under a page that stays put (pinOpen),
           // and the indicator would give it away.
           showsVerticalScrollIndicator={!photoOpen}
@@ -765,7 +768,7 @@ export default function CharacterEditorScreen() {
                 background={backgroundUri ? { uri: backgroundUri, crop: bgSlot.shownCrop(backgroundCrop), effect: bgEffect, intensity: bgIntensity } : null}
                 // Saves the card as it is stored, so edits not yet saved are not in it.
                 exportItems={isNew ? undefined : exportTargets(() => getCharacter(db, Number(id)))}
-                gallery={isNew ? null : <ProfileGallery characterId={Number(id)} system={nativeProfile} />}
+                gallery={isNew ? null : <ProfileGallery characterId={Number(id)} system={nativeProfile} onDragging={setGalleryDrag} />}
                 // The system's list keeps margins of its own, so it is taken out to the edges.
                 style={{ marginLeft: -sideLeft, marginRight: -sideRight }}
                 linkColor={glowColor ? `#${glowColor.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}` : undefined}

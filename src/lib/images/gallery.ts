@@ -74,3 +74,7 @@ export async function pickGalleryItems(source: ImageSource): Promise<NewGalleryI
 }
 
 export const isGalleryVideo = (file: string) => isVideo(file)
+
+// A still picture of the gallery is always stored as a JPEG; a GIF, WebP or APNG keeps its
+// own format because it moves.
+export const isGalleryStill = (file: string) => ['jpg', 'jpeg'].includes(extensionOf(file))

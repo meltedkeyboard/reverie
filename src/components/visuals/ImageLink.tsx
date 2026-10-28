@@ -11,6 +11,7 @@ import {
   type Corners,
   type ViewerImage,
   type ViewerOrigin,
+  type ViewerRemove,
 } from '@/lib/images/viewer'
 
 type Box = { x: number; y: number; width: number; height: number }
@@ -153,15 +154,16 @@ export function useLifted(source: string) {
 let lastOpen = 0
 
 // For places where the picture can't be its own button, like an item in a menu. `origins`
-// are where the pictures sit, and `sources` the thumbnails that hide while their pictures are up.
+// are where the pictures sit, `sources` the thumbnails that hide while their pictures are up,
+// and `remove`, given only for pictures that can be deleted, takes one out (see ViewerRemove).
 export function useOpenViewer() {
   const router = useRouter()
-  return (images: ViewerImage[], index = 0, origins: (ViewerOrigin | null)[] = [], sources: (string | null)[] = []) => {
+  return (images: ViewerImage[], index = 0, origins: (ViewerOrigin | null)[] = [], sources: (string | null)[] = [], remove?: ViewerRemove) => {
     if (!images.length || Date.now() - lastOpen < 400) return
     lastOpen = Date.now()
     // The keyboard would stay up over the picture.
     Keyboard.dismiss()
-    setViewerImages(images, index, origins, sources)
+    setViewerImages(images, index, origins, sources, remove)
     router.push('/viewer')
   }
 }

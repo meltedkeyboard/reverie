@@ -1,3 +1,4 @@
+import type { ImageRef } from 'expo-image'
 import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { getAvatarOriginal } from '@/db/characters'
@@ -5,8 +6,10 @@ import { avatarUri, cropFromJson, pictureSize } from '@/lib/images/avatars'
 
 // The pictures the viewer screen shows. They go around the URL because a chat photo is
 // a data URL far too long for a route param. `avatar` is the file of a stored avatar, by
-// which the viewer finds the original it was cut from.
-export type ViewerImage = { uri: string; aspect: number; avatar?: string | null }
+// which the viewer finds the original it was cut from. `preview` is the picture already
+// decoded at the size of its thumbnail, shown from the first frame of the flight while the
+// whole one, which may be a large file, loads over it.
+export type ViewerImage = { uri: string; aspect: number; avatar?: string | null; preview?: ImageRef | null }
 
 // The whole picture an avatar was cut from, and where the cut lies in it, in fractions of its
 // size.
@@ -67,14 +70,25 @@ type Pending = {
   // The thumbnail of each picture, which hides while that picture is up (see setLifted), or
   // null for one that stays.
   sources: (string | null)[]
+  // For pictures the viewer may delete, those of a character's gallery: takes picture `index`
+  // out of where it came from and gives back where the ones left now sit, in their new order.
+  remove?: ViewerRemove
 }
+
+export type ViewerRemove = (index: number) => (ViewerOrigin | null)[]
 
 let pending: Pending | null = null
 
 // Several pictures are swiped through, starting from `index`: a room's cast, say, or the
 // pictures of one message.
-export function setViewerImages(images: ViewerImage[], index = 0, origins: (ViewerOrigin | null)[] = [], sources: (string | null)[] = []) {
-  pending = images.length ? { images, index: Math.min(Math.max(index, 0), images.length - 1), origins, sources } : null
+export function setViewerImages(
+  images: ViewerImage[],
+  index = 0,
+  origins: (ViewerOrigin | null)[] = [],
+  sources: (string | null)[] = [],
+  remove?: ViewerRemove
+) {
+  pending = images.length ? { images, index: Math.min(Math.max(index, 0), images.length - 1), origins, sources, remove } : null
 }
 
 export function viewerImages() {

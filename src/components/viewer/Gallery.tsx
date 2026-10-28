@@ -1,3 +1,4 @@
+import { Image } from 'expo-image'
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import { StyleSheet, View, type ViewInstance } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -46,6 +47,8 @@ const SWAP_RESPONSE = 0.4
 // Off by less than this many points, a picture flying back is in its thumbnail.
 const LANDED = 0.4
 const FADE = { duration: 200, easing: Easing.out(Easing.quad) }
+// A picture deleted shrinks by this much as it fades, and the one coming in grows from it.
+const VANISH_SHRINK = 0.08
 
 // What a drag does, settled as it starts.
 const NONE = 0
@@ -193,6 +196,7 @@ type Motion = {
   kickX: SharedValue<number>
   kickY: SharedValue<number>
   uncrop: SharedValue<number>
+  vanish: SharedValue<number>
 }
 
 export type GalleryHandle = {
@@ -202,6 +206,8 @@ export type GalleryHandle = {
   go: (step: number) => void
   // Opens the original of the avatar shown out of it, or closes it back in.
   toggleOriginal: () => void
+  // Takes the picture shown away (see `remove` in the motion).
+  remove: () => void
 }
 
 type Props = {
@@ -215,11 +221,13 @@ type Props = {
   originals: (ViewerOriginal | null | undefined)[]
   // The viewer's place in the window and its size, the size of a page.
   frame: Frame
-  // The bars over the pictures, brought in and out with them and by a tap. The top one moves
-  // out of sight by `topTravel` (it may be glass, which never fades); the bottom one fades.
+  // The bars over the pictures, brought in and out with them and by a tap. They move out of
+  // sight, the top one by `topTravel` and the bottom one by `bottomTravel`, rather than fade:
+  // either may hold glass, which never fades.
   top: ReactNode
   bottom: ReactNode
   topTravel: number
+  bottomTravel: number
   onIndexChange: (index: number) => void
   onChromeChange: (shown: boolean) => void
   // The original of picture `index` has loaded and can be swapped in, or has gone with its page.
@@ -228,6 +236,9 @@ type Props = {
   onOriginalChange: (shown: boolean) => void
   // The picture has gone: the viewer can.
   onClosed: () => void
+  // Picture `index`, taken away, has faded out: the viewer takes it out of `images`, and the
+  // gallery brings in the one now in its place. With none left the viewer closes instead.
+  onRemoved?: (index: number) => void
   ref?: Ref<GalleryHandle>
 }
 
@@ -249,11 +260,13 @@ export function Gallery({
   top,
   bottom,
   topTravel,
+  bottomTravel,
   onIndexChange,
   onChromeChange,
   onOriginalLoad,
   onOriginalChange,
   onClosed,
+  onRemoved,
   ref,
 }: Props) {
   const colors = useColors()
@@ -298,6 +311,18 @@ export function Gallery({
   // to be out. It goes back in with the zoom.
   const uncrop = useSharedValue(0)
   const showsOriginal = useSharedValue(false)
+  // How far the picture shown has gone, taken away: 1 while it is out of sight, until the one
+  // that takes its place has come in.
+  const vanish = useSharedValue(0)
+  // The place of the picture taken away, until `images` comes back without it.
+  const removing = useRef<number | null>(null)
+  const removed = useCallback(
+    (at: number) => {
+      removing.current = at
+      onRemoved?.(at)
+    },
+    [onRemoved]
+  )
   // A picture pulled away to close, and the throw of one let go. A spring Reanimated starts
   // with a speed away from its target sets off without it, so a picture let go is two springs
   // added up, as a spring's motion is: one from where it is, at rest, and one from nothing with
@@ -783,6 +808,45 @@ export function Gallery({
       return true
     }
 
+    // The bin under a picture of a character's gallery: the picture shrinks a little and fades
+    // where it is, as in Photos, and once it is out of sight the viewer takes it out of the
+    // pictures (see arrive). The last one goes with the backdrop, and the viewer closes.
+    const remove = () => {
+      'worklet'
+      if (closing.value || mode.value !== NONE) return
+      closing.value = true
+      const at = page.value
+      if (lastPage === 0) {
+        showBars(false)
+        shade.value = withTiming(0, FADE)
+      }
+      vanish.value = withTiming(1, FADE, (finished) => {
+        if (finished) scheduleOnRN(removed, at)
+      })
+    }
+
+    // With the picture taken away out of the pictures, the one that took its place, or the one
+    // before it at the end, comes in where it was, growing as the other shrank, unzoomed. Until
+    // now `vanish` has kept whatever page stood there out of sight.
+    const arrive = (to: number) => {
+      'worklet'
+      cancelAnimation(pager)
+      page.value = to
+      pager.value = to * stride
+      zoomPage.value = to
+      scale.value = 1
+      x.value = 0
+      y.value = 0
+      uncrop.value = 0
+      showsOriginal.value = false
+      pullX.value = 0
+      pullY.value = 0
+      kickX.value = 0
+      kickY.value = 0
+      closing.value = false
+      vanish.value = withTiming(0, FADE)
+    }
+
     // After a turn of the screen the pages are laid out again at the picture shown, unzoomed.
     // One closing has nowhere to land any more, and goes at once.
     const relayout = () => {
@@ -813,8 +877,10 @@ export function Gallery({
       wheel,
       relayout,
       toggleOriginal,
+      remove,
+      arrive,
     }
-  }, [width, height, stride, lastPage, fits, morphs, wholes, turned, onChromeChange, onOriginalChange, onClosed])
+  }, [width, height, stride, lastPage, fits, morphs, wholes, turned, onChromeChange, onOriginalChange, onClosed, removed])
 
   useImperativeHandle(
     ref,
@@ -822,9 +888,20 @@ export function Gallery({
       close: () => scheduleOnUI(motion.close),
       go: (step: number) => scheduleOnUI(motion.go, step),
       toggleOriginal: () => scheduleOnUI(motion.toggleOriginal),
+      remove: () => scheduleOnUI(motion.remove),
     }),
     [motion]
   )
+
+  // The pictures have come back without the one taken away: the one in its place comes in.
+  useEffect(() => {
+    const at = removing.current
+    if (at === null || !images.length) return
+    removing.current = null
+    const to = Math.min(at, images.length - 1)
+    setCurrent(to)
+    scheduleOnUI(motion.arrive, to)
+  }, [images, motion])
 
   // Opens: out of the thumbnail, or fading in where there is none to come from.
   useEffect(() => {
@@ -898,7 +975,19 @@ export function Gallery({
     }
   }, [motion])
 
-  const motionValues = { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY, uncrop }
+  const motionValues = { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY, uncrop, vanish }
+
+  // Each picture keeps its page, known by the picture itself rather than by its place, so a
+  // page that moves up a place when one before it is taken away doesn't load its picture again
+  // nor show the one taken away while the other loads.
+  const pageKeys = useRef({ keys: new WeakMap<ViewerImage, number>(), next: 0 })
+  const keyOf = (image: ViewerImage) => {
+    const known = pageKeys.current.keys.get(image)
+    if (known !== undefined) return known
+    const key = pageKeys.current.next++
+    pageKeys.current.keys.set(image, key)
+    return key
+  }
 
   // The backdrop, in the theme's background, clears as the picture is pulled away or pinched
   // small, which shows the screen underneath, and goes with the picture when it closes.
@@ -910,7 +999,7 @@ export function Gallery({
   })
   const strip = useAnimatedStyle(() => ({ transform: [{ translateX: -pager.value }] }))
   const topBar = useAnimatedStyle(() => ({ transform: [{ translateY: -(1 - bars.value) * topTravel }] }))
-  const bottomBar = useAnimatedStyle(() => ({ opacity: bars.value }))
+  const bottomBar = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - bars.value) * bottomTravel }] }))
 
   return (
     <View style={styles.root}>
@@ -921,7 +1010,7 @@ export function Gallery({
             {images.map((image, i) =>
               Math.abs(i - current) <= 2 ? (
                 <Page
-                  key={i}
+                  key={keyOf(image)}
                   index={i}
                   image={image}
                   fit={fits[i]}
@@ -942,7 +1031,7 @@ export function Gallery({
         {top}
       </Animated.View>
       {bottom ? (
-        <Animated.View style={[styles.bottom, bottomBar]} pointerEvents="none">
+        <Animated.View style={[styles.bottom, bottomBar]} pointerEvents="box-none">
           {bottom}
         </Animated.View>
       ) : null}
@@ -968,7 +1057,7 @@ type PageProps = {
 // a thumbnail of another shape shows, with the thumbnail's corners. An avatar cut from an
 // original has the original under it in the clip, to open out of it (see shapeOf).
 function Page({ index, image, fit, left, width, height, morph, whole, motion, onOriginalLoad }: PageProps) {
-  const { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY, uncrop } = motion
+  const { progress, page, zoomPage, scale, x, y, pullX, pullY, kickX, kickY, uncrop, vanish } = motion
   const cut = morph?.crop ?? null
   // Until the original has loaded, the avatar stays over it whatever the swap.
   const [loaded, setLoaded] = useState(false)
@@ -991,21 +1080,26 @@ function Page({ index, image, fit, left, width, height, morph, whole, motion, on
     const shown = page.value === index
     const dx = shown ? pullX.value + kickX.value : 0
     const dy = shown ? pullY.value + kickY.value : 0
+    // Taken away, or not yet come in in place of one taken away. Every page goes with it, the
+    // ones beside being off the screen: whichever of them stands in the place once the pictures
+    // come back without the one taken away may still have its style of the place it had.
+    const v = vanish.value
+    const gone = 1 - VANISH_SHRINK * v
     if (morph && shown) {
       const k = flight.value
       return {
-        opacity: 1,
+        opacity: 1 - v,
         transform: [
           { translateX: morph.x * k + dx + zx },
           { translateY: morph.y * k + dy + zy },
-          { scale: (1 + (morph.scale - 1) * k) * s },
+          { scale: (1 + (morph.scale - 1) * k) * s * gone },
         ],
       }
     }
     const p = progress.value
     return {
-      opacity: p,
-      transform: [{ translateX: dx + zx }, { translateY: dy + zy }, { scale: (0.94 + 0.06 * p) * s }],
+      opacity: p * (1 - v),
+      transform: [{ translateX: dx + zx }, { translateY: dy + zy }, { scale: (0.94 + 0.06 * p) * s * gone }],
     }
   })
   // The thumbnail's corners come in as the picture lands, and the window changes its size
@@ -1074,7 +1168,10 @@ function Page({ index, image, fit, left, width, height, morph, whole, motion, on
             </Animated.View>
           ) : null}
           <Animated.View style={[styles.layer, box, avatar]}>
-            <Picture uri={image.uri} style={StyleSheet.absoluteFill} contentFit="contain" />
+            {/* The thumbnail's own decoded picture is there at once, and the whole one, read
+                from its file, fades in over it once it has loaded, as Photos sharpens. */}
+            {image.preview ? <Image source={image.preview} style={StyleSheet.absoluteFill} contentFit="contain" /> : null}
+            <Picture uri={image.uri} style={StyleSheet.absoluteFill} contentFit="contain" transition={image.preview ? 150 : undefined} />
           </Animated.View>
         </Animated.View>
       </Animated.View>
@@ -1095,5 +1192,5 @@ const styles = StyleSheet.create({
   layer: { position: 'absolute', left: 0, top: 0 },
   continuous: { borderCurve: 'continuous' },
   top: { position: 'absolute', top: 0, left: 0, right: 0 },
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 })

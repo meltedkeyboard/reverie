@@ -23,6 +23,9 @@ const INSET = 16
 // The system's secondaryLabel.
 const SECONDARY_LABEL = { light: 'rgba(60, 60, 67, 0.6)', dark: 'rgba(235, 235, 245, 0.6)' } as const
 const ROW_HEIGHT = 44
+// The rounding of a group, which a picture filling one of its corners takes on, as a tile of
+// the gallery does for the viewer to fly out of and back into.
+export const GROUP_CORNERS = isDesktop ? { radius: 10, continuous: false } : { radius: 26, continuous: true }
 
 // Fragments are opened up and empty slots dropped, so a hairline goes only between real rows.
 function rowsOf(children: ReactNode): ReactNode[] {
@@ -346,7 +349,7 @@ const baseStyles = (colors: Colors) =>
       paddingHorizontal: INSET,
       marginBottom: 7,
     },
-    group: { backgroundColor: colors.surface, borderRadius: 26, borderCurve: 'continuous', overflow: 'hidden' },
+    group: { backgroundColor: colors.surface, borderRadius: GROUP_CORNERS.radius, borderCurve: 'continuous', overflow: 'hidden' },
     plainHeader: { textTransform: 'none', fontSize: 17, fontWeight: '600', marginBottom: 10, paddingHorizontal: INSET + 2 * StyleSheet.hairlineWidth },
     separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong, marginLeft: INSET },
     footer: { color: colors.textMuted, fontSize: 13, lineHeight: 18, paddingHorizontal: INSET, marginTop: 7 },
@@ -380,7 +383,7 @@ const baseStyles = (colors: Colors) =>
 const desktopOverrides = (colors: Colors) => ({
   section: { marginBottom: 24 },
   header: { color: colors.text, fontSize: 15, fontWeight: '600' as const, paddingHorizontal: 16, marginBottom: 10 },
-  group: { backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden' as const },
+  group: { backgroundColor: colors.surface, borderRadius: GROUP_CORNERS.radius, overflow: 'hidden' as const },
   separator: { height: 1, backgroundColor: colors.border, marginHorizontal: 16 },
   footer: { color: colors.textMuted, fontSize: 12.5, lineHeight: 17, paddingHorizontal: 16, marginTop: 8 },
   row: { minHeight: 52, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, paddingHorizontal: 20, paddingVertical: 12 },
