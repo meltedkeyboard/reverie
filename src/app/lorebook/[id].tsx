@@ -3,6 +3,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
+import { CastMosaic } from '@/components/cast/CastMosaic'
 import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import { ButtonCell, InputCell, ListFooter, ListSection, SliderCell, SwitchCell, TextCell } from '@/components/lists/GroupedList'
@@ -16,6 +17,7 @@ import {
   NativeTextRow,
   nativeForm,
 } from '@/components/lists/NativeForm'
+import { Avatar } from '@/components/visuals/Avatar'
 import { Icon } from '@/components/visuals/Icon'
 import { listCharacters } from '@/db/characters'
 import {
@@ -39,7 +41,12 @@ import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 // An entry being edited, with a key of its own for the list while it has no id.
 type Entry = LoreEntryFields & { key: number }
 
-type Owner = { id: number; name: string }
+// A character with their photo, or a room with its cast, whose faces stand for it as elsewhere.
+type Owner = { id: number; name: string; avatar?: string | null; cast?: { name: string; avatar: string | null }[] }
+
+const AVATAR = 30
+// The rooms tab's symbol, which stands for the word before a room's name.
+const ROOM_SYMBOL = 'bubble.left.and.bubble.right'
 
 // A lorebook: its name, who uses it, its entries (each opening its own rows, as a room's
 // members do) and how much of the talk it reads and how much of the prompt it may take.
@@ -67,8 +74,8 @@ export default function LorebookEditorScreen() {
 
   useEffect(() => {
     ;(async () => {
-      setCharacters((await listCharacters(db)).map((c) => ({ id: c.id, name: c.name })))
-      setRooms((await listRooms(db)).map((r) => ({ id: r.id, name: r.name })))
+      setCharacters((await listCharacters(db)).map((c) => ({ id: c.id, name: c.name, avatar: c.avatar })))
+      setRooms((await listRooms(db)).map((r) => ({ id: r.id, name: r.name, cast: r.cast })))
       if (!isNew) {
         const found = await getLorebook(db, Number(id))
         if (!found) return router.back()
@@ -163,6 +170,14 @@ export default function LorebookEditorScreen() {
     />
   )
 
+  // A tap on the photo opens it in the viewer; the switch is toggled by the switch alone.
+  const ownerPhoto = (owner: Owner) =>
+    owner.cast ? (
+      <CastMosaic cast={owner.cast} name={owner.name} size={AVATAR} round viewable />
+    ) : (
+      <Avatar name={owner.name} file={owner.avatar} size={AVATAR} />
+    )
+
   const entryOpen = entries.some((e) => e.key === expanded)
   const entriesFooter = entryOpen ? [t('lore.keysHint'), t('lore.alwaysHint')] : [entries.length ? t('lore.entriesHint') : t('lore.noEntries')]
   const tokens = (v: number) => String(v)
@@ -202,20 +217,25 @@ export default function LorebookEditorScreen() {
 
       <NativeSection title={t('lore.usedBy')} footer={t('lore.usedByHint')}>
         {characters.map((c) => (
-          <ui.Toggle
-            key={`c${c.id}`}
-            label={c.name}
-            isOn={links.characterIds.includes(c.id)}
-            onIsOnChange={(v) => toggleLink('characterIds', c.id, v)}
-          />
+          // The photo goes into the toggle's own label, so the switch stays the system's.
+          <ui.Toggle key={`c${c.id}`} isOn={links.characterIds.includes(c.id)} onIsOnChange={(v) => toggleLink('characterIds', c.id, v)}>
+            <ui.HStack spacing={12}>
+              <ui.RNHostView matchContents>{ownerPhoto(c)}</ui.RNHostView>
+              <ui.Text>{c.name}</ui.Text>
+            </ui.HStack>
+          </ui.Toggle>
         ))}
         {rooms.map((r) => (
-          <ui.Toggle
-            key={`r${r.id}`}
-            label={t('lore.roomOwner', { name: r.name })}
-            isOn={links.roomIds.includes(r.id)}
-            onIsOnChange={(v) => toggleLink('roomIds', r.id, v)}
-          />
+          <ui.Toggle key={`r${r.id}`} isOn={links.roomIds.includes(r.id)} onIsOnChange={(v) => toggleLink('roomIds', r.id, v)}>
+            <ui.HStack spacing={12}>
+              <ui.RNHostView matchContents>{ownerPhoto(r)}</ui.RNHostView>
+              {/* The rooms tab's symbol in place of the word, in the name's own color. */}
+              <ui.HStack spacing={6}>
+                <ui.Image systemName={ROOM_SYMBOL} size={15} color={colors.text} />
+                <ui.Text>{r.name}</ui.Text>
+              </ui.HStack>
+            </ui.HStack>
+          </ui.Toggle>
         ))}
       </NativeSection>
 
@@ -302,6 +322,7 @@ export default function LorebookEditorScreen() {
               <SwitchCell
                 key={`c${c.id}`}
                 label={c.name}
+                leading={ownerPhoto(c)}
                 value={links.characterIds.includes(c.id)}
                 onValueChange={(v) => toggleLink('characterIds', c.id, v)}
               />
@@ -309,7 +330,9 @@ export default function LorebookEditorScreen() {
             {rooms.map((r) => (
               <SwitchCell
                 key={`r${r.id}`}
-                label={t('lore.roomOwner', { name: r.name })}
+                label={r.name}
+                leading={ownerPhoto(r)}
+                labelIcon={<Icon name="chatbubbles-outline" size={17} color={colors.text} />}
                 value={links.roomIds.includes(r.id)}
                 onValueChange={(v) => toggleLink('roomIds', r.id, v)}
               />

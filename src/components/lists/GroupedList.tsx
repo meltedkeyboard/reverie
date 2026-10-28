@@ -70,11 +70,28 @@ export function ListFooter({ children, danger }: { children: ReactNode; danger?:
 
 type CellProps = { label: string; disabled?: boolean }
 
-export function SwitchCell({ label, value, onValueChange, disabled }: CellProps & { value: boolean; onValueChange: (v: boolean) => void }) {
+// `leading` is the small picture before the label, as in CheckCell; `labelIcon` is a glyph
+// right before the label's text that says what kind of thing it names.
+export function SwitchCell({
+  label,
+  value,
+  onValueChange,
+  disabled,
+  leading,
+  labelIcon,
+}: CellProps & { value: boolean; onValueChange: (v: boolean) => void; leading?: ReactNode; labelIcon?: ReactNode }) {
   const styles = useStyles(createStyles)
   return (
     <View style={[styles.row, styles.switchRow, disabled && styles.disabled]}>
-      <Text style={styles.label}>{label}</Text>
+      {leading ? <View style={styles.leading}>{leading}</View> : null}
+      {labelIcon ? (
+        <View style={styles.labelWithIcon}>
+          {labelIcon}
+          <Text style={styles.label}>{label}</Text>
+        </View>
+      ) : (
+        <Text style={styles.label}>{label}</Text>
+      )}
       <CellSwitch value={value} disabled={disabled} onValueChange={onValueChange} />
     </View>
   )
@@ -360,6 +377,7 @@ const baseStyles = (colors: Colors) =>
     disabled: { opacity: 0.4 },
     label: { flex: 1, color: colors.text, fontSize: 17 },
     leading: { marginRight: 4 },
+    labelWithIcon: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
     value: { color: colors.textMuted, fontSize: 17, flexShrink: 1, maxWidth: '55%' },
     inputLabel: { color: colors.text, fontSize: 17 },
     input: { flex: 1, color: colors.text, fontSize: 17, textAlign: 'right', paddingVertical: 0 },

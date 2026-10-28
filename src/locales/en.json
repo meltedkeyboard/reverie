@@ -882,7 +882,6 @@
   "lore.emptyEntry": "Empty",
   "lore.usedBy": "Used by",
   "lore.usedByHint": "The characters and rooms whose chats draw on this lorebook. In a room, each character also has their own lorebooks",
-  "lore.roomOwner": "Room “{{name}}”",
   "lore.scanDepth": "Messages read",
   "lore.scanHint": "Messages read: how many of the latest messages are searched for the keys",
   "lore.budget": "Token budget",
