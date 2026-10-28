@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router'
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import ReorderableList from 'react-native-reorderable-list'
 
@@ -49,15 +49,21 @@ export default function ServersScreen() {
 
   const serversRef = useRef(servers)
   serversRef.current = servers
+  const aliveRef = useRef(true)
+  useEffect(() => () => void (aliveRef.current = false), [])
+
+  const probeOne = (server: ServerProfile, alive: () => boolean) =>
+    probeServer(server).then((up) => {
+      if (alive()) setReach((prev) => ({ ...prev, [reachKey(server)]: up ? 'up' : 'down' }))
+      return up
+    })
+
   useFocusEffect(
     useCallback(() => {
       let alive = true
       const probe = () => {
         for (const server of serversRef.current ?? []) {
-          if (!server.baseUrl.trim()) continue
-          probeServer(server).then((up) => {
-            if (alive) setReach((prev) => ({ ...prev, [reachKey(server)]: up ? 'up' : 'down' }))
-          })
+          if (server.baseUrl.trim()) probeOne(server, () => alive)
         }
       }
       probe()
@@ -94,6 +100,20 @@ export default function ServersScreen() {
     })
   }
 
+  // Asked by hand, the server loses its color until it answers, so the check is seen to run
+  // even when the answer is the same as before; the result is felt as well.
+  const recheck = (server: ServerProfile) => {
+    if (!server.baseUrl.trim()) return
+    Haptics.selectionAsync()
+    setReach((prev) => {
+      const { [reachKey(server)]: _gone, ...rest } = prev
+      return rest
+    })
+    probeOne(server, () => aliveRef.current).then((up) => {
+      if (aliveRef.current) Haptics.notificationAsync(up ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error)
+    })
+  }
+
   const reorder = (next: ServerProfile[]) => {
     setServers(next)
     orderServers(db, next.map((s) => s.id))
@@ -107,6 +127,7 @@ export default function ServersScreen() {
   const menuOf = (server: ServerProfile): MenuItem[] => [
     { label: t('servers.open'), systemImage: 'info.circle', onSelect: () => open(server) },
     ...(server.id === activeId ? [] : [{ label: t('servers.makeCurrent'), systemImage: 'checkmark.circle', onSelect: () => use(server) }]),
+    ...(server.baseUrl.trim() ? [{ label: t('servers.recheck'), systemImage: 'arrow.clockwise', onSelect: () => recheck(server) }] : []),
     { label: t('servers.duplicate'), systemImage: 'plus.square.on.square', onSelect: () => duplicate(server) },
     { label: t('common.delete'), systemImage: 'trash', destructive: true, separated: true, onSelect: () => confirmDelete(server) },
   ]
@@ -220,6 +241,12 @@ export default function ServersScreen() {
                     <ContextMenu.Items>{menuItemViews(menuOf(server))}</ContextMenu.Items>
                     <ContextMenu.Trigger>{row()}</ContextMenu.Trigger>
                   </ContextMenu>
+                  {/* From the other edge the server is asked again at once, without waiting for the next round. */}
+                  {server.baseUrl.trim() ? (
+                    <SwipeActions.Actions edge="leading" allowsFullSwipe>
+                      <SwiftButton label={t('servers.recheck')} systemImage="arrow.clockwise" onPress={() => recheck(server)} modifiers={[tint(colors.accent)]} />
+                    </SwipeActions.Actions>
+                  ) : null}
                   {/* Not the destructive role: with it the row leaves the list before the question
                       is answered. */}
                   <SwipeActions.Actions edge="trailing">
@@ -277,7 +304,13 @@ export default function ServersScreen() {
         const tone = toneOf(server)
         const status = stateLabel(server)
         return (
-          <ListCard onOpen={() => use(server)} onDelete={() => confirmDelete(server)} menu={menuOf(server)} menuTitle={nameOf(server)}>
+          <ListCard
+            onOpen={() => use(server)}
+            onDelete={() => confirmDelete(server)}
+            menu={menuOf(server)}
+            menuTitle={nameOf(server)}
+            leading={server.baseUrl.trim() ? { label: t('servers.recheck'), icon: 'refresh', color: colors.accent, onAction: () => recheck(server) } : undefined}
+          >
             <View style={styles.row} accessibilityValue={status ? { text: status } : undefined}>
               <View style={styles.check}>{current ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} /> : null}</View>
               <View style={styles.info}>

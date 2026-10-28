@@ -913,6 +913,7 @@
   "servers.listHint": "Тап по серверу делает его текущим, ⓘ открывает его настройки",
   "servers.up": "Отвечает",
   "servers.down": "Не отвечает",
+  "servers.recheck": "Проверить снова",
   "servers.checking": "Проверка",
   "servers.switchedTitle": "Отвечает {{name}}",
   "servers.switchedMessage": "{{name}} не отвечает",

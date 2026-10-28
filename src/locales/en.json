@@ -913,6 +913,7 @@
   "servers.listHint": "Tap a server to use it, ⓘ opens its settings",
   "servers.up": "Answers",
   "servers.down": "Not answering",
+  "servers.recheck": "Check again",
   "servers.checking": "Checking",
   "servers.switchedTitle": "{{name}} answers",
   "servers.switchedMessage": "{{name}} is not answering",
