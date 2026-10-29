@@ -69,11 +69,11 @@ type Person = { name: string; avatar: string | null }
 
 const CLEAR = '#00000000'
 
-// The sizes of a row in each spacing: the compact one of the app, and the roomy one of Messages,
-// a smaller face further in, more room above and below, and always room for two lines.
+// The sizes of a row in each spacing: the compact one of the app, and the roomy one, a larger
+// face a little further in, more room above and below, and always room for two lines.
 function rowMetrics(look: ListLook) {
   return look.spacing === 'roomy'
-    ? { avatar: 44, gap: 14, vertical: 13, leading: 26, textHeight: 62 }
+    ? { avatar: 68, gap: 14, vertical: 12, leading: 20, textHeight: 62 }
     : { avatar: 56, gap: 12, vertical: 8, leading: 16, textHeight: 0 }
 }
 

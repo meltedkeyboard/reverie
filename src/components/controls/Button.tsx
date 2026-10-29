@@ -6,12 +6,16 @@ import { isDesktop } from '@/lib/core/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { GlassSurface } from '../chrome/Glass'
+import { SFIcon } from '../visuals/SFIcon'
 
 type Variant = 'primary' | 'secondary' | 'soft' | 'glass' | 'solid'
 
 type Props = {
   label: string
   icon?: React.ComponentProps<typeof Icon>['name']
+  // An SF Symbol drawn in place of `icon` where SwiftUI is, `icon` remaining the fallback:
+  // for what only the system has a symbol of, like Face ID.
+  symbol?: React.ComponentProps<typeof SFIcon>['name']
   // Optional because a Link with asChild injects its own onPress.
   onPress?: () => void
   disabled?: boolean
@@ -24,7 +28,7 @@ type Props = {
   style?: StyleProp<ViewStyle>
 }
 
-export function Button({ label, icon, onPress, disabled, loading, variant = 'primary', style }: Props) {
+export function Button({ label, icon, symbol, onPress, disabled, loading, variant = 'primary', style }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   // Liquid Glass is not rendered under a parent with opacity, so a disabled glass button is
@@ -35,7 +39,11 @@ export function Button({ label, icon, onPress, disabled, loading, variant = 'pri
     <ActivityIndicator color={tint} />
   ) : (
     <>
-      {icon ? <Icon name={icon} size={isDesktop ? 15 : variant === 'soft' ? 17 : 18} color={tint} /> : null}
+      {icon && symbol ? (
+        <SFIcon name={symbol} fallback={icon} size={isDesktop ? 15 : variant === 'soft' ? 17 : 18} color={tint} onAccent={tint === ON_ACCENT} />
+      ) : icon ? (
+        <Icon name={icon} size={isDesktop ? 15 : variant === 'soft' ? 17 : 18} color={tint} />
+      ) : null}
       <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={[styles.label, styles[`${variant}Label`], plainGlass && { color: tint }]}>{label}</Text>
     </>
   )

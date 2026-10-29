@@ -216,6 +216,8 @@ function Appearance() {
   } = useChatTextSettings()
 
   const wallpaperUri = wallpaper?.file ? avatarUri(wallpaper.file, 'backgrounds') : null
+  // The switches that carry the background elsewhere wait for a picture of one's own.
+  const noPicture = pattern !== 'custom' || !wallpaper?.file
   const previewScheme = useChatScheme(NO_PICTURE)
 
   const openBackground = (uri: string, crop: CropRect | null, original: string | null) => {
@@ -470,8 +472,8 @@ function Appearance() {
           </NativeHostedRow>
           {wallpaper?.file ? <SwiftButton label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
           {wallpaper?.file ? <SwiftButton label={t('background.remove')} role="destructive" onPress={onRemoveBackground} /> : null}
-          <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} />
-          <Toggle label={t('settings.homeBackground')} isOn={homeBackground} onIsOnChange={setHomeBackground} />
+          <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} modifiers={[disabled(noPicture)]} />
+          <Toggle label={t('settings.homeBackground')} isOn={homeBackground} onIsOnChange={setHomeBackground} modifiers={[disabled(noPicture)]} />
         </NativeSection>
 
         <NativeSection>
@@ -620,8 +622,8 @@ function Appearance() {
             <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
             {wallpaper?.file ? <ButtonCell label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
             {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
-            <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} />
-            <SwitchCell label={t('settings.homeBackground')} value={homeBackground} onValueChange={setHomeBackground} />
+            <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} disabled={noPicture} />
+            <SwitchCell label={t('settings.homeBackground')} value={homeBackground} onValueChange={setHomeBackground} disabled={noPicture} />
           </ListSection>
 
           <ListSection>
