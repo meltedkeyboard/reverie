@@ -1,15 +1,16 @@
 import { Image } from 'expo-image'
-import { useState } from 'react'
+import { useRouter } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
-import { GalleryStrip, useGalleryPicks } from '@/components/cast/GalleryStrip'
 import { SourceCell } from '@/components/lists/PictureCells'
 import { Icon } from '@/components/visuals/Icon'
 import type { GalleryItem } from '@/db/gallery'
 import type { MessageImage } from '@/db/messages'
+import { useGalleryPicks } from '@/hooks/features/useGalleryPicks'
 import { useGenInput } from '@/hooks/features/useGenSession'
 import { useTranslation } from '@/i18n'
 import { galleryMessageImage, pickMessageImages, pictureUri } from '@/lib/images/attachments'
+import { setGalleryPick } from '@/lib/images/galleryPick'
 import type { ImageSource } from '@/lib/images/images'
 import { isDesktop } from '@/lib/core/platform'
 import { alertError } from '@/lib/transfer/report'
@@ -27,39 +28,47 @@ type Props = {
 }
 
 // The pictures sent along with a generator's request: their thumbnails in a row, and the
-// sources to add more from, the character's gallery among them.
+// sources to add more from, the character's gallery among them as a sheet of its own.
 export function GenImageAttachments({ characterId, images, onImagesChange, header, footer }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
+  const router = useRouter()
   const gallery = useGalleryPicks(characterId)
   // Which attachment each picked gallery picture became, so its tile shows it as attached
-  // when the sheet opens again, and a second tap takes that attachment off.
+  // when the sheet opens again, and unticking it there takes that attachment off.
   const [fromGallery, setFromGallery] = useGenInput<Record<string, string>>('fromGallery', {})
-  const [storing, setStoring] = useState(false)
 
   const attachedFrom = (item: GalleryItem) => {
     const file = fromGallery[item.file]
     return file && images.some((image) => image.file === file) ? file : null
   }
 
-  const toggleGallery = async (item: GalleryItem) => {
-    if (storing) return
-    const attached = attachedFrom(item)
-    if (attached) {
-      onImagesChange(images.filter((image) => image.file !== attached))
-      return
-    }
-    try {
-      setStoring(true)
-      const picture = await galleryMessageImage(item.file)
-      onImagesChange([...images, picture])
-      setFromGallery((prev) => ({ ...prev, [item.file]: picture.file }))
-    } catch (err) {
-      alertError(t('composer.attachFailedTitle'), err)
-    } finally {
-      setStoring(false)
-    }
+  // The sheet opens with the attached ones ticked in the order they are attached, and what
+  // is ticked as it closes is what the gallery gives: the unticked ones come off, the new
+  // ones are stored, shrunk, as any attached picture, and go after the rest.
+  const openGallery = () => {
+    const position = (item: GalleryItem) => images.findIndex((image) => image.file === attachedFrom(item))
+    const initial = gallery.filter((item) => attachedFrom(item) !== null).sort((a, b) => position(a) - position(b))
+    setGalleryPick({
+      title: t('gallery.title'),
+      items: gallery,
+      multiple: true,
+      initial,
+      onPick: async (picked) => {
+        const has = (list: GalleryItem[], item: GalleryItem) => list.some((other) => other.id === item.id)
+        const dropped = new Set(initial.filter((item) => !has(picked, item)).map(attachedFrom))
+        const added = picked.filter((item) => !has(initial, item))
+        try {
+          const pictures = await Promise.all(added.map((item) => galleryMessageImage(item.file)))
+          onImagesChange([...images.filter((image) => !dropped.has(image.file)), ...pictures])
+          setFromGallery((prev) => ({ ...prev, ...Object.fromEntries(added.map((item, i) => [item.file, pictures[i].file])) }))
+        } catch (err) {
+          alertError(t('composer.attachFailedTitle'), err)
+        }
+      },
+    })
+    router.push('/gallery-pick')
   }
 
   const onPick = async (source: ImageSource) => {
@@ -106,17 +115,13 @@ export function GenImageAttachments({ characterId, images, onImagesChange, heade
           </View>
         </GenRow>
       ) : null}
-      {gallery.length > 0 ? (
-        <GenRow>
-          <GalleryStrip items={gallery} isPicked={(item) => attachedFrom(item) !== null} onPress={toggleGallery} />
-        </GenRow>
-      ) : null}
       {/* A new row once the thumbnails come or go above it, or the system's list leaves it
           blank (see NativeHostedRow). */}
       <GenRow key={images.length > 0 ? 'under' : 'alone'}>
         <SourceCell
           label={images.length > 0 ? t('promptGen.addPhoto') : t('promptGen.attachPhoto')}
           onPick={onPick}
+          onGallery={gallery.length > 0 ? openGallery : undefined}
         />
       </GenRow>
     </GenSection>

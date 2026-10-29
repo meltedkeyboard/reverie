@@ -418,7 +418,6 @@
   "promptGen.attachPhoto": "Attach image",
   "promptGen.addPhoto": "Add another image",
   "promptGen.removePhoto": "Remove photo",
-  "promptGen.fromGallery": "From the gallery",
   "promptGen.galleryPicture": "Picture from the gallery",
   "promptGen.galleryVideo": "Video from the gallery",
   "promptGen.empty": "The model returned an empty response. Try again",

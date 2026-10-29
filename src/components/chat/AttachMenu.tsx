@@ -35,6 +35,7 @@ import { type Colors, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles, use
 import { GlassButton } from '../chrome/Glass'
 import { AttachGalleryPicker } from './AttachGallery'
 import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
+import { OrderBadge } from '../visuals/OrderBadge'
 import { SFIcon } from '../visuals/SFIcon'
 
 // The latest pictures sent for the row at the top of the menu, null when it is switched off.
@@ -191,11 +192,7 @@ export function AttachMenu({
             style={styles.recentTile}
           >
             <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
-            {isSelected ? (
-              <View style={styles.recentCheckBadge}>
-                <Text style={styles.recentOrder}>{order}</Text>
-              </View>
-            ) : null}
+            {isSelected ? <OrderBadge order={order} /> : null}
           </Pressable>
         )
       })}
@@ -1004,21 +1001,6 @@ const createStyles = (colors: Colors) =>
     cameraLabel: { color: colors.text, fontSize: 14, fontWeight: '500' },
     recentTile: { width: 96, height: 96, borderRadius: 22, borderCurve: 'continuous', overflow: 'hidden' },
     recentTileImage: { width: '100%', height: '100%', backgroundColor: colors.surface },
-    recentCheckBadge: {
-      position: 'absolute',
-      top: 6,
-      right: 6,
-      minWidth: 22,
-      height: 22,
-      paddingHorizontal: 5,
-      borderRadius: 11,
-      backgroundColor: 'rgba(0, 0, 0, 0.65)',
-      borderWidth: 1.5,
-      borderColor: 'rgba(255, 255, 255, 0.85)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    recentOrder: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
     actionSlot: { marginTop: 18 },
     actionButton: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     actionBg: { borderRadius: 26 },

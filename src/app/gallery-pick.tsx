@@ -4,6 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Icon } from '@/components/visuals/Icon'
+import { OrderBadge } from '@/components/visuals/OrderBadge'
 import { Picture } from '@/components/visuals/Picture'
 import type { GalleryItem } from '@/db/gallery'
 import { useTranslation } from '@/i18n'
@@ -17,7 +18,9 @@ const COLUMNS = 3
 const GAP = 2
 
 // A character's gallery as a sheet to take one picture or video from, a grid as in Photos:
-// a tap ticks one, another tap moves the tick, and the check in the bar takes it.
+// a tap ticks one, another tap moves the tick, and the check in the bar takes it. A
+// generator takes several: each tap adds one under its number in the order they go, as the
+// attach menu's gallery ticks them, and the check takes them all.
 export default function GalleryPickScreen() {
   const router = useRouter()
   const navigation = useNavigation()
@@ -28,7 +31,8 @@ export default function GalleryPickScreen() {
   const { t } = useTranslation()
   // Read once: the next opening may replace it under a sheet still closing.
   const [pick] = useState(galleryPick)
-  const [selected, setSelected] = useState<GalleryItem | null>(null)
+  const [selected, setSelected] = useState<GalleryItem[]>(() => pick?.initial ?? [])
+  const multiple = pick?.multiple ?? false
   const side = (width - GAP * (COLUMNS - 1)) / COLUMNS
 
   useEffect(() => {
@@ -38,15 +42,17 @@ export default function GalleryPickScreen() {
   // Gone without the end of its transition reported, as on the web, the pick is still handed over.
   useEffect(() => () => finishGalleryPick(), [])
 
+  // Several may all be unticked again, which takes off the ones attached before.
+  const canConfirm = selected.length > 0 || (multiple && (pick?.initial?.length ?? 0) > 0)
+
   const confirm = () => {
-    if (!selected) return
+    if (!canConfirm) return
     choose(selected)
     router.back()
   }
   // The bar takes the handler through a ref, so it is set again only when what it shows changes.
   const confirmRef = useRef(confirm)
   confirmRef.current = confirm
-  const canConfirm = selected !== null
 
   useLayoutEffect(() => {
     navigation.setOptions(
@@ -93,7 +99,10 @@ export default function GalleryPickScreen() {
 
   const toggle = (item: GalleryItem) => {
     selectionAsync()
-    setSelected((current) => (current?.id === item.id ? null : item))
+    setSelected((current) => {
+      if (current.some((other) => other.id === item.id)) return current.filter((other) => other.id !== item.id)
+      return multiple ? [...current, item] : [item]
+    })
   }
 
   return (
@@ -109,12 +118,15 @@ export default function GalleryPickScreen() {
       extraData={selected}
       renderItem={({ item }) => {
         const video = isGalleryVideo(item.file)
-        const ticked = selected?.id === item.id
+        // Where it stands among the ticked ones: the pictures are attached in that order.
+        const order = selected.findIndex((other) => other.id === item.id) + 1
+        const ticked = order > 0
         return (
           <Pressable
             onPress={() => toggle(item)}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: ticked }}
+            accessibilityRole={multiple ? 'checkbox' : 'radio'}
+            accessibilityState={multiple ? { checked: ticked } : { selected: ticked }}
+            accessibilityValue={multiple && ticked ? { text: String(order) } : undefined}
             accessibilityLabel={t(video ? 'promptGen.galleryVideo' : 'promptGen.galleryPicture')}
             style={({ pressed }) => [{ width: side, height: side }, styles.tile, pressed && styles.pressed]}
           >
@@ -128,9 +140,7 @@ export default function GalleryPickScreen() {
             {ticked ? (
               <>
                 <View style={styles.dim} pointerEvents="none" />
-                <View style={styles.check} pointerEvents="none">
-                  <Icon name="checkmark" size={14} color={ON_ACCENT} />
-                </View>
+                <OrderBadge order={multiple ? order : undefined} />
               </>
             ) : null}
           </Pressable>
@@ -159,19 +169,6 @@ const createStyles = (colors: Colors) =>
       backgroundColor: 'rgba(0, 0, 0, 0.45)',
     },
     dim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0, 0, 0, 0.28)' },
-    check: {
-      position: 'absolute',
-      right: 6,
-      bottom: 6,
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1.5,
-      borderColor: '#fff',
-      backgroundColor: colors.accent,
-    },
     headerButton: { color: colors.accent, fontSize: 17 },
     headerDone: { fontWeight: '600' },
     headerDisabled: { opacity: 0.4 },

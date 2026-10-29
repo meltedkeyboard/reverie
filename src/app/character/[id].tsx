@@ -9,7 +9,6 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/visuals/Avatar'
 import { CharacterProfile, NativeProfileList } from '@/components/cast/CharacterProfile'
-import { useGalleryPicks } from '@/components/cast/GalleryStrip'
 import { ProfileGallery } from '@/components/cast/ProfileGallery'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, BackgroundThumbCell, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
@@ -30,6 +29,7 @@ import {
 import type { GalleryItem } from '@/db/gallery'
 import { useDatabase } from '@/db/provider'
 import { useCardExport } from '@/hooks/features/useCardExport'
+import { useGalleryPicks } from '@/hooks/features/useGalleryPicks'
 import { useImageSlot } from '@/hooks/features/useImageSlot'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/ui/haptics'
@@ -267,7 +267,7 @@ export default function CharacterEditorScreen() {
 
   // The gallery opens as a sheet over the editor, app/gallery-pick.tsx.
   const openGallery = (onPick: (item: GalleryItem) => void) => {
-    setGalleryPick({ title: t('gallery.title'), items: gallery, onPick })
+    setGalleryPick({ title: t('gallery.title'), items: gallery, onPick: ([item]) => onPick(item) })
     router.push('/gallery-pick')
   }
 

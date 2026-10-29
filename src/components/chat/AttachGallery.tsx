@@ -15,6 +15,7 @@ import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, FILL, ON_ACCENT, useColors, useStyles, useTheme } from '@/theme'
 
 import { SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
+import { OrderBadge } from '../visuals/OrderBadge'
 
 const COLUMNS = 3
 // Square tiles edge to edge with hairline gaps, as in Photos and the gallery sheet of the editor.
@@ -107,11 +108,7 @@ export function AttachGalleryPicker({
                       >
                         <Image source={{ uri: galleryUri(item.file) }} style={styles.image} contentFit="cover" recyclingKey={item.file} autoplay={false} />
                         {order > 0 ? <View style={styles.dim} pointerEvents="none" /> : null}
-                        {order > 0 ? (
-                          <View style={styles.badge}>
-                            <Text style={styles.order}>{order}</Text>
-                          </View>
-                        ) : null}
+                        {order > 0 ? <OrderBadge order={order} /> : null}
                       </Pressable>
                     )
                   })}
@@ -160,21 +157,6 @@ const createStyles = (colors: Colors) =>
     tile: { overflow: 'hidden', backgroundColor: colors.surface },
     image: { width: '100%', height: '100%' },
     dim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0, 0, 0, 0.28)' },
-    badge: {
-      position: 'absolute',
-      top: 6,
-      right: 6,
-      minWidth: 22,
-      height: 22,
-      paddingHorizontal: 5,
-      borderRadius: 11,
-      backgroundColor: 'rgba(0, 0, 0, 0.65)',
-      borderWidth: 1.5,
-      borderColor: 'rgba(255, 255, 255, 0.85)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    order: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
     footer: {
       position: 'absolute',
       left: 0,
