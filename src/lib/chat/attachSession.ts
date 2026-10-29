@@ -9,13 +9,15 @@ import { isFeatureOn } from '@/lib/settings/features'
 
 // The share of the screen the system sheet opens at with every part of the menu in it.
 const FULL_MENU = 0.55
-// What the menu loses without the pictures row: the row (108) and the attach button (70),
-// less the camera row (50); the note under it (24) only says so when the row is switched off.
-const WITHOUT_RECENTS = 128
-const RECENTS_OFF_NOTE = 24
+// What the menu loses without the pictures row: the row (108) less the camera row (50). The
+// room kept for the attach button is not taken off: the full menu shows only its top under
+// the last card, and without the row that much is left under the card as its margin. The
+// note under the card (30) only says so when the row is switched off.
+const WITHOUT_RECENTS = 58
+const RECENTS_OFF_NOTE = 30
 // A row of the menu's card: the characters' galleries, there only when one of them has a
 // picture, and the persona and the direction, gone when switched off in Settings.
-const CARD_ROW = 44
+const CARD_ROW = 50
 
 // The pictures of one character's gallery to attach from, under its name in a scene.
 export type AttachGallery = { name: string; items: GalleryItem[] }
