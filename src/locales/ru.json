@@ -255,6 +255,8 @@
   "onboarding.gallery.text": "Фото и видео персонажа прямо в его профиле",
   "onboarding.groups.title": "Группы",
   "onboarding.groups.text": "Перетащите одного персонажа на другого, и они соберутся в группу",
+  "onboarding.archive.title": "Архив",
+  "onboarding.archive.text": "Смахните персонажа в архив: он уйдёт из списка, а его чаты останутся, чтобы их читать",
   "onboarding.rooms.title": "Общие сцены",
   "onboarding.rooms.text": "Несколько персонажей говорят с вами и друг с другом",
   "onboarding.director.title": "Режиссёр и рассказчик",
