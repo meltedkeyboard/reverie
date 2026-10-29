@@ -50,6 +50,7 @@
     "fflate": "^0.8.3",
     "lucide-react-native": "^1.52.0",
     "marked": "^18.0.14",
+    "mathjax-full": "^3.2.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",

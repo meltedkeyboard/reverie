@@ -1,9 +1,12 @@
-import { Lexer, type Token, type Tokens } from 'marked'
+import { Marked, type Token, type TokenizerExtension, type Tokens } from 'marked'
 import { Fragment, memo, useMemo, type ReactNode } from 'react'
 import { ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle } from 'react-native'
 
 import { useColors, useStyles, type Colors } from '@/theme'
 import { FONTS, isWeb } from '@/lib/core/platform'
+import { texToUnicode } from '@/lib/chat/tex'
+
+import { LINE_MARK, LineLayer, MathBlock, RULE_TEXT, mathLineHeight } from './MathBlock'
 
 type Props = {
   text: string
@@ -62,13 +65,46 @@ const blockReset = { padding: 0, paddingTop: 0, paddingBottom: 0 } as const
 const TOKEN_CACHE = 400
 const tokenCache = new Map<string, Token[]>()
 
+// A formula on lines of its own, between $$ or \[ and \], drawn whole by MathJax.
+const mathBlock: TokenizerExtension = {
+  name: 'mathBlock',
+  level: 'block',
+  start: (src) => src.match(/^ {0,3}(?:\$\$|\\\[)/m)?.index,
+  tokenizer(src) {
+    const match = /^ {0,3}(?:\$\$([^]+?)\$\$|\\\[([^]+?)\\\])[ \t]*(?:\n+|$)/.exec(src)
+    const tex = match && (match[1] ?? match[2]).trim()
+    if (tex) return { type: 'mathBlock', raw: match[0], text: tex }
+  },
+}
+
+// A formula inside a sentence, between $ and $ or \( and \), or $$ or \[ set within a
+// line, turned into plain characters (lib/chat/tex). A lone $ stays a dollar: the one
+// that opens is followed by something other than a space, and the one that closes
+// comes right after the formula and is not followed by a digit, so "from $5 to $10"
+// is money.
+const mathInline: TokenizerExtension = {
+  name: 'math',
+  level: 'inline',
+  start: (src) => src.match(/\$|\\[([]/)?.index,
+  tokenizer(src) {
+    const match =
+      /^\$\$([^]+?)\$\$/.exec(src) ??
+      /^\\\(([^]+?)\\\)/.exec(src) ??
+      /^\\\[([^]+?)\\\]/.exec(src) ??
+      /^\$((?:\\.|[^\\$\s])(?:(?:\\.|[^\\$\n])*?(?:\\.|[^\\$\s]))?)\$(?!\d)/.exec(src)
+    if (match && match[1].trim()) return { type: 'math', raw: match[0], text: match[1] }
+  },
+}
+
+// breaks: a model writes dialogue and verse line by line, and a single newline must
+// stay a line break rather than join the lines as plain Markdown would.
+const parser = new Marked({ gfm: true, breaks: true, extensions: [mathBlock, mathInline] })
+
 const lex = (text: string, streaming: boolean): Token[] => {
-  // breaks: a model writes dialogue and verse line by line, and a single newline must
-  // stay a line break rather than join the lines as plain Markdown would.
-  if (streaming) return Lexer.lex(closeOpenEmphasis(text), { gfm: true, breaks: true })
+  if (streaming) return parser.lexer(closeOpenEmphasis(text))
   const known = tokenCache.get(text)
   if (known) return known
-  const tokens = Lexer.lex(text, { gfm: true, breaks: true })
+  const tokens = parser.lexer(text)
   tokenCache.set(text, tokens)
   if (tokenCache.size > TOKEN_CACHE) tokenCache.delete(tokenCache.keys().next().value!)
   return tokens
@@ -77,7 +113,8 @@ const lex = (text: string, streaming: boolean): Token[] => {
 // A piece of the reply: a paragraph, a heading or a list item flows as text, a code
 // block or a table needs a view of its own. tight: a list item after the first one,
 // which follows on the next line with no gap.
-type Piece = { flow: true; node: ReactNode; tight: boolean } | { flow: false; node: ReactNode }
+// over: what is laid over the line the piece keeps, a formula or a rule.
+type Piece = { flow: true; node: ReactNode; tight: boolean; over?: ReactNode } | { flow: false; node: ReactNode }
 
 // Pieces that flow are joined into one UITextView, so a selection runs through the
 // whole reply and only stops at a code block or a table, as in ChatGPT. Lists and
@@ -104,6 +141,8 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
         // by the link detector.
         case 'link':
           return <Text key={i} style={styles.link}>{inline((token as Tokens.Link).tokens)}</Text>
+        case 'math':
+          return texToUnicode(token.text)
         case 'br':
           return '\n'
         case 'html':
@@ -184,8 +223,29 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
               </ScrollView>
             ),
           }]
+        case 'mathBlock': {
+          // A browser selects across views by itself, so there the formula stands apart.
+          if (isWeb) return [{ flow: false, node: <MathBlock tex={token.text} style={style} /> }]
+          // Elsewhere it keeps an empty line in the text, so a selection from the text
+          // above runs on below it, and is laid over that line (LineLayer).
+          const height = mathLineHeight(token.text, size)
+          if (!height) return [{ flow: true, tight: false, node: <Text style={styles.mathText}>{texToUnicode(token.text)}</Text> }]
+          return [{
+            flow: true,
+            tight: false,
+            over: <MathBlock tex={token.text} style={style} />,
+            node: <Text style={{ lineHeight: height }}>{LINE_MARK}</Text>,
+          }]
+        }
         case 'hr':
-          return [{ flow: false, node: <View style={styles.rule} /> }]
+          // Kept in the text as a formula is, for the same reason.
+          if (isWeb) return [{ flow: false, node: <View style={styles.rule} /> }]
+          return [{
+            flow: true,
+            tight: false,
+            over: <View style={styles.rule} />,
+            node: <Text style={[styles.ruleText, { lineHeight: Math.round(size * 0.9) }]}>{RULE_TEXT}</Text>,
+          }]
         case 'table': {
           const table = token as Tokens.Table
           const rows = [table.header, ...table.rows]
@@ -225,18 +285,26 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
   const pieces = collect(tokens, '', false, { mark: null })
   const views: ReactNode[] = []
   let run: ReactNode[] = []
+  let layers: ReactNode[] = []
   const flush = () => {
     if (!run.length) return
-    views.push(
-      <Block
-        key={streaming ? views.length : `${views.length}:${text}`}
-        style={style}
-        onSelect={onSelect}
-      >
+    const key = streaming ? views.length : `${views.length}:${text}`
+    const block = (
+      <Block key={key} style={style} onSelect={onSelect}>
         {run}
       </Block>
     )
+    views.push(
+      layers.length ? (
+        // Over the text, so a wide formula scrolls and a press on it or a rule selects nothing.
+        <View key={key}>
+          {block}
+          <LineLayer style={style} layers={layers}>{run}</LineLayer>
+        </View>
+      ) : block
+    )
     run = []
+    layers = []
   }
   pieces.forEach((piece, i) => {
     if (!piece.flow) {
@@ -244,6 +312,7 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
       views.push(<Fragment key={views.length}>{piece.node}</Fragment>)
       return
     }
+    if (piece.over) layers.push(piece.over)
     // The gap between paragraphs is an empty line of its own, set lower than a line of text.
     if (run.length) {
       run.push(piece.tight ? '\n' : <Fragment key={`gap${i}`}>{'\n'}<Text style={{ fontSize: size * 0.4, lineHeight: size * 0.6 }}>{'\n'}</Text></Fragment>)
@@ -279,6 +348,8 @@ const createStyles = (colors: Colors) =>
     link: { color: colors.accent, textDecorationLine: 'underline' },
     codespan: { fontFamily: CODE_FONT, backgroundColor: colors.surface, color: colors.text },
     heading: { fontWeight: '700' },
+    mathText: { textAlign: 'center' },
+    ruleText: { color: 'transparent', textAlign: 'center' },
     codeBlock: {
       borderRadius: 12,
       borderCurve: 'continuous',
