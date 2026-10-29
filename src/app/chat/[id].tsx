@@ -679,7 +679,7 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
       </GlassHeader>
 
       {archived ? (
-        <ArchivedBar name={owner.character.name} onRestore={onRestore} height={composerHeight} top={composerTop} />
+        <ArchivedBar name={owner.character.name} onRestore={onRestore} height={composerHeight} top={composerTop} fade={!hasCustomBackground} />
       ) : data ? (
         // With the private thread open the field talks to the model aside, and the thread
         // takes the accessory slot so it rides the keyboard with the field.
