@@ -574,7 +574,8 @@ function ThreadSurface({ index, store, front, onScreen, frozen, listRef, owner, 
       />
       {chat && empty ? (
         owner.kind === 'character' ? (
-          <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="none">
+          // Through to the list but for the photo, which opens in the viewer.
+          <Animated.View style={[styles.empty, emptyStyle]} pointerEvents="box-none">
             <Intro owner={owner} chat={chat} hint={t('chat.emptyHint')} />
           </Animated.View>
         ) : (
