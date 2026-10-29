@@ -10,6 +10,7 @@ import { formDescription, PromptForm, type PromptFormValues } from './PromptForm
 
 type Props = {
   name: string
+  characterId: number | null
   currentPrompt: string
   onApply: (prompt: string) => void
 }
@@ -18,7 +19,7 @@ const IDEA_KEYS = ['promptGen.idea1', 'promptGen.idea2', 'promptGen.idea3', 'pro
 const TWEAK_KEYS = ['promptGen.tweakShorter', 'promptGen.tweakLonger', 'promptGen.tweakSpeech', 'promptGen.tweakVivid']
 
 // The system prompt written from a description, or the one there is rewritten.
-export function PromptGen({ name, currentPrompt, onApply }: Props) {
+export function PromptGen({ name, characterId, currentPrompt, onApply }: Props) {
   const { t, locale } = useTranslation()
   const hasCurrent = currentPrompt.trim().length > 0
   // A character that already has a prompt most likely wants that prompt improved, not
@@ -76,6 +77,7 @@ export function PromptGen({ name, currentPrompt, onApply }: Props) {
       )}
 
       <GenImageAttachments
+        characterId={characterId}
         images={images}
         onImagesChange={setImages}
         header={t('promptGen.imagesLabel')}

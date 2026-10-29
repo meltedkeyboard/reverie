@@ -9,6 +9,7 @@ import { GenSheet, PresetChips } from './GenSheet'
 
 type Props = {
   name: string
+  characterId: number | null
   systemPrompt: string
   currentGreeting: string
   onApply: (greeting: string) => void
@@ -25,7 +26,7 @@ const TWEAK_KEYS = ['greetingGen.tweakShorter', 'greetingGen.tweakVivid', 'greet
 
 // The character's first message, written from the system prompt: left to the model, or
 // as the user describes it, presets filling in the description.
-export function GreetingGen({ name, systemPrompt, currentGreeting, onApply }: Props) {
+export function GreetingGen({ name, characterId, systemPrompt, currentGreeting, onApply }: Props) {
   const { t, locale } = useTranslation()
   const [free, setFree] = useGenInput('free', true)
   const [wishes, setWishes] = useGenInput('wishes', '')
@@ -60,6 +61,7 @@ export function GreetingGen({ name, systemPrompt, currentGreeting, onApply }: Pr
         </GenSection>
       )}
       <GenImageAttachments
+        characterId={characterId}
         images={images}
         onImagesChange={handleImagesChange}
         header={t('greetingGen.imagesLabel')}

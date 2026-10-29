@@ -1,11 +1,15 @@
 import { Image } from 'expo-image'
+import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
+import { GalleryStrip, useGalleryPicks } from '@/components/cast/GalleryStrip'
 import { SourceCell } from '@/components/lists/PictureCells'
 import { Icon } from '@/components/visuals/Icon'
+import type { GalleryItem } from '@/db/gallery'
 import type { MessageImage } from '@/db/messages'
+import { useGenInput } from '@/hooks/features/useGenSession'
 import { useTranslation } from '@/i18n'
-import { pickMessageImages, pictureUri } from '@/lib/images/attachments'
+import { galleryMessageImage, pickMessageImages, pictureUri } from '@/lib/images/attachments'
 import type { ImageSource } from '@/lib/images/images'
 import { isDesktop } from '@/lib/core/platform'
 import { alertError } from '@/lib/transfer/report'
@@ -14,6 +18,8 @@ import { type Colors, useColors, useStyles } from '@/theme'
 import { GenRow, GenSection } from './GenCells'
 
 type Props = {
+  // A saved character's gallery is offered to pick from, its videos left out.
+  characterId?: number | null
   images: MessageImage[]
   onImagesChange: (images: MessageImage[]) => void
   header?: string
@@ -21,11 +27,40 @@ type Props = {
 }
 
 // The pictures sent along with a generator's request: their thumbnails in a row, and the
-// sources to add more from.
-export function GenImageAttachments({ images, onImagesChange, header, footer }: Props) {
+// sources to add more from, the character's gallery among them.
+export function GenImageAttachments({ characterId, images, onImagesChange, header, footer }: Props) {
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
+  const gallery = useGalleryPicks(characterId)
+  // Which attachment each picked gallery picture became, so its tile shows it as attached
+  // when the sheet opens again, and a second tap takes that attachment off.
+  const [fromGallery, setFromGallery] = useGenInput<Record<string, string>>('fromGallery', {})
+  const [storing, setStoring] = useState(false)
+
+  const attachedFrom = (item: GalleryItem) => {
+    const file = fromGallery[item.file]
+    return file && images.some((image) => image.file === file) ? file : null
+  }
+
+  const toggleGallery = async (item: GalleryItem) => {
+    if (storing) return
+    const attached = attachedFrom(item)
+    if (attached) {
+      onImagesChange(images.filter((image) => image.file !== attached))
+      return
+    }
+    try {
+      setStoring(true)
+      const picture = await galleryMessageImage(item.file)
+      onImagesChange([...images, picture])
+      setFromGallery((prev) => ({ ...prev, [item.file]: picture.file }))
+    } catch (err) {
+      alertError(t('composer.attachFailedTitle'), err)
+    } finally {
+      setStoring(false)
+    }
+  }
 
   const onPick = async (source: ImageSource) => {
     try {
@@ -69,6 +104,11 @@ export function GenImageAttachments({ images, onImagesChange, header, footer }: 
               ))}
             </ScrollView>
           </View>
+        </GenRow>
+      ) : null}
+      {gallery.length > 0 ? (
+        <GenRow>
+          <GalleryStrip items={gallery} isPicked={(item) => attachedFrom(item) !== null} onPress={toggleGallery} />
         </GenRow>
       ) : null}
       {/* A new row once the thumbnails come or go above it, or the system's list leaves it

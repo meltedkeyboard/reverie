@@ -8,6 +8,7 @@ import { showToast } from '@/lib/ui/toast'
 import { t } from '@/i18n'
 import { attachmentLimitBytes } from '@/lib/settings/fileLimits'
 import { movingKind } from '@/lib/images/media'
+import { galleryUri } from '@/lib/images/gallery'
 
 // The pictures attached to messages live as files in the `attachments` folder; a message
 // keeps only their names (and sizes) in the database.
@@ -25,24 +26,28 @@ export const pictureUri = (image: MessageImage) => attachmentUri(image.moving ??
 
 export async function pickMessageImages(source: ImageSource): Promise<MessageImage[]> {
   const uris = await pickUris(source, true)
-  return Promise.all(
-    uris.map(async (uri) => {
-      const saved = await resizedJpeg(uri, MAX_SIDE, 0.8)
-      const picture: MessageImage = {
-        file: await persistAvatar(saved.uri, 'attachments'),
-        width: saved.width,
-        height: saved.height,
-      }
-      // A moving picture is stored as a still, which is all the model gets, and also as it
-      // is, for the screen. Too big a one stays a still.
-      if (movingKind(uri) === 'image') {
-        const limit = attachmentLimitBytes()
-        if ((new File(uri).size ?? 0) <= limit) picture.moving = await persistAvatar(uri, 'attachments')
-        else showToast({ title: t('composer.movingTooBig', { mb: Math.round(limit / 1024 / 1024) }), tone: 'info' })
-      }
-      return picture
-    })
-  )
+  return Promise.all(uris.map(storeMessageImage))
+}
+
+// A picture of the character's gallery sent to a generator: stored again, shrunk, as any
+// other attachment, so a request and the sweep of attachments treat it the same.
+export const galleryMessageImage = (file: string) => storeMessageImage(galleryUri(file))
+
+async function storeMessageImage(uri: string): Promise<MessageImage> {
+  const saved = await resizedJpeg(uri, MAX_SIDE, 0.8)
+  const picture: MessageImage = {
+    file: await persistAvatar(saved.uri, 'attachments'),
+    width: saved.width,
+    height: saved.height,
+  }
+  // A moving picture is stored as a still, which is all the model gets, and also as it
+  // is, for the screen. Too big a one stays a still.
+  if (movingKind(uri) === 'image') {
+    const limit = attachmentLimitBytes()
+    if ((new File(uri).size ?? 0) <= limit) picture.moving = await persistAvatar(uri, 'attachments')
+    else showToast({ title: t('composer.movingTooBig', { mb: Math.round(limit / 1024 / 1024) }), tone: 'info' })
+  }
+  return picture
 }
 
 // A request names pictures by file; the server needs them inline, so the files are read

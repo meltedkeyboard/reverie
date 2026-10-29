@@ -9,6 +9,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/visuals/Avatar'
 import { CharacterProfile, NativeProfileList } from '@/components/cast/CharacterProfile'
+import { GalleryStrip, useGalleryPicks } from '@/components/cast/GalleryStrip'
 import { ProfileGallery } from '@/components/cast/ProfileGallery'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, BackgroundThumbCell, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
@@ -26,6 +27,7 @@ import {
   type BackgroundTone,
   type ThinkingMode,
 } from '@/db/characters'
+import type { GalleryItem } from '@/db/gallery'
 import { useDatabase } from '@/db/provider'
 import { useCardExport } from '@/hooks/features/useCardExport'
 import { useImageSlot } from '@/hooks/features/useImageSlot'
@@ -33,7 +35,8 @@ import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/ui/haptics'
 import { setAvatarCropDraft } from '@/lib/images/avatarCrop'
 import { setGenDraft } from '@/lib/chat/genDraft'
-import { acceptMoving, pickAvatar, pickBackground, type CropRect } from '@/lib/images/avatars'
+import { acceptMoving, checkBackground, pickAvatar, pickBackground, type CropRect } from '@/lib/images/avatars'
+import { galleryUri } from '@/lib/images/gallery'
 import { movingKind } from '@/lib/images/media'
 import { avatarTint } from '@/lib/images/initial'
 import { usePictureColor } from '@/lib/images/pictureColor'
@@ -232,6 +235,23 @@ export default function CharacterEditorScreen() {
     }
   }
 
+  // Asked for again each time the editor opens, so what was just added in the profile is there.
+  const bgGallery = useGalleryPicks(editing && !isNew ? Number(id) : null, true)
+
+  // A picture or video of the gallery goes to the same screen as a picked one; the copy kept
+  // behind the chat is made on Save, so the gallery's file stays its own.
+  const onBackgroundFromGallery = (item: GalleryItem) => {
+    try {
+      const uri = galleryUri(item.file)
+      checkBackground(uri)
+      openBackground(uri, null, uri)
+    } catch (err) {
+      alertError(t('background.failedTitle'), err)
+    }
+  }
+
+  const backgroundGallery = bgGallery.length > 0 ? <GalleryStrip items={bgGallery} onPress={onBackgroundFromGallery} /> : null
+
   const onAdjustBackground = () => {
     const source = bgSlot.adjustSource({ file: background, original: backgroundOriginal, crop: backgroundCrop })
     if (source) openBackground(source.uri, source.crop, source.original)
@@ -308,12 +328,12 @@ export default function CharacterEditorScreen() {
 
   // The generators open as a form sheet of the stack, app/generate.tsx.
   const openPromptGen = () => {
-    setGenDraft({ kind: 'prompt', target: `character:${id}`, name, currentPrompt: systemPrompt, onApply: applyGenerated })
+    setGenDraft({ kind: 'prompt', target: `character:${id}`, name, characterId: isNew ? null : Number(id), currentPrompt: systemPrompt, onApply: applyGenerated })
     router.push('/generate')
   }
 
   const openGreetingGen = () => {
-    setGenDraft({ kind: 'greeting', target: `character:${id}`, name, systemPrompt, currentGreeting: greeting, onApply: applyGreeting })
+    setGenDraft({ kind: 'greeting', target: `character:${id}`, name, characterId: isNew ? null : Number(id), systemPrompt, currentGreeting: greeting, onApply: applyGreeting })
     router.push('/generate')
   }
 
@@ -543,6 +563,7 @@ export default function CharacterEditorScreen() {
         <NativeHostedRow key={backgroundUri ? 'under' : 'alone'}>
           <SourceCell label={backgroundUri ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
         </NativeHostedRow>
+        {backgroundGallery ? <NativeHostedRow key={backgroundUri ? 'gallery-under' : 'gallery-alone'}>{backgroundGallery}</NativeHostedRow> : null}
         {backgroundUri ? <NativeActionRow label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
         {backgroundUri ? <NativeActionRow label={t('background.remove')} destructive onPress={onClearBackground} /> : null}
       </NativeSection>
@@ -693,6 +714,7 @@ export default function CharacterEditorScreen() {
                   onPick={onPickBackground}
                   onAdjust={onAdjustBackground}
                   onClear={onClearBackground}
+                  gallery={backgroundGallery}
                 />
 
                 <ListSection

@@ -1,4 +1,4 @@
-import { useState, type ComponentProps } from 'react'
+import { useState, type ComponentProps, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 
@@ -105,6 +105,7 @@ export function BackgroundSection({
   onPick,
   onAdjust,
   onClear,
+  gallery,
 }: {
   uri: string | null
   crop: CropRect | null
@@ -113,6 +114,8 @@ export function BackgroundSection({
   onPick: (source: ImageSource) => void
   onAdjust: () => void
   onClear: () => void
+  // The character's gallery to take one from, under the sources.
+  gallery?: ReactNode
 }) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -120,6 +123,7 @@ export function BackgroundSection({
     <ListSection header={t('background.title')}>
       {uri ? <BackgroundThumbCell uri={uri} crop={crop} effect={effect} intensity={intensity} /> : null}
       <SourceCell label={uri ? t('background.change') : t('background.choose')} onPick={onPick} />
+      {gallery}
       {uri ? <ButtonCell label={t('background.adjust')} onPress={onAdjust} /> : null}
       {uri ? <ButtonCell danger label={t('background.remove')} onPress={onClear} /> : null}
     </ListSection>

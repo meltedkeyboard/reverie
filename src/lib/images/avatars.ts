@@ -94,12 +94,18 @@ const BACKGROUND_SIDE = 1600
 export async function pickBackground(source: ImageSource) {
   const [uri] = await pickUris(source, false, true)
   if (!uri) return null
+  checkBackground(uri)
+  return uri
+}
+
+// Whether a picture or video can go behind a chat, also one taken from the gallery, whose
+// limit is the larger one of attachments.
+export function checkBackground(uri: string) {
   if (extensionOf(uri) === 'webm') throw new Error(t('background.webm'))
   const limit = backgroundLimitBytes()
   if (movingKind(uri) && (new File(uri).size ?? 0) > limit) {
     throw new Error(t('background.tooBig', { mb: Math.round(limit / 1024 / 1024) }))
   }
-  return uri
 }
 
 // The part of the original the chat shows (all of it without a frame), shrunk to a size a
