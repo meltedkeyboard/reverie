@@ -199,8 +199,10 @@ export default function OnboardingScreen() {
 
   // The pages follow a sideways drag and are held back past the first and the last. Let go,
   // they settle on the page the drag and its speed point to, one page at most, the spring
-  // taking on the finger's speed.
+  // taking on the finger's speed. The title page is left only by its button, so the drag
+  // starts working from the page after it.
   const drag = Gesture.Pan()
+    .enabled(page !== 0)
     .activeOffsetX([-12, 12])
     .failOffsetY([-12, 12])
     .onUpdate((e) => {
@@ -272,6 +274,14 @@ export default function OnboardingScreen() {
       paddingRight: Math.max(SIDE, insets.right + 16),
     },
   ]
+  // A part's heading reaches out over the content's side padding to the screen's edges, so its
+  // fill hides the icons that stand a little past the text's column as they scroll under it.
+  const headingBleed = {
+    marginLeft: -Math.max(SIDE, insets.left + 16),
+    marginRight: -Math.max(SIDE, insets.right + 16),
+    paddingLeft: Math.max(SIDE, insets.left + 16),
+    paddingRight: Math.max(SIDE, insets.right + 16),
+  }
   // Only a transform on the footers: a fading ancestor leaves the Liquid Glass effect
   // unrendered until the app comes back from the background.
   const footerStyle = [
@@ -362,7 +372,7 @@ export default function OnboardingScreen() {
                 {t('onboarding.featuresTitle')}
               </Text>
               {SECTIONS.flatMap((section, i) => [
-                <View key={`${section.titleKey}.heading`} style={styles.sectionHeading}>
+                <View key={`${section.titleKey}.heading`} style={[styles.sectionHeading, headingBleed]}>
                   <Text style={styles.sectionTitle} accessibilityRole="header">
                     {t(section.titleKey)}
                   </Text>
