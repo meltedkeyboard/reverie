@@ -30,7 +30,16 @@ export function getLocale(): Locale {
   return activeLocale
 }
 
+// On Halloween the warm theme goes by a seasonal name in English, read at render so the
+// name comes and goes with the date.
+function seasonal(key: string): string {
+  if (activeLocale !== 'en' || key !== 'theme.warm') return key
+  const now = new Date()
+  return now.getMonth() === 9 && now.getDate() === 31 ? 'theme.warmHalloween' : key
+}
+
 export function t(key: string, vars?: Record<string, string | number>): string {
+  key = seasonal(key)
   const template = catalogs[activeLocale][key] ?? catalogs.ru[key] ?? key
   if (!vars) return template
   return template.replace(/\{\{(\w+)\}\}/g, (match, name) => (name in vars ? String(vars[name]) : match))
