@@ -58,5 +58,9 @@ function clean(raw: string) {
   // Some templates open <think> themselves, so only the closing tag shows up.
   const parts = raw.split(/<\/think>/i)
   const answer = parts.length > 1 ? parts[parts.length - 1] : raw.replace(/<think>[\s\S]*$/i, '')
-  return answer.trim().replace(/^["\u00ab]+|["\u00bb]+$/g, '').trim()
+  const text = answer.trim()
+  // Quotes are taken off only when they wrap the whole message: one that ends a line of
+  // speech, as in *nods* "Let's go.", belongs to it.
+  const wrapped = /^(["\u201c\u00ab])([^"\u201c\u201d\u00ab\u00bb]*)(["\u201d\u00bb])$/.exec(text)
+  return wrapped ? wrapped[2].trim() : text
 }
