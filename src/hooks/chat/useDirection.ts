@@ -6,6 +6,7 @@ import { setChatDirection, type Chat } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { setTextDraft } from '@/lib/chat/textDraft'
+import { isFeatureOn } from '@/lib/settings/features'
 
 // A chat's direction: the user's standing note to the model (where the story should go, the
 // tone, the pace), sent with every request until it is cleared. Opened from the attach menu
@@ -25,7 +26,8 @@ export function useDirection(chat: Chat) {
     setIsSet(Boolean(chat.direction?.trim()))
   }, [chat.id, chat.direction])
 
-  const current = useCallback(() => text.current.trim(), [])
+  // Switched off in Settings, nothing is sent, the text kept for when it is on again.
+  const current = useCallback(() => (isFeatureOn('direction') ? text.current.trim() : ''), [])
 
   const set = useCallback((value: string) => {
     text.current = value

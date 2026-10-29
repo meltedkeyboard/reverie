@@ -17,6 +17,7 @@ import { errorMessage } from '@/lib/core/errors'
 import * as Haptics from '@/lib/ui/haptics'
 import { CONTINUE_NOTE, directionNote, emptyReplyReason, replyLimitNote, runReplyStream, toTurn, withReplyLimit } from '@/lib/chat/replyStream'
 import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
+import { useFeature } from '@/lib/settings/features'
 import { formatPersonaPrompt } from '@/lib/chat/persona'
 
 export type ChatPhase = 'idle' | 'waiting' | 'streaming'
@@ -89,6 +90,7 @@ export function useChat(chat: Chat, character: Character) {
 
   const [personaId, setPersonaId] = useState<number | null>(chat.personaId ?? null)
   const [persona, setPersona] = useState<Persona | null>(null)
+  const personasOn = useFeature('personas')
   const personaRef = useRef<Persona | null>(null)
   personaRef.current = persona
 
@@ -99,7 +101,8 @@ export function useChat(chat: Chat, character: Character) {
   useEffect(() => {
     let alive = true
     const load = async () => {
-      if (!personaId) {
+      // Switched off in Settings, the chat speaks as no one, its choice kept for later.
+      if (!personaId || !personasOn) {
         if (alive) setPersona(null)
         return
       }
@@ -112,7 +115,7 @@ export function useChat(chat: Chat, character: Character) {
       alive = false
       unsub()
     }
-  }, [db, personaId])
+  }, [db, personaId, personasOn])
 
   const selectPersona = useCallback(
     async (id: number | null) => {

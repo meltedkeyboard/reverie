@@ -29,6 +29,7 @@ import { isGalleryVideo } from '@/lib/images/gallery'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
+import { useFeature } from '@/lib/settings/features'
 import { type Colors, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles, useTheme } from '@/theme'
 
 import { GlassButton } from '../chrome/Glass'
@@ -254,6 +255,9 @@ export function AttachMenu({
   // The pictures of the character's gallery, or of the cast's, counted as Photos counts an album's.
   const galleryCount = (session.galleries ?? []).reduce((sum, gallery) => sum + gallery.items.length, 0)
   const showGallery = !!onOpenGallery && galleryCount > 0
+  // Either can be switched off in Settings, rows and all.
+  const showPersona = useFeature('personas')
+  const showDirection = useFeature('direction') && !!onOpenDirection
 
   // The same menu as the system's own list (iOS with SwiftUI), over the chat's picture as the
   // app's cards are. The row of the camera and the latest pictures and the button that attaches
@@ -278,13 +282,15 @@ export function AttachMenu({
             {showGallery ? (
               <NativeLinkRow label={t('gallery.title')} symbol="photo.on.rectangle.angled" value={String(galleryCount)} onPress={openGallery} />
             ) : null}
-            <NativeLinkRow
-              label={t('attach.persona')}
-              symbol="person"
-              value={session.persona?.name ? session.persona.name : t('attach.personaNone')}
-              onPress={openPersonas}
-            />
-            {onOpenDirection ? (
+            {showPersona ? (
+              <NativeLinkRow
+                label={t('attach.persona')}
+                symbol="person"
+                value={session.persona?.name ? session.persona.name : t('attach.personaNone')}
+                onPress={openPersonas}
+              />
+            ) : null}
+            {showDirection ? (
               <NativeLinkRow
                 label={t('direction.title')}
                 symbol="signpost.right"
@@ -369,25 +375,29 @@ export function AttachMenu({
             </>
           ) : null}
 
-          <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+          {showPersona ? (
+            <>
+              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
 
-          <Pressable
-            onPress={openPersonas}
-            accessibilityRole="button"
-            accessibilityLabel={t('attach.persona')}
-            style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
-          >
-            <Icon name="person-outline" size={22} color={colors.text} />
-            <Text style={styles.cardLabel}>{t('attach.persona')}</Text>
-            <View style={styles.cardTrailing}>
-              <Text style={styles.cardTrailingText} numberOfLines={1}>
-                {session.persona?.name ? session.persona.name : t('attach.personaNone')}
-              </Text>
-              <Icon name="chevron-forward" size={17} color={colors.textFaint} />
-            </View>
-          </Pressable>
+              <Pressable
+                onPress={openPersonas}
+                accessibilityRole="button"
+                accessibilityLabel={t('attach.persona')}
+                style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+              >
+                <Icon name="person-outline" size={22} color={colors.text} />
+                <Text style={styles.cardLabel}>{t('attach.persona')}</Text>
+                <View style={styles.cardTrailing}>
+                  <Text style={styles.cardTrailingText} numberOfLines={1}>
+                    {session.persona?.name ? session.persona.name : t('attach.personaNone')}
+                  </Text>
+                  <Icon name="chevron-forward" size={17} color={colors.textFaint} />
+                </View>
+              </Pressable>
+            </>
+          ) : null}
 
-          {onOpenDirection ? (
+          {showDirection ? (
             <>
               <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
 

@@ -23,6 +23,7 @@ import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/conf
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/prefs/continue'
 import { getFileLimits } from '@/lib/settings/fileLimits'
 import { loadFileLimits, setAttachmentLimitMb, setAvatarLimitMb, setBackgroundLimitMb, setLimitsOff } from '@/db/prefs/fileLimits'
+import { isDirectionEnabled, isPersonasEnabled, setDirectionEnabled, setPersonasEnabled } from '@/db/prefs/features'
 import { isHapticsEnabled, setHapticsEnabled } from '@/db/prefs/haptics'
 import {
   isAttachGalleryEnabled,
@@ -198,6 +199,8 @@ export default function SettingsScreen() {
     loadSuggestionTokens(db).then(setSuggestionTokens)
   }, [db])
   const [recentPictures, toggleRecentPictures] = useStoredFlag(isRecentAttachmentsEnabled, setRecentAttachmentsEnabled, true)
+  const [personasOn, togglePersonas] = useStoredFlag(isPersonasEnabled, setPersonasEnabled, true)
+  const [directionOn, toggleDirection] = useStoredFlag(isDirectionEnabled, setDirectionEnabled, true)
   const [attachGallery, toggleAttachGallery] = useStoredFlag(isAttachGalleryEnabled, setAttachGalleryEnabled, true)
   // How many of them: a number that may be empty while retyped, or no limit.
   const [recent, setRecent] = useState<RecentSettings>({ count: DEFAULT_RECENT_COUNT, unlimited: false })
@@ -414,13 +417,23 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
+  // Personas and direction can be switched off whole; their list and texts are kept.
   const personasRow = (
-    <ListSection header={t('persona.title')} footer={t('persona.emptyText')}>
-      <LinkCell
-        label={t('persona.title')}
-        value={personas.length > 0 ? String(personas.length) : t('persona.none')}
-        onPress={() => router.push('/personas')}
-      />
+    <ListSection header={t('persona.title')} footer={personasOn ? t('persona.emptyText') : t('settings.personasOffNote')}>
+      <SwitchCell label={t('settings.personasOn')} value={personasOn} onValueChange={togglePersonas} />
+      {personasOn ? (
+        <LinkCell
+          label={t('persona.title')}
+          value={personas.length > 0 ? String(personas.length) : t('persona.none')}
+          onPress={() => router.push('/personas')}
+        />
+      ) : null}
+    </ListSection>
+  )
+
+  const directionRow = (
+    <ListSection footer={t('settings.directionNote')}>
+      <SwitchCell label={t('direction.title')} value={directionOn} onValueChange={toggleDirection} />
     </ListSection>
   )
 
@@ -767,12 +780,19 @@ export default function SettingsScreen() {
           />
         </NativeSection>
 
-        <NativeSection id="personas" title={t('persona.title')} footer={t('persona.emptyText')}>
-          <NativeLinkRow
-            label={t('persona.title')}
-            value={personas.length > 0 ? String(personas.length) : t('persona.none')}
-            onPress={() => router.push('/personas')}
-          />
+        <NativeSection id="personas" title={t('persona.title')} footer={personasOn ? t('persona.emptyText') : t('settings.personasOffNote')}>
+          {toggle(null, t('settings.personasOn'), personasOn, togglePersonas)}
+          {personasOn ? (
+            <NativeLinkRow
+              label={t('persona.title')}
+              value={personas.length > 0 ? String(personas.length) : t('persona.none')}
+              onPress={() => router.push('/personas')}
+            />
+          ) : null}
+        </NativeSection>
+
+        <NativeSection id="direction" footer={t('settings.directionNote')}>
+          {toggle(null, t('direction.title'), directionOn, toggleDirection)}
         </NativeSection>
 
         <NativeSection id="suggest" footer={t('settings.suggestButtonNote')}>
@@ -900,6 +920,7 @@ export default function SettingsScreen() {
           {block('private', privateRow)}
           {block('memory', memoryRows)}
           {block('personas', personasRow)}
+          {block('direction', directionRow)}
           {block('suggest', suggestRow)}
           {block('recents', recentRow)}
           {block('attachGallery', attachGalleryRow)}

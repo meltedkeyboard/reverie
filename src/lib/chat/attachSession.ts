@@ -5,6 +5,7 @@ import type { GalleryItem } from '@/db/gallery'
 import type { MessageImage } from '@/db/messages'
 import type { Persona } from '@/db/personas'
 import type { ImageSource } from '@/lib/images/images'
+import { isFeatureOn } from '@/lib/settings/features'
 
 // The share of the screen the system sheet opens at with every part of the menu in it.
 const FULL_MENU = 0.55
@@ -12,8 +13,9 @@ const FULL_MENU = 0.55
 // less the camera row (50); the note under it (24) only says so when the row is switched off.
 const WITHOUT_RECENTS = 128
 const RECENTS_OFF_NOTE = 24
-// The row of the characters' galleries, there only when one of them has a picture.
-const GALLERY_ROW = 44
+// A row of the menu's card: the characters' galleries, there only when one of them has a
+// picture, and the persona and the direction, gone when switched off in Settings.
+const CARD_ROW = 44
 
 // The pictures of one character's gallery to attach from, under its name in a scene.
 export type AttachGallery = { name: string; items: GalleryItem[] }
@@ -62,8 +64,9 @@ export function setAttachSession(session: AttachSession) {
   after = null
   const height = Dimensions.get('window').height
   const lost = session.recents === null ? WITHOUT_RECENTS - RECENTS_OFF_NOTE : session.recents?.length === 0 ? WITHOUT_RECENTS : 0
-  const gained = session.galleries?.length ? GALLERY_ROW : 0
-  detent = height > 0 ? FULL_MENU + (gained - lost) / height : FULL_MENU
+  const gained = session.galleries?.length ? CARD_ROW : 0
+  const off = (['personas', 'direction'] as const).filter((feature) => !isFeatureOn(feature)).length * CARD_ROW
+  detent = height > 0 ? FULL_MENU + (gained - lost - off) / height : FULL_MENU
 }
 
 // Read by the root layout as the sheet is presented, so a menu with less in it opens lower.

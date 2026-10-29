@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ThinkingMode } from '@/db/characters'
 import { setChatThinking, setSceneState, type Chat } from '@/db/chats'
 import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
+import { useFeature } from '@/lib/settings/features'
 import { addMessage, addVariant, listMessages, type Message, type MessageImage, type MessageKind, type Thought } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { setMemberBonds, setMemberPresent, type Room, type RoomMember } from '@/db/rooms'
@@ -133,6 +134,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
 
   const [personaId, setPersonaId] = useState<number | null>(chat.personaId ?? null)
   const [persona, setPersona] = useState<Persona | null>(null)
+  const personasOn = useFeature('personas')
   const personaRef = useRef<Persona | null>(null)
   personaRef.current = persona
 
@@ -143,7 +145,8 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   useEffect(() => {
     let alive = true
     const load = async () => {
-      if (!personaId) {
+      // Switched off in Settings, the chat speaks as no one, its choice kept for later.
+      if (!personaId || !personasOn) {
         if (alive) setPersona(null)
         return
       }
@@ -156,7 +159,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       alive = false
       unsub()
     }
-  }, [db, personaId])
+  }, [db, personaId, personasOn])
 
   const selectPersona = useCallback(
     async (id: number | null) => {

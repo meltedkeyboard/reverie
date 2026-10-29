@@ -23,6 +23,7 @@ export type SettingsSection =
   | 'private'
   | 'memory'
   | 'personas'
+  | 'direction'
   | 'suggest'
   | 'confirmDelete'
   | 'recents'

@@ -18,6 +18,7 @@ import { isConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { loadFileLimits } from '@/db/prefs/fileLimits'
 import { loadListLook } from '@/db/prefs/listLook'
 import { loadLongMemory } from '@/db/prefs/memory'
+import { isDirectionEnabled, isPersonasEnabled } from '@/db/prefs/features'
 import { isHapticsEnabled } from '@/db/prefs/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemeMode, loadThemeName, saveLocalePreference, saveThemeMode, saveThemeName } from '@/db/prefs/settings'
@@ -58,6 +59,8 @@ function ThemedApp() {
 
   useEffect(() => {
     isHapticsEnabled(db)
+    isPersonasEnabled(db)
+    isDirectionEnabled(db)
     isConfirmDeleteEnabled(db)
     loadFileLimits(db)
     loadLongMemory(db)
