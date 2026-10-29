@@ -155,7 +155,11 @@
   "settings.exportJson": "Экспорт",
   "settings.importJson": "Импорт",
   "settings.aboutTitle": "О приложении",
-  "settings.aboutReverie": "О Reverie",
+  "settings.version": "Версия",
+  "settings.copyright": "Авторские права",
+  "settings.starOnGithub": "Поставить звёздочку на GitHub",
+  "settings.starThanks": "Спасибо за поддержку!",
+  "settings.starNote": "Нравится Reverie? Поддержите меня, поставив звёздочку на GitHub. А также это поможет найти приложение другим",
   "settings.dangerZone": "Опасная зона",
   "settings.dangerNote": "Удаляет персонажей, переписки, аватары и адрес сервера. Отменить нельзя",
   "settings.wipeAll": "Стереть все данные",
@@ -170,9 +174,6 @@
   "settings.wipeConfirmLabel": "Стереть всё",
   "settings.wipeFailedTitle": "Не удалось стереть данные",
 
-  "about.version": "Версия {{version}}",
-  "about.tagline": "Приватный ролевой чат с вашей собственной моделью",
-  "about.shakeHint": "Потрясите телефон, чтобы заново пройти онбординг",
 
   "characters.title": "Персонажи",
   "characters.edit": "Изменить",

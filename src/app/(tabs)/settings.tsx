@@ -1,9 +1,9 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { AppState, Linking, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
-import { ButtonCell, CheckCell, InputCell, LinkCell, ListFooter, ListSection, SegmentCell, SliderCell, SwitchCell } from '@/components/lists/GroupedList'
+import { ButtonCell, CheckCell, InputCell, LinkCell, ListFooter, ListSection, SegmentCell, SliderCell, SwitchCell, ValueCell } from '@/components/lists/GroupedList'
 import {
   nativeForm,
   NativeActionRow,
@@ -63,11 +63,12 @@ import { confirm } from '@/lib/ui/dialogs'
 import { showToast } from '@/lib/ui/toast'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import { formatWhen } from '@/lib/core/format'
-import { selectionAsync } from '@/lib/ui/haptics'
+import { NotificationFeedbackType, notificationAsync, selectionAsync } from '@/lib/ui/haptics'
 import type { SettingsSection } from '@/lib/core/searchScope'
 import { isShownInFiles } from '@/lib/core/storage'
 import { reportError } from '@/lib/transfer/report'
-import { isAndroid } from '@/lib/core/platform'
+import { isAndroid, isDesktop } from '@/lib/core/platform'
+import { APP_COPYRIGHT, APP_VERSION, REPO_URL } from '@/lib/core/version'
 import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 
 
@@ -240,6 +241,21 @@ export default function SettingsScreen() {
 
   const [showInFiles, setShowInFiles] = useState(isShownInFiles)
   const [movingFiles, setMovingFiles] = useState(false)
+
+  // Once GitHub has been opened from About, the button thanks the user. On a phone it does so
+  // as they come back from the browser, so that they see it change, with a tap of success; the
+  // desktop app stays in front while the browser opens, so it thanks at once.
+  const [thanked, setThanked] = useState(false)
+  const awayToStar = useRef(false)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !awayToStar.current) return
+      awayToStar.current = false
+      setThanked(true)
+      notificationAsync(NotificationFeedbackType.Success)
+    })
+    return () => sub.remove()
+  }, [])
   const moveFiles = useShowInFiles()
 
   // The data moves right away: the database is copied, reopened from the new place, and
@@ -665,9 +681,22 @@ export default function SettingsScreen() {
     </>
   )
 
-  const aboutRow = (
-    <ListSection header={t('settings.aboutTitle')}>
-      <LinkCell label={t('settings.aboutReverie')} onPress={() => router.push('/about')} />
+  const openRepo = () => {
+    if (isDesktop) setThanked(true)
+    else awayToStar.current = true
+    Linking.openURL(REPO_URL).catch((err) => {
+      awayToStar.current = false
+      reportError(t('settings.starOnGithub'), err)
+    })
+  }
+  const star = thanked
+    ? { label: t('settings.starThanks'), symbol: 'heart.fill' as const, fallback: 'heart' as const }
+    : { label: t('settings.starOnGithub'), symbol: 'star' as const, fallback: 'star-outline' as const }
+  const about = (
+    <ListSection header={t('settings.aboutTitle')} footer={t('settings.starNote')}>
+      <ValueCell label={t('settings.version')} value={APP_VERSION} />
+      <ValueCell label={t('settings.copyright')} value={APP_COPYRIGHT} />
+      <ButtonCell label={star.label} icon={{ symbol: star.symbol, fallback: star.fallback }} onPress={openRepo} />
     </ListSection>
   )
 
@@ -680,7 +709,7 @@ export default function SettingsScreen() {
   // The same page as the system's own list (iOS with SwiftUI). The model's chips and the rows
   // of chips for the sync and the backup stay React Native views in rows of their own.
   const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
-    const { Picker, Text: SwiftText, HStack, Spacer, Toggle, Button: SwiftButton, Image, ProgressView, SwipeActions } = ui
+    const { Picker, Text: SwiftText, LabeledContent, HStack, Spacer, Toggle, Button: SwiftButton, Image, ProgressView, SwipeActions } = ui
     const { pickerStyle, tag, labelsHidden, disabled, id, tint, foregroundStyle, lineLimit } = modifiers
     const toggle = (name: string | null, label: string, isOn: boolean, onChange: (on: boolean) => void, off = false) => (
       <Toggle label={label} isOn={isOn} onIsOnChange={onChange} modifiers={[disabled(off), ...(name ? [id(name)] : [])]} />
@@ -854,8 +883,14 @@ export default function SettingsScreen() {
           <NativeHostedRow>{backupChips}</NativeHostedRow>
         </NativeSection>
 
-        <NativeSection title={t('settings.aboutTitle')}>
-          <NativeLinkRow label={t('settings.aboutReverie')} onPress={() => router.push('/about')} />
+        <NativeSection id="about" title={t('settings.aboutTitle')} footer={t('settings.starNote')}>
+          <LabeledContent label={t('settings.version')}>
+            <SwiftText>{APP_VERSION}</SwiftText>
+          </LabeledContent>
+          <LabeledContent label={t('settings.copyright')}>
+            <SwiftText>{APP_COPYRIGHT}</SwiftText>
+          </LabeledContent>
+          <NativeActionRow label={star.label} symbol={star.symbol} onPress={openRepo} />
         </NativeSection>
 
         <NativeSection id="wipe" title={t('settings.dangerZone')} footer={t('settings.dangerNote')}>
@@ -897,7 +932,7 @@ export default function SettingsScreen() {
           {block('server', server)}
           {showCloud ? block('folderSync', folderSync) : null}
           {block('backup', backup)}
-          {aboutRow}
+          {block('about', about)}
           {block('wipe', wipe)}
         </KeyboardAwareScrollView>
       ) : null}

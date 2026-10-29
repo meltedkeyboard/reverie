@@ -99,7 +99,7 @@ Data (the database and the images) is for now kept in the browser storage of the
 
 ## Project layout
 
-- `src/app/` - screens (expo-router): character list, character chats, chat, character editor, chat background, settings, onboarding, about, image viewer.
+- `src/app/` - screens (expo-router): character list, character chats, chat, character editor, chat background, settings, onboarding, image viewer.
 - `src/api/llm.ts` - server requests, SSE parsing, context window (`CONTEXT_WINDOW`, 20 messages).
 - `src/hooks/` - `useChat` (conversation state and streaming), `useRoom` (group scenes) and smaller UI hooks.
 - `src/lib/chat/room/` - room logic: who speaks next, who hears what, the director request, each speaker's view of the scene.

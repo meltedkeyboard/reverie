@@ -133,7 +133,7 @@ export default function SearchScreen() {
         href: '/servers',
       },
       { label: t('settings.backupTitle'), keywords: [t('settings.exportJson'), t('settings.importJson')], symbol: 'externaldrive', fallback: 'archive-outline', href: settingsAt('backup') },
-      { label: t('settings.aboutReverie'), keywords: [t('settings.aboutTitle')], symbol: 'info.circle', fallback: 'information-circle-outline', href: '/about' },
+      { label: t('settings.aboutTitle'), keywords: [t('settings.version'), t('settings.copyright'), 'GitHub'], symbol: 'info.circle', fallback: 'information-circle-outline', href: settingsAt('about') },
       { label: t('settings.wipeAll'), keywords: [t('settings.dangerZone')], symbol: 'exclamationmark.triangle', fallback: 'warning-outline', href: settingsAt('wipe'), danger: true },
     ]
     if (alternateIconsAvailable) {

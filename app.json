@@ -83,6 +83,7 @@
       ],
       "expo-font",
       "./tools/plugins/android-lint",
+      "./tools/plugins/ios-settings",
       ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }],
       [
         "expo-alternate-app-icons",

@@ -164,6 +164,19 @@ export function LinkCell({ label, value, onPress }: CellProps & { value?: string
   )
 }
 
+// A label and its value that cannot be changed, as the rows of Settings > General > About.
+export function ValueCell({ label, value }: CellProps & { value: string }) {
+  const styles = useStyles(createStyles)
+  return (
+    <View style={styles.row} accessible accessibilityLabel={`${label}, ${value}`}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.value} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  )
+}
+
 // A row whose value is picked from the system menu.
 export function MenuCell({ label, value, placeholder, items }: CellProps & { value: string; placeholder?: string; items: MenuItem[] }) {
   const colors = useColors()

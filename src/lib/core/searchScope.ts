@@ -34,4 +34,5 @@ export type SettingsSection =
   | 'folderSync'
   | 'server'
   | 'backup'
+  | 'about'
   | 'wipe'

@@ -156,7 +156,11 @@
   "settings.exportJson": "Export",
   "settings.importJson": "Import",
   "settings.aboutTitle": "About",
-  "settings.aboutReverie": "About Reverie",
+  "settings.version": "Version",
+  "settings.copyright": "Copyright",
+  "settings.starOnGithub": "Give Reverie a star on GitHub",
+  "settings.starThanks": "Thank you for the support!",
+  "settings.starNote": "Enjoying Reverie? A star on GitHub is the nicest thank-you, and it helps others find the app",
   "settings.dangerZone": "Danger zone",
   "settings.dangerNote": "Deletes characters, chats, avatars and the server address. Can't be undone",
   "settings.wipeAll": "Erase all data",
@@ -171,9 +175,6 @@
   "settings.wipeConfirmLabel": "Erase everything",
   "settings.wipeFailedTitle": "Couldn't erase data",
 
-  "about.version": "Version {{version}}",
-  "about.tagline": "A private roleplay chat with your own model",
-  "about.shakeHint": "Shake your phone to go through onboarding again",
 
   "characters.title": "Characters",
   "characters.edit": "Edit",

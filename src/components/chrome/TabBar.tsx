@@ -168,7 +168,6 @@ const PLACES: Record<string, () => TabLabel> = {
   '/settings': () => ({ title: t('settings.title'), icon: 'settings-outline' }),
   '/chat-text': () => ({ title: t('settings.appearance'), icon: 'color-palette-outline' }),
   '/app-icon': () => ({ title: t('settings.appIcon'), icon: 'apps-outline' }),
-  '/about': () => ({ title: t('settings.aboutReverie'), icon: 'information-circle-outline' }),
   '/character/new': () => ({ title: t('editor.newCharacterTitle'), icon: 'person-add-outline' }),
   '/room/new': () => ({ title: t('roomEditor.newTitle'), icon: 'chatbubbles-outline' }),
 }
