@@ -25,8 +25,10 @@ import { getFileLimits } from '@/lib/settings/fileLimits'
 import { loadFileLimits, setAttachmentLimitMb, setAvatarLimitMb, setBackgroundLimitMb, setLimitsOff } from '@/db/prefs/fileLimits'
 import { isHapticsEnabled, setHapticsEnabled } from '@/db/prefs/haptics'
 import {
+  isAttachGalleryEnabled,
   isRecentAttachmentsEnabled,
   loadRecentSettings,
+  setAttachGalleryEnabled,
   setRecentAttachmentsEnabled,
   setRecentCount,
   setRecentUnlimited,
@@ -196,6 +198,7 @@ export default function SettingsScreen() {
     loadSuggestionTokens(db).then(setSuggestionTokens)
   }, [db])
   const [recentPictures, toggleRecentPictures] = useStoredFlag(isRecentAttachmentsEnabled, setRecentAttachmentsEnabled, true)
+  const [attachGallery, toggleAttachGallery] = useStoredFlag(isAttachGalleryEnabled, setAttachGalleryEnabled, true)
   // How many of them: a number that may be empty while retyped, or no limit.
   const [recent, setRecent] = useState<RecentSettings>({ count: DEFAULT_RECENT_COUNT, unlimited: false })
   const [recentDraft, setRecentDraft] = useState<string>()
@@ -402,6 +405,12 @@ export default function SettingsScreen() {
           onChange={(value) => setContinueByVisitValue(value === 'visit')}
         />
       ) : null}
+    </ListSection>
+  )
+
+  const attachGalleryRow = (
+    <ListSection footer={t('settings.attachGalleryNote')}>
+      <SwitchCell label={t('settings.attachGallery')} value={attachGallery} onValueChange={toggleAttachGallery} />
     </ListSection>
   )
 
@@ -794,6 +803,10 @@ export default function SettingsScreen() {
           {recentPictures ? numberRow(t('settings.recentCount'), recentDraft ?? String(recent.count), typeRecentCount, recent.unlimited) : null}
         </NativeSection>
 
+        <NativeSection id="attachGallery" footer={t('settings.attachGalleryNote')}>
+          {toggle(null, t('settings.attachGallery'), attachGallery, toggleAttachGallery)}
+        </NativeSection>
+
         <NativeSection id="confirmDelete">{toggle(null, t('settings.confirmDelete'), confirmDelete, toggleConfirmDelete)}</NativeSection>
 
         <NativeSection id="haptics" title={t('settings.feedback')}>
@@ -889,6 +902,7 @@ export default function SettingsScreen() {
           {block('personas', personasRow)}
           {block('suggest', suggestRow)}
           {block('recents', recentRow)}
+          {block('attachGallery', attachGalleryRow)}
           {block('confirmDelete', confirmDeleteRow)}
           {block('haptics', hapticsRow)}
           {security}

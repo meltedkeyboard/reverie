@@ -52,6 +52,8 @@
   "settings.limitAttachment": "Лимит вложения, МБ",
   "settings.recentPictures": "Недавние картинки",
   "settings.recentPicturesNote": "Ряд последних картинок в меню прикрепления",
+  "settings.attachGallery": "Галерея персонажа",
+  "settings.attachGalleryNote": "Строка «Галерея» в меню прикрепления с фото персонажей чата",
   "settings.recentUnlimited": "Без лимита",
   "settings.recentCount": "Сколько показывать",
   "settings.confirmDelete": "Подтверждать удаление",

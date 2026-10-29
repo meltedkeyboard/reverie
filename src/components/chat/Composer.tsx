@@ -31,7 +31,7 @@ import { BlurBar, EdgeFade } from '../chrome/BarChrome'
 import type { ChatLook } from '../chrome/ChatChrome'
 import { useChatDrawer } from '../chrome/ChatDrawer'
 import { GlassSurface, useGlassStyles } from '../chrome/Glass'
-import { AttachSheet, loadRecentPictures } from './AttachMenu'
+import { AttachSheet, loadAttachGalleries, loadRecentPictures } from './AttachMenu'
 import { useInputColors } from '../controls/Field'
 import { IconButton } from '../controls/IconButton'
 import { ImageLink, useImageGroup, type ImageGroup } from '../visuals/ImageLink'
@@ -104,6 +104,8 @@ type Props = {
   fade?: boolean
   // The look of the chat, for the attach menu to carry its background.
   look?: ChatLook
+  // Whose galleries the attach menu offers: the character, or a scene's cast.
+  cast?: { id: number; name: string }[]
 }
 
 export function Composer({
@@ -111,6 +113,7 @@ export function Composer({
   top,
   fade = true,
   look,
+  cast,
   generating,
   editing,
   accessory,
@@ -398,10 +401,12 @@ export function Composer({
       await KeyboardController.dismiss({ animated: true })
     }
 
+    const [recents, galleries] = await Promise.all([loadRecentPictures(db), loadAttachGalleries(db, cast ?? [])])
     const next: AttachSession = {
       opened: Date.now(),
       look,
-      recents: await loadRecentPictures(db),
+      recents,
+      galleries,
       thinking,
       onToggleThinking,
       persona,

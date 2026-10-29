@@ -119,6 +119,7 @@ export default function SearchScreen() {
       { label: t('memory.long'), keywords: [t('memory.section'), t('lore.title'), t('settings.chats')], symbol: 'brain', fallback: 'book-outline', href: settingsAt('memory') },
       { label: t('settings.suggestButton'), keywords: [t('settings.chats')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
       { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: settingsAt('recents') },
+      { label: t('settings.attachGallery'), keywords: [t('settings.chats'), t('attach.title'), t('gallery.title')], symbol: 'photo.on.rectangle.angled', fallback: 'images-outline', href: settingsAt('attachGallery') },
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
       { label: t('settings.limitsTitle'), keywords: [t('settings.limitsOff'), t('settings.limitAvatar'), t('settings.limitAttachment')], symbol: 'externaldrive', fallback: 'resize-outline', href: settingsAt('limits') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },

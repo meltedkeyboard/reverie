@@ -16,20 +16,23 @@ import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { Avatar } from '@/components/visuals/Avatar'
 import { Star } from '@/components/visuals/motifs/Star'
 import { listRecentAttachments } from '@/db/attachments'
+import { listGallery } from '@/db/gallery'
 import type { MessageImage } from '@/db/messages'
 import { deletePersona, listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
 import { useDatabase } from '@/db/provider'
-import { isRecentAttachmentsEnabled, loadRecentSettings } from '@/db/recentAttachments'
+import { isAttachGalleryEnabled, isRecentAttachmentsEnabled, loadRecentSettings } from '@/db/recentAttachments'
 import { useTranslation } from '@/i18n'
-import { choosePersona, type AttachSession } from '@/lib/chat/attachSession'
+import { choosePersona, type AttachGallery, type AttachSession } from '@/lib/chat/attachSession'
 import { isDesktop, isIOS, isWeb } from '@/lib/core/platform'
 import { pictureUri } from '@/lib/images/attachments'
+import { isGalleryVideo } from '@/lib/images/gallery'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { type Colors, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles, useTheme } from '@/theme'
 
 import { GlassButton } from '../chrome/Glass'
+import { AttachGalleryPicker } from './AttachGallery'
 import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { SFIcon } from '../visuals/SFIcon'
 
@@ -39,6 +42,23 @@ export async function loadRecentPictures(db: SQLiteDatabase): Promise<MessageIma
     if (!(await isRecentAttachmentsEnabled(db))) return null
     const { count, unlimited } = await loadRecentSettings(db)
     return await listRecentAttachments(db, unlimited ? null : count)
+  } catch {
+    return []
+  }
+}
+
+// The galleries of the chat's character or a scene's cast that have a still picture in them,
+// for the menu's Gallery row and its screen; none when the row is switched off in Settings.
+export async function loadAttachGalleries(db: SQLiteDatabase, cast: { id: number; name: string }[]): Promise<AttachGallery[]> {
+  try {
+    if (!(await isAttachGalleryEnabled(db))) return []
+    const galleries = await Promise.all(
+      cast.map(async (character) => ({
+        name: character.name,
+        items: (await listGallery(db, character.id)).filter((item) => !isGalleryVideo(item.file)),
+      }))
+    )
+    return galleries.filter((gallery) => gallery.items.length > 0)
   } catch {
     return []
   }
@@ -63,12 +83,14 @@ export function AttachMenu({
   onClose,
   onOpenPersonas,
   onOpenDirection,
+  onOpenGallery,
   scrollStyle,
 }: {
   session: AttachSession
   onClose: Close
   onOpenPersonas: () => void
   onOpenDirection?: () => void
+  onOpenGallery?: () => void
   scrollStyle?: StyleProp<ViewStyle>
 }) {
   const colors = useColors()
@@ -225,6 +247,13 @@ export function AttachMenu({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onOpenDirection?.()
   }
+  const openGallery = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    onOpenGallery?.()
+  }
+  // The pictures of the character's gallery, or of the cast's, counted as Photos counts an album's.
+  const galleryCount = (session.galleries ?? []).reduce((sum, gallery) => sum + gallery.items.length, 0)
+  const showGallery = !!onOpenGallery && galleryCount > 0
 
   // The same menu as the system's own list (iOS with SwiftUI), over the chat's picture as the
   // app's cards are. The row of the camera and the latest pictures and the button that attaches
@@ -246,6 +275,9 @@ export function AttachMenu({
               <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onClose(() => session.onPick('camera'))} modifiers={[tint(colors.text)]} />
             ) : null}
             <SwiftButton label={t('attach.addFiles')} systemImage="doc" onPress={() => onClose(() => session.onPick('files'))} modifiers={[tint(colors.text)]} />
+            {showGallery ? (
+              <NativeLinkRow label={t('gallery.title')} symbol="photo.on.rectangle.angled" value={String(galleryCount)} onPress={openGallery} />
+            ) : null}
             <NativeLinkRow
               label={t('attach.persona')}
               symbol="person"
@@ -316,6 +348,26 @@ export function AttachMenu({
             <Icon name="document-outline" size={22} color={colors.text} />
             <Text style={styles.cardLabel}>{t('attach.addFiles')}</Text>
           </Pressable>
+
+          {showGallery ? (
+            <>
+              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+
+              <Pressable
+                onPress={openGallery}
+                accessibilityRole="button"
+                accessibilityLabel={t('gallery.title')}
+                style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+              >
+                <SFIcon name="photo.on.rectangle.angled" fallback="images-outline" size={22} color={colors.text} />
+                <Text style={styles.cardLabel}>{t('gallery.title')}</Text>
+                <View style={styles.cardTrailing}>
+                  <Text style={styles.cardTrailingText}>{galleryCount}</Text>
+                  <Icon name="chevron-forward" size={17} color={colors.textFaint} />
+                </View>
+              </Pressable>
+            </>
+          ) : null}
 
           <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
 
@@ -737,14 +789,16 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
   const { t } = useTranslation()
   const router = useRouter()
   const { width } = useWindowDimensions()
-  const [screen, setScreen] = useState<'attach' | 'persona' | 'direction'>('attach')
+  const [screen, setScreen] = useState<'attach' | 'persona' | 'direction' | 'gallery'>('attach')
   const [attachHeight, setAttachHeight] = useState<number | undefined>(undefined)
   const progress = useSharedValue(0)
   // Over the chat's background the main screen fades out under the picker instead of
   // being covered by the sheet's color, which would hide the background.
   const backdrop = useChatBackdrop(session?.look)
 
-  const go = (to: 'attach' | 'persona' | 'direction') => {
+  const [galleryVisit, setGalleryVisit] = useState(0)
+  const go = (to: 'attach' | 'persona' | 'direction' | 'gallery') => {
+    if (to === 'gallery') setGalleryVisit((n) => n + 1)
     setScreen(to)
     progress.value = withSpring(to === 'attach' ? 0 : 1, { stiffness: 280, damping: 28, mass: 0.9 })
   }
@@ -775,6 +829,8 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
       title={
         screen === 'direction'
           ? t('direction.title')
+          : screen === 'gallery'
+            ? t('gallery.title')
           : screen === 'persona'
             ? t('persona.pickerTitle')
             : t('attach.addToChat')
@@ -833,6 +889,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
               onClose={onClose}
               onOpenPersonas={() => go('persona')}
               onOpenDirection={() => go('direction')}
+              onOpenGallery={() => go('gallery')}
             />
           </Animated.View>
 
@@ -871,6 +928,25 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
               session={session}
               onDone={() => go('attach')}
               scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 380) } : null}
+            />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.pane,
+              screen === 'gallery' ? styles.paneActive : styles.paneAbsolute,
+              attachHeight ? { minHeight: attachHeight } : null,
+              { backgroundColor: backdrop ? 'transparent' : tones.sheet },
+              personaPaneStyle,
+            ]}
+            pointerEvents={screen === 'gallery' ? 'auto' : 'none'}
+          >
+            {/* Made anew each time it slides in, so nothing is left ticked from before. */}
+            <AttachGalleryPicker
+              key={galleryVisit}
+              session={session}
+              onClose={onClose}
+              scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 480) } : null}
             />
           </Animated.View>
         </View>

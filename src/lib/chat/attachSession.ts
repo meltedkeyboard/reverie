@@ -1,6 +1,7 @@
 import { Dimensions } from 'react-native'
 
 import type { Character } from '@/db/characters'
+import type { GalleryItem } from '@/db/gallery'
 import type { MessageImage } from '@/db/messages'
 import type { Persona } from '@/db/personas'
 import type { ImageSource } from '@/lib/images/images'
@@ -11,6 +12,11 @@ const FULL_MENU = 0.55
 // less the camera row (50); the note under it (24) only says so when the row is switched off.
 const WITHOUT_RECENTS = 128
 const RECENTS_OFF_NOTE = 24
+// The row of the characters' galleries, there only when one of them has a picture.
+const GALLERY_ROW = 44
+
+// The pictures of one character's gallery to attach from, under its name in a scene.
+export type AttachGallery = { name: string; items: GalleryItem[] }
 
 // What the attach menu of the composer works with and where its choices go: the field's
 // pictures, the chat's thinking switch, persona and direction. On iOS the menu is a form sheet
@@ -33,6 +39,9 @@ export type AttachSession = {
   onSelectPersona?: (personaId: number | null) => void
   direction?: string | null
   onSetDirection?: (direction: string) => void
+  // The galleries of the chat's character, or of a scene's cast, with a picture in them;
+  // their stills only, as a message takes no video.
+  galleries?: AttachGallery[]
   onPick: (source: ImageSource) => void
   onAttach: (pictures: MessageImage[]) => void
   // The menu is gone and nothing was chosen to follow it: the field may take the keyboard back.
@@ -53,7 +62,8 @@ export function setAttachSession(session: AttachSession) {
   after = null
   const height = Dimensions.get('window').height
   const lost = session.recents === null ? WITHOUT_RECENTS - RECENTS_OFF_NOTE : session.recents?.length === 0 ? WITHOUT_RECENTS : 0
-  detent = lost && height > 0 ? FULL_MENU - lost / height : FULL_MENU
+  const gained = session.galleries?.length ? GALLERY_ROW : 0
+  detent = height > 0 ? FULL_MENU + (gained - lost) / height : FULL_MENU
 }
 
 // Read by the root layout as the sheet is presented, so a menu with less in it opens lower.

@@ -57,6 +57,7 @@ export default function AttachScreen() {
         onClose={close}
         onOpenPersonas={() => router.push('/attach/persona')}
         onOpenDirection={() => router.push('/attach/direction')}
+        onOpenGallery={() => router.push('/attach/gallery')}
         scrollStyle={fillScreen}
       />
     </AttachScreenFrame>

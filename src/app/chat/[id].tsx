@@ -31,6 +31,7 @@ import {
   createChatOf,
   EMPTY_CONFIG,
   EMPTY_THREAD,
+  castOf,
   latestChatOf,
   lookOf,
   noop,
@@ -660,7 +661,7 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump }:
         // With the private thread open the field talks to the model aside, and the thread
         // takes the accessory slot so it rides the keyboard with the field.
         <ComposerSwap id={asideOpen ? 'aside' : 'scene'}>
-          <Composer {...data.composer} height={composerHeight} top={composerTop} resetKey={data.chatId} fade={!hasCustomBackground} look={lookOf(owner)} />
+          <Composer {...data.composer} height={composerHeight} top={composerTop} resetKey={data.chatId} fade={!hasCustomBackground} look={lookOf(owner)} cast={castOf(owner)} />
         </ComposerSwap>
       ) : null}
       {/* Outside the swap, so it neither sinks with the field nor goes missing in Private. */}

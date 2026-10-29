@@ -15,6 +15,12 @@ const recentAttachments = defineFlag(ENABLED_KEY, true)
 export const isRecentAttachmentsEnabled = recentAttachments.load
 export const setRecentAttachmentsEnabled = recentAttachments.save
 
+// The Gallery row of the attach menu, the pictures of the chat's character or a scene's cast.
+const attachGallery = defineFlag('attach_gallery', true)
+
+export const isAttachGalleryEnabled = attachGallery.load
+export const setAttachGalleryEnabled = attachGallery.save
+
 export type RecentSettings = { count: number; unlimited: boolean }
 
 export async function loadRecentSettings(db: SQLiteDatabase): Promise<RecentSettings> {

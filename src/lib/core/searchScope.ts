@@ -26,6 +26,7 @@ export type SettingsSection =
   | 'suggest'
   | 'confirmDelete'
   | 'recents'
+  | 'attachGallery'
   | 'limits'
   | 'haptics'
   | 'faceId'

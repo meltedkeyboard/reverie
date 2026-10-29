@@ -21,6 +21,9 @@ export type Owner =
 // The picture and the look of the bubbles come from the character or the room.
 export const lookOf = (owner: Owner) => (owner.kind === 'character' ? owner.character : owner.room)
 
+// Whose galleries the attach menu offers: the character, or a scene's cast.
+export const castOf = (owner: Owner) => (owner.kind === 'character' ? [owner.character] : owner.members.map((member) => member.character))
+
 export const ownerKey = (owner: Owner) => (owner.kind === 'character' ? `character:${owner.character.id}` : `room:${owner.room.id}`)
 
 export function createChatOf(db: SQLiteDatabase, owner: Owner) {
