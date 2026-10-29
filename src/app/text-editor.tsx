@@ -6,17 +6,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useInputColors } from '@/components/controls/Field'
 import { BarButton, DrawnFormScreenHeader } from '@/components/chrome/FormScreenHeader'
-import { useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { useTranslation } from '@/i18n'
 import { textDraft } from '@/lib/chat/textDraft'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
 
 // A long text of a form (a system prompt, a scene) on the whole screen, like a note.
 // Every change goes straight back to the form, so leaving is all there is to it.
 export default function TextEditorScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const headerHeight = useHeaderHeight()
   const colors = useColors()
   const styles = useStyles(createStyles)
   const inputColors = useInputColors()
@@ -50,11 +48,15 @@ export default function TextEditorScreen() {
           }}
           placeholder={draft.placeholder}
           multiline
-          // The padding scrolls along with the text, so it passes under the header.
+          // The padding scrolls along with the text, so it passes under the header. The
+          // field stops below the status bar: a text view that reaches under it gets the
+          // safe area added to its padding by iOS a second time, which moved the text (not
+          // the placeholder) a status bar lower and shifted again as the keyboard came up.
           style={[
             styles.input,
             {
-              paddingTop: headerHeight + 12,
+              marginTop: insets.top,
+              paddingTop: HEADER_ROW_HEIGHT + 12,
               paddingBottom: insets.bottom + 24,
               paddingLeft: Math.max(20, insets.left + 8),
               paddingRight: Math.max(20, insets.right + 8),
