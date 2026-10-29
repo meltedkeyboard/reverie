@@ -31,7 +31,7 @@
   "settings.showInFilesFailedTitle": "Could not move the files",
   "settings.feedback": "Feedback",
   "settings.haptics": "Haptics",
-  "settings.privateButton": "Private question button",
+  "settings.privateButton": "Private question",
   "settings.privateButtonNote": "The eye icon in a chat's header: ask the model about the chat privately, without the characters hearing",
   "settings.suggestButton": "Reply suggestion",
   "settings.suggestButtonNote": "The model suggests your reply in the message field. Swipe right to use it, left to dismiss",

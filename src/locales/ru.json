@@ -30,7 +30,7 @@
   "settings.showInFilesFailedTitle": "Не удалось переместить файлы",
   "settings.feedback": "Отклик",
   "settings.haptics": "Вибрация",
-  "settings.privateButton": "Кнопка приватного вопроса",
+  "settings.privateButton": "Приватный вопрос",
   "settings.privateButtonNote": "Глаз в шапке чата: спросить модель о чате в стороне, так что персонажи не услышат",
   "settings.suggestButton": "Подсказка ответа",
   "settings.suggestButtonNote": "Модель предлагает ваш ответ в поле ввода. Проведите вправо, чтобы вставить, влево — чтобы убрать",
