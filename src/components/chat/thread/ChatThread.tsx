@@ -80,6 +80,9 @@ export function ChatThread({
   // list at the end again, near enough for the next token, so the reader could not get away.
   // A drag lets go of the end; coming back to it, or the jump button, takes it up again.
   const follow = useRef(true)
+  // A reply is being written: only then does a list let go near the end snap onto it.
+  const generating = useRef(false)
+  generating.current = rows.some((row) => row.streaming)
   // A finger is on the list: nothing scrolls it from under the finger, followed or not.
   const held = useRef(false)
   // Nor while it glides on after the finger.
@@ -249,10 +252,11 @@ export function ChatThread({
     if (restTimer.current) clearTimeout(restTimer.current)
     restTimer.current = setTimeout(() => slowHydration(reason, false), SCROLL_REST)
   }, [reason])
-  // Let go near the end, the list snaps onto it, as onto a magnet; after a fling, once it
-  // stops there. Put off a moment, for the fling's start to arrive after the release.
+  // Let go near the end while a reply is written, the list snaps onto it, as onto a magnet;
+  // after a fling, once it stops there. Put off a moment, for the fling's start to arrive
+  // after the release. A chat only read stays where the finger left it.
   const snap = useCallback(() => {
-    if (follow.current && !held.current && !gliding.current && !touching.current) glideToEnd()
+    if (generating.current && follow.current && !held.current && !gliding.current && !touching.current) glideToEnd()
   }, [glideToEnd])
   const released = useCallback(() => {
     held.current = false
