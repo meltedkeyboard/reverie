@@ -607,7 +607,7 @@ export default function CharacterEditorScreen() {
           format={(v) => v.toFixed(2)}
           onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
         />
-        <NativeSliderRow label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={(v) => setMaxTokens(Math.round(v))} />
+        <NativeSliderRow label={t('editor.maxTokens')} value={maxTokens} min={100} max={16384} step={1} onChange={(v) => setMaxTokens(Math.round(v))} />
         <NativeSliderRow
           label={t('editor.topP')}
           value={topP}
@@ -762,7 +762,7 @@ export default function CharacterEditorScreen() {
                     digits={2}
                     onChange={(v) => setTemperature(Math.round(v * 100) / 100)}
                   />
-                  <SliderCell label={t('editor.maxTokens')} value={maxTokens} min={100} max={4096} step={1} onChange={setMaxTokens} />
+                  <SliderCell label={t('editor.maxTokens')} value={maxTokens} min={100} max={16384} step={1} onChange={setMaxTokens} />
                   <SliderCell
                     label={t('editor.topP')}
                     value={topP}
