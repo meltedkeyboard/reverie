@@ -59,6 +59,7 @@ const SECTIONS: Section[] = [
       { icon: 'square.and.arrow.down', fallback: 'download-outline', titleKey: 'onboarding.cards.title', textKey: 'onboarding.cards.text' },
       { icon: 'photo.on.rectangle.angled', fallback: 'images-outline', titleKey: 'onboarding.gallery.title', textKey: 'onboarding.gallery.text' },
       { icon: 'folder', fallback: 'folder-outline', titleKey: 'onboarding.groups.title', textKey: 'onboarding.groups.text' },
+      { icon: 'archivebox', fallback: 'archive-outline', titleKey: 'onboarding.archive.title', textKey: 'onboarding.archive.text' },
     ],
   },
   {
