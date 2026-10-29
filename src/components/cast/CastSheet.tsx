@@ -23,6 +23,7 @@ import { showSheet } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
 
+import { ArchivedMark } from '../visuals/ArchivedMark'
 import { Avatar } from '../visuals/Avatar'
 import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { Check } from '../controls/Check'
@@ -236,9 +237,12 @@ function MemberContent({ member, picked, speakingId, queuedIds }: { member: Room
         </Speaking>
       </Animated.View>
       <Animated.View style={[styles.body, { opacity: member.present ? 1 : AWAY }, FADE]}>
-        <Text style={styles.name} numberOfLines={1}>
-          {member.character.name}
-        </Text>
+        <View style={styles.nameLine}>
+          <Text style={styles.name} numberOfLines={1}>
+            {member.character.name}
+          </Text>
+          {member.character.archivedAt !== null ? <ArchivedMark /> : null}
+        </View>
         <View style={styles.statusRow}>
           <Animated.View style={[styles.liveDot, { backgroundColor: ink }, live ? styles.liveDotOn : styles.liveDotOff, DOT]} />
           <View style={styles.statusText}>
@@ -629,7 +633,8 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.accentSoft,
     },
     body: { flex: 1 },
-    name: { color: colors.text, fontSize: 17 },
+    nameLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    name: { flexShrink: 1, color: colors.text, fontSize: 17 },
     statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
     liveDot: { height: 6, borderRadius: 3 },
     liveDotOn: { width: 6, marginRight: 6, opacity: 1 },

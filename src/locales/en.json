@@ -1002,5 +1002,18 @@
   "discover.nothing": "Nothing was found. Make sure the server is running and open to the network",
   "discover.noWifi": "Connect to Wi-Fi to search the network",
   "discover.locked": "needs a key",
-  "discover.models": "models: {{count}}"
+  "discover.models": "models: {{count}}",
+  "archive.title": "Archive",
+  "archive.archive": "Archive",
+  "archive.restore": "Restore",
+  "archive.restoreFull": "Restore from Archive",
+  "archive.archiveSelected": "Archive selected",
+  "archive.restoreSelected": "Restore selected",
+  "archive.none": "Empty",
+  "archive.settingsNote": "Characters you don't need for now. They are off the list and their chats can only be read until you restore them",
+  "archive.emptyTitle": "Archive is empty",
+  "archive.emptyText": "Swipe a character to the left or pick Archive in its menu to put it away here",
+  "archive.readOnly": "{{name}} is in the archive",
+  "archive.archived": "In the archive",
+  "archive.failed": "Couldn't change the archive"
 }

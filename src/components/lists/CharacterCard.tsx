@@ -9,7 +9,7 @@ import { useStyles, type Colors } from '@/theme'
 import { AnimatedFill } from '../visuals/AnimatedFill'
 import { Avatar } from '../visuals/Avatar'
 import { FeaturedBody } from '../cast/FeaturedBody'
-import { CARD_CORNERS_CONTINUOUS, CARD_RADIUS, ListCard } from './ListCard'
+import { CARD_CORNERS_CONTINUOUS, CARD_RADIUS, ListCard, type SwipeAction } from './ListCard'
 import type { MenuItem } from '../overlays/NativeMenu'
 import { DraggableCard, unlessDragging } from './DraggableCard'
 
@@ -28,16 +28,18 @@ type Props = {
   // A member of an open group: set in under it. `groupIds` are all of that group's characters.
   inGroup?: boolean
   groupIds?: number[]
+  // A swipe to the left that does something else than delete (see ListCard).
+  swipe?: SwipeAction
 }
 
-function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, editing }: Props) {
+function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, editing, swipe }: Props) {
   const styles = useStyles(createStyles)
   const { locale } = useTranslation()
   const preview = characterPreview(character)
   const chats = character.chatCount
   if (fillHeight !== undefined) {
     return (
-      <ListCard vertical longPressDrag={editing?.active} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={[styles.featured, { height: fillHeight }]}>
+      <ListCard vertical longPressDrag={editing?.active} onOpen={onOpen} onDelete={onDelete} swipe={swipe} menu={menu} menuTitle={character.name} style={[styles.featured, { height: fillHeight }]}>
         <View style={styles.hero}>
           <Avatar name={character.name} file={character.avatar} size={200} square corners={HERO_CORNERS} fill />
         </View>
@@ -50,7 +52,7 @@ function CharacterCardContent({ character, onOpen, onDelete, menu, fillHeight, e
     )
   }
   return (
-    <ListCard longPressDrag={editing?.active} editing={editing} onOpen={onOpen} onDelete={onDelete} menu={menu} menuTitle={character.name} style={styles.card}>
+    <ListCard longPressDrag={editing?.active} editing={editing} onOpen={onOpen} onDelete={onDelete} swipe={swipe} menu={menu} menuTitle={character.name} style={styles.card}>
       <View style={styles.avatar}>
         <Avatar name={character.name} file={character.avatar} size={AVATAR} square corners={ROW_CORNERS} fill />
       </View>

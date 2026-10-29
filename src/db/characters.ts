@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite'
 
 import { PREVIEW } from '@/db/chats'
 import { copyGallery } from '@/db/gallery'
+import { pruneGroups } from '@/db/groups'
 import { MESSAGE_COPY_COLUMNS } from '@/db/messages'
 
 export type CharacterFields = {
@@ -51,7 +52,8 @@ export type BackgroundTone = 'auto' | 'light' | 'dark'
 
 export const backgroundToneOf = (value: unknown): BackgroundTone => (value === 'light' || value === 'dark' ? value : 'auto')
 
-export type Character = CharacterFields & { id: number; createdAt: number }
+// archivedAt: when the character was put in the archive; null while it is on the lists.
+export type Character = CharacterFields & { id: number; createdAt: number; archivedAt: number | null }
 
 export type CharacterPreview = Character & {
   lastMessage: string | null
@@ -95,10 +97,15 @@ export const CHARACTER_COLUMNS = `
   thinking, background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
   background_effect AS backgroundEffect,
   background_intensity AS backgroundIntensity,
-  background_bubble_transparency AS backgroundBubbleTransparency, background_tone AS backgroundTone, created_at AS createdAt
+  background_bubble_transparency AS backgroundBubbleTransparency, background_tone AS backgroundTone, created_at AS createdAt,
+  archived_at AS archivedAt
 `
 
-export function listCharacters(db: SQLiteDatabase) {
+// The characters on the lists; with `archived`, those in the archive instead, the one put
+// there last on top, or with 'all' both.
+export function listCharacters(db: SQLiteDatabase, archived: boolean | 'all' = false) {
+  const where = archived === 'all' ? '' : archived ? 'WHERE c.archived_at IS NOT NULL' : 'WHERE c.archived_at IS NULL'
+  const order = archived === true ? 'c.archived_at DESC, c.id DESC' : 'c.sort_order DESC, c.id DESC'
   return db.getAllAsync<CharacterPreview>(`
     SELECT ${CHARACTER_COLUMNS},
       (SELECT ${PREVIEW} FROM messages m JOIN chats ch ON ch.id = m.chat_id
@@ -111,7 +118,8 @@ export function listCharacters(db: SQLiteDatabase) {
       (SELECT COUNT(*) FROM chats ch WHERE ch.character_id = c.id) AS chatCount,
       c.group_id AS groupId, c.sort_order AS sortOrder
     FROM characters c
-    ORDER BY c.sort_order DESC, c.id DESC
+    ${where}
+    ORDER BY ${order}
   `)
 }
 
@@ -247,6 +255,45 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
     }
   })
   return characterId
+}
+
+// Puts characters away: off the home list and out of their groups, which remember them. A
+// group left with one member falls apart, as after a delete.
+export async function archiveCharacters(db: SQLiteDatabase, ids: number[]) {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE characters SET archived_at = ?, archived_group = group_id, group_id = NULL
+       WHERE archived_at IS NULL AND id IN (SELECT value FROM json_each(?))`,
+      [Date.now(), JSON.stringify(ids)]
+    )
+    await pruneGroups(db)
+  })
+}
+
+// Brings characters back on top of the list, into the group they were in if it is still
+// there, else alone.
+export async function restoreCharacters(db: SQLiteDatabase, ids: number[]) {
+  await db.withTransactionAsync(async () => {
+    for (const id of ids) {
+      const row = await db.getFirstAsync<{ groupId: number | null }>(
+        'SELECT g.id AS groupId FROM characters c LEFT JOIN character_groups g ON g.id = c.archived_group WHERE c.id = ? AND c.archived_at IS NOT NULL',
+        id
+      )
+      if (!row) continue
+      const group = row.groupId
+      const top = await db.getFirstAsync<{ n: number | null }>(
+        group === null
+          ? 'SELECT MAX(sort_order) AS n FROM (SELECT sort_order FROM characters WHERE group_id IS NULL AND archived_at IS NULL UNION ALL SELECT sort_order FROM character_groups)'
+          : 'SELECT MAX(sort_order) AS n FROM characters WHERE group_id = ?',
+        ...(group === null ? [] : [group])
+      )
+      await db.runAsync('UPDATE characters SET archived_at = NULL, archived_group = NULL, group_id = ?, sort_order = ? WHERE id = ?', [
+        group,
+        (top?.n ?? 0) + 1,
+        id,
+      ])
+    }
+  })
 }
 
 export async function deleteCharacter(db: SQLiteDatabase, id: number) {

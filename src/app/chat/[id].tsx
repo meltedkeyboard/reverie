@@ -15,6 +15,7 @@ import {
   useChatScheme,
   type ChatLook,
 } from '@/components/chrome/ChatChrome'
+import { ArchivedBar } from '@/components/chat/ArchivedBar'
 import { AsidePanel } from '@/components/chat/AsidePanel'
 import { ChatDrawer, useChatDrawer } from '@/components/chrome/ChatDrawer'
 import { Avatar } from '@/components/visuals/Avatar'
@@ -43,7 +44,7 @@ import {
 } from '@/components/chat/thread/screen'
 import { createStore, useStore, type Store } from '@/components/chat/thread/store'
 import { ShimmerText } from '@/components/visuals/ShimmerText'
-import { getCharacter, type Character } from '@/db/characters'
+import { getCharacter, restoreCharacters, type Character } from '@/db/characters'
 import { createChat, getChat, getLatestChatId, type Chat } from '@/db/chats'
 import { getDraft, setDraft } from '@/db/drafts'
 import { setContinueHidden, setLastOpened } from '@/db/prefs/continue'
@@ -67,6 +68,7 @@ import { isAndroid } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { holdToastScheme } from '@/lib/ui/toast'
+import { reportError } from '@/lib/transfer/report'
 import { FILL, fonts, HEADER_FONT_SCALE, SchemeOverride, useColors, useStyles, type Colors, type Scheme } from '@/theme'
 
 type Loaded = { chat: Chat; owner: Owner }
@@ -206,6 +208,7 @@ type ChatsProps = {
 // views of the thread, so starting one for another chat is cheap.
 function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
   const db = useDatabase()
+  const { t } = useTranslation()
   const styles = useStyles(createStyles)
   const wide = useLayoutMode() === 'wide'
   // A room's controller changes it as people walk in and out or the floor is switched;
@@ -387,6 +390,19 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
     return () => clearTimeout(timer)
   })
 
+  // A character in the archive comes back from the bar in place of the composer, and the
+  // chat can be written in again at once.
+  const restore = useCallback(async () => {
+    const current = ownerRef.current
+    if (current.kind !== 'character') return
+    try {
+      await restoreCharacters(db, [current.character.id])
+      setOwner((o) => (o.kind === 'character' ? { ...o, character: { ...o.character, archivedAt: null } } : o))
+    } catch (err) {
+      reportError(t('archive.failed'), err)
+    }
+  }, [db, t])
+
   const scrollToNewest = useCallback(() => {
     away.set(false)
     lists[activeRef.current.thread].current?.scrollToNewest()
@@ -438,6 +454,7 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
               composerHeight={composerHeight}
               composerTop={composerTop}
               onJump={() => lists[activeRef.current.thread].current?.jumpToNewest()}
+              onRestore={restore}
             />
           </View>
           {owner.kind === 'character' ? (
@@ -598,11 +615,12 @@ type ChatChromeProps = {
   composerHeight: SharedValue<number>
   composerTop: SharedValue<number>
   onJump: () => void
+  onRestore: () => void
 }
 
 // The header and the composer of the screen, made once: another chat only changes what
 // they show, so their glass is never made anew.
-function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump }: ChatChromeProps) {
+function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, onRestore }: ChatChromeProps) {
   const styles = useStyles(createStyles)
   const glass = useGlassStyles()
   const { t } = useTranslation()
@@ -621,8 +639,10 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump }:
   // Private is asked from the menu under the name. It stays while the thread is open, even
   // if it is turned off in Settings, so the thread can always be closed from there too.
   const chatMenu: MenuItem[] = data?.chatMenu ?? []
+  // The chat of a character in the archive is only read: no field, nor one aside.
+  const archived = owner.kind === 'character' && owner.character.archivedAt !== null
   const menu: MenuItem[] =
-    data && (privateEnabled || asideOpen)
+    data && !archived && (privateEnabled || asideOpen)
       ? [{ label: t(asideOpen ? 'chat.menuClosePrivate' : 'chat.menuPrivate'), systemImage: asideOpen ? 'eye' : 'eye.slash', onSelect: data.toggleAside }, ...chatMenu]
       : chatMenu
 
@@ -658,7 +678,9 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump }:
         </NativeMenu>
       </GlassHeader>
 
-      {data ? (
+      {archived ? (
+        <ArchivedBar name={owner.character.name} onRestore={onRestore} height={composerHeight} top={composerTop} />
+      ) : data ? (
         // With the private thread open the field talks to the model aside, and the thread
         // takes the accessory slot so it rides the keyboard with the field.
         <ComposerSwap id={asideOpen ? 'aside' : 'scene'}>
@@ -746,10 +768,12 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   }
 
   const idle = phase === 'idle'
-  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(scene, messages, suggestEnabled && idle && !asideOpen && !editingRow)
+  // The chat of a character in the archive is there to be read.
+  const archived = character.archivedAt !== null
+  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(scene, messages, suggestEnabled && idle && !asideOpen && !editingRow && !archived)
   // Changing the conversation while a reply streams or a message is edited would pull
   // the context out from under it, so only reading actions stay available then.
-  const locked = !idle || editingRow !== null
+  const locked = archived || !idle || editingRow !== null
 
   const regenerable = useMemo(() => regenerableOf({ kind: 'character', character }, messages), [character, messages])
 
@@ -794,10 +818,11 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     thread.set({ chat, rows, loaded, config, error, onRetry: retry, focusId: focusMessageId })
   })
 
-  const chatMenu: MenuItem[] = [
+  const profileItem: MenuItem = { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) }
+  const chatMenu: MenuItem[] = archived ? [profileItem] : [
     { label: t('chat.menuRename'), systemImage: 'pencil', onSelect: promptRename },
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
-    { label: t('chat.menuShowProfile'), systemImage: 'person.crop.circle', onSelect: () => router.push(`/character/${character.id}?profile=1`) },
+    profileItem,
     ...memoryMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]

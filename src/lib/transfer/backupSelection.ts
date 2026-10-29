@@ -4,7 +4,8 @@
 
 export type TreeChat = { id: number; title: string | null; messageCount: number }
 // `avatar` is a stored file (the export), `avatarUri` a picture read out of the backup (the import).
-export type TreeNode = { id: number; name: string; avatar?: string | null; avatarUri?: string | null; chats: TreeChat[] }
+// `archived`: a character in the archive, marked so in the tree.
+export type TreeNode = { id: number; name: string; avatar?: string | null; avatarUri?: string | null; archived?: boolean; chats: TreeChat[] }
 // A persona's `chats` are the ones held in it, and `owners` the same chats under the characters
 // and rooms they belong to, for the sheet to show them as a tree. `exists` marks one the
 // device already has (the import then takes that one instead).
@@ -21,7 +22,7 @@ export type Branch = 'characters' | 'rooms' | 'personas'
 export type CheckState = 'all' | 'some' | 'none'
 
 type Source = {
-  characters: { id: number; name: string; avatar?: string | null; group?: { id: number; name: string | null } | null }[]
+  characters: { id: number; name: string; avatar?: string | null; archivedAt?: number | null; group?: { id: number; name: string | null } | null }[]
   rooms?: { id: number; name: string }[]
   // `messageCount` when the caller already has it (SQL), else it is counted from `messages`.
   chats?: { id: number; characterId: number | null; roomId?: number | null; personaId?: number | null; title: string | null; messageCount?: number }[]
@@ -44,7 +45,7 @@ export function buildTree(source: Source): BackupTree {
     if (ownerId === null) continue
     owner.set(ownerId, [...(owner.get(ownerId) ?? []), entry])
   }
-  const characters = source.characters.map(({ id, name, avatar }) => ({ id, name, avatar, chats: byCharacter.get(id) ?? [] }))
+  const characters = source.characters.map(({ id, name, avatar, archivedAt }) => ({ id, name, avatar, archived: Boolean(archivedAt), chats: byCharacter.get(id) ?? [] }))
   // In the order of their characters; one that came with a single member is no group.
   const groups = new Map<number, TreeGroup>()
   source.characters.forEach(({ group }, index) => {

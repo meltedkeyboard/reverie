@@ -42,7 +42,18 @@ type Props = {
   trailing?: React.ReactNode
   // An action behind a swipe to the right (see SwipeToDelete).
   leading?: React.ComponentProps<typeof SwipeToDelete>['leading']
+  // What a swipe to the left does in place of deleting, at once and with no question (a
+  // character put in the archive); the delete is then in the menu.
+  swipe?: SwipeAction
   children: React.ReactNode
+}
+
+export type SwipeAction = {
+  label: string
+  icon: React.ComponentProps<typeof Icon>['name']
+  symbol: React.ComponentProps<typeof SFIcon>['name']
+  color: string
+  onAction: () => void
 }
 
 // A tappable card in a list with a menu behind the trailing ellipsis. On iOS it is the
@@ -54,7 +65,7 @@ type Props = {
 // solid fill turned into a grey haze in the dark scheme. The glass is a sibling of the
 // content rather than inside it: clipped, its rim and the swell of a touch would be cut
 // off at the corners.
-export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, solid, longPressDrag = true, editing, trailing, leading, children }: Props) {
+export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, solid, longPressDrag = true, editing, trailing, leading, swipe, children }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -116,9 +127,12 @@ export function ListCard({ onOpen, onDelete, menu, menuTitle, style, vertical, s
   return (
     <SwipeToDelete
       radius={RADIUS}
-      label={t('common.delete')}
-      onDelete={onDelete}
-      throwAway={!isConfirmDeleteOn()}
+      label={swipe?.label ?? t('common.delete')}
+      onDelete={swipe?.onAction ?? onDelete}
+      throwAway={swipe ? true : !isConfirmDeleteOn()}
+      actionIcon={swipe?.icon}
+      actionIconSF={swipe?.symbol}
+      actionColor={swipe?.color}
       disabled={active}
       leading={leading}
     >

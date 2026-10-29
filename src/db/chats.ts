@@ -243,7 +243,7 @@ export type LastChat = {
 
 // The chat of the given kind for the continue button on its home tab: the one opened last if
 // it is still there and has been written in, otherwise the one written in most recently.
-// A scene shows its room's name and its cast.
+// A scene shows its room's name and its cast. An archived character's chats are passed over.
 export async function getLastChat(db: SQLiteDatabase, kind: 'character' | 'room', openedId: number | null): Promise<LastChat | null> {
   const column = kind === 'room' ? 'room_id' : 'character_id'
   const row = await db.getFirstAsync<Omit<LastChat, 'cast'> & { roomId: number | null }>(`
@@ -256,6 +256,7 @@ export async function getLastChat(db: SQLiteDatabase, kind: 'character' | 'room'
       LEFT JOIN characters c ON c.id = ch.character_id
       LEFT JOIN rooms r ON r.id = ch.room_id
     WHERE ch.${column} IS NOT NULL
+      AND c.archived_at IS NULL
       AND (
         EXISTS (SELECT 1 FROM messages m WHERE m.chat_id = ch.id AND m.role = 'user')
         OR (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ch.id) > 1

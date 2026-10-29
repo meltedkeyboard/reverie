@@ -37,6 +37,7 @@ import {
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/prefs/privateChat'
 import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
 import { listLorebooks } from '@/db/lorebooks'
+import { listCharacters } from '@/db/characters'
 import { loadLongMemory, saveLongMemory } from '@/db/prefs/memory'
 import { useReloadOnFocus } from '@/hooks/chat/useChatListActions'
 import { useDatabase, useShowInFiles } from '@/db/provider'
@@ -238,6 +239,10 @@ export default function SettingsScreen() {
   const [lorebookCount, setLorebookCount] = useState(0)
   const countLorebooks = useCallback(async () => setLorebookCount((await listLorebooks(db)).length), [db])
   useReloadOnFocus(countLorebooks)
+  // How many characters are in the archive, counted the same way.
+  const [archivedCount, setArchivedCount] = useState(0)
+  const countArchived = useCallback(async () => setArchivedCount((await listCharacters(db, true)).length), [db])
+  useReloadOnFocus(countArchived)
 
   const [showInFiles, setShowInFiles] = useState(isShownInFiles)
   const [movingFiles, setMovingFiles] = useState(false)
@@ -397,6 +402,12 @@ export default function SettingsScreen() {
           onChange={(value) => setContinueByVisitValue(value === 'visit')}
         />
       ) : null}
+    </ListSection>
+  )
+
+  const archiveRow = (
+    <ListSection footer={t('archive.settingsNote')}>
+      <LinkCell label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
     </ListSection>
   )
 
@@ -763,6 +774,10 @@ export default function SettingsScreen() {
           ) : null}
         </NativeSection>
 
+        <NativeSection id="archive" footer={t('archive.settingsNote')}>
+          <NativeLinkRow label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
+        </NativeSection>
+
         <NativeSection id="private" title={t('settings.chats')} footer={t('settings.privateButtonNote')}>
           {toggle(null, t('settings.privateButton'), privateButton, togglePrivateButton)}
         </NativeSection>
@@ -918,6 +933,7 @@ export default function SettingsScreen() {
           {block('appearance', appearance)}
           {block('language', language)}
           {block('continue', continueRows)}
+          {block('archive', archiveRow)}
           {block('private', privateRow)}
           {block('memory', memoryRows)}
           {block('personas', personasRow)}
