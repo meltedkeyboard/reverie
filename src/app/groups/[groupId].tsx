@@ -81,7 +81,7 @@ export default function GroupScreen() {
 
   useReloadOnFocus(reload)
 
-  const { menuItems, confirmDelete } = useCharacterActions(reload)
+  const { menuItems, confirmDelete, swipeAction, swipeCard } = useCharacterActions(reload)
   const reorder = useReorder(members, setMembers, (ids) => setCharacterOrder(db, ids))
   const { editing, setEditing, motion, button: editButton, checked, setChecked, toggleChecked } = useEditMode()
 
@@ -218,6 +218,7 @@ export default function GroupScreen() {
             systemImage: 'rectangle.stack.badge.minus',
             onAction: () => removeFromGroup(db, [character.id]).then(reload),
           },
+          trailing: swipeAction(character),
         })
       )
     : []
@@ -267,6 +268,7 @@ export default function GroupScreen() {
               character={character}
               onOpen={() => router.push(`/chat/latest?character=${character.id}`)}
               onDelete={() => confirmDelete(character)}
+              swipe={swipeCard(character)}
               menu={menuItems(character)}
               // All member ids: no card in the group becomes a drop target for another member.
               groupIds={groupedIds}

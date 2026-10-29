@@ -8,6 +8,7 @@ import { useColors, useStyles, type Colors } from '@/theme'
 
 import { ListSection } from '../lists/GroupedList'
 import type { MenuItem } from '../overlays/NativeMenu'
+import { ArchivedMark } from '../visuals/ArchivedMark'
 import { Avatar } from '../visuals/Avatar'
 import { Icon } from '../visuals/Icon'
 import { NativeHostedRow, NativeSection } from '../lists/NativeForm'
@@ -59,9 +60,12 @@ export function RoomProfile({ fields, members, background, exportItems, system =
     >
       <Avatar name={member.character.name} file={member.character.avatar} size={36} />
       <View style={styles.memberBody}>
-        <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
-          {member.character.name}
-        </Text>
+        <View style={styles.memberNameLine}>
+          <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
+            {member.character.name}
+          </Text>
+          {member.character.archivedAt !== null ? <ArchivedMark /> : null}
+        </View>
         <Text style={styles.memberMeta} numberOfLines={1}>
           {memberSummary(member, t)}
         </Text>
@@ -120,6 +124,7 @@ const createStyles = (colors: Colors) =>
     member: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
     pressed: { backgroundColor: colors.surfaceRaised },
     memberBody: { flex: 1 },
-    memberName: { fontSize: 17, fontWeight: '600' },
+    memberNameLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    memberName: { flexShrink: 1, fontSize: 17, fontWeight: '600' },
     memberMeta: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   })

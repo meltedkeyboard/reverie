@@ -6,6 +6,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 
 import { Avatar } from '@/components/visuals/Avatar'
+import { ArchivedMark } from '@/components/visuals/ArchivedMark'
 import { CastMosaic } from '@/components/cast/CastMosaic'
 import { glowTop, hexRgb, ProfileGlow, profileTint } from '@/components/cast/ProfileGlow'
 import { memberSummary, RoomProfile } from '@/components/cast/RoomProfile'
@@ -290,7 +291,7 @@ export default function RoomEditorScreen() {
         ...DEFAULT_MEMBER,
         ...settings,
         characterId,
-        character: { ...newCharacterFields(name, prompt), id: characterId, createdAt: Date.now() },
+        character: { ...newCharacterFields(name, prompt), id: characterId, createdAt: Date.now(), archivedAt: null },
       })
       matched += 1
     }
@@ -396,9 +397,12 @@ export default function RoomEditorScreen() {
     >
       <Avatar name={member.character.name} file={member.character.avatar} size={36} />
       <View style={styles.memberBody}>
-        <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
-          {member.character.name}
-        </Text>
+        <View style={styles.memberNameLine}>
+          <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
+            {member.character.name}
+          </Text>
+          {member.character.archivedAt !== null ? <ArchivedMark /> : null}
+        </View>
         <Text style={styles.memberMeta} numberOfLines={1}>
           {member.characterId < 0 ? t('roomEditor.newCharacter') : memberSummary(member, t)}
         </Text>
@@ -867,6 +871,7 @@ const createStyles = (colors: Colors) =>
     pressed: { backgroundColor: colors.surfaceRaised },
     memberHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
     memberBody: { flex: 1 },
-    memberName: { fontSize: 17, fontWeight: '600' },
+    memberNameLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    memberName: { flexShrink: 1, fontSize: 17, fontWeight: '600' },
     memberMeta: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   })

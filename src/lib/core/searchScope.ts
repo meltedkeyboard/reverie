@@ -20,6 +20,7 @@ export type SettingsSection =
   | 'appearance'
   | 'language'
   | 'continue'
+  | 'archive'
   | 'private'
   | 'memory'
   | 'personas'

@@ -26,7 +26,7 @@ import { SFIcon } from '@/components/visuals/SFIcon'
 import { withAlpha } from '@/lib/core/color'
 import { countLabel } from '@/lib/core/format'
 import * as Haptics from '@/lib/ui/haptics'
-import { deleteCharacter, listCharacters, mergeCharacters, sameCharacter, type CharacterPreview } from '@/db/characters'
+import { archiveCharacters, deleteCharacter, listCharacters, mergeCharacters, sameCharacter, type CharacterPreview } from '@/db/characters'
 import { addToGroup, createGroup, deleteGroup, listGroups, pruneGroups, removeFromGroup, renameGroup, saveHomeOrder, ungroup, type CharacterGroup } from '@/db/groups'
 import { pruneUntouchedChats } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
@@ -141,6 +141,14 @@ export default function CharactersScreen() {
     })
   }
 
+  const archiveChecked = () => {
+    const ids = (characters ?? []).filter((c) => checked.has(c.id)).map((c) => c.id)
+    if (!ids.length) return
+    setChecked(new Set())
+    setEditing(false)
+    run(archiveCharacters(db, ids))
+  }
+
   const canGroup = groups.length > 0 ? checked.size >= 1 : checked.size >= 2
 
   const groupChecked = () => {
@@ -223,7 +231,7 @@ export default function CharactersScreen() {
     importFiles([{ uri: openedFile, kind: openedFile.toLowerCase().endsWith('.png') ? 'card' : 'archive' }])
   }, [openedFile])
 
-  const { menuItems, confirmDelete, duplicate } = useCharacterActions(reload)
+  const { menuItems, confirmDelete, duplicate, swipeAction, swipeCard } = useCharacterActions(reload)
   // Only the haptics and the edge guard of the shared hook: the rows here are of two kinds.
   const reorder = useReorder(null, () => {}, async () => {})
 
@@ -390,6 +398,7 @@ export default function CharactersScreen() {
           onOpen: () => router.push(`/chat/latest?character=${row.character.id}`),
           onDelete: () => confirmDelete(row.character),
           leading: { label: t('characters.duplicate'), systemImage: 'plus.square.on.square', onAction: () => duplicate(row.character) },
+          trailing: swipeAction(row.character),
         })
       })
     : []
@@ -489,6 +498,7 @@ export default function CharactersScreen() {
                 character={character}
                 onOpen={() => router.push(`/chat/latest?character=${character.id}`)}
                 onDelete={() => confirmDelete(character)}
+                swipe={swipeCard(character)}
                 menu={menuItems(character)}
                 fillHeight={fillHeight}
                 editing={{ active: editing, checked: checked.has(character.id), onToggle: () => toggleChecked([character.id]), motion: editMotion }}
@@ -525,6 +535,13 @@ export default function CharactersScreen() {
               disabled={!canGroup}
               onPress={groupChecked}
               accessibilityLabel={t('groups.groupSelected')}
+            />
+            <GlassButton
+              icon="archive-outline"
+              tint={checked.size ? colors.accent : undefined}
+              disabled={!checked.size}
+              onPress={archiveChecked}
+              accessibilityLabel={t('archive.archiveSelected')}
             />
             <GlassButton
               icon="trash-outline"

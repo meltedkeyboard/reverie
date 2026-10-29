@@ -48,6 +48,9 @@ export type NativeCardRow = {
   onDelete: () => void
   // An action behind a swipe from the other edge.
   leading?: { label: string; systemImage: string; onAction: () => void }
+  // An action beside the delete, at the end of the row, which a full swipe runs (a
+  // character put in the archive, or brought back from it), as Mail's archive.
+  trailing?: { label: string; systemImage: string; onAction: () => void }
 }
 
 type Props = {
@@ -60,7 +63,8 @@ type Props = {
   // Room under the list's end for what floats over it: the continue button, the edit bar.
   bottomInset: number
   // From and to as a list that reorders by dragging gives them: `to` where the row ends up.
-  onMove: (from: number, to: number) => void
+  // Without it the rows keep their order (the archive, by when each was put there).
+  onMove?: (from: number, to: number) => void
   // The file a drop outside the app asked for, of a character dragged out of a row.
   onProvide?: (token: string, kind: 'archive' | 'card', id: number) => void
 }
@@ -68,6 +72,8 @@ type Props = {
 type Person = { name: string; avatar: string | null }
 
 const CLEAR = '#00000000'
+// The system's grey, behind the white of a swipe's action in either scheme.
+export const SYSTEM_GREY = '#8E8E93'
 
 // The sizes of a row in each spacing: the compact one of the app, and the roomy one, a larger
 // face a little further in, more room above and below, and always room for two lines.
@@ -261,8 +267,12 @@ export function NativeCardList({ rows, editing, checked, onCheck, notice, bottom
             <Button label={row.leading.label} systemImage={row.leading.systemImage as never} onPress={row.leading.onAction} modifiers={[m.tint(colors.accent)]} />
           </SwipeActions.Actions>
         ) : null}
-        {/* Not the destructive role: with it the row leaves the list before the question is answered. */}
+        {/* Not the destructive role: with it the row leaves the list before the question is answered.
+            The first button sits at the very end, where a full swipe takes it. */}
         <SwipeActions.Actions edge="trailing">
+          {row.trailing ? (
+            <Button label={row.trailing.label} systemImage={row.trailing.systemImage as never} onPress={row.trailing.onAction} modifiers={[m.tint(SYSTEM_GREY)]} />
+          ) : null}
           <Button label={t('common.delete')} systemImage="trash" onPress={row.onDelete} modifiers={[m.tint(colors.danger)]} />
         </SwipeActions.Actions>
       </SwipeActions>
@@ -301,13 +311,17 @@ export function NativeCardList({ rows, editing, checked, onCheck, notice, bottom
           </Button>
         ) : null}
         <List.ForEach
-          onMove={(sources, destination) => {
-            const from = sources[0]
-            if (from === undefined) return
-            // The list counts the destination before the row is taken out.
-            const to = destination > from ? destination - 1 : destination
-            if (to !== from) onMove(from, to)
-          }}
+          onMove={
+            onMove
+              ? (sources, destination) => {
+                  const from = sources[0]
+                  if (from === undefined) return
+                  // The list counts the destination before the row is taken out.
+                  const to = destination > from ? destination - 1 : destination
+                  if (to !== from) onMove(from, to)
+                }
+              : undefined
+          }
         >
           {rows.map(renderRow)}
         </List.ForEach>
@@ -320,7 +334,7 @@ export function NativeCardList({ rows, editing, checked, onCheck, notice, bottom
 // A character's row: its face, its last message and its date, lifted alone in a drag.
 export function characterRow(
   character: CharacterPreview,
-  row: Pick<NativeCardRow, 'key' | 'menu' | 'onDrop' | 'own' | 'onOpen' | 'onDelete' | 'leading'>
+  row: Pick<NativeCardRow, 'key' | 'menu' | 'onDrop' | 'own' | 'onOpen' | 'onDelete' | 'leading' | 'trailing'>
 ): NativeCardRow {
   return {
     ...row,

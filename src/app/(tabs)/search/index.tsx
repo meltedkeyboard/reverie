@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native'
 import type { SearchBarCommands } from 'react-native-screens'
 
+import { ArchivedMark } from '@/components/visuals/ArchivedMark'
 import { Avatar } from '@/components/visuals/Avatar'
 import { AvatarStack } from '@/components/cast/AvatarStack'
 import { CastMosaic } from '@/components/cast/CastMosaic'
@@ -84,7 +85,7 @@ export default function SearchScreen() {
     useCallback(() => {
       setScope(getSearchScope())
       ;(async () => {
-        setLoaded({ characters: await listCharacters(db), rooms: await listRooms(db), chats: await listSearchChats(db) })
+        setLoaded({ characters: await listCharacters(db, 'all'), rooms: await listRooms(db), chats: await listSearchChats(db) })
       })()
       // Opening search is asking to type, as with Spotlight.
       const timer = setTimeout(() => searchBar.current?.focus(), 250)
@@ -115,6 +116,7 @@ export default function SearchScreen() {
       { label: t('settings.appearance'), keywords: [t('settings.theme'), t('theme.default'), t('theme.warm'), t('theme.neutral'), t('theme.oled'), t('theme.system'), t('theme.light'), t('theme.dark'), t('settings.chatFontField'), t('settings.chatTextSize'), t('settings.chatPattern')], symbol: 'paintbrush', fallback: 'color-palette-outline', href: settingsAt('appearance') },
       { label: t('settings.language'), keywords: [t('language.ru'), t('language.en')], symbol: 'globe', fallback: 'globe-outline', href: settingsAt('language') },
       { label: t('settings.continueButton'), keywords: [t('settings.homeScreen')], symbol: 'play.circle', fallback: 'play-circle-outline', href: settingsAt('continue') },
+      { label: t('archive.title'), keywords: [t('characters.title')], symbol: 'archivebox', fallback: 'archive-outline', href: '/archive' },
       { label: t('settings.privateButton'), keywords: [t('settings.chats')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('private') },
       { label: t('memory.long'), keywords: [t('memory.section'), t('lore.title'), t('settings.chats')], symbol: 'brain', fallback: 'book-outline', href: settingsAt('memory') },
       { label: t('settings.suggestButton'), keywords: [t('settings.chats')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
@@ -348,7 +350,10 @@ function ResultRow({ item, needle, locale, you }: RowProps) {
       <>
         <Avatar name={character.name} file={character.avatar} size={40} />
         <View style={styles.body}>
-          <Highlighted text={character.name} needle={needle} style={styles.title} />
+          <View style={styles.nameLine}>
+            <Highlighted text={character.name} needle={needle} style={[styles.title, styles.shrink]} />
+            {character.archivedAt !== null ? <ArchivedMark /> : null}
+          </View>
           <Text style={styles.subtitle} numberOfLines={1}>
             {characterPreview(character)}
           </Text>
@@ -383,7 +388,10 @@ function ResultRow({ item, needle, locale, you }: RowProps) {
           <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={40} />
         )}
         <View style={styles.body}>
-          <Highlighted text={chat.title ?? when} needle={needle} style={styles.title} />
+          <View style={styles.nameLine}>
+            <Highlighted text={chat.title ?? when} needle={needle} style={[styles.title, styles.shrink]} />
+            {chat.archived ? <ArchivedMark /> : null}
+          </View>
           <Text style={styles.subtitle} numberOfLines={1}>
             {chat.title ? `${chat.ownerName} · ${when}` : chat.ownerName}
           </Text>
@@ -499,6 +507,9 @@ const createStyles = (colors: Colors) =>
     body: { flex: 1 },
     titleLine: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
     flexText: { flex: 1 },
+    // A name with the archive's box after it, which keeps its place as the name is cut.
+    nameLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+    shrink: { flexShrink: 1, marginBottom: 0 },
     title: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 2 },
     subtitle: { color: colors.textMuted, fontSize: 14 },
     snippet: { color: colors.textMuted, fontSize: 14, lineHeight: 19 },

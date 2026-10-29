@@ -2,6 +2,7 @@ import { Icon } from '@/components/visuals/Icon'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 
+import { ArchivedMark } from '@/components/visuals/ArchivedMark'
 import { Avatar } from '@/components/visuals/Avatar'
 import { GlassSurface } from '@/components/chrome/Glass'
 import { PageSheet } from '@/components/overlays/PageSheet'
@@ -200,9 +201,12 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
             style={styles.rowMain}
             onPress={() => (node.chats.length ? toggleOpen(key) : setSelection(toggle))}
           >
-            <Text style={styles.name} numberOfLines={1}>
-              {node.name}
-            </Text>
+            <View style={styles.nameLine}>
+              <Text style={[styles.name, styles.nameShrink]} numberOfLines={1}>
+                {node.name}
+              </Text>
+              {node.archived ? <ArchivedMark /> : null}
+            </View>
             {node.chats.length ? (
               <Text style={styles.count}>
                 {t('backup.selected', { selected: chatsSelected(selection, node), total: node.chats.length })}
@@ -471,6 +475,9 @@ const createStyles = (colors: Colors) =>
     // Only a stub that joins the row above: past it the elbow's rounded corner takes over.
     trunkEnd: { bottom: undefined, height: LINE * 2 },
     name: { flex: 1, color: colors.text, fontSize: 16 },
+    // A character's name with the archive's box right after it, the two taking the name's room.
+    nameLine: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    nameShrink: { flex: 0, flexShrink: 1 },
     chatTitle: { flex: 1, color: colors.text, fontSize: 15 },
     count: { color: colors.textFaint, fontSize: 13 },
     action: { color: colors.accent, fontSize: 17 },

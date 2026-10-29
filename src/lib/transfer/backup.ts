@@ -19,10 +19,10 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
+// 15: whether a character is in the archive. 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
 // each chat's long memory and direction, and lorebooks. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 14
+const BACKUP_VERSION = 15
 
 type BackupCharacter = {
   id: number
@@ -57,6 +57,8 @@ type BackupCharacter = {
   group?: BackupGroupSlot
   // Version 14: the pictures and videos of its gallery, in their order.
   gallery?: BackupGalleryItem[]
+  // Version 15: when it was put in the archive, which it goes back into.
+  archivedAt?: number | null
 }
 
 type BackupGalleryItem = { file: string; width: number | null; height: number | null }
@@ -187,8 +189,8 @@ const PERSONA_ROWS = `SELECT id, name, avatar, avatar_original AS avatarOriginal
 // The tree the export sheet shows: characters and rooms with their chats and the personas, from the database.
 export async function loadBackupTree(db: SQLiteDatabase): Promise<BackupTree> {
   // Top down like the home list, so a group stands where it does there.
-  const rows = await db.getAllAsync<{ id: number; name: string; avatar: string | null; groupId: number | null; groupName: string | null }>(
-    `SELECT c.id, c.name, c.avatar, c.group_id AS groupId, g.name AS groupName
+  const rows = await db.getAllAsync<{ id: number; name: string; avatar: string | null; archivedAt: number | null; groupId: number | null; groupName: string | null }>(
+    `SELECT c.id, c.name, c.avatar, c.archived_at AS archivedAt, c.group_id AS groupId, g.name AS groupName
      FROM characters c LEFT JOIN character_groups g ON g.id = c.group_id
      ORDER BY COALESCE(g.sort_order, c.sort_order) DESC, c.group_id IS NULL, c.sort_order DESC, c.id DESC`
   )
@@ -567,6 +569,7 @@ export async function importBackup(
         character.createdAt
       )
       characterIds.set(character.id, id)
+      if (character.archivedAt) await db.runAsync('UPDATE characters SET archived_at = ? WHERE id = ?', [character.archivedAt, id])
       const gallery: NewGalleryItem[] = []
       for (const item of character.gallery ?? []) {
         const file = await importImage(item.file, 'gallery')

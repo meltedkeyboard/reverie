@@ -365,6 +365,12 @@ const MIGRATIONS = [
     END;`
       )
       .join('\n'),
+  // The archive: a character put away off the lists, its chats kept to read. The group it
+  // was in is remembered, without a reference, to go back to if it is still there.
+  `
+    ALTER TABLE characters ADD COLUMN archived_at INTEGER;
+    ALTER TABLE characters ADD COLUMN archived_group INTEGER;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

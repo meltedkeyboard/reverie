@@ -11,6 +11,8 @@ export type SearchChat = {
   // A scene's cast, shown in place of a photo; null for a one-on-one chat.
   cast: CastFace[] | null
   lastActivity: number
+  // The chat of a character in the archive, which search still finds.
+  archived: boolean
 }
 
 export type SearchMessage = {
@@ -37,8 +39,9 @@ const OWNER_AVATAR = `
 // Every chat with who it belongs to. There are few enough of them to match the titles
 // in JS, where case folding works for Cyrillic too, unlike SQLite's LIKE.
 export async function listSearchChats(db: SQLiteDatabase): Promise<SearchChat[]> {
-  const chats = await db.getAllAsync<Omit<SearchChat, 'cast'>>(`
+  const chats = await db.getAllAsync<Omit<SearchChat, 'cast' | 'archived'> & { archived: number }>(`
     SELECT ch.id, ch.title, ch.room_id AS roomId, COALESCE(c.name, r.name) AS ownerName, ${OWNER_AVATAR},
+      c.archived_at IS NOT NULL AS archived,
       COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.chat_id = ch.id), ch.created_at) AS lastActivity
     FROM chats ch
       LEFT JOIN characters c ON c.id = ch.character_id
@@ -46,7 +49,7 @@ export async function listSearchChats(db: SQLiteDatabase): Promise<SearchChat[]>
     ORDER BY lastActivity DESC
   `)
   const casts = await listRoomCasts(db)
-  return chats.map((chat) => ({ ...chat, cast: chat.roomId === null ? null : (casts.get(chat.roomId) ?? []) }))
+  return chats.map((chat) => ({ ...chat, archived: Boolean(chat.archived), cast: chat.roomId === null ? null : (casts.get(chat.roomId) ?? []) }))
 }
 
 // SQLite folds case only for ASCII, so the query goes in the spellings a word usually

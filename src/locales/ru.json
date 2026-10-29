@@ -1001,5 +1001,18 @@
   "discover.nothing": "Ничего не нашлось. Проверьте, что сервер запущен и открыт для сети",
   "discover.noWifi": "Подключитесь к Wi-Fi, чтобы искать серверы в сети",
   "discover.locked": "нужен ключ",
-  "discover.models": "моделей: {{count}}"
+  "discover.models": "моделей: {{count}}",
+  "archive.title": "Архив",
+  "archive.archive": "В архив",
+  "archive.restore": "Вернуть",
+  "archive.restoreFull": "Вернуть из архива",
+  "archive.archiveSelected": "Убрать выбранных в архив",
+  "archive.restoreSelected": "Вернуть выбранных",
+  "archive.none": "Пусто",
+  "archive.settingsNote": "Персонажи, которые пока не нужны. Их нет в списке, а их чаты можно только читать, пока не вернёте их",
+  "archive.emptyTitle": "В архиве пусто",
+  "archive.emptyText": "Смахните персонажа влево или выберите «В архив» в его меню, чтобы убрать его сюда",
+  "archive.readOnly": "{{name}} в архиве",
+  "archive.archived": "В архиве",
+  "archive.failed": "Не удалось изменить архив"
 }

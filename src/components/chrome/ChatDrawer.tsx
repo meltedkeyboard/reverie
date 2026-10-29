@@ -509,7 +509,10 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
                     )}
                   </Pressable>
                 </View>
-                <GlassButton icon="create-outline" onPress={startNew} accessibilityLabel={t('chatDrawer.newChat')} />
+                {/* A character in the archive starts no chats; its own stay to be read. */}
+                {owner.kind === 'character' && owner.character.archivedAt !== null ? null : (
+                  <GlassButton icon="create-outline" onPress={startNew} accessibilityLabel={t('chatDrawer.newChat')} />
+                )}
               </View>
               <ReorderableList
                 data={chats}

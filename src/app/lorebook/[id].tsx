@@ -74,7 +74,7 @@ export default function LorebookEditorScreen() {
 
   useEffect(() => {
     ;(async () => {
-      setCharacters((await listCharacters(db)).map((c) => ({ id: c.id, name: c.name, avatar: c.avatar })))
+      setCharacters((await listCharacters(db, 'all')).map((c) => ({ id: c.id, name: c.name, avatar: c.avatar })))
       setRooms((await listRooms(db)).map((r) => ({ id: r.id, name: r.name, cast: r.cast })))
       if (!isNew) {
         const found = await getLorebook(db, Number(id))
