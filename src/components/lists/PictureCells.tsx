@@ -1,4 +1,4 @@
-import { useState, type ComponentProps, type ReactNode } from 'react'
+import { useState, type ComponentProps } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 
@@ -46,8 +46,9 @@ export function ChipRowCell({ actions }: { actions: ChipAction[] }) {
 // Where a picture comes from: a button that fades away and leaves the sources behind as
 // chips, with no sheet or menu in between (the system menu jumps behind the scroll as it
 // closes on iOS 26 and 27). The desktop has only files to choose from, so it keeps the button.
-// The button has no highlight under the touch: it fades into the chips anyway.
-export function SourceCell({ label, onPick }: { label: string; onPick: (source: ImageSource) => void }) {
+// The button has no highlight under the touch: it fades into the chips anyway. `onGallery`
+// adds the character's own gallery as a fourth source.
+export function SourceCell({ label, onPick, onGallery }: { label: string; onPick: (source: ImageSource) => void; onGallery?: () => void }) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -56,7 +57,14 @@ export function SourceCell({ label, onPick }: { label: string; onPick: (source: 
   // never faded: Liquid Glass is not drawn under an ancestor with opacity.
   const shown = useSharedValue(0)
   const buttonStyle = useAnimatedStyle(() => ({ opacity: 1 - shown.value }))
-  if (isWeb) return <ButtonCell label={label} onPress={() => onPick('files')} unlit />
+  if (isWeb) {
+    return (
+      <>
+        <ButtonCell label={label} onPress={() => onPick('files')} unlit />
+        {onGallery ? <ButtonCell label={t('gallery.pickFrom')} onPress={onGallery} unlit /> : null}
+      </>
+    )
+  }
   const toggle = (next: boolean) => {
     setOpen(next)
     shown.value = withTiming(next ? 1 : 0, { duration: 220 })
@@ -73,6 +81,18 @@ export function SourceCell({ label, onPick }: { label: string; onPick: (source: 
             { label: t('imageSource.camera'), icon: { symbol: 'camera', fallback: 'camera-outline' }, onPress: () => pick('camera') },
             { label: t('imageSource.photos'), icon: { symbol: 'photo.on.rectangle', fallback: 'images-outline' }, onPress: () => pick('library') },
             { label: t('imageSource.files'), icon: { symbol: 'folder', fallback: 'folder-outline' }, onPress: () => pick('files') },
+            ...(onGallery
+              ? [
+                  {
+                    label: t('gallery.title'),
+                    icon: { symbol: 'photo.on.rectangle.angled', fallback: 'images-outline' } as const,
+                    onPress: () => {
+                      toggle(false)
+                      onGallery()
+                    },
+                  },
+                ]
+              : []),
           ]}
         />
       </View>
@@ -105,7 +125,7 @@ export function BackgroundSection({
   onPick,
   onAdjust,
   onClear,
-  gallery,
+  onGallery,
 }: {
   uri: string | null
   crop: CropRect | null
@@ -114,16 +134,15 @@ export function BackgroundSection({
   onPick: (source: ImageSource) => void
   onAdjust: () => void
   onClear: () => void
-  // The character's gallery to take one from, under the sources.
-  gallery?: ReactNode
+  // The character's gallery to take one from, a fourth source.
+  onGallery?: () => void
 }) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   return (
     <ListSection header={t('background.title')}>
       {uri ? <BackgroundThumbCell uri={uri} crop={crop} effect={effect} intensity={intensity} /> : null}
-      <SourceCell label={uri ? t('background.change') : t('background.choose')} onPick={onPick} />
-      {gallery}
+      <SourceCell label={uri ? t('background.change') : t('background.choose')} onPick={onPick} onGallery={onGallery} />
       {uri ? <ButtonCell label={t('background.adjust')} onPress={onAdjust} /> : null}
       {uri ? <ButtonCell danger label={t('background.remove')} onPress={onClear} /> : null}
     </ListSection>

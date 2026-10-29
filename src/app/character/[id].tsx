@@ -9,7 +9,7 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { Avatar } from '@/components/visuals/Avatar'
 import { CharacterProfile, NativeProfileList } from '@/components/cast/CharacterProfile'
-import { GalleryStrip, useGalleryPicks } from '@/components/cast/GalleryStrip'
+import { useGalleryPicks } from '@/components/cast/GalleryStrip'
 import { ProfileGallery } from '@/components/cast/ProfileGallery'
 import { ButtonCell, InputCell, ListFooter, ListSection, SegmentCell, SliderCell, TextCell } from '@/components/lists/GroupedList'
 import { BackgroundSection, BackgroundThumbCell, ChipRowCell, SourceCell } from '@/components/lists/PictureCells'
@@ -37,6 +37,7 @@ import { setAvatarCropDraft } from '@/lib/images/avatarCrop'
 import { setGenDraft } from '@/lib/chat/genDraft'
 import { acceptMoving, checkBackground, pickAvatar, pickBackground, type CropRect } from '@/lib/images/avatars'
 import { galleryUri } from '@/lib/images/gallery'
+import { setGalleryPick } from '@/lib/images/galleryPick'
 import { movingKind } from '@/lib/images/media'
 import { avatarTint } from '@/lib/images/initial'
 import { usePictureColor } from '@/lib/images/pictureColor'
@@ -147,6 +148,10 @@ export default function CharacterEditorScreen() {
 
   const canSave = ready && !saving && name.trim().length > 0
 
+  // The gallery the photo and the background can be taken from, asked for again each time
+  // the editor opens, so what was just added in the profile is there.
+  const gallery = useGalleryPicks(editing && !isNew ? Number(id) : null, true)
+
   // Frames a still picture on its own screen. `original` is what gets stored beside the
   // framed copy: a temporary file for a fresh pick, or null when the stored one is reframed.
   const openCrop = (uri: string, crop: CropRect | null, original: string | null) => {
@@ -162,18 +167,31 @@ export default function CharacterEditorScreen() {
     router.push('/avatar-crop')
   }
 
+  // A GIF or a video keeps its motion, so it skips the crop and is shown by its middle.
+  const takeAvatar = (file: string) => {
+    if (acceptMoving(file)) {
+      setRemovedAvatar(null)
+      avatarSlot.setUnframed(file)
+      setAvatarOriginal(null)
+      return
+    }
+    openCrop(file, null, file)
+  }
+
   const onPickAvatar = async (source: ImageSource) => {
     try {
       const file = await pickAvatar(source)
-      if (!file) return
-      // A GIF or a video keeps its motion, so it skips the crop and is shown by its middle.
-      if (acceptMoving(file)) {
-        setRemovedAvatar(null)
-        avatarSlot.setUnframed(file)
-        setAvatarOriginal(null)
-        return
-      }
-      openCrop(file, null, file)
+      if (file) takeAvatar(file)
+    } catch (err) {
+      alertError(t('editor.avatarFailedTitle'), err)
+    }
+  }
+
+  // Taken from the gallery as a picked one would be; the copy the avatar keeps is made on
+  // Save, so the gallery's file stays its own.
+  const onAvatarFromGallery = (item: GalleryItem) => {
+    try {
+      takeAvatar(galleryUri(item.file))
     } catch (err) {
       alertError(t('editor.avatarFailedTitle'), err)
     }
@@ -235,9 +253,6 @@ export default function CharacterEditorScreen() {
     }
   }
 
-  // Asked for again each time the editor opens, so what was just added in the profile is there.
-  const bgGallery = useGalleryPicks(editing && !isNew ? Number(id) : null, true)
-
   // A picture or video of the gallery goes to the same screen as a picked one; the copy kept
   // behind the chat is made on Save, so the gallery's file stays its own.
   const onBackgroundFromGallery = (item: GalleryItem) => {
@@ -250,7 +265,11 @@ export default function CharacterEditorScreen() {
     }
   }
 
-  const backgroundGallery = bgGallery.length > 0 ? <GalleryStrip items={bgGallery} onPress={onBackgroundFromGallery} /> : null
+  // The gallery opens as a sheet over the editor, app/gallery-pick.tsx.
+  const openGallery = (onPick: (item: GalleryItem) => void) => {
+    setGalleryPick({ title: t('gallery.title'), items: gallery, onPick })
+    router.push('/gallery-pick')
+  }
 
   const onAdjustBackground = () => {
     const source = bgSlot.adjustSource({ file: background, original: backgroundOriginal, crop: backgroundCrop })
@@ -461,7 +480,11 @@ export default function CharacterEditorScreen() {
       <Avatar name={name} file={avatar} uri={avatarSlot.uri} size={96} viewable={hasPhoto} />
       <View style={styles.editorAvatarActions}>
         <ListSection>
-          <SourceCell label={hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')} onPick={onPickAvatar} />
+          <SourceCell
+            label={hasPhoto ? t('editor.changePhoto') : t('editor.choosePhoto')}
+            onPick={onPickAvatar}
+            onGallery={gallery.length > 0 ? () => openGallery(onAvatarFromGallery) : undefined}
+          />
           {hasPhoto || removedAvatar ? (
             <ChipRowCell
               actions={[
@@ -561,9 +584,12 @@ export default function CharacterEditorScreen() {
             below the ones it adds or takes away, and a view hosted in one of them goes away
             with the row it was in, leaving the new one blank. */}
         <NativeHostedRow key={backgroundUri ? 'under' : 'alone'}>
-          <SourceCell label={backgroundUri ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
+          <SourceCell
+            label={backgroundUri ? t('background.change') : t('background.choose')}
+            onPick={onPickBackground}
+            onGallery={gallery.length > 0 ? () => openGallery(onBackgroundFromGallery) : undefined}
+          />
         </NativeHostedRow>
-        {backgroundGallery ? <NativeHostedRow key={backgroundUri ? 'gallery-under' : 'gallery-alone'}>{backgroundGallery}</NativeHostedRow> : null}
         {backgroundUri ? <NativeActionRow label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
         {backgroundUri ? <NativeActionRow label={t('background.remove')} destructive onPress={onClearBackground} /> : null}
       </NativeSection>
@@ -714,7 +740,7 @@ export default function CharacterEditorScreen() {
                   onPick={onPickBackground}
                   onAdjust={onAdjustBackground}
                   onClear={onClearBackground}
-                  gallery={backgroundGallery}
+                  onGallery={gallery.length > 0 ? () => openGallery(onBackgroundFromGallery) : undefined}
                 />
 
                 <ListSection

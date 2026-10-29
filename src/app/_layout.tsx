@@ -26,6 +26,7 @@ import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
 import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
+import { finishGalleryPick } from '@/lib/images/galleryPick'
 import { castDetent, finishCastSession } from '@/lib/chat/castSession'
 import { cropSheetDetents, cropSheetDown } from '@/lib/images/avatarCropLook'
 import { lookSheetDetents, lookSheetDown } from '@/lib/images/backgroundLook'
@@ -195,6 +196,29 @@ function AppShell() {
                   headerStyle: { backgroundColor: colors.bg },
                   headerTintColor: colors.accent,
                   headerTitleStyle: { color: colors.text },
+                }}
+              />
+              {/* A character's gallery to take a picture from: half the screen, pulled up to the
+                  full height, down to close. */}
+              <Stack.Screen
+                name="gallery-pick"
+                options={{
+                  presentation: 'formSheet',
+                  title: '',
+                  sheetAllowedDetents: [0.6, 1],
+                  sheetGrabberVisible: true,
+                  headerShown: true,
+                  headerShadowVisible: false,
+                  headerBackVisible: false,
+                  headerStyle: { backgroundColor: colors.bg },
+                  headerTintColor: colors.accent,
+                  headerTitleStyle: { color: colors.text },
+                  contentStyle: { backgroundColor: colors.bg },
+                }}
+                listeners={{
+                  transitionEnd: (e) => {
+                    if (e.data.closing) finishGalleryPick()
+                  },
                 }}
               />
               {/* The composer's attach menu, the system sheet of iOS: half the screen, pulled up
