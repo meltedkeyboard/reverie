@@ -103,7 +103,7 @@ let localNetwork: Promise<void> | null = null
 // request fails while the alert is up. So the first request of a session is a throwaway
 // one, and if the alert shows (the app goes inactive), the real one waits for the answer.
 // Every caller waits on the same ask, so a test made while it is still up waits too.
-function askLocalNetworkAccess(url: string) {
+export function askLocalNetworkAccess(url: string) {
   localNetwork ??= probeLocalNetwork(url)
   return localNetwork
 }

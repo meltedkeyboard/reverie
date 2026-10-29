@@ -3,19 +3,22 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import ReorderableList from 'react-native-reorderable-list'
 
-import { probeServer } from '@/api/llm'
+import type { FoundServer } from '@/api/discover'
+import { normalizeBaseUrl, probeServer } from '@/api/llm'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Button } from '@/components/controls/Button'
 import { IconButton } from '@/components/controls/IconButton'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
+import { FoundServersGroup, FoundServersSection } from '@/components/lists/FoundServers'
 import { ListFooter, ListSection, SwitchCell } from '@/components/lists/GroupedList'
 import { ListCard } from '@/components/lists/ListCard'
 import { nativeForm, NativeActionRow, NativeForm, NativeSection } from '@/components/lists/NativeForm'
 import { menuItemViews, type MenuItem } from '@/components/overlays/NativeMenu'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { useDatabase } from '@/db/provider'
-import { addServer, deleteServer, orderServers, saveFailover, serverName, setActiveServer, type ServerProfile } from '@/db/prefs/settings'
+import { addServer, DEFAULT_SERVER, deleteServer, orderServers, saveFailover, serverName, setActiveServer, type ServerProfile } from '@/db/prefs/settings'
+import { useServerDiscovery } from '@/hooks/features/useServerDiscovery'
 import { useServers } from '@/hooks/features/useServers'
 import { useTranslation } from '@/i18n'
 import { isIOS } from '@/lib/core/platform'
@@ -77,6 +80,25 @@ export default function ServersScreen() {
 
   const list = servers ?? []
   const canEdit = list.length > 1
+
+  // With no server yet the network is searched as the screen opens; otherwise on the row's tap.
+  const discovery = useServerDiscovery()
+  const searchedEmpty = useRef(false)
+  useEffect(() => {
+    if (!servers || servers.length || searchedEmpty.current) return
+    searchedEmpty.current = true
+    discovery.search()
+  }, [servers, discovery.search])
+
+  const known = new Set(list.map((s) => normalizeBaseUrl(s.baseUrl)))
+  const markOf = (found: FoundServer) => (known.has(found.baseUrl) ? ('added' as const) : ('add' as const))
+  // Added under what it is, its only model taken as it is; the first one becomes the current.
+  const addFound = (found: FoundServer) => {
+    if (known.has(found.baseUrl)) return
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+    const { id: _id, ...fields } = DEFAULT_SERVER
+    addServer(db, { ...fields, name: found.kind, baseUrl: found.baseUrl, model: found.models.length === 1 ? found.models[0] : '' })
+  }
   const add = () => router.push('/server/new')
   const open = (server: ServerProfile) => router.push(`/server/${server.id}`)
   const nameOf = (server: ServerProfile) => serverName(server) || t('servers.untitled')
@@ -259,6 +281,8 @@ export default function ServersScreen() {
           <NativeActionRow label={t('servers.add')} symbol="plus" onPress={add} />
         </NativeSection>
 
+        <FoundServersSection discovery={discovery} markOf={markOf} onPick={addFound} />
+
         {canEdit ? (
           <NativeSection footer={t('servers.failoverHint')}>
             <Toggle label={t('servers.failover')} isOn={failover} onIsOnChange={toggleFailover} />
@@ -291,13 +315,14 @@ export default function ServersScreen() {
         ) : undefined
       }
       ListFooterComponent={
-        canEdit ? (
-          <View style={styles.footer}>
+        <View style={styles.footer}>
+          <FoundServersGroup discovery={discovery} markOf={markOf} onPick={addFound} />
+          {canEdit ? (
             <ListSection footer={<ListFooter>{t('servers.failoverHintDrag')}</ListFooter>}>
               <SwitchCell label={t('servers.failover')} value={failover} onValueChange={toggleFailover} />
             </ListSection>
-          </View>
-        ) : undefined
+          ) : null}
+        </View>
       }
       renderItem={({ item: server }) => {
         const current = server.id === activeId
