@@ -5,7 +5,6 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 
-import { AppLock } from '@/components/startup/AppLock'
 import { useSheetTones } from '@/components/overlays/BottomSheet'
 import { DialogHost } from '@/components/overlays/DialogHost'
 import { Sidebar } from '@/components/chrome/Sidebar'
@@ -72,11 +71,9 @@ function ThemedApp() {
       <StoredTheme>
         <CloudSyncProvider>
           <ChatTextProvider>
-            <AppLock>
-              {/* A new text size doesn't always reach the layout of screens already shown, so
-                  the screens are built anew for it. The database, the lock and sync stay. */}
-              <AppShell key={fontScale} />
-            </AppLock>
+            {/* A new text size doesn't always reach the layout of screens already shown, so
+                the screens are built anew for it. The database and sync stay. */}
+            <AppShell key={fontScale} />
             <SplashOverlay />
           </ChatTextProvider>
         </CloudSyncProvider>

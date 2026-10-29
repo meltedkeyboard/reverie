@@ -47,7 +47,7 @@
         "backgroundColor": "#0F0F12"
       },
       "predictiveBackGestureEnabled": true,
-      "permissions": ["USE_BIOMETRIC", "VIBRATE"],
+      "permissions": ["VIBRATE"],
       "blockedPermissions": ["android.permission.RECORD_AUDIO", "android.permission.SYSTEM_ALERT_WINDOW"]
     },
     "plugins": [
@@ -79,12 +79,6 @@
           "photosPermission": "Reverie uses your photos for character avatars and messages.",
           "savePhotosPermission": "Reverie saves the pictures you download to Photos.",
           "granularPermissions": ["photo"]
-        }
-      ],
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Reverie uses Face ID to protect your chats."
         }
       ],
       "expo-font",

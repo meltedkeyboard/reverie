@@ -124,7 +124,6 @@ export default function SearchScreen() {
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
       { label: t('settings.limitsTitle'), keywords: [t('settings.limitsOff'), t('settings.limitAvatar'), t('settings.limitAttachment')], symbol: 'externaldrive', fallback: 'resize-outline', href: settingsAt('limits') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
-      { label: t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId'), keywords: [t('settings.security')], symbol: 'faceid', fallback: 'scan-outline', href: settingsAt('faceId') },
       { label: t('settings.showInFiles'), keywords: [t('settings.security')], symbol: 'folder', fallback: 'folder-outline', href: settingsAt('files') },
       {
         label: t('servers.title'),

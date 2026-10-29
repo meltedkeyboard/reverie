@@ -14,10 +14,6 @@ import { Wordmark } from '../visuals/Wordmark'
 SplashScreen.preventAutoHideAsync().catch(() => {})
 SplashScreen.setOptions({ duration: 350, fade: true })
 
-// Settles once the overlay is gone, for what must not interrupt it, like the Face ID prompt.
-let splashGone: () => void
-export const splashDone = new Promise<void>((resolve) => (splashGone = resolve))
-
 // The size the native splash draws the icon at (imageWidth in app.json).
 const ICON = 120
 // backgroundColor and dark.backgroundColor of expo-splash-screen in app.json.
@@ -51,10 +47,7 @@ export function SplashOverlay() {
   }, [])
   useEffect(() => {
     if (isNativeSplashAvailable()) {
-      dismissNativeSplash().then(() => {
-        setDone(true)
-        splashGone()
-      })
+      dismissNativeSplash().then(() => setDone(true))
       SplashScreen.hideAsync().catch(() => {})
       return
     }
@@ -78,10 +71,6 @@ export function SplashOverlay() {
   // The icon leans in a touch as it goes, like the app opening out of it.
   const icon = useAnimatedStyle(() => (reduceMotion ? {} : { transform: [{ scale: 1 + (1 - fade.value) * 0.12 }] }))
   const wordmark = useAnimatedStyle(() => ({ opacity: mark.value, transform: [{ translateY: (1 - mark.value) * 6 }] }))
-
-  useEffect(() => {
-    if (done) splashGone()
-  }, [done])
 
   if (done || isNativeSplashAvailable()) return null
   return (

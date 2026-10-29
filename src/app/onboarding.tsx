@@ -111,7 +111,6 @@ const SECTIONS: Section[] = [
     features: [
       { icon: 'icloud', fallback: 'cloud-outline', titleKey: 'onboarding.sync.title', textKey: 'onboarding.sync.text' },
       { icon: 'archivebox', fallback: 'archive-outline', titleKey: 'onboarding.backups.title', textKey: 'onboarding.backups.text' },
-      { icon: 'faceid', fallback: 'finger-print-outline', titleKey: 'onboarding.lock.title', textKey: 'onboarding.lock.text' },
     ],
   },
 ]

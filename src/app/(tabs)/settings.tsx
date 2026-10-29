@@ -1,6 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import * as LocalAuthentication from 'expo-local-authentication'
 import { StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
@@ -18,7 +17,6 @@ import {
 } from '@/components/lists/NativeForm'
 import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
-import { isAppLockEnabled, setAppLockEnabled } from '@/db/prefs/appLock'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/prefs/continue'
 import { getFileLimits } from '@/lib/settings/fileLimits'
@@ -217,7 +215,6 @@ export default function SettingsScreen() {
   }
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
-  const [appLock, setAppLock] = useStoredFlag(isAppLockEnabled, setAppLockEnabled, false)
 
   const [personas, setPersonas] = useState<Persona[]>([])
   useEffect(() => {
@@ -292,30 +289,6 @@ export default function SettingsScreen() {
   ]
     .filter(Boolean)
     .join('\n')
-
-  // The system's switch stays where it was flicked to whatever its value says, so when the
-  // lock is refused it is built anew, back off.
-  const [lockSwitch, setLockSwitch] = useState(0)
-  const toggleAppLock = async (enabled: boolean) => {
-    if (enabled) {
-      // Verify it works before turning it on, so the app can't lock the user out.
-      if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) {
-        showToast({
-          tone: 'error',
-          title: t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId'),
-          message: t(`settings.${isAndroid ? 'biometricsUnavailable' : 'faceIdUnavailable'}`),
-        })
-        setLockSwitch((n) => n + 1)
-        return
-      }
-      const result = await LocalAuthentication.authenticateAsync({ promptMessage: t('lock.prompt') })
-      if (!result.success) {
-        setLockSwitch((n) => n + 1)
-        return
-      }
-    }
-    setAppLock(enabled)
-  }
 
   // The sheet with what to take or bring in: open while there is a tree.
   const [exportTree, setExportTree] = useState<BackupTree | null>(null)
@@ -518,16 +491,10 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
-  // One group; each row is still its own block, so search can open at either.
-  const security = (
-    <ListSection header={t('settings.security')} footer={isAndroid ? undefined : t('settings.showInFilesNote')}>
-      {block(
-        'faceId',
-        <SwitchCell label={t(isAndroid ? 'settings.requireBiometrics' : 'settings.requireFaceId')} value={appLock} onValueChange={toggleAppLock} />
-      )}
-      {isAndroid
-        ? null
-        : block('files', <SwitchCell label={t('settings.showInFiles')} value={showInFiles} onValueChange={toggleShowInFiles} disabled={movingFiles} />)}
+  // Android has no Files app to show the folder in, and so no group at all.
+  const security = isAndroid ? null : (
+    <ListSection header={t('settings.security')} footer={t('settings.showInFilesNote')}>
+      {block('files', <SwitchCell label={t('settings.showInFiles')} value={showInFiles} onValueChange={toggleShowInFiles} disabled={movingFiles} />)}
     </ListSection>
   )
 
@@ -715,8 +682,8 @@ export default function SettingsScreen() {
   const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
     const { Picker, Text: SwiftText, HStack, Spacer, Toggle, Button: SwiftButton, Image, ProgressView, SwipeActions } = ui
     const { pickerStyle, tag, labelsHidden, disabled, id, tint, foregroundStyle, lineLimit } = modifiers
-    const toggle = (name: string | null, label: string, isOn: boolean, onChange: (on: boolean) => void, off = false, key?: string) => (
-      <Toggle key={key} label={label} isOn={isOn} onIsOnChange={onChange} modifiers={[disabled(off), ...(name ? [id(name)] : [])]} />
+    const toggle = (name: string | null, label: string, isOn: boolean, onChange: (on: boolean) => void, off = false) => (
+      <Toggle label={label} isOn={isOn} onIsOnChange={onChange} modifiers={[disabled(off), ...(name ? [id(name)] : [])]} />
     )
     const numberRow = (label: string, value: string, onChange: (text: string) => void, off: boolean) => (
       <NativeTextRow label={label} value={value} onChangeText={onChange} keyboard="number-pad" disabled={off} />
@@ -834,7 +801,6 @@ export default function SettingsScreen() {
         </NativeSection>
 
         <NativeSection title={t('settings.security')} footer={t('settings.showInFilesNote')}>
-          {toggle('faceId', t('settings.requireFaceId'), appLock, toggleAppLock, false, `lock${lockSwitch}`)}
           {toggle('files', t('settings.showInFiles'), showInFiles, toggleShowInFiles, movingFiles)}
         </NativeSection>
 

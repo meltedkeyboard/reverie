@@ -30,7 +30,6 @@ export type SettingsSection =
   | 'attachGallery'
   | 'limits'
   | 'haptics'
-  | 'faceId'
   | 'files'
   | 'folderSync'
   | 'server'
