@@ -95,7 +95,7 @@ export default function RoomsScreen() {
     })
   }
 
-  const { menuItems, confirmDelete } = useRoomActions(reload)
+  const { menuItems, confirmDelete, duplicate } = useRoomActions(reload)
   // A room saved as a file comes back in through the same sheet a backup does.
   const backupImport = useBackupImport(reload)
   const createMenu = usePopoverMenu()
@@ -120,6 +120,7 @@ export default function RoomsScreen() {
         drags: [],
         onOpen: () => router.push(`/chat/latest?room=${room.id}`),
         onDelete: () => confirmDelete(room),
+        leading: { label: t('characters.duplicate'), systemImage: 'plus.square.on.square', onAction: () => duplicate(room) },
       }))
     : []
 

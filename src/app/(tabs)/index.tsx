@@ -223,7 +223,7 @@ export default function CharactersScreen() {
     importFiles([{ uri: openedFile, kind: openedFile.toLowerCase().endsWith('.png') ? 'card' : 'archive' }])
   }, [openedFile])
 
-  const { menuItems, confirmDelete } = useCharacterActions(reload)
+  const { menuItems, confirmDelete, duplicate } = useCharacterActions(reload)
   // Only the haptics and the edge guard of the shared hook: the rows here are of two kinds.
   const reorder = useReorder(null, () => {}, async () => {})
 
@@ -389,6 +389,7 @@ export default function CharactersScreen() {
           onDrop: (dropped) => dropOnCharacter(row.character, dropped),
           onOpen: () => router.push(`/chat/latest?character=${row.character.id}`),
           onDelete: () => confirmDelete(row.character),
+          leading: { label: t('characters.duplicate'), systemImage: 'plus.square.on.square', onAction: () => duplicate(row.character) },
         })
       })
     : []

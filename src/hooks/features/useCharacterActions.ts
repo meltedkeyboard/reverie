@@ -55,5 +55,5 @@ export function useCharacterActions(reload: () => void) {
 
   const openMenu = (character: CharacterPreview) => showSheet(character.name, menuItems(character))
 
-  return { openMenu, menuItems, confirmDelete }
+  return { openMenu, menuItems, confirmDelete, duplicate }
 }

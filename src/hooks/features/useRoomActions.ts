@@ -68,5 +68,5 @@ export function useRoomActions(reload: () => void) {
     { label: t('common.delete'), systemImage: 'trash', destructive: true, separated: true, onSelect: () => confirmDelete(room) },
   ]
 
-  return { menuItems, confirmDelete, exportFile }
+  return { menuItems, confirmDelete, duplicate, exportFile }
 }
