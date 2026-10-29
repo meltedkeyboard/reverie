@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { SharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { EdgeFade } from '@/components/chrome/BarChrome'
 import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { useTranslation } from '@/i18n'
@@ -14,11 +15,13 @@ type Props = {
   // The room the list keeps under its last message, as the composer's (see Composer).
   height: SharedValue<number>
   top: SharedValue<number>
+  // The fade under the bar, as under the composer: over the chat's own picture it is left out.
+  fade: boolean
 }
 
 // In place of the composer in the chat of a character in the archive: the chat is there to
 // be read, and the bar says why and brings the character back.
-export function ArchivedBar({ name, onRestore, height, top }: Props) {
+export function ArchivedBar({ name, onRestore, height, top, fade }: Props) {
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const glass = useGlassStyles()
@@ -33,6 +36,8 @@ export function ArchivedBar({ name, onRestore, height, top }: Props) {
           top.value = e.nativeEvent.layout.height
         }}
       >
+        {/* Messages scrolling under the bar fade out before they reach it, so its text reads. */}
+        {fade ? <EdgeFade edge="bottom" style={styles.fade} /> : null}
         <GlassSurface style={styles.capsule} fallbackStyle={glass.solid}>
           <SFIcon name="archivebox" fallback="archive-outline" size={17} color={colors.textMuted} />
           <Text style={styles.text} numberOfLines={1}>
@@ -51,6 +56,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     dock: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, justifyContent: 'flex-end' },
     bar: { paddingTop: 8 },
+    fade: { position: 'absolute', top: -28, left: 0, right: 0, bottom: 0 },
     capsule: {
       flexDirection: 'row',
       alignItems: 'center',
