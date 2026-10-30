@@ -339,7 +339,7 @@ export default function OnboardingScreen() {
                 <SFIcon name="hand.raised.fill" fallback="hand-left-outline" size={24} color={colors.accent} />
                 <Text style={styles.privacyText}>{t('onboarding.privacy')}</Text>
               </View>
-              <Button variant="solid" label={t('onboarding.continue')} onPress={next} />
+              <Button variant="glass" label={t('onboarding.continue')} onPress={next} />
             </Animated.View>
             {/* Tucked in a corner, to tell which build is installed without drawing the eye. */}
             <Animated.Text
@@ -398,7 +398,7 @@ export default function OnboardingScreen() {
               ])}
             </ScrollView>
             <Animated.View style={footerStyle}>
-              <Button variant="solid" label={t('onboarding.continue')} onPress={next} />
+              <Button variant="glass" label={t('onboarding.continue')} onPress={next} />
             </Animated.View>
           </View>
 
@@ -421,7 +421,7 @@ export default function OnboardingScreen() {
               </ScrollView>
             )}
             <Animated.View style={footerStyle}>
-              <Button variant="solid" label={t(picked ? 'onboarding.continue' : 'onboarding.byHand')} onPress={takePicked} />
+              <Button variant="glass" label={t(picked ? 'onboarding.continue' : 'onboarding.byHand')} onPress={takePicked} />
               <Pressable onPress={() => finish(false)} hitSlop={8} style={({ pressed }) => [styles.skip, pressed && { opacity: 0.5 }]}>
                 <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
               </Pressable>
@@ -539,11 +539,11 @@ export default function OnboardingScreen() {
               {/* While a model is to be picked the button is the menu's trigger, which opens on the tap. */}
               {connected && !modelPicked ? (
                 <NativeMenu items={modelItems(models)}>
-                  <Button variant="solid" label={mainButton.label} onPress={mainButton.onPress} />
+                  <Button variant="glass" label={mainButton.label} onPress={mainButton.onPress} />
                 </NativeMenu>
               ) : (
                 <Button
-                  variant="solid"
+                  variant="glass"
                   label={mainButton.label}
                   onPress={mainButton.onPress}
                   disabled={mainButton.disabled}
