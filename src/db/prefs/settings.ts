@@ -141,7 +141,11 @@ export function defineChoice<T extends string>(key: string, allowed: readonly T[
 export function defineNumber(key: string, min: number, max: number, fallback: number) {
   return {
     async load(db: SQLiteDatabase) {
-      const n = Number(await getSetting(db, key))
+      // Number() makes nothing and an empty string 0, which a range from 0 would take for a
+      // stored value: the list pictures came up square on a first launch.
+      const value = await getSetting(db, key)
+      if (value === null || value.trim() === '') return fallback
+      const n = Number(value)
       return Number.isSafeInteger(n) && n >= min && n <= max ? n : fallback
     },
     save: (db: SQLiteDatabase, value: number) => setSetting(db, key, String(value)),
