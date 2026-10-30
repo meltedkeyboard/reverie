@@ -69,7 +69,7 @@ import type { SettingsSection } from '@/lib/core/searchScope'
 import { isShownInFiles } from '@/lib/core/storage'
 import { reportError } from '@/lib/transfer/report'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
-import { APP_COPYRIGHT, APP_VERSION, REPO_URL } from '@/lib/core/version'
+import { APP_COPYRIGHT, APP_VERSION_BUILD, REPO_URL } from '@/lib/core/version'
 import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 
 
@@ -705,7 +705,7 @@ export default function SettingsScreen() {
     : { label: t('settings.starOnGithub'), symbol: 'star' as const, fallback: 'star-outline' as const }
   const about = (
     <ListSection header={t('settings.aboutTitle')} footer={t('settings.starNote')}>
-      <ValueCell label={t('settings.version')} value={APP_VERSION} />
+      <ValueCell label={t('settings.version')} value={APP_VERSION_BUILD} />
       <ValueCell label={t('settings.copyright')} value={APP_COPYRIGHT} />
       <ButtonCell label={star.label} icon={{ symbol: star.symbol, fallback: star.fallback }} onPress={openRepo} />
     </ListSection>
@@ -900,7 +900,7 @@ export default function SettingsScreen() {
 
         <NativeSection id="about" title={t('settings.aboutTitle')} footer={t('settings.starNote')}>
           <LabeledContent label={t('settings.version')}>
-            <SwiftText>{APP_VERSION}</SwiftText>
+            <SwiftText>{APP_VERSION_BUILD}</SwiftText>
           </LabeledContent>
           <LabeledContent label={t('settings.copyright')}>
             <SwiftText>{APP_COPYRIGHT}</SwiftText>

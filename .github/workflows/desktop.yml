@@ -35,6 +35,9 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
+        # The whole history: app.config.js counts the commits for the build number.
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

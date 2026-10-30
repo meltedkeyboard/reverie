@@ -16,6 +16,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        # The whole history: app.config.js counts the commits for the build number.
+        with:
+          fetch-depth: 0
 
       # The glass UI needs the iOS 26 SDK, so take the newest stable Xcode on the runner.
       - uses: maxim-lobanov/setup-xcode@v1

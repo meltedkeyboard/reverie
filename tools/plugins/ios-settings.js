@@ -5,7 +5,8 @@ const { IOSConfig, withDangerousMod, withXcodeProject } = require('expo/config-p
 // The app's page in the iOS Settings app: the version and the copyright, as in Settings >
 // About of the app itself, and the link to GitHub under them. A settings bundle has no
 // buttons and its text cannot be tapped, so the link is only written out. The values are
-// fixed at prebuild, the version taken from app.json; the copyright and the address repeat
+// fixed at prebuild, the version taken from app.json with the build number app.config.js
+// adds; the copyright and the address repeat
 // src/lib/core/version.ts.
 const COPYRIGHT = '© 2026 meltedkeyboard'
 const REPO = 'github.com/meltedkeyboard/reverie'
@@ -66,6 +67,8 @@ const rootStrings = (strings) =>
     .map(([key, text]) => `"${key}" = "${text.replace(/"/g, '\\"')}";`)
     .join('\n') + '\n'
 
+const withBuild = (version, build) => (build ? `${version} (${build})` : version)
+
 const withSettingsFiles = (cfg) =>
   withDangerousMod(cfg, [
     'ios',
@@ -73,7 +76,7 @@ const withSettingsFiles = (cfg) =>
       const projectName = IOSConfig.XcodeUtils.getProjectName(mod.modRequest.projectRoot)
       const bundle = path.join(mod.modRequest.platformProjectRoot, projectName, 'Settings.bundle')
       fs.mkdirSync(bundle, { recursive: true })
-      fs.writeFileSync(path.join(bundle, 'Root.plist'), rootPlist(mod.version ?? '1.0.0'))
+      fs.writeFileSync(path.join(bundle, 'Root.plist'), rootPlist(withBuild(mod.version ?? '1.0.0', mod.ios?.buildNumber)))
       for (const [locale, strings] of Object.entries(STRINGS)) {
         fs.mkdirSync(path.join(bundle, `${locale}.lproj`), { recursive: true })
         fs.writeFileSync(path.join(bundle, `${locale}.lproj`, 'Root.strings'), rootStrings(strings))

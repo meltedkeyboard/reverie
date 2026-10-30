@@ -36,7 +36,7 @@ import { FoundServersGroup, FoundServersSection } from '@/components/lists/Found
 import { useTranslation } from '@/i18n'
 import { NativeMenu } from '@/components/overlays/NativeMenu'
 import * as Haptics from '@/lib/ui/haptics'
-import { APP_VERSION } from '@/lib/core/version'
+import { APP_VERSION_BUILD } from '@/lib/core/version'
 import { type Colors, textStyles, useColors, useStyles } from '@/theme'
 
 type Feature = {
@@ -353,7 +353,7 @@ export default function OnboardingScreen() {
               ]}
               pointerEvents="none"
             >
-              v{APP_VERSION}
+              v{APP_VERSION_BUILD}
             </Animated.Text>
           </View>
 
