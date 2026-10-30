@@ -18,7 +18,7 @@ import { useOpenViewer } from '../visuals/ImageLink'
 import { toEntries, unlessDragging } from './DraggableCard'
 import { cardRow, dragModule, dragSession, pictureTap, type CardRowEvent, type RowFace } from '../../../modules/reverie-drag'
 
-// The system's list on iOS for the characters, a group's members and the rooms: a SwiftUI
+// The system's list on iOS for the characters, a group's members, the rooms and the personas: a SwiftUI
 // List as Messages draws its conversations, a face in a circle (or up to three of a group's
 // or a room's cast), the name with the date of the last message and the message under it, the
 // system's swipe and edit mode. A row still behaves as a card did (see CardRow.swift): the
@@ -32,6 +32,8 @@ export type NativeCardRow = {
   // it opens their photos in the viewer.
   people: Person[]
   title: string
+  // A symbol in the accent after the name: the star of the default persona.
+  mark?: string
   // The date of the last message, if there is one.
   date: number | null
   line: string
@@ -87,6 +89,7 @@ type Modifier = ReturnType<NonNullable<typeof nativeCardList>['modifiers']['opac
 
 type ContentProps = {
   title: string
+  mark?: string
   date: number | null
   line: string
   faces: RowFace[]
@@ -142,12 +145,13 @@ export function useRowContent() {
       </ZStack>
     )
   }
-  const render = ({ title, date, line, faces, pictures, ring, chevron, pictureModifiers = [] }: ContentProps) => (
+  const render = ({ title, mark, date, line, faces, pictures, ring, chevron, pictureModifiers = [] }: ContentProps) => (
     <HStack spacing={metrics.gap}>
       {picture(faces, pictures, ring, pictureModifiers)}
       <VStack alignment="leading" spacing={3} modifiers={metrics.textHeight ? [m.frame({ minHeight: metrics.textHeight, alignment: 'topLeading' })] : []}>
         <HStack spacing={6}>
           <Text modifiers={[m.font({ textStyle: 'body', weight: 'semibold' }), m.lineLimit(1)]}>{title}</Text>
+          {mark ? <Image systemName={mark as never} size={12} color={colors.accent} /> : null}
           <Spacer />
           {date !== null ? (
             <Text modifiers={[m.font({ textStyle: 'subheadline' }), m.foregroundStyle(secondary), m.lineLimit(1)]}>{formatShortWhen(date, locale)}</Text>
@@ -223,6 +227,7 @@ export function NativeCardList({ rows, editing, checked, onCheck, notice, bottom
     }
     const content = render({
       title: row.title,
+      mark: row.mark,
       date: row.date,
       line: row.line,
       faces,

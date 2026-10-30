@@ -894,6 +894,12 @@
   "persona.deleteConfirm": "Delete persona \"{{name}}\"? Chats using it will revert to \"None\".",
   "persona.emptyTitle": "No personas",
   "persona.emptyText": "Create a persona so you don't have to re-describe yourself in every chat",
+  "persona.noDescription": "No description",
+  "persona.makeDefault": "Use by Default",
+  "persona.clearDefault": "Not by Default",
+  "persona.deleteSelected": "Delete selected",
+  "persona.deleteSelectedTitle": "Delete {{count}} personas?",
+  "persona.deleteSelectedMessage": "Chats using them will revert to \"None\"",
 
   "personaGen.title": "Persona Generator",
   "personaGen.improveCurrent": "Improve persona description",

@@ -171,6 +171,16 @@ export async function deletePersona(db: SQLiteDatabase, id: number): Promise<voi
   notifyPersonasChanged()
 }
 
+// The order the list was dragged into, first on top, as the rooms keep theirs.
+export async function setPersonaOrder(db: SQLiteDatabase, ids: number[]): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    for (const [index, id] of ids.entries()) {
+      await db.runAsync('UPDATE personas SET sort_order = ? WHERE id = ?', [ids.length - index, id])
+    }
+  })
+  notifyPersonasChanged()
+}
+
 export async function setDefaultPersona(db: SQLiteDatabase, id: number | null): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.runAsync('UPDATE personas SET is_default = 0')

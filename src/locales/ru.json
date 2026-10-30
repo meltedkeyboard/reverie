@@ -893,6 +893,12 @@
   "persona.deleteConfirm": "Удалить персону «{{name}}»? В чатах с ней персона будет сброшена на «Нет».",
   "persona.emptyTitle": "Нет персон",
   "persona.emptyText": "Создайте персону, чтобы не описывать себя заново в каждом чате",
+  "persona.noDescription": "Без описания",
+  "persona.makeDefault": "По умолчанию",
+  "persona.clearDefault": "Не по умолчанию",
+  "persona.deleteSelected": "Удалить выбранные",
+  "persona.deleteSelectedTitle": "Удалить персоны: {{count}}?",
+  "persona.deleteSelectedMessage": "В чатах с ними персона будет сброшена на «Нет»",
 
   "personaGen.title": "Генератор персоны",
   "personaGen.improveCurrent": "Улучшить текущее описание",
