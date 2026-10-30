@@ -69,7 +69,7 @@ import type { SettingsSection } from '@/lib/core/searchScope'
 import { isShownInFiles } from '@/lib/core/storage'
 import { reportError } from '@/lib/transfer/report'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
-import { APP_COPYRIGHT, APP_VERSION_BUILD, REPO_URL } from '@/lib/core/version'
+import { APP_COPYRIGHT, APP_VERSION_BUILD, ISSUES_URL, REPO_URL } from '@/lib/core/version'
 import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
 
 
@@ -700,6 +700,7 @@ export default function SettingsScreen() {
       reportError(t('settings.starOnGithub'), err)
     })
   }
+  const openIssues = () => Linking.openURL(ISSUES_URL).catch((err) => reportError(t('settings.reportBug'), err))
   const star = thanked
     ? { label: t('settings.starThanks'), symbol: 'heart.fill' as const, fallback: 'heart' as const }
     : { label: t('settings.starOnGithub'), symbol: 'star' as const, fallback: 'star-outline' as const }
@@ -708,6 +709,7 @@ export default function SettingsScreen() {
       <ValueCell label={t('settings.version')} value={APP_VERSION_BUILD} />
       <ValueCell label={t('settings.copyright')} value={APP_COPYRIGHT} />
       <ButtonCell label={star.label} icon={{ symbol: star.symbol, fallback: star.fallback }} onPress={openRepo} />
+      <ButtonCell label={t('settings.reportBug')} icon={{ symbol: 'ladybug', fallback: 'bug-outline' }} onPress={openIssues} />
     </ListSection>
   )
 
@@ -906,6 +908,7 @@ export default function SettingsScreen() {
             <SwiftText>{APP_COPYRIGHT}</SwiftText>
           </LabeledContent>
           <NativeActionRow label={star.label} symbol={star.symbol} onPress={openRepo} />
+          <NativeActionRow label={t('settings.reportBug')} symbol="ladybug" onPress={openIssues} />
         </NativeSection>
 
         <NativeSection id="wipe" title={t('settings.dangerZone')} footer={t('settings.dangerNote')}>

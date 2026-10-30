@@ -15,3 +15,5 @@ export const APP_VERSION_BUILD = APP_BUILD ? `${APP_VERSION} (${APP_BUILD})` : A
 // Settings > About: the copyright under the version, and where the star goes.
 export const APP_COPYRIGHT = '© 2026 meltedkeyboard'
 export const REPO_URL = 'https://github.com/meltedkeyboard/reverie'
+// Under the star: a new issue, to tell of a bug.
+export const ISSUES_URL = `${REPO_URL}/issues/new`

@@ -220,7 +220,7 @@ It is missing in Expo Go, and then the Settings block is hidden (`cloudSyncAvail
 | AI helpers | `room/roomGen.ts` (a room's scene, opening and setup sheet), `promptGen.ts` (prompt and greeting generation, multimodal visual reference inputs with `withInlinedImages`, multi-character disambiguation), `diff.ts` (word-level diff with LCS for generator revisions), `titles.ts`, `aside.ts` (the Private request, `characterScene`/`roomScene`) |
 | Platform | `haptics.ts`, `nativeUI.ts` (optional SwiftUI and glass modules), `color.ts`, `storage.ts` (where the data lives, the "show in Files" toggle, see below) |
 | Sync | `cloudSync.ts` (folder sync, see above) |
-| App | `version.ts` (the version with the build number, a count of commits that `app.config.js` works out on every build and passes in `extra.build`, the copyright and repository link of Settings > About, and the same in onboarding), `confirmDelete.ts` (delete that asks unless turned off), `searchScope.ts` (the tab search was opened from, `SettingsSection`) |
+| App | `version.ts` (the version with the build number, a count of commits that `app.config.js` works out on every build and passes in `extra.build`, the copyright, the repository link of the star and the new-issue link of Report a bug in Settings > About, and the same in onboarding), `confirmDelete.ts` (delete that asks unless turned off), `searchScope.ts` (the tab search was opened from, `SettingsSection`) |
 | Message menu | `messageActions.ts` |
 
 ## `src/hooks`
