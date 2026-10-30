@@ -73,7 +73,9 @@ export default function PersonasScreen() {
               text={t('persona.emptyText')}
               action={
                 <Link href="/persona/new" asChild>
-                  <Button variant="glass" label={t('persona.create')} style={emptyButtonStyle} />
+                  <Link.AppleZoom>
+                    <Button variant="glass" label={t('persona.create')} style={emptyButtonStyle} />
+                  </Link.AppleZoom>
                 </Link>
               }
             />

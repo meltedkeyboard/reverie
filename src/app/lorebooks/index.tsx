@@ -58,7 +58,9 @@ export default function LorebooksScreen() {
               text={t('lore.emptyText')}
               action={
                 <Link href="/lorebook/new" asChild>
-                  <Button variant="glass" label={t('lore.create')} style={emptyButtonStyle} />
+                  <Link.AppleZoom>
+                    <Button variant="glass" label={t('lore.create')} style={emptyButtonStyle} />
+                  </Link.AppleZoom>
                 </Link>
               }
             />
