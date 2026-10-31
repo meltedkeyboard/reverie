@@ -9,7 +9,7 @@ export const APP_VERSION = pkg.version
 // absent when it was built without git.
 export const APP_BUILD: number | undefined = Constants.expoConfig?.extra?.build
 
-// Settings > About: "6.1.0 (412)".
+// Settings > About
 export const APP_VERSION_BUILD = APP_BUILD ? `${APP_VERSION} (${APP_BUILD})` : APP_VERSION
 
 // Settings > About: the copyright under the version, and where the star goes.
