@@ -617,6 +617,53 @@ function Appearance() {
             <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
           </ListSection>
 
+          {nativeCardList ? (
+            <ListSection header={t('settings.listLook')} footer={t('settings.listLookHint')}>
+              <NativeListPreview />
+              <View style={styles.sizeRow}>
+                <SFIcon name="square" fallback="square-outline" size={17} color={colors.textMuted} />
+                <Slider
+                  value={listLook.corner}
+                  minimumValue={LIST_CORNER_RANGE.min}
+                  maximumValue={LIST_CORNER_RANGE.max}
+                  onValueChange={dragCorner}
+                  onSlidingComplete={() => setListCorner(db, cornerDragged.current)}
+                  minimumTrackTintColor={colors.accent}
+                  maximumTrackTintColor={colors.borderStrong}
+                  thumbTintColor={ON_ACCENT}
+                  accessibilityLabel={t('settings.listCorners')}
+                  style={styles.slider}
+                />
+                <SFIcon name="circle" fallback="ellipse-outline" size={17} color={colors.textMuted} />
+                <Pressable
+                  onPress={resetCorner}
+                  disabled={listLook.corner === LIST_CORNER_RANGE.default}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('settings.listResetCorners')}
+                  style={({ pressed }) => [styles.sizeReset, pressed && { opacity: 0.5 }]}
+                >
+                  <SFIcon
+                    name="arrow.counterclockwise"
+                    fallback="refresh"
+                    size={20}
+                    color={listLook.corner === LIST_CORNER_RANGE.default ? colors.textFaint : colors.accent}
+                  />
+                </Pressable>
+              </View>
+              <View style={styles.themeMode}>
+                <Segmented
+                  options={spacingOptions}
+                  value={listLook.spacing}
+                  onChange={(next) => {
+                    Haptics.selectionAsync()
+                    setListSpacing(db, next)
+                  }}
+                />
+              </View>
+            </ListSection>
+          ) : null}
+
           <ListSection header={t('settings.chatPattern')} footer={t('settings.chatBackdropHint')}>
             {tiles}
             <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
