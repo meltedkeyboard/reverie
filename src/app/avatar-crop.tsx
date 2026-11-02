@@ -1,4 +1,4 @@
-import Slider from '@react-native-community/slider'
+import { Slider } from '@/components/controls/Slider'
 import { Image } from 'expo-image'
 import { ImageManipulator } from 'expo-image-manipulator'
 import { useNavigation, useRouter } from 'expo-router'

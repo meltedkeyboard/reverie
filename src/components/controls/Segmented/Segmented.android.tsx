@@ -1,8 +1,7 @@
-import { Icon } from '@/components/visuals/Icon'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import * as Haptics from '@/lib/ui/haptics'
-import { type Colors, useStyles } from '@/theme'
+import { type Colors, ON_ACCENT, useStyles } from '@/theme'
 import type { SegmentedProps } from './types'
 
 const HEIGHT = 40
@@ -36,14 +35,11 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
                 onChange(option.value)
               }}
               android_ripple={{
-                color: chosen ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.08)',
+                color: chosen ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)',
                 borderless: false,
               }}
               style={[styles.segment, chosen && styles.chosen]}
             >
-              {chosen ? (
-                <Icon name="checkmark" size={16} color={styles.chosenLabel.color} />
-              ) : null}
               <Text
                 style={[styles.label, chosen && styles.chosenLabel]}
                 numberOfLines={1}
@@ -64,10 +60,10 @@ const createStyles = (colors: Colors) =>
       flexDirection: 'row',
       height: HEIGHT,
       borderRadius: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderWidth: 2,
+      borderColor: colors.borderStrong,
       overflow: 'hidden',
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceRaised,
     },
     segmentWrap: {
       flex: 1,
@@ -75,26 +71,24 @@ const createStyles = (colors: Colors) =>
     },
     segmentBorderLeft: {
       borderLeftWidth: 1,
-      borderLeftColor: colors.border,
+      borderLeftColor: colors.borderStrong,
     },
     firstSegment: {
-      borderTopLeftRadius: 19,
-      borderBottomLeftRadius: 19,
+      borderTopLeftRadius: 18,
+      borderBottomLeftRadius: 18,
     },
     lastSegment: {
-      borderTopRightRadius: 19,
-      borderBottomRightRadius: 19,
+      borderTopRightRadius: 18,
+      borderBottomRightRadius: 18,
     },
     segment: {
       flex: 1,
-      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
       paddingHorizontal: 8,
     },
     chosen: {
-      backgroundColor: colors.accentSoft,
+      backgroundColor: colors.accent,
     },
     label: {
       color: colors.textMuted,
@@ -103,7 +97,7 @@ const createStyles = (colors: Colors) =>
       letterSpacing: 0.1,
     },
     chosenLabel: {
-      color: colors.accent,
+      color: ON_ACCENT,
       fontWeight: '600',
     },
   })

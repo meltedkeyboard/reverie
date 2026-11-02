@@ -1,6 +1,6 @@
 import { Icon } from '@/components/visuals/Icon'
 import { SFIcon } from '@/components/visuals/SFIcon'
-import Slider from '@react-native-community/slider'
+import { Slider } from '@/components/controls/Slider'
 import { useRouter } from 'expo-router'
 import { useMemo, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'

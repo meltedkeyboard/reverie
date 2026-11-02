@@ -1,4 +1,4 @@
-import Slider from '@react-native-community/slider'
+import { Slider } from './Slider'
 import { Platform, StyleSheet, Text, View } from 'react-native'
 
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'

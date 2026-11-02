@@ -13,7 +13,7 @@ export function Chip({ label, active, onPress, style, icon, ink, labeled, loadin
   const sliding = useAtLeastOneLap(!!loading && !!slide)
   const busy = !!loading || sliding
   const color = active ? ON_ACCENT : disabled && !busy ? colors.textFaint : (ink ?? colors.textMuted)
-  const rippleColor = active ? 'rgba(255, 255, 255, 0.2)' : `${colors.text}1A`
+  const rippleColor = active ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)'
 
   const body = (
     <View style={styles.content}>
@@ -56,7 +56,7 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     chip: {
       minHeight: 36,
-      borderRadius: 20,
+      borderRadius: 18,
       overflow: 'hidden',
     },
     pressable: {
@@ -68,19 +68,23 @@ const createStyles = (colors: Colors) =>
     },
     active: {
       backgroundColor: colors.accent,
-      borderWidth: 1,
+      borderWidth: 2,
       borderColor: colors.accent,
-      elevation: 1,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 1.5,
     },
     inactive: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 2,
+      borderColor: colors.borderStrong,
       elevation: 0,
     },
     label: {
       fontSize: 14,
-      fontWeight: '500',
+      fontWeight: '600',
       letterSpacing: 0.1,
     },
     content: {
