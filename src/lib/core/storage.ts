@@ -2,8 +2,8 @@ import { Directory, File, Paths } from 'expo-file-system'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { isAndroid, isWeb } from '@/lib/core/platform'
 
-// All data (the single database and the images) lives in one fixed, private place:
-// Library/Reverie on iOS, and Reverie under Documents on Android.
+// All data (the single database and the images) lives in one fixed place visible in Files:
+// Documents on iOS (under On My iPhone > Reverie), and Reverie under Documents on Android.
 const DATABASE_FOLDER = 'SQLite'
 const DATABASE_NAME = 'reverie.db'
 const IMAGE_FOLDERS = ['avatars', 'backgrounds', 'attachments', 'gallery']
@@ -16,15 +16,7 @@ function pickStorageRoot() {
     dir.create({ intermediates: true, idempotent: true })
     return dir
   }
-  try {
-    const dir = new Directory(library, 'Reverie')
-    dir.create({ intermediates: true, idempotent: true })
-    return dir
-  } catch {
-    const dir = new Directory(Paths.document, '.reverie')
-    dir.create({ intermediates: true, idempotent: true })
-    return dir
-  }
+  return Paths.document
 }
 
 const storageRoot = pickStorageRoot()
@@ -92,8 +84,8 @@ type Candidate = {
 }
 
 // Runs once on import before the database opens. Consolidates all databases and image folders
-// into the single canonical storage root, automatically picking the newest available database,
-// and removes any duplicate or earlier-database shelves.
+// into the Documents folder, automatically picking the newest available database from any
+// previous Library or shelf locations, and cleans up old duplicates.
 function settle() {
   const targetFolder = databaseFolder(storageRoot)
   const canonicalDb = new File(targetFolder, DATABASE_NAME)
@@ -103,10 +95,12 @@ function settle() {
     candidates.push({ folder: targetFolder, dbFile: canonicalDb, mtime: dbMtime(canonicalDb) })
   }
 
+  const libraryRoot = new Directory(library, 'Reverie')
+
   // Scan earlier-databases archives for any newer databases to recover
   const shelves = [
     new Directory(storageRoot, 'earlier-databases'),
-    new Directory(Paths.document, 'earlier-databases'),
+    new Directory(libraryRoot, 'earlier-databases'),
     new Directory(Paths.document, '.reverie', 'earlier-databases'),
   ]
 
@@ -122,8 +116,14 @@ function settle() {
     }
   }
 
-  // Scan alternate roots and merge their images
-  const otherRoots = [legacySupport, legacyMangled, Paths.document, new Directory(Paths.document, '.reverie')]
+  // Scan alternate roots and merge their images into storageRoot
+  const otherRoots = [
+    libraryRoot,
+    legacySupport,
+    legacyMangled,
+    new Directory(Paths.document, '.reverie'),
+  ]
+
   for (const root of otherRoots) {
     if (!existsSafely(root) || root.uri === storageRoot.uri) continue
     const db = new File(databaseFolder(root), DATABASE_NAME)
@@ -145,7 +145,7 @@ function settle() {
     }
   }
 
-  // Clean up legacy files and archives
+  // Clean up legacy shelves and marker
   for (const shelf of shelves) {
     if (existsSafely(shelf)) {
       try {
@@ -161,23 +161,13 @@ function settle() {
     } catch {}
   }
 
-  for (const root of [legacySupport, legacyMangled]) {
-    if (!existsSafely(root)) continue
+  for (const root of [legacySupport, legacyMangled, libraryRoot, new Directory(Paths.document, '.reverie')]) {
+    if (!existsSafely(root) || root.uri === storageRoot.uri) continue
     const folder = databaseFolder(root)
     if (folder.exists) folder.delete()
     removeIfEmpty(root)
   }
   if (existsSafely(legacyMangled)) removeIfEmpty(legacyMangled.parentDirectory)
-
-  // Clean up stale database folder in Documents if not storageRoot
-  if (Paths.document.uri !== storageRoot.uri) {
-    const docsDbFolder = databaseFolder(Paths.document)
-    if (existsSafely(docsDbFolder)) {
-      try {
-        docsDbFolder.delete()
-      } catch {}
-    }
-  }
 }
 
 try {
