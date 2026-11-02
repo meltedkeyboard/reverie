@@ -369,7 +369,7 @@ const baseStyles = (colors: Colors) =>
     },
     group: { backgroundColor: colors.surface, borderRadius: GROUP_CORNERS.radius, borderCurve: 'continuous', overflow: 'hidden' },
     plainHeader: { textTransform: 'none', fontSize: 17, fontWeight: '600', marginBottom: 10, paddingHorizontal: INSET + 2 * StyleSheet.hairlineWidth },
-    separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong, marginLeft: INSET },
+    separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong, marginHorizontal: INSET },
     footer: { color: colors.textMuted, fontSize: 13, lineHeight: 18, paddingHorizontal: INSET, marginTop: 7 },
     danger: { color: colors.danger },
     row: { minHeight: ROW_HEIGHT + 8, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: INSET, paddingVertical: 8 },
