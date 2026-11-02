@@ -40,7 +40,7 @@ import { listLorebooks } from '@/db/lorebooks'
 import { listCharacters } from '@/db/characters'
 import { loadLongMemory, saveLongMemory } from '@/db/prefs/memory'
 import { useReloadOnFocus } from '@/hooks/chat/useChatListActions'
-import { useDatabase, useShowInFiles } from '@/db/provider'
+import { useDatabase } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveContextLimits, serverName, typedCount, updateServer, type ContextLimits } from '@/db/prefs/settings'
 import {
   isSuggestionsEnabled,
@@ -66,7 +66,7 @@ import { useChatTextSettings } from '@/lib/chat/chatText'
 import { formatWhen } from '@/lib/core/format'
 import { NotificationFeedbackType, notificationAsync, selectionAsync } from '@/lib/ui/haptics'
 import type { SettingsSection } from '@/lib/core/searchScope'
-import { isShownInFiles } from '@/lib/core/storage'
+
 import { reportError } from '@/lib/transfer/report'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
 import { APP_COPYRIGHT, APP_VERSION_BUILD, ISSUES_URL, REPO_URL } from '@/lib/core/version'
@@ -244,8 +244,8 @@ export default function SettingsScreen() {
   const countArchived = useCallback(async () => setArchivedCount((await listCharacters(db, true)).length), [db])
   useReloadOnFocus(countArchived)
 
-  const [showInFiles, setShowInFiles] = useState(isShownInFiles)
-  const [movingFiles, setMovingFiles] = useState(false)
+
+
 
   // Once GitHub has been opened from About, the button thanks the user. On a phone it does so
   // as they come back from the browser, so that they see it change, with a tap of success; the
@@ -261,22 +261,8 @@ export default function SettingsScreen() {
     })
     return () => sub.remove()
   }, [])
-  const moveFiles = useShowInFiles()
 
-  // The data moves right away: the database is copied, reopened from the new place, and
-  // every screen reloads from it. The row is disabled while that runs.
-  const toggleShowInFiles = async (shown: boolean) => {
-    setShowInFiles(shown)
-    setMovingFiles(true)
-    try {
-      await moveFiles(shown)
-    } catch (err) {
-      setShowInFiles(isShownInFiles())
-      reportError(t('settings.showInFilesFailedTitle'), err)
-    } finally {
-      setMovingFiles(false)
-    }
-  }
+
 
   const cloudSync = useCloudSync()
   // Expo Go has no sync module. In development the section is still shown there, with
@@ -518,12 +504,6 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
-  // Android has no Files app to show the folder in, and so no group at all.
-  const security = isAndroid ? null : (
-    <ListSection header={t('settings.security')} footer={t('settings.showInFilesNote')}>
-      {block('files', <SwitchCell label={t('settings.showInFiles')} value={showInFiles} onValueChange={toggleShowInFiles} disabled={movingFiles} />)}
-    </ListSection>
-  )
 
   const contextFooter = (
     <>
@@ -846,9 +826,6 @@ export default function SettingsScreen() {
           {toggle(null, t('settings.haptics'), haptics, toggleHaptics)}
         </NativeSection>
 
-        <NativeSection title={t('settings.security')} footer={t('settings.showInFilesNote')}>
-          {toggle('files', t('settings.showInFiles'), showInFiles, toggleShowInFiles, movingFiles)}
-        </NativeSection>
 
         <NativeSection id="limits" title={t('settings.limitsTitle')} footer={t('settings.limitsNote')}>
           {toggle(null, t('settings.limitsOff'), limits.off, (off) => {
@@ -946,7 +923,6 @@ export default function SettingsScreen() {
           {block('attachGallery', attachGalleryRow)}
           {block('confirmDelete', confirmDeleteRow)}
           {block('haptics', hapticsRow)}
-          {security}
           {block('limits', limitRows)}
           {block('server', server)}
           {showCloud ? block('folderSync', folderSync) : null}

@@ -126,7 +126,6 @@ export default function SearchScreen() {
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
       { label: t('settings.limitsTitle'), keywords: [t('settings.limitsOff'), t('settings.limitAvatar'), t('settings.limitAttachment')], symbol: 'externaldrive', fallback: 'resize-outline', href: settingsAt('limits') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
-      { label: t('settings.showInFiles'), keywords: [t('settings.security')], symbol: 'folder', fallback: 'folder-outline', href: settingsAt('files') },
       {
         label: t('servers.title'),
         keywords: [t('settings.server'), t('settings.baseUrlLabel'), t('settings.apiKeyLabel'), t('settings.modelLabel'), t('settings.testConnection'), t('servers.failover')],
@@ -146,7 +145,7 @@ export default function SearchScreen() {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
       entries.splice(backup, 0, { label: t('settings.folderSync'), keywords: [t('settings.folderSyncSync'), 'iCloud', 'Google Drive'], symbol: 'arrow.triangle.2.circlepath', fallback: 'sync-outline', href: settingsAt('folderSync') })
     }
-    return isAndroid ? entries.filter((entry) => entry.label !== t('settings.showInFiles')) : entries
+    return entries
   }, [t])
 
   const sections = useMemo<Section[]>(() => {

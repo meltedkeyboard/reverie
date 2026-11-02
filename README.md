@@ -51,7 +51,7 @@ Character cards from other apps (V1, V2, V3; JSON or PNG) import with the downlo
 - Folder sync (not in Expo Go): the data is kept in a folder you pick (iCloud Drive, Google Drive, any other storage or a local folder) and picked up by the other devices, on iOS and Android. Works with an app signed by a free Apple ID, see below.
 - English and Russian UI.
 - iOS 26 Liquid Glass UI where available, with a plain fallback on older iOS and on Android.
-- Android: the same app without the iOS-only parts. The iOS menus and action sheets are drawn in React Native, and the "show in Files" toggle is absent.
+- Android: the same app without the iOS-only parts. The iOS menus and action sheets are drawn in React Native.
 
 ## Quick start
 
@@ -115,7 +115,7 @@ A detailed map of the code (where to change what, data flow, conventions) is in 
 - Streaming uses `fetch` from `expo/fetch`, because the React Native `fetch` does not expose the response body incrementally.
 - Native menus (the "+" button, the message "..." menu, the chat title capsule) are SwiftUI `Menu` from `@expo/ui`. The button is drawn by React Native and embedded via `RNHostView`, so the menu morphs out of the button. Without the `ExpoUI` module (Expo Go) an action sheet is shown instead (`src/components/overlays/NativeMenu.tsx`).
 - Native modules for the glass UI are loaded in `src/lib/ui/nativeUI.ts` only if they exist in the build.
-- The database lives in iOS Documents. Avatars are files, the database stores only the file name.
+- The database and media files live in private app storage (Library/Reverie on iOS, Documents/Reverie on Android). Avatars are files, the database stores only the file name. To protect access to Reverie with Face ID or Passcode on iOS, use iOS native App Protection (long press the app icon on Home Screen > Require Face ID). The in-app "Show in Files" toggle was removed to eliminate live file moving and prevent data loss risk.
 - Plain HTTP servers are allowed through `NSAllowsArbitraryLoads` in `app.json`.
 - A chat where the user wrote nothing is deleted when returning to the list.
 - The "Continue" capsule state is stored in `app_settings` (`src/db/prefs/continue.ts`).

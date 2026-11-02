@@ -2,24 +2,15 @@ import { Directory, File, Paths } from 'expo-file-system'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { isAndroid, isWeb } from '@/lib/core/platform'
 
-// Everything Reverie keeps on disk (the database and the images) lives in one of two
-// places: the Documents folder, which the Files app shows, or a private folder next to it
-// that Files can't see. The private one is the default. iOS hides the app's folder in
-// Files once Documents is empty, so moving the data out is enough to make it vanish.
+// All data (the single database and the images) lives in one fixed, private place:
+// Library/Reverie on iOS, and Reverie under Documents on Android.
 const DATABASE_FOLDER = 'SQLite'
 const DATABASE_NAME = 'reverie.db'
 const IMAGE_FOLDERS = ['avatars', 'backgrounds', 'attachments', 'gallery']
 
 const library = new Directory(Paths.document.parentDirectory, 'Library')
 
-// The private folder must not have a space in its path: expo-sqlite parses the directory
-// with URL(string:), which on iOS 17+ turns a space into %20, and then opens a brand new
-// empty database in a folder literally called "Application%20Support".
-//
-// Expo Go only lets an app touch its own sandbox folder, so there the private place falls
-// back to a dot-folder inside Documents, which Files doesn't list either.
-function pickHiddenRoot() {
-  // Android keeps the app's files private anyway, and has no Library folder.
+function pickStorageRoot() {
   if (isAndroid) {
     const dir = new Directory(Paths.document, 'Reverie')
     dir.create({ intermediates: true, idempotent: true })
@@ -36,15 +27,11 @@ function pickHiddenRoot() {
   }
 }
 
-const hiddenRoot = pickHiddenRoot()
-const marker = new File(hiddenRoot, 'show-in-files')
+const storageRoot = pickStorageRoot()
 
-// Where versions 2.2 to 3.0 kept things. The images and the marker went to the first one,
-// the database (because of the %20 bug above) to the second.
 const legacySupport = new Directory(library, 'Application Support', 'Reverie')
 const legacyMangled = new Directory(library, 'Application%20Support', 'Reverie')
 
-// In Expo Go the Library folder is out of reach and even asking about it can throw.
 function existsSafely(dir: Directory) {
   try {
     return dir.exists
@@ -53,12 +40,7 @@ function existsSafely(dir: Directory) {
   }
 }
 
-function rootFor(shown: boolean) {
-  return shown ? Paths.document : hiddenRoot
-}
-
 function plainPath(dir: Directory) {
-  // expo-sqlite wants a plain path, without the scheme or a trailing slash.
   return decodeURIComponent(dir.uri.replace(/^file:\/\//, '').replace(/\/$/, ''))
 }
 
@@ -66,12 +48,6 @@ function databaseFolder(root: Directory) {
   return new Directory(root, DATABASE_FOLDER)
 }
 
-function hasDatabase(root: Directory) {
-  return new File(databaseFolder(root), DATABASE_NAME).exists
-}
-
-// Image names are unique, so two folders are merged file by file rather than one replacing
-// the other. A name already at the target is left alone.
 function mergeFolder(from: Directory, to: Directory) {
   if (!from.exists) return
   to.create({ intermediates: true, idempotent: true })
@@ -89,153 +65,143 @@ function moveImages(from: Directory, to: Directory) {
   for (const name of IMAGE_FOLDERS) mergeFolder(new Directory(from, name), new Directory(to, name))
 }
 
-// A database that lost to a newer one is kept, not deleted: it may be the only copy of
-// chats from before an update.
-function setAside(root: Directory) {
-  const shelf = new Directory(hiddenRoot, 'earlier-databases')
-  shelf.create({ intermediates: true, idempotent: true })
-  databaseFolder(root).move(new Directory(shelf, `${Date.now()}-${shelf.list().length}`))
-}
-
 function removeIfEmpty(dir: Directory) {
   if (dir.exists && dir.list().length === 0) dir.delete()
 }
 
-// Runs once, on import, before the database opens. The marker is the wish; this puts the
-// files where it says and picks up whatever older versions left behind.
-//
-// When several databases turn up, the one to keep is the one the app was last showing:
-// the one already in place, else the one 2.2 to 3.0 used with the folder hidden, else the
-// one at the other place (Documents is where versions before 2.2 kept it).
-function settle() {
-  const legacyRoots = [legacySupport, legacyMangled].filter(existsSafely)
+function fileMtime(file: File): number {
+  try {
+    return file.modificationTime ?? 0
+  } catch {
+    return 0
+  }
+}
 
-  const legacyMarker = new File(legacySupport, 'show-in-files')
-  if (legacyRoots.includes(legacySupport) && legacyMarker.exists) {
-    if (!marker.exists) marker.create()
-    legacyMarker.delete()
+function dbMtime(dbFile: File): number {
+  const dir = dbFile.parentDirectory
+  const wal = new File(dir, `${dbFile.name}-wal`)
+  const mainTime = fileMtime(dbFile)
+  const walTime = wal.exists ? fileMtime(wal) : 0
+  return Math.max(mainTime, walTime)
+}
+
+type Candidate = {
+  folder: Directory
+  dbFile: File
+  mtime: number
+}
+
+// Runs once on import before the database opens. Consolidates all databases and image folders
+// into the single canonical storage root, automatically picking the newest available database,
+// and removes any duplicate or earlier-database shelves.
+function settle() {
+  const targetFolder = databaseFolder(storageRoot)
+  const canonicalDb = new File(targetFolder, DATABASE_NAME)
+  const candidates: Candidate[] = []
+
+  if (canonicalDb.exists) {
+    candidates.push({ folder: targetFolder, dbFile: canonicalDb, mtime: dbMtime(canonicalDb) })
   }
 
-  const active = rootFor(marker.exists)
-  const others = [rootFor(!marker.exists), ...legacyRoots]
+  // Scan earlier-databases archives for any newer databases to recover
+  const shelves = [
+    new Directory(storageRoot, 'earlier-databases'),
+    new Directory(Paths.document, 'earlier-databases'),
+    new Directory(Paths.document, '.reverie', 'earlier-databases'),
+  ]
 
-  for (const root of others) moveImages(root, active)
-
-  const candidates = [active, legacyMangled, rootFor(!marker.exists), legacySupport].filter(
-    (root) => existsSafely(root) && hasDatabase(root)
-  )
-  const keep = candidates[0]
-  if (keep) {
-    for (const root of candidates) if (root !== keep) setAside(root)
-    if (keep !== active) {
-      // An empty folder at the target would make move() nest the database inside it.
-      const target = databaseFolder(active)
-      if (target.exists) target.delete()
-      databaseFolder(keep).move(target)
+  for (const shelf of shelves) {
+    if (!existsSafely(shelf)) continue
+    for (const item of shelf.list()) {
+      if (item instanceof Directory) {
+        const direct = new File(item, DATABASE_NAME)
+        const nested = new File(databaseFolder(item), DATABASE_NAME)
+        if (direct.exists) candidates.push({ folder: item, dbFile: direct, mtime: dbMtime(direct) })
+        if (nested.exists) candidates.push({ folder: databaseFolder(item), dbFile: nested, mtime: dbMtime(nested) })
+      }
     }
   }
 
-  for (const root of legacyRoots) {
+  // Scan alternate roots and merge their images
+  const otherRoots = [legacySupport, legacyMangled, Paths.document, new Directory(Paths.document, '.reverie')]
+  for (const root of otherRoots) {
+    if (!existsSafely(root) || root.uri === storageRoot.uri) continue
+    const db = new File(databaseFolder(root), DATABASE_NAME)
+    if (db.exists) candidates.push({ folder: databaseFolder(root), dbFile: db, mtime: dbMtime(db) })
+    moveImages(root, storageRoot)
+  }
+
+  // Pick the candidate with the newest modification time
+  candidates.sort((a, b) => b.mtime - a.mtime)
+  const winner = candidates[0]
+
+  if (winner && winner.folder.uri !== targetFolder.uri) {
+    targetFolder.create({ intermediates: true, idempotent: true })
+    for (const suffix of ['', '-wal', '-shm', '-journal']) {
+      const src = new File(winner.folder, `${DATABASE_NAME}${suffix}`)
+      const dst = new File(targetFolder, `${DATABASE_NAME}${suffix}`)
+      if (dst.exists) dst.delete()
+      if (src.exists) src.copy(targetFolder)
+    }
+  }
+
+  // Clean up legacy files and archives
+  for (const shelf of shelves) {
+    if (existsSafely(shelf)) {
+      try {
+        shelf.delete()
+      } catch {}
+    }
+  }
+
+  const marker = new File(storageRoot, 'show-in-files')
+  if (marker.exists) {
+    try {
+      marker.delete()
+    } catch {}
+  }
+
+  for (const root of [legacySupport, legacyMangled]) {
+    if (!existsSafely(root)) continue
     const folder = databaseFolder(root)
-    if (folder.exists && !hasDatabase(root)) folder.delete()
+    if (folder.exists) folder.delete()
     removeIfEmpty(root)
   }
-  if (legacyRoots.includes(legacyMangled)) removeIfEmpty(legacyMangled.parentDirectory)
+  if (existsSafely(legacyMangled)) removeIfEmpty(legacyMangled.parentDirectory)
+
+  // Clean up stale database folder in Documents if not storageRoot
+  if (Paths.document.uri !== storageRoot.uri) {
+    const docsDbFolder = databaseFolder(Paths.document)
+    if (existsSafely(docsDbFolder)) {
+      try {
+        docsDbFolder.delete()
+      } catch {}
+    }
+  }
 }
 
 try {
   settle()
 } catch (err) {
-  // Leave the data where it is rather than stop the app from starting.
-  console.warn('Could not settle the data folders', err)
+  console.warn('Could not settle storage', err)
 }
 
-let shown = marker.exists
-
 export function dataDirectory() {
-  return rootFor(shown)
+  return storageRoot
 }
 
 export function databaseDirectory(): string | undefined {
-  return plainPath(databaseFolder(rootFor(shown)))
+  return plainPath(databaseFolder(storageRoot))
 }
 
-export function isShownInFiles() {
-  return shown
-}
-
-// Moves everything to the other place while the app keeps running. The open database
-// can't be moved, so it is copied with VACUUM INTO, which gives a consistent snapshot
-// even mid-use; the caller then opens the copy and, once the old one is closed, calls
-// discardInactiveDatabase. The marker flips last, so a crash halfway leaves two copies
-// that settle() sorts out on the next launch.
-//
-// Returns what puts everything back, for when the copy then fails to open.
-export async function moveStorage(db: SQLiteDatabase, nextShown: boolean) {
-  if (nextShown === shown) return () => {}
-  const previous = shown
-  const from = rootFor(shown)
-  const to = rootFor(nextShown)
-
-  const target = databaseFolder(to)
-  if (target.exists) target.delete()
-  target.create({ intermediates: true, idempotent: true })
-  const path = `${plainPath(target)}/${DATABASE_NAME}`
-  try {
-    await db.execAsync(`VACUUM INTO '${path.replace(/'/g, "''")}'`)
-  } catch (err) {
-    if (target.exists) target.delete()
-    throw err
-  }
-
-  // Runs after something already failed, so a failure here is only logged: whatever it
-  // leaves behind, settle() gathers up on the next launch.
-  const undo = () => {
-    shown = previous
-    try {
-      writeMarker(previous)
-      moveImages(to, from)
-      if (target.exists) target.delete()
-    } catch (err) {
-      console.warn('Could not put the files back', err)
-    }
-  }
-
-  try {
-    moveImages(from, to)
-    writeMarker(nextShown)
-  } catch (err) {
-    // Half the images moved would show as broken until the next launch.
-    undo()
-    throw err
-  }
-  shown = nextShown
-  return undo
-}
-
-function writeMarker(value: boolean) {
-  if (value) {
-    if (!marker.exists) marker.create()
-  } else if (marker.exists) {
-    marker.delete()
-  }
-}
-
-// A copy of the database put aside next to the ones settle() keeps, for when the data here
-// is about to be replaced with the copy from the sync folder.
+// A safety snapshot before folder sync replaces rows
 export async function keepCopy(db: SQLiteDatabase) {
-  const shelf = new Directory(hiddenRoot, 'earlier-databases', `${Date.now()}-before-sync`)
-  shelf.create({ intermediates: true, idempotent: true })
-  // On the web the database is not a file SQLite can write to, so its bytes are saved.
+  const backups = new Directory(storageRoot, 'backups')
+  backups.create({ intermediates: true, idempotent: true })
   if (isWeb) {
-    new File(shelf, DATABASE_NAME).writeSync(await db.serializeAsync('main'))
+    new File(backups, DATABASE_NAME).writeSync(await db.serializeAsync('main'))
     return
   }
-  const path = `${plainPath(shelf)}/${DATABASE_NAME}`
+  const path = `${plainPath(backups)}/before-sync-${DATABASE_NAME}`
   await db.execAsync(`VACUUM INTO '${path.replace(/'/g, "''")}'`)
-}
-
-export function discardInactiveDatabase() {
-  const stale = databaseFolder(rootFor(!shown))
-  if (stale.exists && hasDatabase(rootFor(shown))) stale.delete()
 }

@@ -161,7 +161,7 @@ Everything goes through `expo-sqlite`. Components get the database from `useData
 
 | File | Contents |
 |---|---|
-| `provider.tsx` | `DatabaseProvider`, `useDatabase`, `useShowInFiles`, `useReloadDatabase` (the same file on a new connection, after a pull from the sync folder). Replaces expo-sqlite's `SQLiteProvider` so the database can be swapped for one in another folder without remounting the app |
+| `provider.tsx` | `DatabaseProvider`, `useDatabase`, `useReloadDatabase` (the same file on a new connection, after a pull from the sync folder). Checkpoints SQLite WAL into the main database whenever the app leaves the foreground |
 | `schema.ts` | Migrations: `characters`, `chats` (including `thinking`, `scene_state`, `recap`), `messages`, `app_settings`, `rooms`, `room_members`, `character_groups`, `lorebooks` with `lore_entries` and `lorebook_links`, `character_gallery`. `migrate` runs them with foreign keys off, so a table rebuild does not cascade |
 | `rooms.ts` | Room CRUD, members, scenes, `importChatToRoom` |
 | `characters.ts` | Character CRUD, duplicate (the copy stays in its group), ordering, `DEFAULT_SAMPLING`, `CHARACTER_COLUMNS` (without `group_id`, so the backup does not carry it; `listCharacters` adds `groupId` and `sortOrder`) |
