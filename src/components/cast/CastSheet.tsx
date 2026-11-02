@@ -1,6 +1,6 @@
 import { Icon } from '@/components/visuals/Icon'
 import { Fragment, useEffect } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
@@ -27,6 +27,7 @@ import { ArchivedMark } from '../visuals/ArchivedMark'
 import { Avatar } from '../visuals/Avatar'
 import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { Check } from '../controls/Check'
+import { Switch } from '../controls/Switch'
 import { DraggableCard, systemCardMenu, unlessDragging } from '../lists/DraggableCard'
 import { NativeHostedRow, NativeSection, NativeSheetForm, nativeForm } from '../lists/NativeForm'
 import { menuItemViews, NativeMenu, type MenuItem } from '../overlays/NativeMenu'
@@ -202,14 +203,9 @@ export function CastSheetContent({
           <Animated.View style={[{ opacity: canWhisper ? 1 : AWAY }, FADE]} pointerEvents={canWhisper ? 'auto' : 'none'}>
             <Switch
               value={whisper && canWhisper}
-              onValueChange={() => {
-                Haptics.selectionAsync()
-                onToggleWhisper()
-              }}
+              onValueChange={onToggleWhisper}
               disabled={!canWhisper}
               accessibilityLabel={t('room.whisper')}
-              trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
-              {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
             />
           </Animated.View>
         </View>

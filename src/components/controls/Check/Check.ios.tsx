@@ -2,6 +2,7 @@ import { Icon } from '@/components/visuals/Icon'
 import Animated, { type CSSTransitionProperties } from 'react-native-reanimated'
 
 import { useColors } from '@/theme'
+import type { CheckProps } from './types'
 
 const POP: CSSTransitionProperties = {
   transitionProperty: ['opacity', 'transform'],
@@ -11,7 +12,7 @@ const POP: CSSTransitionProperties = {
 
 // The checkmark at the end of a row picked in a sheet; it pops in and out rather than
 // blinking, and keeps its place in the row while hidden.
-export function Check({ on }: { on: boolean }) {
+export function Check({ on }: CheckProps) {
   const colors = useColors()
   return (
     <Animated.View style={[{ opacity: on ? 1 : 0, transform: [{ scale: on ? 1 : 0.5 }] }, POP]}>

@@ -1,23 +1,12 @@
 import { Icon } from '@/components/visuals/Icon'
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 
 import { useColors, useStyles, type Colors } from '@/theme'
 
-import { NativeMenu, type MenuItem } from '../overlays/NativeMenu'
+import { NativeMenu } from '../../overlays/NativeMenu'
+import type { PickerBoxProps } from './types'
 
-type Props = {
-  value: string
-  placeholder: string
-  // One row of the system menu per choice.
-  items: MenuItem[]
-  accessibilityLabel?: string
-  // Extra style for the box, to match the fields around it.
-  fallbackStyle?: StyleProp<ViewStyle>
-}
-
-// A field that is chosen rather than typed: the box of a one-line input showing the
-// choice, with the up-down chevron of a menu, which opens the system menu to pick from.
-export function PickerBox({ value, placeholder, items, accessibilityLabel, fallbackStyle }: Props) {
+export function PickerBox({ value, placeholder, items, accessibilityLabel, fallbackStyle }: PickerBoxProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (

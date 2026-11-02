@@ -4,12 +4,13 @@ import { Image } from 'expo-image'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useRouter } from 'expo-router'
 import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions, type StyleProp, type ViewStyle, type ViewInstance } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type StyleProp, type ViewStyle, type ViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
 import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, type ChatLook } from '@/components/chrome/ChatChrome'
 import { Button } from '@/components/controls/Button'
+import { Switch } from '@/components/controls/Switch'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { NativeActionRow, NativeAreaRow, NativeHostedRow, NativeLinkRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
@@ -431,8 +432,6 @@ export function AttachMenu({
                 value={thinking}
                 onValueChange={toggleThinking}
                 accessibilityLabel={t('chat.thinking')}
-                trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
-                {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
                 style={styles.nativeSwitch}
               />
             </View>

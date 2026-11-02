@@ -75,33 +75,66 @@ function AppTabs({ listeners }: { listeners: TabListeners }) {
   // the tab bar; left automatic, scroll views would get them a second time. The Android
   // bar is opaque and does not float over the content, so there the tabs inset it.
   const own = isIOS
-  // Material You tints the Android bar with the wallpaper's color, so it is set to the app's.
-  const material =
-    isAndroid
-      ? {
-          backgroundColor: colors.surface,
-          indicatorColor: colors.accentSoft,
-          rippleColor: colors.accentSoft,
-          iconColor: { default: colors.textFaint, selected: colors.accent },
-          labelStyle: { default: { color: colors.textFaint }, selected: { color: colors.accent } },
-        }
-      : {}
+
+  const androidAppearance = isAndroid
+    ? {
+        tabBarBackgroundColor: colors.surface,
+        tabBarItemRippleColor: colors.accentSoft,
+        tabBarItemLabelVisibilityMode: 'labeled' as const,
+        tabBarItemActiveIndicatorColor: colors.accentSoft,
+        tabBarItemActiveIndicatorEnabled: true,
+        normal: {
+          tabBarItemTitleFontColor: colors.textMuted,
+          tabBarItemIconColor: colors.textMuted,
+        },
+        selected: {
+          tabBarItemTitleFontColor: colors.accent,
+          tabBarItemIconColor: colors.accent,
+        },
+      }
+    : undefined
+
+  const material = isAndroid
+    ? {
+        backgroundColor: colors.surface,
+        indicatorColor: colors.accentSoft,
+        rippleColor: colors.accentSoft,
+        iconColor: { default: colors.textMuted, selected: colors.accent },
+        labelStyle: {
+          default: { color: colors.textMuted, fontWeight: '500' as const },
+          selected: { color: colors.accent, fontWeight: '600' as const },
+        },
+        labelVisibilityMode: 'labeled' as const,
+      }
+    : {}
+
+  const triggerProps = isAndroid
+    ? {
+        labelVisibilityMode: 'labeled' as const,
+        unstable_nativeProps: {
+          android: {
+            standardAppearance: androidAppearance,
+          },
+        },
+      }
+    : {}
+
   return (
     <NativeTabs tintColor={colors.accent} screenListeners={listeners} {...material}>
-      <NativeTabs.Trigger name="index" disableAutomaticContentInsets={own}>
+      <NativeTabs.Trigger name="index" disableAutomaticContentInsets={own} {...triggerProps}>
         <NativeTabs.Trigger.Label>{t('characters.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} md="group" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="rooms" disableAutomaticContentInsets={own}>
+      <NativeTabs.Trigger name="rooms" disableAutomaticContentInsets={own} {...triggerProps}>
         <NativeTabs.Trigger.Label>{t('rooms.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} md="forum" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings" disableAutomaticContentInsets={own}>
+      <NativeTabs.Trigger name="settings" disableAutomaticContentInsets={own} {...triggerProps}>
         <NativeTabs.Trigger.Label>{t('settings.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
       </NativeTabs.Trigger>
       {/* In iOS 27 search is a unified inline tab item inside the tab bar alongside other tabs, without a separate floating island */}
-      <NativeTabs.Trigger name="search" disableAutomaticContentInsets={own}>
+      <NativeTabs.Trigger name="search" disableAutomaticContentInsets={own} {...triggerProps}>
         <NativeTabs.Trigger.Label>{t('search.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'magnifyingglass', selected: 'magnifyingglass' }} md="search" />
       </NativeTabs.Trigger>

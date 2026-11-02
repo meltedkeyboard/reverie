@@ -1,6 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useEffect, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Switch } from '@/components/controls/Switch'
 
 import { ArchivedMark } from '@/components/visuals/ArchivedMark'
 import { Avatar } from '@/components/visuals/Avatar'
@@ -367,7 +368,6 @@ export function BackupTreeSheet({ tree, confirmLabel, onConfirm, onClose }: Prop
       <Switch
         value={selection.keepGroups !== false}
         onValueChange={(on) => setSelection((s) => ({ ...s, keepGroups: on }))}
-        trackColor={{ true: colors.accent }}
       />
     </Animated.View>
   ) : null

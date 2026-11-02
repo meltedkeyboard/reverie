@@ -1,0 +1,20 @@
+import { Icon } from '@/components/visuals/Icon'
+import Animated, { type CSSTransitionProperties } from 'react-native-reanimated'
+
+import { useColors } from '@/theme'
+import type { CheckProps } from './types'
+
+const POP: CSSTransitionProperties = {
+  transitionProperty: ['opacity', 'transform'],
+  transitionDuration: 200,
+  transitionTimingFunction: 'ease-out',
+}
+
+export function Check({ on }: CheckProps) {
+  const colors = useColors()
+  return (
+    <Animated.View style={[{ opacity: on ? 1 : 0, transform: [{ scale: on ? 1 : 0.5 }] }, POP]}>
+      <Icon name="checkmark" size={24} color={colors.accent} />
+    </Animated.View>
+  )
+}

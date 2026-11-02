@@ -1,10 +1,11 @@
 import { Icon } from '@/components/visuals/Icon'
 import { Link } from 'expo-router'
 import { Children, Fragment, isValidElement, type ComponentProps, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
 
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { NativeMenu } from '@/components/overlays/NativeMenu'
+import { Switch } from '@/components/controls/Switch'
 import { ParamSlider } from '@/components/controls/ParamSlider'
 import { Segmented } from '@/components/controls/Segmented'
 import { Chip } from '@/components/controls/Chip'
@@ -101,20 +102,7 @@ export function SwitchCell({
 // and the iOS 26 switch, 28 pt tall, is drawn from the top of it; the nudge recenters it.
 // (SwiftUI's Toggle in a Host stuck to the top of its frame and ignored the tint.)
 function CellSwitch({ value, onValueChange, disabled }: { value: boolean; onValueChange: (v: boolean) => void; disabled?: boolean }) {
-  const colors = useColors()
-  return (
-    <Switch
-      value={value}
-      disabled={disabled}
-      onValueChange={(v) => {
-        Haptics.selectionAsync()
-        onValueChange(v)
-      }}
-      trackColor={{ true: colors.accent, false: isIOS ? undefined : colors.borderStrong }}
-      // react-native-web paints the thumb in its own teal; here it is white either way.
-      {...(isDesktop ? ({ thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF' } as object) : {})}
-    />
-  )
+  return <Switch value={value} disabled={disabled} onValueChange={onValueChange} />
 }
 
 // A choice among the rows of its group, marked with a checkmark like a ringtone list.

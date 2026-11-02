@@ -1,42 +1,16 @@
-import type { ComponentProps } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { isDesktop } from '@/lib/core/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
-import { GlassSurface } from '../chrome/Glass'
-import { SlidingIcon, useAtLeastOneLap } from './PillButton'
-import { SFIcon } from '../visuals/SFIcon'
+import { GlassSurface } from '../../chrome/Glass'
+import { SlidingIcon, useAtLeastOneLap } from '../PillButton'
+import { SFIcon } from '../../visuals/SFIcon'
+import type { ChipProps } from './types'
 
-type Props = {
-  label: string
-  active: boolean
-  onPress: () => void
-  style?: StyleProp<ViewStyle>
-  // Shows the symbol instead of the label, which is then only read out.
-  icon?: { symbol: ComponentProps<typeof SFIcon>['name']; fallback: ComponentProps<typeof SFIcon>['fallback'] }
-  // The ink while not chosen, as colors.danger for removing.
-  ink?: string
-  // Liquid Glass on iOS 26. Off by default: a chip is the plain surface, filled when chosen.
-  glass?: boolean
-  // Interactive glass springs under the finger. Off by default: in a row that scrolls
-  // sideways the spring pulls the chip along with the scroll.
-  interactive?: boolean
-  // The label beside the symbol rather than only read out.
-  labeled?: boolean
-  // Busy: the symbol runs away `slide` and back, at least one lap, or a spinner takes its
-  // place. Neither busy nor disabled fades the chip (glass under opacity is not drawn), its
-  // ink goes faint instead.
-  loading?: boolean
-  slide?: 'up' | 'down'
-  disabled?: boolean
-}
-
-// A small capsule to pick from a row of them: the plain surface, filled with the accent
-// when chosen; with `glass`, a Liquid Glass one tinted with the accent on iOS 26.
-export function Chip({ label, active, onPress, style, icon, ink, glass = false, interactive = false, labeled, loading, slide, disabled }: Props) {
+export function Chip({ label, active, onPress, style, icon, ink, glass = false, interactive = false, labeled, loading, slide, disabled }: ChipProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const sliding = useAtLeastOneLap(!!loading && !!slide)
@@ -69,7 +43,6 @@ export function Chip({ label, active, onPress, style, icon, ink, glass = false, 
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}
-      // Glass is not interactive by default (its press spring pulls the chip along with a sideways scroll), so on glass nothing moves.
       style={({ pressed }) => [style, !glassy && !isDesktop && pressed && { transform: [{ scale: 0.96 }] }, isDesktop && pressed && { opacity: 0.8 }]}
     >
       {glassy ? (
@@ -90,13 +63,4 @@ const createStyles = (colors: Colors) =>
     solidActive: { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.accent },
     label: { fontSize: 14, fontWeight: '600' },
     content: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    // Segmented choices on the desktop: small flat tabs, the chosen one filled.
-    ...(isDesktop
-      ? {
-          chip: { minHeight: 28, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-          solid: { backgroundColor: colors.surfaceRaised, borderWidth: 0 },
-          solidActive: { backgroundColor: colors.accent, borderWidth: 0 },
-          label: { fontSize: 13, fontWeight: '500' },
-        }
-      : {}),
   })

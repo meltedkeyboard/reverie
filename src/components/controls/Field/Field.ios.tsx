@@ -1,30 +1,24 @@
-import { StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle } from 'react-native'
+import { StyleSheet, Text, TextInput, View } from 'react-native'
 
 import { useStyles, useTheme, type Colors } from '@/theme'
+import type { FieldHintProps, FieldLabelProps, FieldProps } from './types'
 
-type Props = TextInputProps & {
-  label?: string
-  hint?: string
-}
-
-// The colors every text input in the app takes from the theme.
 export function useInputColors() {
   const { colors, scheme } = useTheme()
   return { placeholderTextColor: colors.textFaint, selectionColor: colors.accent, keyboardAppearance: scheme }
 }
 
-export function FieldLabel({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
+export function FieldLabel({ children, style }: FieldLabelProps) {
   const styles = useStyles(createStyles)
   return <Text style={[styles.label, style]}>{children}</Text>
 }
 
-export function FieldHint({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
+export function FieldHint({ children, style }: FieldHintProps) {
   const styles = useStyles(createStyles)
   return <Text style={[styles.hint, style]}>{children}</Text>
 }
 
-// A box with a hairline, as in the first releases.
-export function Field({ label, hint, style, multiline, ...input }: Props) {
+export function Field({ label, hint, style, multiline, ...input }: FieldProps) {
   const styles = useStyles(createStyles)
   const inputColors = useInputColors()
   return (
@@ -51,7 +45,6 @@ const createStyles = (colors: Colors) =>
       height: 48,
       paddingVertical: 0,
     },
-    // Several lines: no set height, the padding comes back.
     multiline: { height: undefined, minHeight: 132, paddingTop: 13, paddingBottom: 13, textAlignVertical: 'top' },
     hint: { color: colors.textFaint, fontSize: 12, marginTop: 6, marginLeft: 4, lineHeight: 17 },
   })
