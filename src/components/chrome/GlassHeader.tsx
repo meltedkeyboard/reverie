@@ -23,6 +23,7 @@ type Props = {
   centerTitle?: boolean
   // Whether to draw the edge fade behind the floating bar. Defaults to true.
   fade?: boolean
+  fadeRgb?: string
 }
 
 const FADE_OVERHANG = 28
@@ -103,7 +104,7 @@ export function BackButton({ close }: { close?: boolean }) {
   return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
 }
 
-export function GlassHeader({ left, right, children, floating, centerTitle, fade = true }: Props) {
+export function GlassHeader({ left, right, children, floating, centerTitle, fade = true, fadeRgb }: Props) {
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const pathname = usePathname()
@@ -158,7 +159,7 @@ export function GlassHeader({ left, right, children, floating, centerTitle, fade
 
   const content = floating && floatingBars ? (
     <View style={[styles.floating, { paddingTop: insets.top }]} pointerEvents="box-none">
-      {fade ? <EdgeFade edge="top" style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} /> : null}
+      {fade ? <EdgeFade edge="top" rgb={fadeRgb} style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} /> : null}
       {row}
     </View>
   ) : (

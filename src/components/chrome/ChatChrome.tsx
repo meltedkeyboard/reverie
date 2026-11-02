@@ -5,10 +5,10 @@ import { Pattern } from '@/components/visuals/Pattern'
 import type { BackgroundEffect, BackgroundTone, Character } from '@/db/characters'
 import type { ChatWallpaper } from '@/db/prefs/settings'
 import { avatarUri, cropFromJson } from '@/lib/images/avatars'
-import { schemeOver } from '@/lib/images/backgroundTone'
-import { usePictureColor } from '@/lib/images/pictureColor'
+import { hexRgb, MAX_DIM, schemeOver } from '@/lib/images/backgroundTone'
+import { usePictureColor, type Rgb } from '@/lib/images/pictureColor'
 import { useChatTextSettings } from '@/lib/chat/chatText'
-import { FILL, useColors, useTheme, type Scheme } from '@/theme'
+import { FILL, paletteOf, useColors, useTheme, type Scheme } from '@/theme'
 
 // What a character or a room says about the look of its chats.
 export type ChatLook = Pick<
@@ -134,6 +134,29 @@ export const bubbleOpacityOf = (
 export function useHomeScheme(): Scheme | null {
   const { homeBackground } = useChatTextSettings()
   return useChatScheme(homeBackground ? NO_PICTURE : null)
+}
+
+// The top edge fade color for screens with the chats' background behind them:
+// the average color of the custom wallpaper, or undefined to keep the theme's default background color.
+export function useHomeFadeRgb(): string | undefined {
+  const { homeBackground, pattern, wallpaper } = useChatTextSettings()
+  const { theme, scheme } = useTheme()
+  const picture = homeBackground ? pictureOf(NO_PICTURE, wallpaper, pattern) : null
+  const color = usePictureColor(picture?.uri ?? null)
+  if (!picture || !color) return undefined
+  if (picture.effect === 'blur') {
+    return `${Math.round(color[0])}, ${Math.round(color[1])}, ${Math.round(color[2])}`
+  }
+  const dim =
+    picture.effect === 'dim-light'
+      ? paletteOf(theme, 'light').bg
+      : picture.effect === 'dim-dark'
+        ? paletteOf(theme, 'dark').bg
+        : paletteOf(theme, scheme).bg
+  const dimRgb = hexRgb(dim)
+  const amount = picture.intensity * MAX_DIM
+  const mixed: Rgb = [0, 1, 2].map((i) => Math.round(color[i] + (dimRgb[i] - color[i]) * amount)) as Rgb
+  return `${mixed[0]}, ${mixed[1]}, ${mixed[2]}`
 }
 
 // Behind the lists of those screens: the chats' wallpaper or pattern as a chat with no picture

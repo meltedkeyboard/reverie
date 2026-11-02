@@ -14,7 +14,7 @@ import { characterRow, NativeCardList, nativeCardList, type NativeCardRow } from
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, useScreenPadding } from '@/components/chrome/GlassHeader'
-import { HomeBackground, useHomeScheme } from '@/components/chrome/ChatChrome'
+import { HomeBackground, useHomeFadeRgb, useHomeScheme } from '@/components/chrome/ChatChrome'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '@/components/overlays/NativeMenu'
 import { Icon } from '@/components/visuals/Icon'
 import { deleteCharacter, listCharacters, listGroupCharacters, setCharacterOrder, type CharacterPreview } from '@/db/characters'
@@ -53,6 +53,7 @@ export default function GroupScreen() {
   const insets = useSafeAreaInsets()
   // Over the chats' wallpaper, when the home tabs have it behind them, so does a group.
   const homeScheme = useHomeScheme()
+  const homeFadeRgb = useHomeFadeRgb()
 
   const [group, setGroup] = useState<CharacterGroup | null>(null)
   const [members, setMembers] = useState<CharacterPreview[] | null>(null)
@@ -318,6 +319,7 @@ export default function GroupScreen() {
       ) : null}
       <GlassHeader
         floating
+        fadeRgb={homeFadeRgb}
         centerTitle
         left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
         right={

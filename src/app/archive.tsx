@@ -13,7 +13,7 @@ import { characterRow, NativeCardList, nativeCardList, type NativeCardRow } from
 import { EmptyState, ListSeparator } from '@/components/lists/EmptyState'
 import { GlassButton } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
-import { HomeBackground, useHomeScheme } from '@/components/chrome/ChatChrome'
+import { HomeBackground, useHomeFadeRgb, useHomeScheme } from '@/components/chrome/ChatChrome'
 import { deleteCharacter, listCharacters, restoreCharacters, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import { useCharacterActions } from '@/hooks/features/useCharacterActions'
@@ -44,6 +44,7 @@ export default function ArchiveScreen() {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const homeScheme = useHomeScheme()
+  const homeFadeRgb = useHomeFadeRgb()
   const [characters, setCharacters] = useState<CharacterPreview[] | null>(null)
 
   const reload = useCallback(async () => {
@@ -188,6 +189,7 @@ export default function ArchiveScreen() {
         ) : null}
         <GlassHeader
           floating
+          fadeRgb={homeFadeRgb}
           centerTitle
           left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
           right={

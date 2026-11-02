@@ -18,7 +18,7 @@ import { CONTINUE_BUTTON_SPACE } from '@/components/chat/ContinueButton'
 import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { GlassButton, GlassGroup, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
-import { HomeBackground, useHomeScheme } from '@/components/chrome/ChatChrome'
+import { HomeBackground, useHomeFadeRgb, useHomeScheme } from '@/components/chrome/ChatChrome'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { PopoverMenu, usePopoverMenu } from '@/components/overlays/PopoverMenu'
 import { Icon } from '@/components/visuals/Icon'
@@ -92,6 +92,7 @@ export default function CharactersScreen() {
   const anchor = useContinueAnchor()
   // Over the chats' wallpaper, when it is behind the list, the list takes the scheme a chat takes there.
   const homeScheme = useHomeScheme()
+  const homeFadeRgb = useHomeFadeRgb()
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
@@ -555,6 +556,7 @@ export default function CharactersScreen() {
       ) : null}
       <GlassHeader
         floating
+        fadeRgb={homeFadeRgb}
         right={
           <GlassGroup interactive={false}>
             {characters?.length ? (

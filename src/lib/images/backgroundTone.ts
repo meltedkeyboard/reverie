@@ -48,7 +48,7 @@ function readsAs(color: Rgb, theme: ThemeName): Scheme {
 // Laid over as the screen composites it, in sRGB.
 const mix = (base: Rgb, over: Rgb, amount: number): Rgb => [0, 1, 2].map((i) => base[i] + (over[i] - base[i]) * amount) as Rgb
 
-const hexRgb = (hex: string): Rgb => {
+export const hexRgb = (hex: string): Rgb => {
   const value = parseInt(hex.slice(1, 7), 16)
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
 }

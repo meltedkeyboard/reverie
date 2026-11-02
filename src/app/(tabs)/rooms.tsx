@@ -12,7 +12,7 @@ import { EmptyState, FeaturedSeparator, ListSeparator, emptyButtonStyle } from '
 import { IconButton } from '@/components/controls/IconButton'
 import { GlassButton, GlassGroup } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
-import { HomeBackground, useHomeScheme } from '@/components/chrome/ChatChrome'
+import { HomeBackground, useHomeFadeRgb, useHomeScheme } from '@/components/chrome/ChatChrome'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { PopoverMenu, usePopoverMenu } from '@/components/overlays/PopoverMenu'
 import { NativeCardList, nativeCardList, type NativeCardRow } from '@/components/lists/NativeCardList'
@@ -48,6 +48,7 @@ export default function RoomsScreen() {
   const anchor = useContinueAnchor()
   // Over the chats' wallpaper, when it is behind the list, the list takes the scheme a chat takes there.
   const homeScheme = useHomeScheme()
+  const homeFadeRgb = useHomeFadeRgb()
 
   const reload = useCallback(async () => {
     await pruneUntouchedChats(db)
@@ -208,6 +209,7 @@ export default function RoomsScreen() {
         ) : null}
         <GlassHeader
           floating
+          fadeRgb={homeFadeRgb}
           right={
             // The edit and create buttons share one capsule, as on the Characters tab.
             <GlassGroup interactive={false}>
