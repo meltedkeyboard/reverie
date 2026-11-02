@@ -5,12 +5,13 @@ import Animated, { interpolate, useAnimatedStyle, type SharedValue } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
-import { isDesktop } from '@/lib/core/platform'
+import { isAndroid, isDesktop } from '@/lib/core/platform'
 import { type Colors, HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { EdgeFade } from './BarChrome'
-import { GlassButton } from './Glass'
+import { GlassButton, HeaderContext, useInHeader } from './Glass'
 import { TAB_TITLE_STAR, TAB_TITLE_STAR_ROOM, TabTitle, useHeaderHeight } from './GlassHeader'
+import { IconButton } from '../controls/IconButton'
 import { SFIcon } from '../visuals/SFIcon'
 
 
@@ -22,12 +23,13 @@ export function FormScreenHeader({ title }: { title: string }) {
   const styles = useStyles(createStyles)
   return (
     <>
-      <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
+      {!isAndroid && <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />}
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTransparent: true,
+          headerTransparent: !isAndroid,
           headerShadowVisible: false,
+          headerStyle: isAndroid ? { backgroundColor: colors.surface } : undefined,
           // Like the glass buttons everywhere else, not the accent the navigation theme tints with.
           headerTintColor: colors.text,
           headerBackButtonDisplayMode: 'minimal',
@@ -83,12 +85,26 @@ export function DrawnFormScreenHeader({
     const shown = overPhoto ? 1 - overPhoto.value : 1
     return { opacity: clearAtTop && scrollY ? shown * interpolate(scrollY.value, [0, FADE_IN], [0, 1], 'clamp') : shown }
   })
+  const colors = useColors()
   return (
-    <>
-      <Animated.View style={[styles.fade, { height: headerHeight + 28 }, fadeShown]}>
-        <EdgeFade edge="top" rgb={fadeRgb} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <View style={[styles.bar, { paddingTop: insets.top }]} pointerEvents="box-none">
+    <HeaderContext.Provider value={true}>
+      {!isAndroid && (
+        <Animated.View style={[styles.fade, { height: headerHeight + 28 }, fadeShown]}>
+          <EdgeFade edge="top" rgb={fadeRgb} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+      )}
+      <View
+        style={[
+          styles.bar,
+          { paddingTop: insets.top },
+          isAndroid && {
+            backgroundColor: colors.surface,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: colors.border,
+          },
+        ]}
+        pointerEvents="box-none"
+      >
         <View
           style={[
             styles.row,
@@ -112,7 +128,7 @@ export function DrawnFormScreenHeader({
           {right}
         </View>
       </View>
-    </>
+    </HeaderContext.Provider>
   )
 }
 
@@ -134,7 +150,26 @@ type BarButtonProps = {
 // glass button in the app, or white on the accent when prominent.
 export function BarButton({ symbol, fallback, onPress, disabled, accessibilityLabel, prominent = false, animateChange }: BarButtonProps) {
   const colors = useColors()
+  const inHeader = useInHeader()
   const filled = prominent && !disabled
+  if (isAndroid && inHeader) {
+    return (
+      <IconButton
+        name={fallback}
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityLabel={accessibilityLabel}
+      >
+        <SFIcon
+          name={symbol}
+          fallback={fallback}
+          size={19}
+          color={filled ? colors.accent : colors.text}
+          animateChange={animateChange}
+        />
+      </IconButton>
+    )
+  }
   return (
     <GlassButton
       icon={fallback}

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router'
+import { usePathname, useRouter } from 'expo-router'
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -8,10 +8,10 @@ import { floatingBars } from '@/lib/ui/nativeUI'
 import { fonts, HEADER_FONT_SCALE, HEADER_ROW_HEIGHT, useColors, useStyles, type Colors } from '@/theme'
 
 import { BlurBar, EdgeFade } from './BarChrome'
-import { GlassButton } from './Glass'
+import { GlassButton, HeaderContext } from './Glass'
 import { IconButton } from '../controls/IconButton'
 import { Star } from '../visuals/motifs/Star'
-import { isDesktop, isIOS } from '@/lib/core/platform'
+import { isAndroid, isDesktop, isIOS } from '@/lib/core/platform'
 
 type Props = {
   left?: React.ReactNode
@@ -98,14 +98,16 @@ export function BackButton({ close }: { close?: boolean }) {
   const router = useRouter()
   const name = close ? 'close' : 'chevron-back'
   const size = close ? 24 : 26
-  // iOS keeps the plain icon; elsewhere it sits on the round surface like the other bar buttons.
-  if (isIOS) return <IconButton name={name} size={size} onPress={() => router.back()} />
+  // iOS and Android keep the plain icon; elsewhere it sits on the round surface like the other bar buttons.
+  if (isIOS || isAndroid) return <IconButton name={name} size={size} onPress={() => router.back()} />
   return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
 }
 
 export function GlassHeader({ left, right, children, floating, centerTitle, fade = true }: Props) {
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
+  const pathname = usePathname()
+  const isChat = pathname?.startsWith('/chat/')
   const row = (
     <View
       style={[
@@ -144,20 +146,28 @@ export function GlassHeader({ left, right, children, floating, centerTitle, fade
     </View>
   )
 
-  if (floating && floatingBars) {
+  if (isAndroid && !isChat) {
     return (
-      <View style={[styles.floating, { paddingTop: insets.top }]} pointerEvents="box-none">
-        {fade ? <EdgeFade edge="top" style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} /> : null}
-        {row}
-      </View>
+      <HeaderContext.Provider value={true}>
+        <View style={[styles.androidBar, { paddingTop: insets.top }]}>
+          {row}
+        </View>
+      </HeaderContext.Provider>
     )
   }
 
-  return (
+  const content = floating && floatingBars ? (
+    <View style={[styles.floating, { paddingTop: insets.top }]} pointerEvents="box-none">
+      {fade ? <EdgeFade edge="top" style={[styles.fade, { height: insets.top + HEADER_ROW_HEIGHT + FADE_OVERHANG }]} /> : null}
+      {row}
+    </View>
+  ) : (
     <BlurBar edge="top" style={[styles.root, { paddingTop: insets.top }]}>
       {row}
     </BlurBar>
   )
+
+  return isChat ? content : <HeaderContext.Provider value={true}>{content}</HeaderContext.Provider>
 }
 
 const createStyles = (colors: Colors) =>
@@ -172,6 +182,16 @@ const createStyles = (colors: Colors) =>
     left: 0,
     right: 0,
     zIndex: 10,
+  },
+  androidBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    backgroundColor: colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   floating: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   fade: { position: 'absolute', top: 0, left: 0, right: 0 },

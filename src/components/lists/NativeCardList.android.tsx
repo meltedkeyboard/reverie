@@ -222,6 +222,7 @@ function NativeCardRowItem({ row, editing, checked, onToggle, isLast }: RowItemP
               />
             </View>
           ) : null}
+          <View style={styles.spacer} />
           {row.date !== null ? (
             <Text style={styles.date} numberOfLines={1}>
               {formatShortWhen(row.date, locale)}
@@ -236,16 +237,18 @@ function NativeCardRowItem({ row, editing, checked, onToggle, isLast }: RowItemP
                 color={colors.textFaint}
               />
             </View>
-          ) : (
-            <Pressable onPressIn={drag} hitSlop={8} style={styles.dragHandle}>
-              <Icon name="reorder-three-outline" size={24} color={colors.textFaint} />
-            </Pressable>
-          )}
+          ) : null}
         </View>
         <Text style={styles.line} numberOfLines={2}>
           {row.line}
         </Text>
       </View>
+
+      {editing ? (
+        <Pressable onPressIn={drag} hitSlop={12} style={styles.dragHandle}>
+          <Icon name="reorder-three-outline" size={24} color={colors.textFaint} />
+        </Pressable>
+      ) : null}
     </Pressable>
   )
 
@@ -466,18 +469,23 @@ const createStyles = (colors: Colors) =>
     mark: {
       marginLeft: 4,
     },
+    spacer: {
+      flex: 1,
+      minWidth: 8,
+    },
     date: {
       fontSize: 14,
       color: colors.textMuted,
-      marginLeft: 'auto',
-      paddingLeft: 8,
+      paddingLeft: 4,
     },
     chevron: {
       marginLeft: 6,
     },
     dragHandle: {
-      marginLeft: 8,
-      padding: 2,
+      marginLeft: 12,
+      padding: 4,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     line: {
       fontSize: 14,

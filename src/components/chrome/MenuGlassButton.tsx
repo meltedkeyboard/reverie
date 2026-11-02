@@ -2,7 +2,7 @@ import { Icon } from '@/components/visuals/Icon'
 import { View } from 'react-native'
 
 import { showSheet } from '@/lib/ui/dialogs'
-import { isDesktop } from '@/lib/core/platform'
+import { isAndroid, isDesktop } from '@/lib/core/platform'
 import { useColors } from '@/theme'
 
 import { GlassSurface, useGlassStyles } from './Glass'
@@ -28,6 +28,14 @@ export function MenuGlassButton({ icon, items, size = 44, disabled }: Props) {
       {glyph}
     </GlassSurface>
   )
+
+  if (isAndroid) {
+    return (
+      <NativeMenu items={items} disabled={disabled}>
+        <IconButton name={icon} size={22} disabled={disabled} />
+      </NativeMenu>
+    )
+  }
 
   // On the desktop the flat square of IconButton, like the buttons beside it; the menu is the
   // same sheet NativeMenu opens on the web, at the pointer.

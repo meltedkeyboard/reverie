@@ -45,7 +45,9 @@ export function TapTrigger({ onPress, disabled, style, children }: { onPress: ()
       pressRetentionOffset={PRESS_ANYWHERE}
       style={({ pressed }) => [style, pressed && { opacity: 0.6 }]}
     >
-      {children}
+      <View pointerEvents="none" style={styles.triggerContent}>
+        {children}
+      </View>
     </Pressable>
   )
 }
@@ -150,4 +152,5 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
 const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   hosted: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  triggerContent: { alignSelf: 'stretch', flexGrow: 1 },
 })

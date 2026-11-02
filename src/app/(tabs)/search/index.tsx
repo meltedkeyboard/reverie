@@ -276,7 +276,8 @@ export default function SearchScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTransparent: true,
+          headerTransparent: !isAndroid,
+          headerStyle: isAndroid ? { backgroundColor: colors.surface } : undefined,
           // Search is a place of the sidebar on the isWeb, not a step on the way from another screen.
           headerBackVisible: !isWeb,
           title: '',
@@ -312,7 +313,7 @@ export default function SearchScreen() {
         }}
       />
       {list({ paddingBottom: 24 })}
-      <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
+      {!isAndroid && <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />}
     </View>
   )
 }

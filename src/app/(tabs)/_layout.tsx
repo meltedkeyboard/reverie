@@ -83,6 +83,11 @@ function AppTabs({ listeners }: { listeners: TabListeners }) {
         tabBarItemLabelVisibilityMode: 'labeled' as const,
         tabBarItemActiveIndicatorColor: colors.accentSoft,
         tabBarItemActiveIndicatorEnabled: true,
+        tabBarItemActiveIndicatorWidth: 64,
+        tabBarItemActiveIndicatorHeight: 32,
+        tabBarItemTitleSmallLabelFontSize: 11,
+        tabBarItemTitleLargeLabelFontSize: 11,
+        tabBarItemTitleFontWeight: '500' as const,
         normal: {
           tabBarItemTitleFontColor: colors.textMuted,
           tabBarItemIconColor: colors.textMuted,
@@ -101,8 +106,8 @@ function AppTabs({ listeners }: { listeners: TabListeners }) {
         rippleColor: colors.accentSoft,
         iconColor: { default: colors.textMuted, selected: colors.accent },
         labelStyle: {
-          default: { color: colors.textMuted, fontWeight: '500' as const },
-          selected: { color: colors.accent, fontWeight: '600' as const },
+          default: { color: colors.textMuted, fontSize: 11, fontWeight: '500' as const },
+          selected: { color: colors.accent, fontSize: 11, fontWeight: '600' as const },
         },
         labelVisibilityMode: 'labeled' as const,
       }

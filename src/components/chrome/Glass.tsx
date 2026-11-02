@@ -1,12 +1,15 @@
 import { Icon } from '@/components/visuals/Icon'
-import type { ComponentProps } from 'react'
+import { createContext, useContext, type ComponentProps } from 'react'
 import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
 
 import { floatingBars, glassEffect, liquidGlass } from '@/lib/ui/nativeUI'
-import { isDesktop } from '@/lib/core/platform'
+import { isAndroid, isDesktop } from '@/lib/core/platform'
 import { ON_ACCENT, useStyles, useTheme, type Colors } from '@/theme'
 
 import { IconButton } from '../controls/IconButton'
+
+export const HeaderContext = createContext<boolean>(false)
+export const useInHeader = () => useContext(HeaderContext)
 
 type SurfaceProps = ViewProps & {
   // Applied only when Liquid Glass is unavailable, in place of the glass material.
@@ -72,20 +75,24 @@ type ButtonProps = {
 // finger by itself, so a glass control adds no press scale of its own: the two fight.
 export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOut, disabled = false, accessibilityLabel, tint, interactive = true, children }: ButtonProps) {
   const { colors } = useTheme()
+  const inHeader = useInHeader()
   const styles = useStyles(createStyles)
-  const fill = disabled ? undefined : tint
+  const isAndroidHeader = isAndroid && inHeader
+  const fill = disabled || isAndroidHeader ? undefined : tint
+  const iconColor = isAndroidHeader && tint ? colors.accent : fill ? ON_ACCENT : undefined
   if (!liquidGlass) {
+    const hasCircle = floatingBars && !isDesktop && !isAndroidHeader
     return (
       <IconButton
         name={icon}
         size={iconSize}
-        color={fill ? ON_ACCENT : undefined}
+        color={iconColor}
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         disabled={disabled}
         accessibilityLabel={accessibilityLabel}
-        style={[floatingBars && !isDesktop && styles.circleSolid, fill ? { backgroundColor: fill } : undefined]}
+        style={[hasCircle && styles.circleSolid, fill ? { backgroundColor: fill } : undefined]}
       >
         {children}
       </IconButton>
@@ -115,9 +122,10 @@ export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOu
 // Several icon buttons in one Liquid Glass capsule, the way iOS 26 groups bar items;
 // outside iOS 26 they are just the plain icon buttons side by side.
 export function GlassGroup({ children, interactive = true }: { children: React.ReactNode; interactive?: boolean }) {
+  const inHeader = useInHeader()
   const styles = useStyles(createStyles)
-  // On the desktop the buttons stand loose, flat, as in a toolbar.
-  if (isDesktop) return <View style={styles.desktopGroup}>{children}</View>
+  // On the desktop or Android headers the buttons stand loose, flat, as in a toolbar.
+  if (isDesktop || (isAndroid && inHeader)) return <View style={styles.desktopGroup}>{children}</View>
   return (
     <GlassSurface interactive={interactive} style={styles.group} fallbackStyle={floatingBars && styles.solid}>
       {children}
