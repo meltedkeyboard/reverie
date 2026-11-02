@@ -55,14 +55,14 @@ export function Chip({ label, active, onPress, style, icon, ink, labeled, loadin
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     chip: {
-      minHeight: 34,
-      borderRadius: 10,
+      minHeight: 36,
+      borderRadius: 20,
       overflow: 'hidden',
     },
     pressable: {
       flex: 1,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
       alignItems: 'center',
       justifyContent: 'center',
     },
