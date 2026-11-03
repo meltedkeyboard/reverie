@@ -316,6 +316,12 @@ export const HEADER_ROW_HEIGHT = 52
 export const CONTROL_FONT_SCALE = 1.35
 export const HEADER_FONT_SCALE = 1.2
 
+export type ThemeAccent = {
+  accent: string
+  accentSoft: string
+  accentBorder: string
+}
+
 type ThemeContextValue = {
   colors: Colors
   scheme: Scheme
@@ -323,6 +329,7 @@ type ThemeContextValue = {
   setTheme: (theme: ThemeName) => void
   mode: ThemeMode
   setMode: (mode: ThemeMode) => void
+  accent: ThemeAccent | null
 }
 
 const [ThemeContext, useThemeContext] = createRequiredContext<ThemeContextValue>('useColors/useTheme must be used within ThemeContextProvider')
@@ -337,17 +344,28 @@ export function ThemeContextProvider({
   setTheme,
   mode,
   setMode,
+  accent,
   children,
 }: {
   theme: ThemeName
   setTheme: (theme: ThemeName) => void
   mode: ThemeMode
   setMode: (mode: ThemeMode) => void
+  accent?: ThemeAccent | null
   children: React.ReactNode
 }) {
   const systemScheme = useColorScheme()
   const scheme: Scheme = mode === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : mode
-  const colors = palettes[theme][scheme]
+  const baseColors = palettes[theme][scheme]
+  const colors = useMemo(() => {
+    if (!accent) return baseColors
+    return {
+      ...baseColors,
+      accent: accent.accent,
+      accentSoft: accent.accentSoft,
+      accentBorder: accent.accentBorder,
+    }
+  }, [baseColors, accent])
   // Alerts, action sheets and the keyboard follow the window rather than the app, so
   // a theme picked in the app is passed down to it; 'system' gives it back to iOS.
   // react-native-web has no setColorScheme, and the page has no such windows.
@@ -383,8 +401,8 @@ export function ThemeContextProvider({
     if (isDesktop) applyDesktopChrome(colors)
   }, [colors, scheme])
   const value = useMemo(
-    () => ({ colors, scheme, theme, setTheme, mode, setMode }),
-    [colors, scheme, theme, setTheme, mode, setMode]
+    () => ({ colors, scheme, theme, setTheme, mode, setMode, accent: accent ?? null }),
+    [colors, scheme, theme, setTheme, mode, setMode, accent]
   )
   return (
     <UrgentThemeContext.Provider value={value}>
@@ -408,12 +426,38 @@ export function ImmediateTheme({ children }: { children: React.ReactNode }) {
 // What is inside takes the theme's light or dark palette whatever the app's own scheme, as a
 // chat does from its picture; null leaves it the app's. Only the app's own views follow:
 // alerts and the window keep the app's scheme, which Appearance holds for the whole app.
-export function SchemeOverride({ scheme, children }: { scheme: Scheme | null; children: React.ReactNode }) {
+export function SchemeOverride({
+  scheme,
+  accent,
+  children,
+}: {
+  scheme: Scheme | null
+  accent?: ThemeAccent | null
+  children: React.ReactNode
+}) {
   const outer = useThemeContext()
-  const value = useMemo(
-    () => (!scheme || scheme === outer.scheme ? outer : { ...outer, scheme, colors: palettes[outer.theme][scheme] }),
-    [outer, scheme]
-  )
+  const value = useMemo(() => {
+    const nextScheme = scheme ?? outer.scheme
+    const baseColors = palettes[outer.theme][nextScheme]
+    const effectiveAccent = accent !== undefined ? accent : outer.accent
+    const nextColors = effectiveAccent
+      ? {
+          ...baseColors,
+          accent: effectiveAccent.accent,
+          accentSoft: effectiveAccent.accentSoft,
+          accentBorder: effectiveAccent.accentBorder,
+        }
+      : baseColors
+    if (nextScheme === outer.scheme && nextColors === outer.colors) {
+      return outer
+    }
+    return {
+      ...outer,
+      scheme: nextScheme,
+      colors: nextColors,
+      accent: effectiveAccent,
+    }
+  }, [outer, scheme, accent])
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 

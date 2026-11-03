@@ -34,6 +34,7 @@ import { ChatTextProvider } from '@/lib/chat/chatText'
 import { isElectron, isWeb } from '@/lib/core/platform'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemeMode, type ThemeName } from '@/theme'
+import { useAppDynamicAccent } from '@/components/chrome/ChatChrome'
 
 export default function RootLayout() {
   return (
@@ -68,16 +69,16 @@ function ThemedApp() {
 
   return (
     <LocaleContextProvider preference={localePreference} setPreference={setLocalePreference}>
-      <StoredTheme>
-        <CloudSyncProvider>
-          <ChatTextProvider>
+      <ChatTextProvider>
+        <StoredTheme>
+          <CloudSyncProvider>
             {/* A new text size doesn't always reach the layout of screens already shown, so
                 the screens are built anew for it. The database and sync stay. */}
             <AppShell key={fontScale} />
             <SplashOverlay />
-          </ChatTextProvider>
-        </CloudSyncProvider>
-      </StoredTheme>
+          </CloudSyncProvider>
+        </StoredTheme>
+      </ChatTextProvider>
     </LocaleContextProvider>
   )
 }
@@ -87,8 +88,9 @@ function ThemedApp() {
 function StoredTheme({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useStoredValue<ThemeName>(loadThemeName, saveThemeName, 'default')
   const [mode, setMode] = useStoredValue<ThemeMode>(loadThemeMode, saveThemeMode, 'system')
+  const appAccent = useAppDynamicAccent()
   return (
-    <ThemeContextProvider theme={theme} setTheme={setTheme} mode={mode} setMode={setMode}>
+    <ThemeContextProvider theme={theme} setTheme={setTheme} mode={mode} setMode={setMode} accent={appAccent}>
       {children}
     </ThemeContextProvider>
   )

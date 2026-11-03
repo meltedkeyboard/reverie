@@ -14,6 +14,7 @@ import {
   pictureOf,
   useChatBackdropTone,
   useChatScheme,
+  useChatWallpaperAccent,
   type ChatLook,
 } from '@/components/chrome/ChatChrome'
 import { ArchivedBar } from '@/components/chat/ArchivedBar'
@@ -414,9 +415,10 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
   // the picture blurred under it; over a pattern both keep the app's.
   const scheme = useChatScheme(lookOf(owner))
   const backdrop = useChatBackdropTone(lookOf(owner))
+  const chatAccent = useChatWallpaperAccent(lookOf(owner))
 
   return (
-    <SchemeOverride scheme={wide ? null : backdrop}>
+    <SchemeOverride scheme={wide ? null : backdrop} accent={chatAccent}>
       <ChatDrawer
         owner={owner}
         chatId={active.chat.id}
@@ -428,7 +430,7 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
         onCurrentDeleted={replaceDeleted}
         onClosed={onClosed}
       >
-        <SchemeOverride scheme={scheme}>
+        <SchemeOverride scheme={scheme} accent={chatAccent}>
           {scheme ? <ChatStatusBar scheme={scheme} /> : null}
           <View style={styles.screen}>
             <ChatSurface owner={lookOf(owner)} />
