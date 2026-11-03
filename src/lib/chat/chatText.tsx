@@ -11,6 +11,7 @@ import {
   loadChatUserFont,
   loadChatUserMarkdown,
   loadChatWallpaper,
+  loadDynamicAccent,
   loadHomeBackground,
   saveChatBackdrop,
   saveChatFont,
@@ -19,6 +20,7 @@ import {
   saveChatUserFont,
   saveChatUserMarkdown,
   saveChatWallpaper,
+  saveDynamicAccent,
   saveHomeBackground,
   type ChatFont,
   type ChatPatternId,
@@ -53,6 +55,8 @@ type ChatTextValue = {
   // Whether the Characters and Rooms tabs show it behind their lists too.
   homeBackground: boolean
   setHomeBackground: (on: boolean) => void
+  dynamicAccent: boolean
+  setDynamicAccent: (on: boolean) => void
   // How much the chat text is enlarged: 1 is the regular size.
   scale: number
   setFont: (font: ChatFont) => void
@@ -73,12 +77,14 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   const [wallpaper, setWallpaperState] = useState<ChatWallpaper | null>(null)
   const [backdrop, setBackdropState] = useState(true)
   const [homeBackground, setHomeBackgroundState] = useState(false)
+  const [dynamicAccent, setDynamicAccentState] = useState(false)
 
   useEffect(() => {
     loadChatPattern(db).then(setPatternState)
     loadChatWallpaper(db).then(setWallpaperState)
     loadChatBackdrop(db).then(setBackdropState)
     loadHomeBackground(db).then(setHomeBackgroundState)
+    loadDynamicAccent(db).then(setDynamicAccentState)
     loadChatFont(db).then(setFontState)
     loadChatTextScale(db).then(setScaleState)
     loadChatUserFont(db).then(setUserFontState)
@@ -141,6 +147,13 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     },
     [db]
   )
+  const setDynamicAccent = useCallback(
+    (on: boolean) => {
+      setDynamicAccentState(on)
+      saveDynamicAccent(db, on)
+    },
+    [db]
+  )
   const reset = useCallback(() => {
     setFont(DEFAULT_CHAT_FONT)
     setUserFont(false)
@@ -162,6 +175,8 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
       setBackdrop,
       homeBackground,
       setHomeBackground,
+      dynamicAccent,
+      setDynamicAccent,
       scale,
       setFont,
       setScale,
@@ -181,6 +196,8 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
       setBackdrop,
       homeBackground,
       setHomeBackground,
+      dynamicAccent,
+      setDynamicAccent,
       scale,
       setFont,
       setScale,

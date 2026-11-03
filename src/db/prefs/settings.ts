@@ -439,6 +439,12 @@ const homeBackground = defineFlag('home_background', false)
 export const loadHomeBackground = homeBackground.load
 export const saveHomeBackground = homeBackground.save
 
+// Whether the chrome (tab bar, continue button, composer, attach menu) takes its accent color
+// from the wallpaper's average color, off by default.
+const dynamicAccent = defineFlag('dynamic_accent', false)
+export const loadDynamicAccent = dynamicAccent.load
+export const saveDynamicAccent = dynamicAccent.save
+
 // The pattern behind a chat that has no picture of its own, from the Penpot page
 // "Background Pattern"; 'none' is the plain theme background.
 export const CHAT_PATTERNS = ['none', 'stars', 'two-stars', 'big-star', 'diagonal', 'scattered', 'rings', 'rings-centered', 'dots'] as const

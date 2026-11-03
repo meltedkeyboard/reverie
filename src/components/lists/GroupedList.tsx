@@ -212,6 +212,7 @@ export function ButtonCell({
   loading,
   icon,
   unlit = false,
+  color,
 }: CellProps & {
   onPress: () => void
   danger?: boolean
@@ -220,11 +221,12 @@ export function ButtonCell({
   unlit?: boolean
   // `symbol` is the SF Symbol drawn on iOS, `fallback` the icon elsewhere (or everywhere without one).
   icon?: { symbol?: ComponentProps<typeof SFIcon>['name']; fallback: ComponentProps<typeof Icon>['name']; slide?: 'up' | 'down' }
+  color?: string
 }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const sliding = useAtLeastOneLap(!!loading && !!icon?.slide)
-  const ink = danger ? colors.danger : colors.accent
+  const ink = danger ? colors.danger : (color ?? colors.accent)
   return (
     <Pressable
       disabled={disabled || loading || sliding}

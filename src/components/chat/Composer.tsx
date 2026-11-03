@@ -28,7 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { BlurBar, EdgeFade } from '../chrome/BarChrome'
-import type { ChatLook } from '../chrome/ChatChrome'
+import { useChatWallpaperAccent, type ChatLook } from '../chrome/ChatChrome'
 import { useChatDrawer } from '../chrome/ChatDrawer'
 import { GlassSurface, useGlassStyles } from '../chrome/Glass'
 import { AttachSheet, loadAttachGalleries, loadRecentPictures } from './AttachMenu'
@@ -144,6 +144,8 @@ export function Composer({
   const insets = useSafeAreaInsets()
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   const colors = useColors()
+  const wallpaperColors = useChatWallpaperAccent(look)
+  const effectiveAccent = wallpaperColors?.accent ?? colors.accent
   const { scheme } = useTheme()
   const inputColors = useInputColors()
   const glass = useGlassStyles()
@@ -305,7 +307,7 @@ export function Composer({
   }, [mode, armed])
 
   const buttonStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(armed.value, [0, 1], [colors.surfaceRaised, colors.accent]),
+    backgroundColor: interpolateColor(armed.value, [0, 1], [colors.surfaceRaised, effectiveAccent]),
     transform: [{ scale: 0.92 + armed.value * 0.08 }],
   }))
 
@@ -346,7 +348,7 @@ export function Composer({
       name={ICONS[mode].sf}
       fallback={ICONS[mode].fallback}
       size={mode === 'stop' ? 15 : 20}
-      color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? colors.accent : ON_ACCENT}
+      color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? effectiveAccent : ON_ACCENT}
       onAccent={accented}
     />
   )
@@ -362,7 +364,7 @@ export function Composer({
         // Glass of its own on the field's glass, tinted with the accent while it sends. Not
         // interactive: the field clips its corners, and the glass swelling under the finger
         // was cut off at the field's edge.
-        <GlassSurface tintColor={accented ? colors.accent : undefined} style={styles.send}>
+        <GlassSurface tintColor={accented ? effectiveAccent : undefined} style={styles.send}>
           {sendIcon}
         </GlassSurface>
       ) : (
@@ -556,7 +558,7 @@ export function Composer({
         <View style={styles.field} onLayout={fit}>
         {editing ? (
           <View style={styles.banner} onLayout={(e) => setBannerH(e.nativeEvent.layout.height)}>
-            <Icon name="create-outline" size={15} color={colors.accent} />
+            <Icon name="create-outline" size={15} color={effectiveAccent} />
             <Text style={styles.bannerText}>{t('chat.editingMessage')}</Text>
             <IconButton name="close" size={18} color={colors.textMuted} onPress={onCancelEdit} style={styles.bannerClose} />
           </View>
@@ -619,6 +621,7 @@ export function Composer({
                 onBlur={() => setFocused(false)}
                 placeholder={suggesting ? '' : (placeholder ?? t('chat.messagePlaceholder'))}
                 {...inputColors}
+                selectionColor={effectiveAccent}
                 // The placeholder is drawn below, where it can glide between the two layouts.
                 placeholderTextColor="transparent"
                 multiline

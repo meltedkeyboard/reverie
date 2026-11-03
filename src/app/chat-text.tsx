@@ -209,6 +209,8 @@ function Appearance() {
     setBackdrop,
     homeBackground,
     setHomeBackground,
+    dynamicAccent,
+    setDynamicAccent,
     scale,
     setFont,
     setScale,
@@ -474,6 +476,7 @@ function Appearance() {
           {wallpaper?.file ? <SwiftButton label={t('background.remove')} role="destructive" onPress={onRemoveBackground} /> : null}
           <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} modifiers={[disabled(noPicture)]} />
           <Toggle label={t('settings.homeBackground')} isOn={homeBackground} onIsOnChange={setHomeBackground} modifiers={[disabled(noPicture)]} />
+          <Toggle label={t('settings.dynamicAccent')} isOn={dynamicAccent} onIsOnChange={setDynamicAccent} modifiers={[disabled(noPicture)]} />
         </NativeSection>
 
         <NativeSection>
@@ -671,6 +674,7 @@ function Appearance() {
             {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
             <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} disabled={noPicture} />
             <SwitchCell label={t('settings.homeBackground')} value={homeBackground} onValueChange={setHomeBackground} disabled={noPicture} />
+            <SwitchCell label={t('settings.dynamicAccent')} value={dynamicAccent} onValueChange={setDynamicAccent} disabled={noPicture} />
           </ListSection>
 
           <ListSection>

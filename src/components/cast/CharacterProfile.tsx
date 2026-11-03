@@ -30,18 +30,18 @@ type Props = {
 // A character to look at rather than to edit, as a Telegram profile: under the avatar
 // what the character is, and how it answers, in the grouped look of the editor. The name stays in the header, from where it
 // moves onto the photo when the avatar spreads. Empty parts are left out.
-export function CharacterProfile({ greeting, systemPrompt, notes, params, background, exportItems, gallery }: Props) {
+export function CharacterProfile({ greeting, systemPrompt, notes, params, background, exportItems, gallery, linkColor }: Props & { linkColor?: string }) {
   const { t } = useTranslation()
 
   return (
     <View>
-      <ProfileText header={t('editor.systemPromptLabel')} text={systemPrompt} lines={6} />
-      <ProfileText header={t('editor.greetingLabel')} text={greeting} lines={4} />
-      <ProfileText header={t('editor.notesLabel')} text={notes} lines={4} />
+      <ProfileText header={t('editor.systemPromptLabel')} text={systemPrompt} lines={6} ink={linkColor} />
+      <ProfileText header={t('editor.greetingLabel')} text={greeting} lines={4} ink={linkColor} />
+      <ProfileText header={t('editor.notesLabel')} text={notes} lines={4} ink={linkColor} />
       {gallery}
       <ProfileParams header={t('editor.genParamsSection')} params={params} />
       <ProfileBackground background={background} />
-      {exportItems ? <ProfileActions header={t('card.export')} items={exportItems} /> : null}
+      {exportItems ? <ProfileActions header={t('card.export')} items={exportItems} color={linkColor} /> : null}
     </View>
   )
 }
@@ -67,6 +67,7 @@ export function NativeProfileList({ style, linkColor, ...profile }: Props & { st
         background={profile.background}
         exportHeader={t('card.export')}
         exportItems={profile.exportItems}
+        actionColor={linkColor}
         style={style}
       />
     </View>
@@ -83,6 +84,7 @@ export function SystemProfileRest({
   background,
   exportHeader,
   exportItems,
+  actionColor,
   style,
 }: {
   paramsHeader: string
@@ -90,11 +92,12 @@ export function SystemProfileRest({
   background: Props['background']
   exportHeader: string
   exportItems?: MenuItem[]
+  actionColor?: string
   style?: StyleProp<ViewStyle>
 }) {
   return (
     <SystemListBlock style={style}>
-      <SystemProfileSections paramsHeader={paramsHeader} params={params} background={background} exportHeader={exportHeader} exportItems={exportItems} />
+      <SystemProfileSections paramsHeader={paramsHeader} params={params} background={background} exportHeader={exportHeader} exportItems={exportItems} actionColor={actionColor} />
     </SystemListBlock>
   )
 }
@@ -132,6 +135,7 @@ function SystemProfileSections({
   background,
   exportHeader,
   exportItems,
+  actionColor,
 }: Omit<React.ComponentProps<typeof SystemProfileRest>, 'style'>) {
   const { t } = useTranslation()
   const { LabeledContent, Text } = nativeForm!.ui
@@ -156,7 +160,7 @@ function SystemProfileSections({
       {exportItems ? (
         <NativeSection title={exportHeader}>
           {exportItems.map((item) => (
-            <NativeActionRow key={item.label} label={item.label} onPress={() => item.onSelect?.()} />
+            <NativeActionRow key={item.label} label={item.label} color={actionColor} symbol={item.systemImage} onPress={() => item.onSelect?.()} />
           ))}
         </NativeSection>
       ) : null}
@@ -215,11 +219,11 @@ export function ProfileBackground({ background }: { background: Props['backgroun
 
 // Each way out is a row of its own rather than a menu: the system menu jumps behind the
 // scroll as it closes on iOS 26 and 27.
-export function ProfileActions({ header, items }: { header: string; items: MenuItem[] }) {
+export function ProfileActions({ header, items, color }: { header: string; items: MenuItem[]; color?: string }) {
   return (
     <ListSection header={header}>
       {items.map((item) => (
-        <ButtonCell key={item.label} label={item.label} onPress={() => item.onSelect?.()} />
+        <ButtonCell key={item.label} label={item.label} color={color} onPress={() => item.onSelect?.()} />
       ))}
     </ListSection>
   )

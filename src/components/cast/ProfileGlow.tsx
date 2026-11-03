@@ -58,6 +58,12 @@ export function hexRgb(hex: string): Rgb {
 // out greyish, a photo's colors cancelling out, and washed over the page as it is it read
 // as a dirty shade rather than the character's color. The hue is kept, the saturation
 // raised and the lightness kept to the middle.
+// A softer tint for chrome UI (tab bar, buttons, composer): keeps natural saturation and balanced lightness.
+export function wallpaperTint(average: Rgb): Rgb {
+  const [h, s, l] = hsl(average)
+  return rgb(h, Math.min(0.6, Math.max(0.2, s)), Math.min(0.52, Math.max(0.36, l)))
+}
+
 export function profileTint(average: Rgb): Rgb {
   const [h, s, l] = hsl(average)
   return rgb(h, Math.min(1, s * 1.6 + 0.15), Math.min(0.62, Math.max(0.38, l)))

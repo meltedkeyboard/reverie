@@ -5,6 +5,7 @@ import { Pattern } from '@/components/visuals/Pattern'
 import type { BackgroundEffect, BackgroundTone, Character } from '@/db/characters'
 import type { ChatWallpaper } from '@/db/prefs/settings'
 import { avatarUri, cropFromJson } from '@/lib/images/avatars'
+import { wallpaperTint } from '@/components/cast/ProfileGlow'
 import { hexRgb, MAX_DIM, schemeOver } from '@/lib/images/backgroundTone'
 import { usePictureColor, type Rgb } from '@/lib/images/pictureColor'
 import { useChatTextSettings } from '@/lib/chat/chatText'
@@ -157,6 +158,41 @@ export function useHomeFadeRgb(): string | undefined {
   const amount = picture.intensity * MAX_DIM
   const mixed: Rgb = [0, 1, 2].map((i) => Math.round(color[i] + (dimRgb[i] - color[i]) * amount)) as Rgb
   return `${mixed[0]}, ${mixed[1]}, ${mixed[2]}`
+}
+
+function toWallpaperAccent(color: Rgb): { accent: string; accentSoft: string } {
+  const tinted = wallpaperTint(color)
+  const hex = `#${tinted.map((c) => Math.min(255, Math.max(0, Math.round(c))).toString(16).padStart(2, '0')).join('')}`
+  const [r, g, b] = tinted.map((c) => Math.min(255, Math.max(0, Math.round(c))))
+  return {
+    accent: hex,
+    accentSoft: `rgba(${r}, ${g}, ${b}, 0.16)`,
+  }
+}
+
+// The accent color for home tabs chrome (tab bar and continue button):
+// the average color of the custom wallpaper when background on home screen is enabled, or null.
+export function useHomeWallpaperAccent(): { accent: string; accentSoft: string } | null {
+  const { dynamicAccent, homeBackground, pattern, wallpaper } = useChatTextSettings()
+  if (!dynamicAccent) return null
+  const picture = homeBackground && pattern === 'custom' && wallpaper?.file
+    ? pictureOf(NO_PICTURE, wallpaper, pattern)
+    : null
+  const color = usePictureColor(picture?.uri ?? null)
+  if (!picture || !color) return null
+  return toWallpaperAccent(color)
+}
+
+// The accent color for chat chrome (such as Composer):
+// the average color of the chat's or custom wallpaper when "Background in menus" (backdrop) is enabled, or null.
+export function useChatWallpaperAccent(look?: ChatLook | null): { accent: string; accentSoft: string } | null {
+  const { backdrop, dynamicAccent, pattern, wallpaper } = useChatTextSettings()
+  if (!dynamicAccent) return null
+  if (!backdrop) return null
+  const picture = pictureOf(look ?? NO_PICTURE, wallpaper, pattern)
+  const color = usePictureColor(picture?.uri ?? null)
+  if (!picture || !color) return null
+  return toWallpaperAccent(color)
 }
 
 // Behind the lists of those screens: the chats' wallpaper or pattern as a chat with no picture

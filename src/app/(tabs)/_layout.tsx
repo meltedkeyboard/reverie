@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native'
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AndroidFloatingTabBar, getAndroidTabBarBottom, getAndroidTabBarSpace } from '@/components/chrome/AndroidTabBar'
+import { useHomeWallpaperAccent } from '@/components/chrome/ChatChrome'
 import { HomeContinueButton } from '@/components/chat/ContinueButton'
 import type { ContinueKind } from '@/db/prefs/continue'
 import { isOnboardingComplete } from '@/db/prefs/onboarding'
@@ -24,6 +25,9 @@ const HOME_TABS: Record<string, ContinueKind> = { index: 'character', rooms: 'ro
 export default function TabsLayout() {
   const db = useDatabase()
   const colors = useColors()
+  const wallpaperAccent = useHomeWallpaperAccent()
+  const accentColor = wallpaperAccent?.accent ?? colors.accent
+  const accentSoftColor = wallpaperAccent?.accentSoft ?? colors.accentSoft
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
   const [home, setHome] = useState<ContinueKind | null>('character')
   const wide = useLayoutMode() === 'wide'
@@ -63,7 +67,12 @@ export default function TabsLayout() {
   if (isAndroid) {
     return (
       <LastChatProvider>
-        <AndroidTabsLayout listeners={listeners} home={home} />
+        <AndroidTabsLayout
+          listeners={listeners}
+          home={home}
+          accentColor={accentColor}
+          accentSoftColor={accentSoftColor}
+        />
       </LastChatProvider>
     )
   }
@@ -71,14 +80,24 @@ export default function TabsLayout() {
   return (
     <LastChatProvider>
       <View style={styles.blank}>
-        <AppTabs listeners={listeners} />
-        <HomeContinueButton kind={home} />
+        <AppTabs listeners={listeners} accentColor={accentColor} />
+        <HomeContinueButton kind={home} accentColor={accentColor} />
       </View>
     </LastChatProvider>
   )
 }
 
-function AndroidTabsLayout({ listeners, home }: { listeners: TabListeners; home: ContinueKind | null }) {
+function AndroidTabsLayout({
+  listeners,
+  home,
+  accentColor,
+  accentSoftColor,
+}: {
+  listeners: TabListeners
+  home: ContinueKind | null
+  accentColor?: string
+  accentSoftColor?: string
+}) {
   const insets = useSafeAreaInsets()
   const colors = useColors()
 
@@ -97,7 +116,15 @@ function AndroidTabsLayout({ listeners, home }: { listeners: TabListeners; home:
     <SafeAreaInsetsContext.Provider value={tabInsets}>
       <View style={styles.blank}>
         <Tabs
-          tabBar={(props) => <AndroidFloatingTabBar {...props} bottom={tabBarBottom} sideInsets={insets} />}
+          tabBar={(props) => (
+            <AndroidFloatingTabBar
+              {...props}
+              bottom={tabBarBottom}
+              sideInsets={insets}
+              accentColor={accentColor}
+              accentSoftColor={accentSoftColor}
+            />
+          )}
           screenOptions={{
             headerShown: false,
             sceneStyle: { backgroundColor: colors.bg },
@@ -109,18 +136,18 @@ function AndroidTabsLayout({ listeners, home }: { listeners: TabListeners; home:
           <Tabs.Screen name="settings" />
           <Tabs.Screen name="search" />
         </Tabs>
-        <HomeContinueButton kind={home} />
+        <HomeContinueButton kind={home} accentColor={accentColor} />
       </View>
     </SafeAreaInsetsContext.Provider>
   )
 }
 
-function AppTabs({ listeners }: { listeners: TabListeners }) {
+function AppTabs({ listeners, accentColor }: { listeners: TabListeners; accentColor?: string }) {
   const colors = useColors()
   const { t } = useTranslation()
 
   return (
-    <NativeTabs tintColor={colors.accent} screenListeners={listeners}>
+    <NativeTabs tintColor={accentColor ?? colors.accent} screenListeners={listeners}>
       <NativeTabs.Trigger name="index" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Label>{t('characters.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} md="group" />

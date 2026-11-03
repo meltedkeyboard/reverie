@@ -1,6 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useTranslation } from '@/i18n'
 import * as Haptics from '@/lib/ui/haptics'
+import { useHomeWallpaperAccent } from '@/components/chrome/ChatChrome'
 import { type Colors, CONTROL_FONT_SCALE, useColors, useStyles } from '@/theme'
 import { useEffect, type ComponentProps } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -47,10 +48,24 @@ type TabBarProps = {
   insets: EdgeInsets
   bottom?: number
   sideInsets?: EdgeInsets
+  accentColor?: string
+  accentSoftColor?: string
 }
 
-export function AndroidFloatingTabBar({ state, emitter, navigateToTab, insets, bottom, sideInsets }: TabBarProps) {
+export function AndroidFloatingTabBar({
+  state,
+  emitter,
+  navigateToTab,
+  insets,
+  bottom,
+  sideInsets,
+  accentColor: customAccent,
+  accentSoftColor: customAccentSoft,
+}: TabBarProps) {
   const colors = useColors()
+  const homeAccent = useHomeWallpaperAccent()
+  const accentColor = customAccent ?? homeAccent?.accent ?? colors.accent
+  const accentSoftColor = customAccentSoft ?? homeAccent?.accentSoft ?? colors.accentSoft
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const isKeyboardVisible = useKeyboardState((s) => s.isVisible)
@@ -109,8 +124,8 @@ export function AndroidFloatingTabBar({ state, emitter, navigateToTab, insets, b
               iconActive={config.iconActive}
               onPress={onPress}
               onLongPress={onLongPress}
-              accentColor={colors.accent}
-              accentSoftColor={colors.accentSoft}
+              accentColor={accentColor}
+              accentSoftColor={accentSoftColor}
               textMutedColor={colors.textMuted}
               styles={styles}
             />

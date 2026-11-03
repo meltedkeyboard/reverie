@@ -7,10 +7,10 @@ import { type Colors, ON_ACCENT, useStyles } from '@/theme'
 // picked, the attach menu's row, its gallery and the sheet a generator takes pictures from.
 // With an order it says where the picture stands among the ones picked; without one, where
 // only one is picked, it is a checkmark.
-export function OrderBadge({ order }: { order?: number }) {
+export function OrderBadge({ order, color }: { order?: number; color?: string }) {
   const styles = useStyles(createStyles)
   return (
-    <View style={[styles.badge, order === undefined && styles.round]} pointerEvents="none">
+    <View style={[styles.badge, order === undefined && styles.round, color ? { backgroundColor: color } : null]} pointerEvents="none">
       {order === undefined ? (
         <Icon name="checkmark" size={14} color={ON_ACCENT} />
       ) : (

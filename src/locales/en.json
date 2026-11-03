@@ -7,7 +7,6 @@
   "common.save": "Save",
   "common.done": "Done",
   "common.delete": "Delete",
-
   "settings.title": "Settings",
   "settings.appearance": "Appearance",
   "settings.theme": "Theme",
@@ -97,7 +96,7 @@
   "chatPreview.user": "*Smiles.* Tell me how the **evening** went.",
   "chatPreview.reply": "She set the cup down and smiled. *The candle had burned low.*\n\n“Quiet, mostly. I kept thinking you would come back.”",
   "chatFont.system": "System",
-  "settings.continueButton":"Continue button",
+  "settings.continueButton": "Continue button",
   "settings.continueButtonNote": "The latest chat or scene on the home tabs. Swipe left to hide it",
   "settings.continueBy": "Which chat",
   "settings.continueByVisit": "Last visited",
@@ -175,8 +174,6 @@
   "settings.wipeConfirmMessage": "Characters, chats, avatars and the server address will be gone for good",
   "settings.wipeConfirmLabel": "Erase everything",
   "settings.wipeFailedTitle": "Couldn't erase data",
-
-
   "characters.title": "Characters",
   "characters.edit": "Edit",
   "characters.delete": "Delete",
@@ -236,7 +233,6 @@
   "card.importFailed": "Couldn't import the card",
   "card.notACard": "This file is not a character card",
   "card.noCardInPng": "This picture has no character card inside",
-
   "onboarding.welcomeTo": "Welcome to",
   "onboarding.tagline": "Stories with characters of your own, told by a model of your own.",
   "onboarding.privacy": "Reverie collects nothing. Characters, chats and pictures are kept on this device, and messages go only to the server you choose.",
@@ -312,7 +308,6 @@
   "onboarding.done": "Done",
   "onboarding.pickModel": "Choose a Model",
   "onboarding.skip": "Skip",
-
   "editor.thinkingAuto": "Same as server",
   "editor.thinkingOn": "On",
   "editor.thinkingOff": "Off",
@@ -539,7 +534,6 @@
   "gallery.addFailed": "Couldn't add to the gallery",
   "gallery.removeFailed": "Couldn't remove from the gallery",
   "gallery.someRefused": "Not added: {{count}}. WebM can't be played, and a moving picture or a video can take up to {{mb}} MB.",
-
   "chat.editingMessage": "Editing message",
   "chat.messagePlaceholder": "Message",
   "chat.suggestionHint": "Swipe right to insert",
@@ -579,12 +573,10 @@
   "composer.movingTooBig": "This picture is over {{mb}} MB, so it will be sent as a still",
   "composer.attachFailedTitle": "Couldn't attach photo",
   "composer.openPicture": "Open picture",
-
   "chatDrawer.open": "Chats",
   "chatDrawer.close": "Back to the chat",
   "chatDrawer.newChat": "New chat",
   "chatDrawer.draft": "Draft:",
-
   "attach.choosePhoto": "Choose photo",
   "attach.recent": "Recent picture",
   "attach.recentsOff": "Recent pictures are turned off in Settings",
@@ -600,17 +592,12 @@
   "attach.attachAction": "Attach",
   "attach.attachSingle": "Attach 1 photo",
   "attach.attachMultiple": "Attach {{count}} photos",
-
-
   "message.thinking": "Thinking...",
   "message.reasoning": "Reasoning",
   "message.secondsShort": "s",
-
   "chatCard.emptyChat": "Empty chat",
   "characterCard.noDescription": "No description",
-
   "startup.dbFailedTitle": "Couldn't open the database",
-
   "llm.serverError": "The server returned error {{status}}: {{msg}}",
   "llm.serverErrorNoMsg": "The server returned error {{status}}{{body}}",
   "llm.unreachable": "Server unreachable: {{detail}}",
@@ -618,7 +605,6 @@
   "llm.timeout": "The server didn't respond within 8 seconds. Check the address and network",
   "llm.baseUrlMissing": "Set the server address in settings",
   "llm.noStreaming": "The server doesn't support streaming",
-
   "action.copy": "Copy",
   "action.replyAgain": "Reply again",
   "action.regenerate": "Regenerate",
@@ -627,7 +613,6 @@
   "action.delete": "Delete",
   "action.deleteVariant": "Delete version",
   "action.deleteMessage": "Delete message",
-
   "images.cameraPermission": "No camera access. Enable it in iOS settings",
   "images.readFailed": "Couldn't read the image",
   "images.save": "Save photo",
@@ -636,8 +621,6 @@
   "images.savePermission": "No permission to add photos. Enable it in iOS settings",
   "images.showOriginal": "Show original",
   "images.showCropped": "Show cropped",
-
-
   "backup.corrupted": "The file is corrupted or isn't a Reverie backup",
   "backup.chooseTitle": "What to include",
   "backup.cancel": "Cancel",
@@ -655,7 +638,6 @@
   "backup.personaDefault": "default",
   "backup.personaExists": "already here",
   "backup.personaNote": "Chats whose persona isn't ticked come without one. A persona already on this device isn't duplicated",
-
   "format.today": "Today",
   "format.yesterday": "Yesterday",
   "sidebar.collapse": "Collapse sidebar",
@@ -666,7 +648,6 @@
   "sidebar.untitled": "New chat",
   "tabs.new": "New tab",
   "tabs.close": "Close tab",
-
   "rooms.title": "Rooms",
   "rooms.emptyTitle": "No rooms yet",
   "rooms.emptyText": "Put several characters in one scene: they talk to you and to each other",
@@ -690,7 +671,6 @@
   "rooms.exportFailed": "Couldn't export the room",
   "rooms.duplicateFailed": "Couldn't duplicate the room",
   "rooms.importFailed": "Couldn't start the scene",
-
   "room.everyone": "Everyone",
   "room.castTitle": "Talking to",
   "room.castEveryoneHint": "Whoever fits best answers",
@@ -752,7 +732,6 @@
   "room.emptyHint": "Pick who you talk to below, or write to everyone",
   "room.noMembersHint": "Nobody is in the room. Add members in its settings",
   "room.menuImportScene": "New scene from a chat",
-
   "roomEditor.newTitle": "New room",
   "roomEditor.title": "Room",
   "roomEditor.nameLabel": "Name",
@@ -844,7 +823,6 @@
   "roomGen.parseFailed": "Couldn't read the setup",
   "roomGen.parseFailedText": "Keep the labels at the start of their lines, as the model wrote them",
   "roomProfile.settings": "Settings",
-
   "search.title": "Search",
   "search.placeholderCharacters": "Characters, chats, messages",
   "search.placeholderRooms": "Rooms, scenes, messages",
@@ -857,7 +835,6 @@
   "search.emptyText": "Characters, rooms, chat titles and the text of messages",
   "search.noResultsTitle": "Nothing found",
   "search.noResultsText": "Try another word",
-
   "sync.failedTitle": "Couldn't sync with the folder",
   "sync.unavailable": "This build has no folder sync",
   "sync.corrupted": "The sync folder holds something that isn't Reverie data",
@@ -875,7 +852,6 @@
   "sync.pullOverTitle": "This device has changes",
   "sync.pullOverText": "Pulling replaces this device's chats with the ones in the folder. The current data is put aside first",
   "sync.pullAnyway": "Pull anyway",
-
   "persona.title": "Personas",
   "persona.pickerTitle": "User Persona",
   "persona.new": "New persona",
@@ -900,7 +876,6 @@
   "persona.deleteSelected": "Delete selected",
   "persona.deleteSelectedTitle": "Delete {{count}} personas?",
   "persona.deleteSelectedMessage": "Chats using them will revert to \"None\"",
-
   "personaGen.title": "Persona Generator",
   "personaGen.improveCurrent": "Improve persona description",
   "personaGen.hint": "Appearance, traits, profession, habits, or world role. A couple of sentences is enough",
@@ -1024,5 +999,6 @@
   "archive.emptyText": "Swipe a character to the left or pick Archive in its menu to put it away here",
   "archive.readOnly": "{{name}} is in the archive",
   "archive.archived": "In the archive",
-  "archive.failed": "Couldn't change the archive"
+  "archive.failed": "Couldn't change the archive",
+  "settings.dynamicAccent": "Dynamic accent"
 }

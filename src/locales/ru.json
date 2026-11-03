@@ -7,7 +7,6 @@
   "common.save": "Сохранить",
   "common.done": "Готово",
   "common.delete": "Удалить",
-
   "settings.title": "Настройки",
   "settings.appearance": "Оформление",
   "settings.theme": "Тема",
@@ -174,8 +173,6 @@
   "settings.wipeConfirmMessage": "Персонажи, переписки, аватары и адрес сервера удалятся безвозвратно",
   "settings.wipeConfirmLabel": "Стереть всё",
   "settings.wipeFailedTitle": "Не удалось стереть данные",
-
-
   "characters.title": "Персонажи",
   "characters.edit": "Изменить",
   "characters.delete": "Удалить",
@@ -235,7 +232,6 @@
   "card.importFailed": "Не удалось импортировать карточку",
   "card.notACard": "Этот файл не похож на карточку персонажа",
   "card.noCardInPng": "В этой картинке нет карточки персонажа",
-
   "onboarding.welcomeTo": "Добро пожаловать в",
   "onboarding.tagline": "Истории с вашими персонажами, которые рассказывает ваша собственная модель.",
   "onboarding.privacy": "Reverie ничего не собирает. Персонажи, переписки и картинки хранятся на этом устройстве, а сообщения уходят только на сервер, который вы укажете.",
@@ -311,7 +307,6 @@
   "onboarding.done": "Готово",
   "onboarding.pickModel": "Выберите модель",
   "onboarding.skip": "Пропустить",
-
   "editor.thinkingAuto": "Как на сервере",
   "editor.thinkingOn": "Включено",
   "editor.thinkingOff": "Выключено",
@@ -538,7 +533,6 @@
   "gallery.addFailed": "Не удалось добавить в галерею",
   "gallery.removeFailed": "Не удалось убрать из галереи",
   "gallery.someRefused": "Не добавлено: {{count}}. WebM не воспроизводится, а анимация или видео могут занимать до {{mb}} МБ.",
-
   "chat.editingMessage": "Редактирование сообщения",
   "chat.messagePlaceholder": "Сообщение",
   "chat.suggestionHint": "Проведите вправо, чтобы вставить",
@@ -578,12 +572,10 @@
   "composer.movingTooBig": "Эта картинка больше {{mb}} МБ, она отправится неподвижной",
   "composer.attachFailedTitle": "Не удалось прикрепить фото",
   "composer.openPicture": "Открыть картинку",
-
   "chatDrawer.open": "Чаты",
   "chatDrawer.close": "Вернуться к чату",
   "chatDrawer.newChat": "Новый чат",
   "chatDrawer.draft": "Черновик:",
-
   "attach.choosePhoto": "Выбрать фото",
   "attach.recent": "Недавняя картинка",
   "attach.recentsOff": "Недавние картинки выключены в настройках",
@@ -599,17 +591,12 @@
   "attach.attachAction": "Прикрепить",
   "attach.attachSingle": "Прикрепить 1 фото",
   "attach.attachMultiple": "Прикрепить {{count}} фото",
-
-
   "message.thinking": "Размышляет...",
   "message.reasoning": "Размышления",
   "message.secondsShort": "с",
-
   "chatCard.emptyChat": "Пустой чат",
   "characterCard.noDescription": "Без описания",
-
   "startup.dbFailedTitle": "Не удалось открыть базу данных",
-
   "llm.serverError": "Сервер вернул ошибку {{status}}: {{msg}}",
   "llm.serverErrorNoMsg": "Сервер вернул ошибку {{status}}{{body}}",
   "llm.unreachable": "Сервер недоступен: {{detail}}",
@@ -617,7 +604,6 @@
   "llm.timeout": "Сервер не ответил за 8 секунд. Проверьте адрес и сеть",
   "llm.baseUrlMissing": "Укажите адрес сервера в настройках",
   "llm.noStreaming": "Сервер не поддерживает потоковую передачу",
-
   "action.copy": "Копировать",
   "action.replyAgain": "Ответить заново",
   "action.regenerate": "Перегенерировать",
@@ -626,7 +612,6 @@
   "action.delete": "Удалить",
   "action.deleteVariant": "Удалить вариант",
   "action.deleteMessage": "Удалить сообщение",
-
   "images.cameraPermission": "Нет доступа к камере. Включите его в настройках iOS",
   "images.readFailed": "Не удалось прочитать изображение",
   "images.save": "Сохранить фото",
@@ -635,8 +620,6 @@
   "images.savePermission": "Нет разрешения добавлять фото. Включите его в настройках iOS",
   "images.showOriginal": "Показать оригинал",
   "images.showCropped": "Показать кадр",
-
-
   "backup.corrupted": "Файл повреждён или это не копия Reverie",
   "backup.chooseTitle": "Что включить",
   "backup.cancel": "Отмена",
@@ -654,7 +637,6 @@
   "backup.personaDefault": "по умолчанию",
   "backup.personaExists": "уже есть",
   "backup.personaNote": "Чаты, чья персона не отмечена, придут без неё. Персона, которая уже есть на устройстве, не задублируется",
-
   "format.today": "Сегодня",
   "format.yesterday": "Вчера",
   "sidebar.collapse": "Свернуть панель",
@@ -665,7 +647,6 @@
   "sidebar.untitled": "Новый чат",
   "tabs.new": "Новая вкладка",
   "tabs.close": "Закрыть вкладку",
-
   "rooms.title": "Комнаты",
   "rooms.emptyTitle": "Комнат пока нет",
   "rooms.emptyText": "Соберите нескольких персонажей в одну сцену: они будут говорить с вами и друг с другом",
@@ -689,7 +670,6 @@
   "rooms.exportFailed": "Не удалось экспортировать комнату",
   "rooms.duplicateFailed": "Не удалось дублировать комнату",
   "rooms.importFailed": "Не удалось начать сцену",
-
   "room.everyone": "Всем",
   "room.castTitle": "Кому пишете",
   "room.castEveryoneHint": "Ответит самый уместный",
@@ -751,7 +731,6 @@
   "room.emptyHint": "Выберите адресата внизу или напишите всем",
   "room.noMembersHint": "В комнате никого нет. Добавьте участников в настройках",
   "room.menuImportScene": "Новая сцена из чата",
-
   "roomEditor.newTitle": "Новая комната",
   "roomEditor.title": "Комната",
   "roomEditor.nameLabel": "Название",
@@ -843,7 +822,6 @@
   "roomGen.parseFailed": "Не удалось разобрать настройку",
   "roomGen.parseFailedText": "Оставьте метки в начале строк, как их написала модель",
   "roomProfile.settings": "Настройки",
-
   "search.title": "Поиск",
   "search.placeholderCharacters": "Персонажи, чаты, сообщения",
   "search.placeholderRooms": "Комнаты, сцены, сообщения",
@@ -856,7 +834,6 @@
   "search.emptyText": "Персонажи, комнаты, названия чатов и текст сообщений",
   "search.noResultsTitle": "Ничего не найдено",
   "search.noResultsText": "Попробуйте другое слово",
-
   "sync.failedTitle": "Не удалось синхронизировать с папкой",
   "sync.unavailable": "В этой сборке нет синхронизации с папкой",
   "sync.corrupted": "В папке синхронизации лежат не данные Reverie",
@@ -874,7 +851,6 @@
   "sync.pullOverTitle": "На этом устройстве есть изменения",
   "sync.pullOverText": "Получение заменит переписки на этом устройстве данными из папки. Текущие данные сначала откладываются в сторону",
   "sync.pullAnyway": "Всё равно получить",
-
   "persona.title": "Персоны",
   "persona.pickerTitle": "Личность пользователя",
   "persona.new": "Новая персона",
@@ -899,7 +875,6 @@
   "persona.deleteSelected": "Удалить выбранные",
   "persona.deleteSelectedTitle": "Удалить персоны: {{count}}?",
   "persona.deleteSelectedMessage": "В чатах с ними персона будет сброшена на «Нет»",
-
   "personaGen.title": "Генератор персоны",
   "personaGen.improveCurrent": "Улучшить текущее описание",
   "personaGen.hint": "Внешность, характер, профессия, привычки или роль в мире. Хватит пары предложений",
@@ -1023,5 +998,6 @@
   "archive.emptyText": "Смахните персонажа влево или выберите «В архив» в его меню, чтобы убрать его сюда",
   "archive.readOnly": "{{name}} в архиве",
   "archive.archived": "В архиве",
-  "archive.failed": "Не удалось изменить архив"
+  "archive.failed": "Не удалось изменить архив",
+  "settings.dynamicAccent": "Динамический акцент"
 }

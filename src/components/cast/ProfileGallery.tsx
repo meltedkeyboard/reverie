@@ -44,10 +44,12 @@ const SETTLE = spring(0.35, 0.9)
 export function ProfileGallery({
   characterId,
   system = false,
+  color,
   onDragging,
 }: {
   characterId: number
   system?: boolean
+  color?: string
   onDragging?: (dragging: boolean) => void
 }) {
   const styles = useStyles(createStyles)
@@ -155,7 +157,7 @@ export function ProfileGallery({
             ) : (
               <ImageSourceMenu onPick={add} disabled={adding} style={nextStyle}>
                 <View style={styles.plusInner} accessible accessibilityRole="button" accessibilityLabel={t('gallery.add')}>
-                  {adding ? <ActivityIndicator color={colors.textMuted} /> : <Icon name="add" size={30} color={colors.textMuted} />}
+                  {adding ? <ActivityIndicator color={color ?? colors.textMuted} /> : <Icon name="add" size={30} color={color ?? colors.textMuted} />}
                 </View>
               </ImageSourceMenu>
             )
@@ -173,7 +175,7 @@ export function ProfileGallery({
           <Text style={styles.emptyText}>{t('gallery.empty')}</Text>
         </View>
       )}
-      {button ? <SourceCell label={t('gallery.add')} onPick={add} /> : null}
+      {button ? <SourceCell label={t('gallery.add')} onPick={add} color={color} /> : null}
     </ListSection>
   )
 }

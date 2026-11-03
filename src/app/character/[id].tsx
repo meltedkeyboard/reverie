@@ -386,6 +386,7 @@ export default function CharacterEditorScreen() {
   const photoColor = usePictureColor(editing ? null : photoUri ?? null)
   const average = editing ? null : hasPhoto ? photoColor : hexRgb(avatarTint(name))
   const glowColor = average ? profileTint(average) : null
+  const linkColor = glowColor ? `#${glowColor.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}` : undefined
   // The character's own name heads the screen once it has one.
   const title = name.trim() || (isNew ? t('editor.newCharacterTitle') : t('editor.characterTitle'))
 
@@ -816,10 +817,10 @@ export default function CharacterEditorScreen() {
                 background={backgroundUri ? { uri: backgroundUri, crop: bgSlot.shownCrop(backgroundCrop), effect: bgEffect, intensity: bgIntensity } : null}
                 // Saves the card as it is stored, so edits not yet saved are not in it.
                 exportItems={isNew ? undefined : exportTargets(() => getCharacter(db, Number(id)))}
-                gallery={isNew ? null : <ProfileGallery characterId={Number(id)} system={nativeProfile} onDragging={setGalleryDrag} />}
+                gallery={isNew ? null : <ProfileGallery characterId={Number(id)} system={nativeProfile} color={linkColor} onDragging={setGalleryDrag} />}
                 // The system's list keeps margins of its own, so it is taken out to the edges.
                 style={{ marginLeft: -sideLeft, marginRight: -sideRight }}
-                linkColor={glowColor ? `#${glowColor.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}` : undefined}
+                linkColor={linkColor}
               />
             )}
           </Animated.View>
@@ -867,7 +868,7 @@ const GLOW_BELOW = 120
 
 // The profile's details, in the system's list or in the grouped look of the editor.
 function ShownProfile({ style, linkColor, ...profile }: React.ComponentProps<typeof NativeProfileList>) {
-  return nativeProfile ? <NativeProfileList {...profile} style={style} linkColor={linkColor} /> : <CharacterProfile {...profile} />
+  return nativeProfile ? <NativeProfileList {...profile} style={style} linkColor={linkColor} /> : <CharacterProfile {...profile} linkColor={linkColor} />
 }
 
 // Android only: carries the gesture that stands in for the overscroll pull of iOS. Elsewhere

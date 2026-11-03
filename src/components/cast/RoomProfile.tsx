@@ -106,13 +106,14 @@ export function RoomProfile({ fields, members, background, exportItems, system =
           background={background}
           exportHeader={t('rooms.export')}
           exportItems={exportItems}
+          actionColor={ink}
           style={systemStyle}
         />
       ) : (
         <>
           <ProfileParams header={t('roomProfile.settings')} params={params} />
           <ProfileBackground background={background} />
-          {exportItems ? <ProfileActions header={t('rooms.export')} items={exportItems} /> : null}
+          {exportItems ? <ProfileActions header={t('rooms.export')} items={exportItems} color={ink} /> : null}
         </>
       )}
     </View>

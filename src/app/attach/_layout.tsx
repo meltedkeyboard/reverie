@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View, type ViewInstance } from 'react-native'
 
 import { AttachStackContext } from '@/components/chat/AttachMenu'
-import { ChatBackdrop, useChatBackdrop, useChatBackdropTone } from '@/components/chrome/ChatChrome'
+import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, useChatWallpaperAccent } from '@/components/chrome/ChatChrome'
 import { SheetBackdropContext, useSheetTones } from '@/components/overlays/BottomSheet'
 import { attachSession, finishAttachSession, type AttachSession } from '@/lib/chat/attachSession'
 import { SchemeOverride, useColors, useTheme } from '@/theme'
@@ -35,6 +35,7 @@ function AttachStack({ session }: { session: AttachSession | null }) {
   // Over the chat's background the bar is see-through and each screen draws the background
   // from under it (AttachScreenFrame); the one under the stack shows should a screen be
   // clipped to its own frame.
+  const wallpaperColors = useChatWallpaperAccent(session?.look)
   const backdrop = useChatBackdrop(session?.look)
   const root = useRef<ViewInstance>(null)
 
@@ -53,7 +54,7 @@ function AttachStack({ session }: { session: AttachSession | null }) {
               headerShadowVisible: false,
               headerBackButtonDisplayMode: 'minimal',
               headerStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet },
-              headerTintColor: colors.accent,
+              headerTintColor: wallpaperColors?.accent ?? colors.accent,
               headerTitleStyle: { color: colors.text },
               contentStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet },
             }}

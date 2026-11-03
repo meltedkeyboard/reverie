@@ -92,15 +92,25 @@ type RowItemProps = {
   checked: boolean
   onToggle: () => void
   isLast: boolean
+  drag?: () => void
 }
 
-function NativeCardRowItem({ row, editing, checked, onToggle, isLast }: RowItemProps) {
+function ReorderableCardRowItem(props: RowItemProps) {
+  let drag: () => void = () => {}
+  try {
+    drag = useReorderableDrag()
+  } catch {
+    // Left empty: outside ReorderableList fallback to no-op.
+  }
+  return <NativeCardRowItem {...props} drag={drag} />
+}
+
+function NativeCardRowItem({ row, editing, checked, onToggle, isLast, drag = () => {} }: RowItemProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
   const look = useListLook()
   const metrics = rowMetrics(look)
-  const drag = useReorderableDrag()
   const openViewer = useOpenViewer()
 
   const side = metrics.avatar
@@ -344,7 +354,7 @@ export function NativeCardList({
       ]}
       ListHeaderComponent={noticeHeader}
       renderItem={({ item: row, index }) => (
-        <NativeCardRowItem
+        <ReorderableCardRowItem
           row={row}
           editing={editing}
           checked={isRowChecked(row)}

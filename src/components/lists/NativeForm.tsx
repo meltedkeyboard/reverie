@@ -173,13 +173,13 @@ export function NativeHostedRow({ height, clear = false, children }: { height?: 
 // A row that opens another screen: its name, the value in grey and a chevron, as a navigation
 // row of Settings, the whole row highlighting on a tap. `symbol` stands before the name, in
 // the name's color.
-export function NativeLinkRow({ label, value, symbol, onPress }: { label: string; value?: string; symbol?: string; onPress: () => void }) {
+export function NativeLinkRow({ label, value, symbol, color, onPress }: { label: string; value?: string; symbol?: string; color?: string; onPress: () => void }) {
   const { colors } = useTheme()
   const { Button, HStack, Spacer, Text, Image } = nativeForm!.ui
   const { tint, foregroundStyle, lineLimit } = nativeForm!.modifiers
   return (
     <HStack spacing={8}>
-      <Button label={label} systemImage={symbol as never} onPress={onPress} modifiers={[tint(colors.text)]} />
+      <Button label={label} systemImage={symbol as never} onPress={onPress} modifiers={[tint(color ?? colors.text)]} />
       <Spacer />
       {value ? <Text modifiers={[foregroundStyle(colors.textMuted), lineLimit(1)]}>{value}</Text> : null}
       <Image systemName="chevron.right" size={13} color={colors.textFaint} />
@@ -199,6 +199,7 @@ export function NativeActionRow({
   busy = false,
   disabled = false,
   destructive = false,
+  color,
   onPress,
 }: {
   label: string
@@ -207,6 +208,7 @@ export function NativeActionRow({
   busy?: boolean
   disabled?: boolean
   destructive?: boolean
+  color?: string
   onPress: () => void
 }) {
   const { colors } = useTheme()
@@ -225,7 +227,15 @@ export function NativeActionRow({
       // The destructive role reddens only the name, and a tint does not reach the symbol, which
       // keeps the form's accent: a foreground paints both. Left off while the row is disabled,
       // so that it greys as the others do.
-      modifiers={[off(disabled || busy), ...(destructive && !disabled && !busy ? [foregroundStyle(colors.danger)] : []), ...(symbol ? [symbolEffect(effect, { isActive: running, options: { repeat: 'continuous' } })] : [])]}
+      modifiers={[
+        off(disabled || busy),
+        ...(destructive && !disabled && !busy
+          ? [foregroundStyle(colors.danger)]
+          : color && !disabled && !busy
+          ? [foregroundStyle(color)]
+          : []),
+        ...(symbol ? [symbolEffect(effect, { isActive: running, options: { repeat: 'continuous' } })] : []),
+      ]}
     />
   )
 }

@@ -10,6 +10,7 @@ import type { LastChat } from '@/db/chats'
 import type { ContinueKind } from '@/db/prefs/continue'
 import { useLastChatContext } from '@/hooks/chat/useLastChat'
 import { useTranslation } from '@/i18n'
+import { useHomeWallpaperAccent } from '@/components/chrome/ChatChrome'
 import { formatWhen } from '@/lib/core/format'
 import { isIOS } from '@/lib/core/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
@@ -25,6 +26,7 @@ type Props = {
   chat: LastChat
   // Distance from the bottom of the window to where the tab's content ends.
   bottom: number
+  accentColor?: string
   onOpen: () => void
   onDismiss: () => void
 }
@@ -48,8 +50,10 @@ const SHIFT = 8
 
 // The one continue button of the home tabs, drawn by the tabs layout over whichever of
 // Characters and Rooms is open, so switching between them changes only what it shows.
-export function HomeContinueButton({ kind }: { kind: ContinueKind | null }) {
+export function HomeContinueButton({ kind, accentColor: customAccent }: { kind: ContinueKind | null; accentColor?: string }) {
   const router = useRouter()
+  const homeAccent = useHomeWallpaperAccent()
+  const accentColor = customAccent ?? homeAccent?.accent
   const { chats, hide, bottom, suspended } = useLastChatContext()
   const chat = kind ? chats[kind] : null
   if (!kind || !chat || suspended) return null
@@ -58,6 +62,7 @@ export function HomeContinueButton({ kind }: { kind: ContinueKind | null }) {
       kind={kind}
       chat={chat}
       bottom={bottom}
+      accentColor={accentColor}
       onOpen={() => router.push(`/chat/${chat.id}`)}
       onDismiss={() => hide(kind)}
     />
@@ -68,9 +73,10 @@ export function HomeContinueButton({ kind }: { kind: ContinueKind | null }) {
 // and swipes away like a row in a list. When it comes to lead to another chat, the old
 // content slides out and the new one in, while the glass capsule stays where it is. On a
 // switch to the other tab the content just changes.
-export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props) {
+export function ContinueButton({ kind, chat, bottom, accentColor, onOpen, onDismiss }: Props) {
   const insets = useSafeAreaInsets()
   const colors = useColors()
+  const effectiveAccent = accentColor ?? colors.accent
   const styles = useStyles(createStyles)
   const { t, locale } = useTranslation()
 
@@ -150,9 +156,9 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
       >
         <GlassSurface
           interactive
-          tintColor={colors.accent}
+          tintColor={effectiveAccent}
           style={styles.pill}
-          fallbackStyle={styles.solid}
+          fallbackStyle={[styles.solid, { backgroundColor: effectiveAccent }]}
         >
           <Animated.View style={[styles.content, contentStyle]}>
             {shown.cast ? (

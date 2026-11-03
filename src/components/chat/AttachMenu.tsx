@@ -8,7 +8,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDime
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
-import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, type ChatLook } from '@/components/chrome/ChatChrome'
+import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, useChatWallpaperAccent, type ChatLook } from '@/components/chrome/ChatChrome'
 import { Button } from '@/components/controls/Button'
 import { Switch } from '@/components/controls/Switch'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
@@ -99,6 +99,8 @@ export function AttachMenu({
   const colors = useColors()
   const { scheme } = useTheme()
   const tones = useSheetTones({ noGlass: true })
+  const wallpaperColors = useChatWallpaperAccent(session.look)
+  const iconColor = wallpaperColors?.accent ?? colors.text
   const styles = useStyles(createStyles)
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
@@ -162,7 +164,7 @@ export function AttachMenu({
       accessibilityLabel={t('imageSource.camera')}
       style={({ pressed }) => [styles.cameraTile, { backgroundColor: pressed ? tones.pressed : tones.card }]}
     >
-      <Icon name="camera-outline" size={30} color={colors.text} />
+      <Icon name="camera-outline" size={30} color={iconColor} />
       <Text style={styles.cameraLabel} numberOfLines={1}>
         {t('imageSource.camera')}
       </Text>
@@ -193,7 +195,7 @@ export function AttachMenu({
             style={styles.recentTile}
           >
             <Image source={{ uri: pictureUri(item) }} style={styles.recentTileImage} contentFit="cover" />
-            {isSelected ? <OrderBadge order={order} /> : null}
+            {isSelected ? <OrderBadge order={order} color={wallpaperColors?.accent} /> : null}
           </Pressable>
         )
       })}
@@ -207,7 +209,7 @@ export function AttachMenu({
       accessibilityLabel={actionLabel}
       style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.85 }]}
     >
-      <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }]} />
+      <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: wallpaperColors?.accent ?? colors.accent }]} />
       <Text style={[styles.actionText, { color: ON_ACCENT }]}>{actionLabel}</Text>
     </Pressable>
   ) : null
@@ -274,16 +276,17 @@ export function AttachMenu({
           ) : null}
           <NativeSection fill={tones.card} top={!tiles} footer={recents === null ? t('attach.recentsOff') : undefined}>
             {!showRow ? (
-              <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onClose(() => session.onPick('camera'))} modifiers={[tint(colors.text)]} />
+              <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onClose(() => session.onPick('camera'))} modifiers={[tint(iconColor)]} />
             ) : null}
-            <SwiftButton label={t('attach.addFiles')} systemImage="doc" onPress={() => onClose(() => session.onPick('files'))} modifiers={[tint(colors.text)]} />
+            <SwiftButton label={t('attach.addFiles')} systemImage="doc" onPress={() => onClose(() => session.onPick('files'))} modifiers={[tint(iconColor)]} />
             {showGallery ? (
-              <NativeLinkRow label={t('gallery.title')} symbol="photo.on.rectangle.angled" value={String(galleryCount)} onPress={openGallery} />
+              <NativeLinkRow label={t('gallery.title')} symbol="photo.on.rectangle.angled" color={iconColor} value={String(galleryCount)} onPress={openGallery} />
             ) : null}
             {showPersona ? (
               <NativeLinkRow
                 label={t('attach.persona')}
                 symbol="person"
+                color={iconColor}
                 value={session.persona?.name ? session.persona.name : t('attach.personaNone')}
                 onPress={openPersonas}
               />
@@ -292,6 +295,7 @@ export function AttachMenu({
               <NativeLinkRow
                 label={t('direction.title')}
                 symbol="signpost.right"
+                color={iconColor}
                 value={session.direction?.trim() || undefined}
                 onPress={openDirection}
               />
@@ -335,7 +339,7 @@ export function AttachMenu({
                 accessibilityLabel={t('imageSource.camera')}
                 style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
               >
-                <Icon name="camera-outline" size={22} color={colors.text} />
+                <Icon name="camera-outline" size={22} color={iconColor} />
                 <Text style={styles.cardLabel}>{t('imageSource.camera')}</Text>
               </Pressable>
 
@@ -349,7 +353,7 @@ export function AttachMenu({
             accessibilityLabel={t('attach.addFiles')}
             style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
           >
-            <Icon name="document-outline" size={22} color={colors.text} />
+            <Icon name="document-outline" size={22} color={iconColor} />
             <Text style={styles.cardLabel}>{t('attach.addFiles')}</Text>
           </Pressable>
 
@@ -363,7 +367,7 @@ export function AttachMenu({
                 accessibilityLabel={t('gallery.title')}
                 style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
               >
-                <SFIcon name="photo.on.rectangle.angled" fallback="images-outline" size={22} color={colors.text} />
+                <SFIcon name="photo.on.rectangle.angled" fallback="images-outline" size={22} color={iconColor} />
                 <Text style={styles.cardLabel}>{t('gallery.title')}</Text>
                 <View style={styles.cardTrailing}>
                   <Text style={styles.cardTrailingText}>{galleryCount}</Text>
@@ -383,7 +387,7 @@ export function AttachMenu({
                 accessibilityLabel={t('attach.persona')}
                 style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
               >
-                <Icon name="person-outline" size={22} color={colors.text} />
+                <Icon name="person-outline" size={22} color={iconColor} />
                 <Text style={styles.cardLabel}>{t('attach.persona')}</Text>
                 <View style={styles.cardTrailing}>
                   <Text style={styles.cardTrailingText} numberOfLines={1}>
@@ -405,7 +409,7 @@ export function AttachMenu({
                 accessibilityLabel={t('direction.title')}
                 style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
               >
-                <SFIcon name="signpost.right" fallback="compass-outline" size={22} color={colors.text} />
+                <SFIcon name="signpost.right" fallback="compass-outline" size={22} color={iconColor} />
                 <Text style={styles.cardLabel}>{t('direction.title')}</Text>
                 <View style={styles.cardTrailing}>
                   {session.direction?.trim() ? (
@@ -425,7 +429,7 @@ export function AttachMenu({
           <View style={[styles.card, styles.cardSecondary, { backgroundColor: tones.card }]}>
             <View style={[styles.cardRow, styles.thinkingRow]}>
               <View style={styles.thinkingLeft}>
-                <SFIcon name="brain" fallback="sparkles-outline" size={22} color={colors.text} />
+                <SFIcon name="brain" fallback="sparkles-outline" size={22} color={iconColor} />
                 <Text style={styles.cardLabel}>{t('chat.thinking')}</Text>
               </View>
               <Switch
@@ -463,6 +467,8 @@ export function PersonaPicker({
   const styles = useStyles(createStyles)
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const wallpaperColors = useChatWallpaperAccent(session.look)
+  const effectiveAccent = wallpaperColors?.accent ?? colors.accent
   const db = useDatabase()
   const router = useRouter()
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -508,7 +514,7 @@ export function PersonaPicker({
         <Text style={styles.personaName}>{t('persona.none')}</Text>
         <Text style={styles.personaSubtitle}>{t('persona.noneSubtitle')}</Text>
       </View>
-      {currentId === null ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} /> : null}
+      {currentId === null ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={effectiveAccent} /> : null}
     </Pressable>
   )
 
@@ -552,7 +558,7 @@ export function PersonaPicker({
               <Text style={styles.personaName} numberOfLines={1}>
                 {item.name}
               </Text>
-              {item.isDefault ? <Star size={12} color={colors.accent} /> : null}
+              {item.isDefault ? <Star size={12} color={effectiveAccent} /> : null}
             </View>
             {item.description ? (
               <Text style={styles.personaSubtitle} numberOfLines={1}>
@@ -560,7 +566,7 @@ export function PersonaPicker({
               </Text>
             ) : null}
           </View>
-          {isSelected ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={colors.accent} /> : null}
+          {isSelected ? <SFIcon name="checkmark" fallback="checkmark" size={18} color={effectiveAccent} /> : null}
         </Pressable>
         <View style={styles.personaMenuWrapper} onStartShouldSetResponder={() => true}>
           <NativeMenu items={menu}>
@@ -654,6 +660,7 @@ export function DirectionEditor({
   const styles = useStyles(createStyles)
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const wallpaperColors = useChatWallpaperAccent(session.look)
   const [value, setValue] = useState(session.direction ?? '')
 
   const handleChange = (text: string) => {
@@ -703,7 +710,7 @@ export function DirectionEditor({
           onChangeText={handleChange}
           placeholder={t('direction.placeholder')}
           placeholderTextColor={colors.textFaint}
-          selectionColor={colors.accent}
+          selectionColor={wallpaperColors?.accent ?? colors.accent}
           multiline
           style={[styles.directionInput, { color: colors.text }]}
         />
@@ -794,6 +801,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const router = useRouter()
+  const wallpaperColors = useChatWallpaperAccent(session?.look)
   const { width } = useWindowDimensions()
   const [screen, setScreen] = useState<'attach' | 'persona' | 'direction' | 'gallery'>('attach')
   const [attachHeight, setAttachHeight] = useState<number | undefined>(undefined)
@@ -863,7 +871,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
               accessibilityLabel={t('persona.create')}
               style={({ pressed }) => [styles.headerIconBtn, pressed && { opacity: 0.6 }]}
             >
-              <Icon name="add" size={24} color={colors.accent} />
+              <Icon name="add" size={24} color={wallpaperColors?.accent ?? colors.accent} />
             </Pressable>
           )
         ) : !isWeb && session ? (
@@ -874,7 +882,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
             accessibilityLabel={t('attach.photos')}
             style={({ pressed }) => [styles.photosHeaderBtn, pressed && { opacity: 0.6 }]}
           >
-            <Text style={styles.photosHeaderText}>{t('attach.photos')}</Text>
+            <Text style={[styles.photosHeaderText, wallpaperColors ? { color: wallpaperColors.accent } : null]}>{t('attach.photos')}</Text>
           </Pressable>
         ) : null
       }

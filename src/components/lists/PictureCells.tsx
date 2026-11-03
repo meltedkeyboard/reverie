@@ -48,7 +48,17 @@ export function ChipRowCell({ actions }: { actions: ChipAction[] }) {
 // closes on iOS 26 and 27). The desktop has only files to choose from, so it keeps the button.
 // The button has no highlight under the touch: it fades into the chips anyway. `onGallery`
 // adds the character's own gallery as a fourth source.
-export function SourceCell({ label, onPick, onGallery }: { label: string; onPick: (source: ImageSource) => void; onGallery?: () => void }) {
+export function SourceCell({
+  label,
+  onPick,
+  onGallery,
+  color,
+}: {
+  label: string
+  onPick: (source: ImageSource) => void
+  onGallery?: () => void
+  color?: string
+}) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -60,8 +70,8 @@ export function SourceCell({ label, onPick, onGallery }: { label: string; onPick
   if (isWeb) {
     return (
       <>
-        <ButtonCell label={label} onPress={() => onPick('files')} unlit />
-        {onGallery ? <ButtonCell label={t('gallery.pickFrom')} onPress={onGallery} unlit /> : null}
+        <ButtonCell label={label} onPress={() => onPick('files')} unlit color={color} />
+        {onGallery ? <ButtonCell label={t('gallery.pickFrom')} onPress={onGallery} unlit color={color} /> : null}
       </>
     )
   }
@@ -97,7 +107,7 @@ export function SourceCell({ label, onPick, onGallery }: { label: string; onPick
         />
       </View>
       <Animated.View style={[styles.cover, buttonStyle]} pointerEvents={open ? 'none' : 'auto'}>
-        <ButtonCell label={label} onPress={() => toggle(true)} unlit />
+        <ButtonCell label={label} onPress={() => toggle(true)} unlit color={color} />
       </Animated.View>
     </View>
   )

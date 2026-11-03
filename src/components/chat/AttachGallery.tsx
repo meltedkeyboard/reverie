@@ -14,6 +14,7 @@ import { alertError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, FILL, ON_ACCENT, useColors, useStyles, useTheme } from '@/theme'
 
+import { useChatWallpaperAccent } from '../chrome/ChatChrome'
 import { SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { OrderBadge } from '../visuals/OrderBadge'
 
@@ -34,6 +35,7 @@ export function AttachGalleryPicker({
   scrollStyle?: StyleProp<ViewStyle>
 }) {
   const colors = useColors()
+  const wallpaperColors = useChatWallpaperAccent(session.look)
   const { scheme } = useTheme()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
@@ -108,7 +110,7 @@ export function AttachGalleryPicker({
                       >
                         <Image source={{ uri: galleryUri(item.file) }} style={styles.image} contentFit="cover" recyclingKey={item.file} autoplay={false} />
                         {order > 0 ? <View style={styles.dim} pointerEvents="none" /> : null}
-                        {order > 0 ? <OrderBadge order={order} /> : null}
+                        {order > 0 ? <OrderBadge order={order} color={wallpaperColors?.accent} /> : null}
                       </Pressable>
                     )
                   })}
@@ -138,7 +140,7 @@ export function AttachGalleryPicker({
           disabled={storing}
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
-          style={({ pressed }) => [styles.action, { backgroundColor: colors.accent }, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.action, { backgroundColor: wallpaperColors?.accent ?? colors.accent }, pressed && { opacity: 0.85 }]}
         >
           {storing ? <ActivityIndicator color={ON_ACCENT} /> : <Text style={styles.actionText}>{actionLabel}</Text>}
         </Pressable>
