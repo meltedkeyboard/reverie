@@ -301,9 +301,7 @@ export function Composer({
 
   const armed = useSharedValue(0)
   useEffect(() => {
-    // Continuing is a secondary action, so the button stays gray instead of turning accent;
-    // only its symbol takes the accent, to show it does something.
-    armed.value = withTiming(mode === 'idle' || mode === 'continue' ? 0 : 1, { duration: 160 })
+    armed.value = withTiming(mode === 'idle' ? 0 : 1, { duration: 160 })
   }, [mode, armed])
 
   const buttonStyle = useAnimatedStyle(() => ({
@@ -342,13 +340,13 @@ export function Composer({
     }
   }
 
-  const accented = mode === 'send' || mode === 'save' || mode === 'stop'
+  const accented = mode !== 'idle'
   const sendIcon = (
     <SFIcon
       name={ICONS[mode].sf}
       fallback={ICONS[mode].fallback}
       size={mode === 'stop' ? 15 : 20}
-      color={mode === 'idle' ? colors.textFaint : mode === 'continue' ? effectiveAccent : ON_ACCENT}
+      color={mode === 'idle' ? colors.textFaint : ON_ACCENT}
       onAccent={accented}
     />
   )
@@ -554,7 +552,7 @@ export function Composer({
     <Animated.View ref={drawer?.guard} style={[styles.row, narrowStyle]}>
       <Animated.View style={[styles.fieldBox, boxStyle]} collapsable={false}>
         {/* The glass is a sibling of the content, so the box can grow under the text. */}
-        <GlassSurface style={[StyleSheet.absoluteFill, styles.glass, hushed && styles.hushed]} fallbackStyle={glass.solid} />
+        <GlassSurface interactive={isIOS} style={[StyleSheet.absoluteFill, styles.glass, hushed && styles.hushed]} fallbackStyle={glass.solid} />
         <View style={styles.field} onLayout={fit}>
         {editing ? (
           <View style={styles.banner} onLayout={(e) => setBannerH(e.nativeEvent.layout.height)}>

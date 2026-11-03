@@ -101,6 +101,7 @@ export function AttachMenu({
   const tones = useSheetTones({ noGlass: true })
   const wallpaperColors = useChatWallpaperAccent(session.look)
   const iconColor = wallpaperColors?.accent ?? colors.text
+  const effectiveAccent = wallpaperColors?.accent ?? colors.accent
   const styles = useStyles(createStyles)
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
@@ -264,8 +265,8 @@ export function AttachMenu({
   // them are the app's own, in rows of the list with nothing drawn under them; the camera
   // without the row, files, the persona and the thinking switch are the system's rows.
   if (nativeForm) {
-    const { Button: SwiftButton, Toggle } = nativeForm.ui
-    const { tint } = nativeForm.modifiers
+    const { Toggle, HStack, Text: SwiftText, Image } = nativeForm.ui
+    const { foregroundStyle, tint } = nativeForm.modifiers
     return (
       <View style={[styles.menuContainer, scrollStyle]}>
         <NativeSheetForm>
@@ -276,11 +277,29 @@ export function AttachMenu({
           ) : null}
           <NativeSection fill={tones.card} top={!tiles} footer={recents === null ? t('attach.recentsOff') : undefined}>
             {!showRow ? (
-              <SwiftButton label={t('imageSource.camera')} systemImage="camera" onPress={() => onClose(() => session.onPick('camera'))} modifiers={[tint(iconColor)]} />
+              <NativeLinkRow
+                label={t('imageSource.camera')}
+                symbol="camera"
+                color={iconColor}
+                chevron={false}
+                onPress={() => onClose(() => session.onPick('camera'))}
+              />
             ) : null}
-            <SwiftButton label={t('attach.addFiles')} systemImage="doc" onPress={() => onClose(() => session.onPick('files'))} modifiers={[tint(iconColor)]} />
+            <NativeLinkRow
+              label={t('attach.addFiles')}
+              symbol="doc"
+              color={iconColor}
+              chevron={false}
+              onPress={() => onClose(() => session.onPick('files'))}
+            />
             {showGallery ? (
-              <NativeLinkRow label={t('gallery.title')} symbol="photo.on.rectangle.angled" color={iconColor} value={String(galleryCount)} onPress={openGallery} />
+              <NativeLinkRow
+                label={t('gallery.title')}
+                symbol="photo.on.rectangle.angled"
+                color={iconColor}
+                value={String(galleryCount)}
+                onPress={openGallery}
+              />
             ) : null}
             {showPersona ? (
               <NativeLinkRow
@@ -303,7 +322,12 @@ export function AttachMenu({
           </NativeSection>
           {session.onToggleThinking ? (
             <NativeSection fill={tones.card}>
-              <Toggle label={t('chat.thinking')} systemImage="brain" isOn={thinking} onIsOnChange={toggleThinking} />
+              <Toggle isOn={thinking} onIsOnChange={toggleThinking} modifiers={[tint(effectiveAccent)]}>
+                <HStack spacing={10}>
+                  <Image systemName="brain" size={18} color={iconColor} />
+                  <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('chat.thinking')}</SwiftText>
+                </HStack>
+              </Toggle>
             </NativeSection>
           ) : null}
           {showRow ? (
@@ -436,6 +460,7 @@ export function AttachMenu({
                 value={thinking}
                 onValueChange={toggleThinking}
                 accessibilityLabel={t('chat.thinking')}
+                trackColor={{ true: effectiveAccent }}
                 style={styles.nativeSwitch}
               />
             </View>
