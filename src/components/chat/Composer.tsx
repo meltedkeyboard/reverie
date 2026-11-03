@@ -357,17 +357,9 @@ export function Composer({
       disabled={mode === 'idle'}
       hitSlop={6}
       accessibilityLabel={mode === 'continue' ? t('chat.continueAccessibility') : undefined}
+      style={({ pressed }) => (pressed && mode !== 'idle' ? styles.pressed : null)}
     >
-      {liquidGlass ? (
-        // Glass of its own on the field's glass, tinted with the accent while it sends. Not
-        // interactive: the field clips its corners, and the glass swelling under the finger
-        // was cut off at the field's edge.
-        <GlassSurface tintColor={accented ? effectiveAccent : undefined} style={styles.send}>
-          {sendIcon}
-        </GlassSurface>
-      ) : (
-        <Animated.View style={[styles.send, buttonStyle]}>{sendIcon}</Animated.View>
-      )}
+      <Animated.View style={[styles.send, buttonStyle]}>{sendIcon}</Animated.View>
     </Pressable>
   )
 
@@ -552,7 +544,7 @@ export function Composer({
     <Animated.View ref={drawer?.guard} style={[styles.row, narrowStyle]}>
       <Animated.View style={[styles.fieldBox, boxStyle]} collapsable={false}>
         {/* The glass is a sibling of the content, so the box can grow under the text. */}
-        <GlassSurface interactive={isIOS} style={[StyleSheet.absoluteFill, styles.glass, hushed && styles.hushed]} fallbackStyle={glass.solid} />
+        <GlassSurface style={[StyleSheet.absoluteFill, styles.glass, hushed && styles.hushed]} fallbackStyle={glass.solid} />
         <View style={styles.field} onLayout={fit}>
         {editing ? (
           <View style={styles.banner} onLayout={(e) => setBannerH(e.nativeEvent.layout.height)}>
@@ -956,5 +948,6 @@ const createStyles = (colors: Colors) =>
   inputDocked: { paddingTop: 12, paddingBottom: 8 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolbar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  send: { width: SIDE, height: SIDE, borderRadius: SIDE / 2, alignItems: 'center', justifyContent: 'center' },
+  send: { width: SIDE, height: SIDE, borderRadius: SIDE / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  pressed: { opacity: 0.85 },
 })
