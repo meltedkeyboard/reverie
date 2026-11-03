@@ -23,7 +23,8 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
               styles.segmentWrap,
               isFirst && styles.firstSegment,
               isLast && styles.lastSegment,
-              !isFirst && styles.segmentBorderLeft,
+              !isFirst && styles.notFirstSegment,
+              chosen ? styles.chosenWrap : styles.unselectedWrap,
             ]}
           >
             <Pressable
@@ -38,7 +39,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
                 color: chosen ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)',
                 borderless: false,
               }}
-              style={[styles.segment, chosen && styles.chosen]}
+              style={styles.segment}
             >
               <Text
                 style={[styles.label, chosen && styles.chosenLabel]}
@@ -59,36 +60,39 @@ const createStyles = (colors: Colors) =>
     group: {
       flexDirection: 'row',
       height: HEIGHT,
-      borderRadius: 20,
-      borderWidth: 2,
-      borderColor: colors.borderStrong,
-      overflow: 'hidden',
-      backgroundColor: colors.surfaceRaised,
     },
     segmentWrap: {
       flex: 1,
       height: '100%',
-    },
-    segmentBorderLeft: {
-      borderLeftWidth: 1,
-      borderLeftColor: colors.borderStrong,
+      borderWidth: 2,
+      overflow: 'hidden',
     },
     firstSegment: {
-      borderTopLeftRadius: 18,
-      borderBottomLeftRadius: 18,
+      borderTopLeftRadius: HEIGHT / 2,
+      borderBottomLeftRadius: HEIGHT / 2,
     },
     lastSegment: {
-      borderTopRightRadius: 18,
-      borderBottomRightRadius: 18,
+      borderTopRightRadius: HEIGHT / 2,
+      borderBottomRightRadius: HEIGHT / 2,
+    },
+    notFirstSegment: {
+      marginLeft: -2,
+    },
+    unselectedWrap: {
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceRaised,
+      zIndex: 1,
+    },
+    chosenWrap: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accent,
+      zIndex: 2,
     },
     segment: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 8,
-    },
-    chosen: {
-      backgroundColor: colors.accent,
     },
     label: {
       color: colors.textMuted,

@@ -11,7 +11,7 @@ import type { ContinueKind } from '@/db/prefs/continue'
 import { useLastChatContext } from '@/hooks/chat/useLastChat'
 import { useTranslation } from '@/i18n'
 import { formatWhen } from '@/lib/core/format'
-import { isAndroid, isIOS } from '@/lib/core/platform'
+import { isIOS } from '@/lib/core/platform'
 import { type Colors, CONTROL_FONT_SCALE, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { Avatar } from '../visuals/Avatar'
@@ -132,24 +132,17 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
       exiting={FadeOutDown.duration(200)}
       style={[
         styles.slot,
-        isAndroid ? styles.slotAndroid : styles.slotIOS,
-        isAndroid
-          ? {
-              bottom,
-              left: 0,
-              right: 0,
-            }
-          : {
-              bottom: bottom + 8,
-              left: Math.max(SIDE, insets.left + 8),
-              right: Math.max(SIDE, insets.right + 8),
-            },
+        {
+          bottom: (bottom || insets.bottom) + 8,
+          left: Math.max(SIDE, insets.left + 8),
+          right: Math.max(SIDE, insets.right + 8),
+        },
       ]}
       pointerEvents="box-none"
     >
       <SwipeToDelete
         throwAway
-        radius={isAndroid ? 0 : HEIGHT / 2}
+        radius={HEIGHT / 2}
         label={t('continue.hide')}
         contentLabel={t('continue.accessibility')}
         onPress={onOpen}
@@ -158,16 +151,7 @@ export function ContinueButton({ kind, chat, bottom, onOpen, onDismiss }: Props)
         <GlassSurface
           interactive
           tintColor={colors.accent}
-          style={[
-            styles.pill,
-            isAndroid && [
-              styles.pillAndroid,
-              {
-                paddingLeft: Math.max(16, insets.left + 8),
-                paddingRight: Math.max(16, insets.right + 8),
-              },
-            ],
-          ]}
+          style={styles.pill}
           fallbackStyle={styles.solid}
         >
           <Animated.View style={[styles.content, contentStyle]}>
@@ -196,14 +180,8 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     slot: {
       position: 'absolute',
-    },
-    slotIOS: {
-      maxWidth: 720,
+      maxWidth: 520,
       alignSelf: 'center',
-    },
-    slotAndroid: {
-      left: 0,
-      right: 0,
     },
     pill: {
       flexDirection: 'row',
@@ -218,12 +196,14 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.bg,
       padding: 8,
       paddingRight: 16,
+      overflow: 'hidden',
     },
-    pillAndroid: {
-      borderRadius: 0,
-      padding: 8,
+    solid: {
+      backgroundColor: colors.accent,
+      borderRadius: HEIGHT / 2,
+      borderCurve: 'continuous',
+      overflow: 'hidden',
     },
-    solid: { backgroundColor: colors.accent },
     content: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
     text: { flex: 1 },
     name: { color: ON_ACCENT, fontSize: 16, fontWeight: '600' },

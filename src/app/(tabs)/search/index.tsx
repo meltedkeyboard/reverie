@@ -311,7 +311,7 @@ export default function SearchScreen() {
           },
         }}
       />
-      {list({ paddingBottom: 24 })}
+      {list({ paddingBottom: insets.bottom + 24 })}
       {!isAndroid && <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />}
     </View>
   )

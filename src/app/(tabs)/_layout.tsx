@@ -1,8 +1,10 @@
-import { Redirect, Stack } from 'expo-router'
+import { Redirect, Stack, Tabs } from 'expo-router'
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
+import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { AndroidFloatingTabBar, getAndroidTabBarBottom, getAndroidTabBarSpace } from '@/components/chrome/AndroidTabBar'
 import { HomeContinueButton } from '@/components/chat/ContinueButton'
 import type { ContinueKind } from '@/db/prefs/continue'
 import { isOnboardingComplete } from '@/db/prefs/onboarding'
@@ -12,7 +14,7 @@ import { LastChatProvider } from '@/hooks/chat/useLastChat'
 import { useTranslation } from '@/i18n'
 import { noteTabFocus } from '@/lib/core/searchScope'
 import { useColors } from '@/theme'
-import { isAndroid, isIOS } from '@/lib/core/platform'
+import { isAndroid } from '@/lib/core/platform'
 
 type TabListeners = ({ route }: { route: { name: string } }) => { tabPress: () => void; focus: () => void }
 
@@ -58,6 +60,14 @@ export default function TabsLayout() {
     )
   }
 
+  if (isAndroid) {
+    return (
+      <LastChatProvider>
+        <AndroidTabsLayout listeners={listeners} home={home} />
+      </LastChatProvider>
+    )
+  }
+
   return (
     <LastChatProvider>
       <View style={styles.blank}>
@@ -68,78 +78,63 @@ export default function TabsLayout() {
   )
 }
 
+function AndroidTabsLayout({ listeners, home }: { listeners: TabListeners; home: ContinueKind | null }) {
+  const insets = useSafeAreaInsets()
+  const colors = useColors()
+
+  // On Android the custom floating capsule tab bar floats over the content.
+  // We inset the safe area bottom so that screens and lists reserve room above the tab bar.
+  const tabBarBottom = getAndroidTabBarBottom(insets.bottom)
+  const tabInsets = useMemo(
+    () => ({
+      ...insets,
+      bottom: getAndroidTabBarSpace(insets.bottom),
+    }),
+    [insets]
+  )
+
+  return (
+    <SafeAreaInsetsContext.Provider value={tabInsets}>
+      <View style={styles.blank}>
+        <Tabs
+          tabBar={(props) => <AndroidFloatingTabBar {...props} bottom={tabBarBottom} sideInsets={insets} />}
+          screenOptions={{
+            headerShown: false,
+            sceneStyle: { backgroundColor: colors.bg },
+          }}
+          screenListeners={listeners}
+        >
+          <Tabs.Screen name="index" />
+          <Tabs.Screen name="rooms" />
+          <Tabs.Screen name="settings" />
+          <Tabs.Screen name="search" />
+        </Tabs>
+        <HomeContinueButton kind={home} />
+      </View>
+    </SafeAreaInsetsContext.Provider>
+  )
+}
+
 function AppTabs({ listeners }: { listeners: TabListeners }) {
   const colors = useColors()
   const { t } = useTranslation()
-  // On iOS the screens draw their own insets from the safe area, which already takes in
-  // the tab bar; left automatic, scroll views would get them a second time. The Android
-  // bar is opaque and does not float over the content, so there the tabs inset it.
-  const own = isIOS
-
-  const androidAppearance = isAndroid
-    ? {
-        tabBarBackgroundColor: colors.surface,
-        tabBarItemRippleColor: colors.accentSoft,
-        tabBarItemLabelVisibilityMode: 'labeled' as const,
-        tabBarItemActiveIndicatorColor: colors.accentSoft,
-        tabBarItemActiveIndicatorEnabled: true,
-        tabBarItemActiveIndicatorWidth: 64,
-        tabBarItemActiveIndicatorHeight: 32,
-        tabBarItemTitleSmallLabelFontSize: 11,
-        tabBarItemTitleLargeLabelFontSize: 11,
-        tabBarItemTitleFontWeight: '500' as const,
-        normal: {
-          tabBarItemTitleFontColor: colors.textMuted,
-          tabBarItemIconColor: colors.textMuted,
-        },
-        selected: {
-          tabBarItemTitleFontColor: colors.accent,
-          tabBarItemIconColor: colors.accent,
-        },
-      }
-    : undefined
-
-  const material = isAndroid
-    ? {
-        backgroundColor: colors.surface,
-        indicatorColor: colors.accentSoft,
-        rippleColor: colors.accentSoft,
-        iconColor: { default: colors.textMuted, selected: colors.accent },
-        labelStyle: {
-          default: { color: colors.textMuted, fontSize: 11, fontWeight: '500' as const },
-          selected: { color: colors.accent, fontSize: 11, fontWeight: '600' as const },
-        },
-        labelVisibilityMode: 'labeled' as const,
-      }
-    : {}
-
-  const triggerProps = isAndroid
-    ? {
-        labelVisibilityMode: 'labeled' as const,
-        unstable_nativeProps: {
-          android: {
-            standardAppearance: androidAppearance,
-          },
-        },
-      }
-    : {}
 
   return (
-    <NativeTabs tintColor={colors.accent} screenListeners={listeners} {...material}>
-      <NativeTabs.Trigger name="index" disableAutomaticContentInsets={own} {...triggerProps}>
+    <NativeTabs tintColor={colors.accent} screenListeners={listeners}>
+      <NativeTabs.Trigger name="index" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Label>{t('characters.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} md="group" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="rooms" disableAutomaticContentInsets={own} {...triggerProps}>
+      <NativeTabs.Trigger name="rooms" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Label>{t('rooms.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} md="forum" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings" disableAutomaticContentInsets={own} {...triggerProps}>
+      <NativeTabs.Trigger name="settings" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Label>{t('settings.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
       </NativeTabs.Trigger>
       {/* In iOS 27 search is a unified inline tab item inside the tab bar alongside other tabs, without a separate floating island */}
-      <NativeTabs.Trigger name="search" disableAutomaticContentInsets={own} {...triggerProps}>
+      <NativeTabs.Trigger name="search" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Label>{t('search.title')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'magnifyingglass', selected: 'magnifyingglass' }} md="search" />
       </NativeTabs.Trigger>
