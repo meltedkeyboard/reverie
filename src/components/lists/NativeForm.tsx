@@ -348,6 +348,7 @@ export function NativeSliderRow({
   onChange,
   onEditing,
   tintColor,
+  disabled: rowDisabled = false,
 }: {
   label: string
   value: number
@@ -359,18 +360,19 @@ export function NativeSliderRow({
   // When the finger takes the thumb and lets it go.
   onEditing?: (editing: boolean) => void
   tintColor?: string
+  disabled?: boolean
 }) {
   const { colors } = useTheme()
   const { VStack, HStack, Spacer, Text, Slider } = nativeForm!.ui
-  const { foregroundStyle, monospacedDigit, tint } = nativeForm!.modifiers
+  const { foregroundStyle, monospacedDigit, tint, disabled: swiftDisabled } = nativeForm!.modifiers
   return (
-    <VStack alignment="leading" spacing={6}>
+    <VStack alignment="leading" spacing={6} modifiers={rowDisabled ? [swiftDisabled(true)] : []}>
       <HStack>
-        <Text>{label}</Text>
+        <Text modifiers={rowDisabled ? [foregroundStyle(colors.textFaint)] : []}>{label}</Text>
         <Spacer />
-        <Text modifiers={[foregroundStyle(tintColor ?? colors.textMuted), monospacedDigit()]}>{format(value)}</Text>
+        <Text modifiers={[foregroundStyle(rowDisabled ? colors.textFaint : (tintColor ?? colors.textMuted)), monospacedDigit()]}>{format(value)}</Text>
       </HStack>
-      <Slider value={value} min={min} max={max} step={step} onValueChange={onChange} onEditingChanged={onEditing} modifiers={tintColor ? [tint(tintColor)] : []} />
+      <Slider value={value} min={min} max={max} step={step} onValueChange={onChange} onEditingChanged={onEditing} modifiers={[...(tintColor ? [tint(tintColor)] : []), ...(rowDisabled ? [swiftDisabled(true)] : [])]} />
     </VStack>
   )
 }

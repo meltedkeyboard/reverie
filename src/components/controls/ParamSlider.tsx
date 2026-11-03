@@ -16,16 +16,17 @@ type Props = {
   onSlidingStart?: () => void
   onSlidingComplete?: (value: number) => void
   tintColor?: string
+  disabled?: boolean
 }
 
-export function ParamSlider({ label, value, min, max, step, digits = 0, formatValue, onChange, onSlidingStart, onSlidingComplete, tintColor }: Props) {
+export function ParamSlider({ label, value, min, max, step, digits = 0, formatValue, onChange, onSlidingStart, onSlidingComplete, tintColor, disabled = false }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, disabled && { opacity: 0.4 }]} pointerEvents={disabled ? "none" : "auto"}>
       <View style={styles.row}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={[styles.value, tintColor ? { color: tintColor } : null]}>
+        <Text style={[styles.label, disabled && { color: colors.textFaint }]}>{label}</Text>
+        <Text style={[styles.value, disabled ? { color: colors.textFaint } : (tintColor ? { color: tintColor } : null)]}>
           {formatValue ? formatValue(value) : value.toFixed(digits)}
         </Text>
       </View>
@@ -34,6 +35,7 @@ export function ParamSlider({ label, value, min, max, step, digits = 0, formatVa
         minimumValue={min}
         maximumValue={max}
         step={step}
+        disabled={disabled}
         onSlidingStart={onSlidingStart}
         onValueChange={onChange}
         onSlidingComplete={onSlidingComplete}

@@ -15,7 +15,7 @@ import type { ChromeData, RowConfig, ThreadData } from '@/components/chat/thread
 import type { Store } from '@/components/chat/thread/store'
 import { useChatDrawer } from '@/components/chrome/ChatDrawer'
 import { GlassSurface } from '@/components/chrome/Glass'
-import { bubbleOpacityOf } from '@/components/chrome/ChatChrome'
+import { bubbleGlassOf, bubbleOpacityOf } from '@/components/chrome/ChatChrome'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { Icon } from '@/components/visuals/Icon'
@@ -255,11 +255,12 @@ export function RoomController({
   const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow, branch })
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
-  const { pattern, wallpaper } = useChatTextSettings()
+  const { pattern, wallpaper, bubbleGlass: globalBubbleGlass } = useChatTextSettings()
+  const bubbleGlass = bubbleGlassOf(room, wallpaper, pattern, globalBubbleGlass)
   const bubbleOpacity = bubbleOpacityOf(room, wallpaper, pattern)
   const config = useMemo<RowConfig>(
-    () => ({ regenerable, locked, onAction, onSelectVariant: selectVariant, bubbleOpacity, sceneOf }),
-    [regenerable, locked, onAction, selectVariant, bubbleOpacity, sceneOf]
+    () => ({ regenerable, locked, onAction, onSelectVariant: selectVariant, bubbleOpacity, bubbleGlass, sceneOf }),
+    [regenerable, locked, onAction, selectVariant, bubbleOpacity, bubbleGlass, sceneOf]
   )
 
   // Until its messages are in, the thread keeps what it shows: the scene as it was laid

@@ -1,3 +1,4 @@
+import { isIOS } from '@/lib/core/platform'
 import { StyleSheet, View } from 'react-native'
 
 import { ChatBackground } from '@/components/chat/ChatBackground'
@@ -14,7 +15,7 @@ import { FILL, paletteOf, useColors, useTheme, type Scheme } from '@/theme'
 // What a character or a room says about the look of its chats.
 export type ChatLook = Pick<
   Character,
-  'background' | 'backgroundCrop' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency' | 'backgroundTone'
+  'background' | 'backgroundCrop' | 'backgroundEffect' | 'backgroundIntensity' | 'backgroundBubbleTransparency' | 'backgroundBubbleGlass' | 'backgroundTone'
 >
 
 type ChatPicture = { uri: string; crop: string | null; effect: BackgroundEffect; intensity: number; tone: BackgroundTone }
@@ -119,6 +120,19 @@ export function ChatBackdrop({ owner }: { owner: ChatLook | null | undefined }) 
 }
 
 // Over a picture the user's bubbles can be made see-through.
+export const bubbleGlassOf = (
+  owner: ChatLook,
+  wallpaper?: { file: string | null; bubbleGlass?: boolean } | null,
+  pattern?: string,
+  globalBubbleGlass?: boolean
+) => {
+  if (!isIOS) return false
+  if (globalBubbleGlass) return true
+  if (owner.background) return !!owner.backgroundBubbleGlass
+  if (pattern === 'custom' && wallpaper?.file) return !!wallpaper.bubbleGlass
+  return false
+}
+
 export const bubbleOpacityOf = (
   owner: ChatLook,
   wallpaper?: { file: string | null; bubbleTransparency: number } | null,
@@ -174,12 +188,11 @@ function toWallpaperAccent(color: Rgb): { accent: string; accentSoft: string } {
 // the average color of the custom wallpaper when background on home screen is enabled, or null.
 export function useHomeWallpaperAccent(): { accent: string; accentSoft: string } | null {
   const { dynamicAccent, homeBackground, pattern, wallpaper } = useChatTextSettings()
-  if (!dynamicAccent) return null
-  const picture = homeBackground && pattern === 'custom' && wallpaper?.file
+  const picture = dynamicAccent && homeBackground && pattern === 'custom' && wallpaper?.file
     ? pictureOf(NO_PICTURE, wallpaper, pattern)
     : null
   const color = usePictureColor(picture?.uri ?? null)
-  if (!picture || !color) return null
+  if (!dynamicAccent || !picture || !color) return null
   return toWallpaperAccent(color)
 }
 
@@ -187,11 +200,11 @@ export function useHomeWallpaperAccent(): { accent: string; accentSoft: string }
 // the average color of the chat's or custom wallpaper when "Background in menus" (backdrop) is enabled, or null.
 export function useChatWallpaperAccent(look?: ChatLook | null): { accent: string; accentSoft: string } | null {
   const { backdrop, dynamicAccent, pattern, wallpaper } = useChatTextSettings()
-  if (!dynamicAccent) return null
-  if (!backdrop) return null
-  const picture = pictureOf(look ?? NO_PICTURE, wallpaper, pattern)
+  const picture = dynamicAccent && backdrop
+    ? pictureOf(look ?? NO_PICTURE, wallpaper, pattern)
+    : null
   const color = usePictureColor(picture?.uri ?? null)
-  if (!picture || !color) return null
+  if (!dynamicAccent || !backdrop || !picture || !color) return null
   return toWallpaperAccent(color)
 }
 

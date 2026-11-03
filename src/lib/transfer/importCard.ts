@@ -137,6 +137,7 @@ export async function importCardFile(db: SQLiteDatabase, uri: string, pictureOnl
     backgroundEffect: 'blur',
     backgroundIntensity: 0.5,
     backgroundBubbleTransparency: 0.3,
+    backgroundBubbleGlass: false,
     backgroundTone: 'auto',
   })
   // The card's lorebook comes in as a lorebook of its own, tied to the new character.

@@ -109,6 +109,7 @@ export default function CharacterEditorScreen() {
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>('blur')
   const [bgIntensity, setBgIntensity] = useState(0.5)
   const [bgBubbleTransparency, setBgBubbleTransparency] = useState(0.3)
+  const [bgBubbleGlass, setBgBubbleGlass] = useState(false)
   const [bgTone, setBgTone] = useState<BackgroundTone>('auto')
   // The greeting before the generated one replaced it, until it is edited by hand.
   const [beforeGreeting, setBeforeGreeting] = useState<string | null>(null)
@@ -139,6 +140,7 @@ export default function CharacterEditorScreen() {
       setBgEffect(found.backgroundEffect)
       setBgIntensity(found.backgroundIntensity)
       setBgBubbleTransparency(found.backgroundBubbleTransparency)
+      setBgBubbleGlass(found.backgroundBubbleGlass ?? false)
       setBgTone(found.backgroundTone)
       avatarSlot.remember({ file: found.avatar, original: found.avatarOriginal })
       bgSlot.remember({ file: found.background, original: found.backgroundOriginal })
@@ -231,6 +233,7 @@ export default function CharacterEditorScreen() {
       effect: bgEffect,
       intensity: bgIntensity,
       bubbleTransparency: bgBubbleTransparency,
+      bubbleGlass: bgBubbleGlass,
       tone: bgTone,
       onDone: (result) => {
         bgSlot.setFramed(result.uri, result.crop, original)
@@ -238,6 +241,7 @@ export default function CharacterEditorScreen() {
         setBgEffect(result.effect)
         setBgIntensity(result.intensity)
         setBgBubbleTransparency(result.bubbleTransparency)
+        setBgBubbleGlass(result.bubbleGlass ?? false)
         setBgTone(result.tone)
       },
     })
@@ -310,6 +314,7 @@ export default function CharacterEditorScreen() {
         backgroundEffect: bgEffect,
         backgroundIntensity: bgIntensity,
         backgroundBubbleTransparency: bgBubbleTransparency,
+        backgroundBubbleGlass: bgBubbleGlass,
         backgroundTone: bgTone,
       })
       avatarSlot.settle(nextAvatarValue)

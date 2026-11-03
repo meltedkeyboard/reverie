@@ -31,6 +31,8 @@ import { Pager } from '../lists/Pager'
 import { PlainSymbol } from '../visuals/PlainSymbol'
 import { useHydrated, type Hydration } from './thread/hydration'
 import { SFIcon } from '../visuals/SFIcon'
+import { GlassBubble } from '../chrome/Glass'
+import { isIOS } from '@/lib/core/platform'
 import { ShimmerText } from '../visuals/ShimmerText'
 import { TypingIndicator } from './TypingIndicator'
 
@@ -59,6 +61,7 @@ type Props = {
   onSelectVariant: (id: number, variant: number) => void
   // How much of the user's bubble color shows: below 1 over a chat background.
   bubbleOpacity?: number
+  bubbleGlass?: boolean
   scene?: RowScene
   // Whether it comes up plain and takes on the selectable text, the native menu and the
   // animated symbols later, a row a frame while nothing moves (see thread/hydration).
@@ -75,7 +78,7 @@ function textSize({ fontFamily, scaled }: ReturnType<typeof useChatText>, metric
 // the bar below.
 const LONG_PRESS_MS = 350
 
-function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1, scene, hydrate = 'off' }: Props) {
+function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVariant, bubbleOpacity = 1, bubbleGlass = false, scene, hydrate = 'off' }: Props) {
   const { scheme } = useTheme()
   const styles = useStyles(createStyles)
   const colors = useColors()
@@ -156,13 +159,14 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           <Picture image={message.images[0]} group={pictures} index={0} onLongPress={openSheet} />
         ) : null}
         {message.content ? (
-          <View
-            style={[
-              styles.bubble,
-              bubbleOpacity < 1 && { backgroundColor: withAlpha(colors.bubble, bubbleOpacity) },
-              scene?.whisper ? styles.whisperBubble : null,
-            ]}
-          >
+          bubbleGlass && isIOS ? (
+            <GlassBubble
+              style={[
+                styles.bubble,
+                styles.glassBubble,
+                scene?.whisper ? styles.whisperBubble : null,
+              ]}
+            >
             {chatText.userMarkdown ? (
               <Markdown
                 key={`${message.variant}:${message.content}`}
@@ -182,7 +186,36 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
                 {message.content}
               </Text>
             )}
+          </GlassBubble>
+          ) : (
+          <View
+            style={[
+              styles.bubble,
+              bubbleOpacity < 1 && { backgroundColor: withAlpha(colors.bubble, bubbleOpacity) },
+              scene?.whisper ? styles.whisperBubble : null,
+            ]}
+          >
+            {chatText.userMarkdown ? (
+              <Markdown
+                key={`${message.variant}:${message.content}`}
+                text={message.content}
+                style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}
+                selectable={rich}
+              />
+            ) : rich ? (
+              <SelectableText
+                key={`${message.variant}:${message.content}`}
+                style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}
+                >
+                {message.content}
+              </SelectableText>
+            ) : (
+              <Text style={[styles.userText, textSize(chatText, CHAT_METRICS.user), { fontFamily: chatText.userFontFamily }]}>
+                {message.content}
+              </Text>
+            )}
           </View>
+          )
         ) : null}
         {scene?.overheard ? <Overheard names={scene.overheard} end /> : null}
         {bar}
@@ -757,6 +790,7 @@ function Picture({ image, group, index, onLongPress, frame, corners }: PicturePr
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
   userRow: { alignItems: 'flex-end', paddingLeft: 56, paddingRight: 16, marginVertical: 8, width: '100%', maxWidth: CHAT_COLUMN, alignSelf: 'center' },
+  glassBubble: { backgroundColor: withAlpha(colors.bubble, 0.25), borderColor: colors.borderStrong, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   bubble: {
     backgroundColor: colors.bubble,
     borderRadius: 20,

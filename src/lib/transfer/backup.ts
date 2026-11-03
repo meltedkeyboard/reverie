@@ -49,6 +49,7 @@ type BackupCharacter = {
   backgroundEffect?: BackgroundEffect
   backgroundIntensity?: number
   backgroundBubbleTransparency?: number
+  backgroundBubbleGlass?: boolean
   // Backups from before the tone leave it out.
   backgroundTone?: BackgroundTone
   createdAt: number
@@ -123,6 +124,7 @@ type BackupRoom = {
   backgroundEffect: BackgroundEffect
   backgroundIntensity: number
   backgroundBubbleTransparency: number
+  backgroundBubbleGlass?: boolean
   backgroundTone?: BackgroundTone
   createdAt: number
 }
@@ -564,6 +566,7 @@ export async function importBackup(
           backgroundEffect: character.backgroundEffect ?? 'blur',
           backgroundIntensity: character.backgroundIntensity ?? 0.5,
           backgroundBubbleTransparency: character.backgroundBubbleTransparency ?? 0.3,
+          backgroundBubbleGlass: character.backgroundBubbleGlass ?? false,
           backgroundTone: backgroundToneOf(character.backgroundTone),
         },
         character.createdAt

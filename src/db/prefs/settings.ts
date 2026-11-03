@@ -445,6 +445,11 @@ const dynamicAccent = defineFlag('dynamic_accent', false)
 export const loadDynamicAccent = dynamicAccent.load
 export const saveDynamicAccent = dynamicAccent.save
 
+// Whether user prompt bubbles are rendered as Liquid Glass on iOS, off by default.
+const chatBubbleGlass = defineFlag('chat_bubble_glass', false)
+export const loadChatBubbleGlass = chatBubbleGlass.load
+export const saveChatBubbleGlass = chatBubbleGlass.save
+
 // The pattern behind a chat that has no picture of its own, from the Penpot page
 // "Background Pattern"; 'none' is the plain theme background.
 export const CHAT_PATTERNS = ['none', 'stars', 'two-stars', 'big-star', 'diagonal', 'scattered', 'rings', 'rings-centered', 'dots'] as const
@@ -461,6 +466,7 @@ export type ChatWallpaper = {
   effect: BackgroundEffect
   intensity: number
   bubbleTransparency: number
+  bubbleGlass?: boolean
   tone: BackgroundTone
 }
 
@@ -471,6 +477,7 @@ export const DEFAULT_CHAT_WALLPAPER: ChatWallpaper = {
   effect: 'blur',
   intensity: 0.5,
   bubbleTransparency: 0.3,
+  bubbleGlass: false,
   tone: 'auto',
 }
 
@@ -481,6 +488,7 @@ const CHAT_WALLPAPER_KEYS = {
   effect: 'chat_wallpaper_effect',
   intensity: 'chat_wallpaper_intensity',
   bubbleTransparency: 'chat_wallpaper_bubble_transparency',
+  bubbleGlass: 'chat_wallpaper_bubble_glass',
   tone: 'chat_wallpaper_tone',
 } as const
 
@@ -504,9 +512,10 @@ export async function loadChatWallpaper(db: SQLiteDatabase): Promise<ChatWallpap
   const rawTrans = Number(map.get(CHAT_WALLPAPER_KEYS.bubbleTransparency))
   const bubbleTransparency = Number.isFinite(rawTrans) ? rawTrans : 0.3
 
+  const bubbleGlass = map.get(CHAT_WALLPAPER_KEYS.bubbleGlass) === '1'
   const tone = backgroundToneOf(map.get(CHAT_WALLPAPER_KEYS.tone))
 
-  return { file, original, crop, effect, intensity, bubbleTransparency, tone }
+  return { file, original, crop, effect, intensity, bubbleTransparency, bubbleGlass, tone }
 }
 
 export async function saveChatWallpaper(db: SQLiteDatabase, wallpaper: ChatWallpaper | null) {
@@ -524,6 +533,7 @@ export async function saveChatWallpaper(db: SQLiteDatabase, wallpaper: ChatWallp
   await setSetting(db, CHAT_WALLPAPER_KEYS.effect, wallpaper.effect)
   await setSetting(db, CHAT_WALLPAPER_KEYS.intensity, String(wallpaper.intensity))
   await setSetting(db, CHAT_WALLPAPER_KEYS.bubbleTransparency, String(wallpaper.bubbleTransparency))
+  await setSetting(db, CHAT_WALLPAPER_KEYS.bubbleGlass, wallpaper.bubbleGlass ? '1' : '0')
   await setSetting(db, CHAT_WALLPAPER_KEYS.tone, wallpaper.tone)
 }
 

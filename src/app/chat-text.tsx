@@ -9,7 +9,7 @@ import { ChatBackground } from '@/components/chat/ChatBackground'
 import { Pattern } from '@/components/visuals/Pattern'
 import { NO_PICTURE, useChatScheme } from '@/components/chrome/ChatChrome'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
-import { GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
+import { GlassBubble, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { ButtonCell, CheckCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
 import { nativeCardList, NativeListPreview } from '@/components/lists/NativeCardList'
 import { nativeForm, NativeForm, NativeHostedRow, NativeSection, NativeSegmentRow } from '@/components/lists/NativeForm'
@@ -24,7 +24,7 @@ import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { CHAT_METRICS, useChatTextSettings } from '@/lib/chat/chatText'
 import { withAlpha } from '@/lib/core/color'
-import { isAndroid, isWeb } from '@/lib/core/platform'
+import { isAndroid, isIOS, isWeb } from '@/lib/core/platform'
 import {
   avatarUri,
   cropFromJson,
@@ -96,12 +96,13 @@ function ChoiceMark({ selected }: { selected: boolean }) {
 
 // The preview card, a component of its own so that it reads the colors of the scheme set
 // around it.
-function ChatPreview({ flush = false }: { flush?: boolean }) {
+function ChatPreview({ flush = false, bubbleGlass: bubbleGlassProp }: { flush?: boolean; bubbleGlass?: boolean }) {
   const colors = useColors()
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const { font, userFont, userMarkdown, pattern, wallpaper, scale } = useChatTextSettings()
+  const { font, userFont, userMarkdown, bubbleGlass: bubbleGlassContext, pattern, wallpaper, scale } = useChatTextSettings()
+  const bubbleGlass = bubbleGlassProp !== undefined ? bubbleGlassProp : bubbleGlassContext
   const wallpaperUri = wallpaper?.file ? avatarUri(wallpaper.file, 'backgrounds') : null
   const fontFamily = font
   const scaled = (value: number) => value * scale
@@ -136,20 +137,30 @@ function ChatPreview({ flush = false }: { flush?: boolean }) {
         )}
       </View>
       <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
-        <View
-          style={[
-            styles.bubble,
-            pattern === 'custom' && wallpaper?.file
-              ? { backgroundColor: withAlpha(colors.bubble, 1 - (wallpaper.bubbleTransparency ?? 0.3)) }
-              : null,
-          ]}
-        >
-          {userMarkdown ? (
-            <Markdown text={t('chatPreview.user')} style={user} selectable={false} />
-          ) : (
-            <Text style={user}>{t('chatPreview.user')}</Text>
-          )}
-        </View>
+        {(bubbleGlass || (wallpaper?.bubbleGlass && pattern === 'custom')) && isIOS ? (
+          <GlassBubble style={[styles.bubble, styles.glassBubble]}>
+            {userMarkdown ? (
+              <Markdown text={t('chatPreview.user')} style={user} selectable={false} />
+            ) : (
+              <Text style={user}>{t('chatPreview.user')}</Text>
+            )}
+          </GlassBubble>
+        ) : (
+          <View
+            style={[
+              styles.bubble,
+              pattern === 'custom' && wallpaper?.file
+                ? { backgroundColor: withAlpha(colors.bubble, 1 - (wallpaper.bubbleTransparency ?? 0.3)) }
+                : null,
+            ]}
+          >
+            {userMarkdown ? (
+              <Markdown text={t('chatPreview.user')} style={user} selectable={false} />
+            ) : (
+              <Text style={user}>{t('chatPreview.user')}</Text>
+            )}
+          </View>
+        )}
         <Markdown text={t('chatPreview.reply')} style={bot} emStyle={styles.action} />
       </ScrollView>
       <View style={styles.composer}>
@@ -211,6 +222,8 @@ function Appearance() {
     setHomeBackground,
     dynamicAccent,
     setDynamicAccent,
+    bubbleGlass,
+    setBubbleGlass,
     scale,
     setFont,
     setScale,
@@ -230,6 +243,7 @@ function Appearance() {
       effect: wallpaper?.effect ?? 'blur',
       intensity: wallpaper?.intensity ?? 0.5,
       bubbleTransparency: wallpaper?.bubbleTransparency ?? 0.3,
+      bubbleGlass: wallpaper?.bubbleGlass ?? false,
       tone: wallpaper?.tone ?? 'auto',
       onDone: async (result) => {
         try {
@@ -387,7 +401,7 @@ function Appearance() {
         <NativeSection>
           <NativeHostedRow height={PREVIEW_HEIGHT} clear>
             <SchemeOverride scheme={previewScheme}>
-              <ChatPreview flush />
+              <ChatPreview flush bubbleGlass={bubbleGlass} />
             </SchemeOverride>
           </NativeHostedRow>
         </NativeSection>
@@ -427,6 +441,9 @@ function Appearance() {
           </Picker>
           <Toggle label={t('settings.chatUserFont')} isOn={userFont} onIsOnChange={setUserFont} />
           <Toggle label={t('settings.chatUserMarkdown')} isOn={userMarkdown} onIsOnChange={setUserMarkdown} />
+          {isIOS ? (
+            <Toggle label={t('background.bubbleGlass')} isOn={bubbleGlass} onIsOnChange={setBubbleGlass} />
+          ) : null}
         </NativeSection>
 
         {/* The look of the system's lists of characters, groups and rooms, which only iOS has. */}
@@ -579,7 +596,7 @@ function Appearance() {
           {/* A made-up exchange, so a change shows at once as it will look in a chat, in the
               scheme the chat takes over the wallpaper. */}
           <SchemeOverride scheme={previewScheme}>
-            <ChatPreview />
+            <ChatPreview bubbleGlass={bubbleGlass} />
           </SchemeOverride>
 
           <ListSection>
@@ -618,6 +635,9 @@ function Appearance() {
             <MenuCell label={t('settings.chatFontField')} value={font === SYSTEM_FONT ? t('chatFont.system') : font} items={items} />
             <SwitchCell label={t('settings.chatUserFont')} value={userFont} onValueChange={setUserFont} />
             <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
+            {isIOS ? (
+              <SwitchCell label={t('background.bubbleGlass')} value={bubbleGlass} onValueChange={setBubbleGlass} />
+            ) : null}
           </ListSection>
 
           {nativeCardList ? (
@@ -705,6 +725,7 @@ const createStyles = (colors: Colors) =>
     cardFlush: { flex: 1, marginBottom: 0, borderRadius: 0 },
     messages: { height: 200, marginBottom: 12 },
     messagesContent: { gap: 16 },
+    glassBubble: { backgroundColor: withAlpha(colors.bubble, 0.25), borderColor: colors.borderStrong, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
     bubble: {
       alignSelf: 'flex-end',
       marginLeft: 40,

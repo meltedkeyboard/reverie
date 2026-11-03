@@ -148,6 +148,7 @@ export default function RoomEditorScreen() {
       effect: fields.backgroundEffect,
       intensity: fields.backgroundIntensity,
       bubbleTransparency: fields.backgroundBubbleTransparency,
+      bubbleGlass: fields.backgroundBubbleGlass,
       tone: fields.backgroundTone,
       onDone: (result) => {
         bgSlot.setFramed(result.uri, result.crop, original)
@@ -157,6 +158,7 @@ export default function RoomEditorScreen() {
           backgroundEffect: result.effect,
           backgroundIntensity: result.intensity,
           backgroundBubbleTransparency: result.bubbleTransparency,
+          backgroundBubbleGlass: result.bubbleGlass,
           backgroundTone: result.tone,
         }))
       },

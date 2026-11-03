@@ -371,6 +371,11 @@ const MIGRATIONS = [
     ALTER TABLE characters ADD COLUMN archived_at INTEGER;
     ALTER TABLE characters ADD COLUMN archived_group INTEGER;
   `,
+  // Glass user bubble for iOS over chat background.
+  `
+    ALTER TABLE characters ADD COLUMN background_bubble_glass INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE rooms ADD COLUMN background_bubble_glass INTEGER NOT NULL DEFAULT 0;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

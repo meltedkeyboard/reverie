@@ -11,6 +11,7 @@ import { BlurBar, EdgeFade } from './BarChrome'
 import { GlassButton, HeaderContext } from './Glass'
 import { IconButton } from '../controls/IconButton'
 import { Star } from '../visuals/motifs/Star'
+import { useHomeWallpaperAccent } from './ChatChrome'
 import { isAndroid, isDesktop, isIOS } from '@/lib/core/platform'
 
 type Props = {
@@ -62,20 +63,24 @@ export function TabTitle({
   maxWidth,
   fit,
   color,
+  starColor,
   starStyle,
 }: {
   children: React.ReactNode
   maxWidth?: number
   fit?: boolean
   color?: string
+  starColor?: string
   starStyle?: React.ComponentProps<typeof Animated.View>['style']
 }) {
   const colors = useColors()
+  const homeAccent = useHomeWallpaperAccent()
   const styles = useStyles(createStyles)
+  const effectiveStarColor = starColor ?? homeAccent?.accent ?? colors.danger
   return (
     <View style={[styles.tabTitleRow, maxWidth !== undefined && { maxWidth }]}>
       <Animated.View style={starStyle}>
-        <Star size={TAB_TITLE_STAR} color={colors.danger} rotation={-14} style={styles.tabTitleStar} />
+        <Star size={TAB_TITLE_STAR} color={effectiveStarColor} rotation={-14} style={styles.tabTitleStar} />
       </Animated.View>
       <Text
         maxFontSizeMultiplier={HEADER_FONT_SCALE}

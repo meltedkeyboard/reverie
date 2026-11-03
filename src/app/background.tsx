@@ -20,9 +20,10 @@ import { scheduleOnRN } from 'react-native-worklets'
 import { Button } from '@/components/controls/Button'
 import { ChatBackground } from '@/components/chat/ChatBackground'
 import { ChipGroup } from '@/components/controls/ChipGroup'
-import { GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
+import { GlassBubble, GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { GlassHeader, HeaderTitle } from '@/components/chrome/GlassHeader'
 import { ParamSlider } from '@/components/controls/ParamSlider'
+import { Switch } from '@/components/controls/Switch'
 import { Segmented } from '@/components/controls/Segmented'
 import type { BackgroundEffect, BackgroundTone } from '@/db/characters'
 import { useTranslation } from '@/i18n'
@@ -43,6 +44,7 @@ import {
   rubber,
   transformFromCrop,
 } from '@/lib/images/backgroundFrame'
+import { useChatTextSettings } from '@/lib/chat/chatText'
 import { withAlpha } from '@/lib/core/color'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
@@ -105,6 +107,8 @@ function BackgroundEditor({ draft, look }: { draft: BackgroundDraft | null; look
   const [moving] = useState(() => (draft ? movingKind(draft.uri) : null))
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [bubbleTransparency, setBubbleTransparency] = useState(draft?.bubbleTransparency ?? 0.3)
+  const { bubbleGlass: globalBubbleGlass } = useChatTextSettings()
+  const [bubbleGlass, setBubbleGlass] = useState(draft?.bubbleGlass ?? globalBubbleGlass)
 
   const [saving, setSaving] = useState(false)
 
@@ -372,6 +376,8 @@ function BackgroundEditor({ draft, look }: { draft: BackgroundDraft | null; look
       setIntensity,
       bubbleTransparency,
       setBubbleTransparency,
+      bubbleGlass,
+      setBubbleGlass,
       tone,
       setTone,
       scheme: look.scheme,
@@ -450,9 +456,15 @@ function BackgroundEditor({ draft, look }: { draft: BackgroundDraft | null; look
 
       {/* A message of the user's, to judge how see-through its bubble is. */}
       <View style={[styles.sample, { right: chatRight + 16 }]} pointerEvents="none">
-        <View style={[styles.bubble, { backgroundColor: withAlpha(colors.bubble, 1 - bubbleTransparency) }]}>
-          <Text style={styles.bubbleText}>{t('background.sampleMessage')}</Text>
-        </View>
+        {bubbleGlass && isIOS ? (
+          <GlassBubble style={[styles.bubble, styles.glassBubble]}>
+            <Text style={styles.bubbleText}>{t('background.sampleMessage')}</Text>
+          </GlassBubble>
+        ) : (
+          <View style={[styles.bubble, { backgroundColor: withAlpha(colors.bubble, 1 - bubbleTransparency) }]}>
+            <Text style={styles.bubbleText}>{t('background.sampleMessage')}</Text>
+          </View>
+        )}
       </View>
 
       {/* On iOS the sheet's bar has the title, close and reset. */}
@@ -490,9 +502,16 @@ function BackgroundEditor({ draft, look }: { draft: BackgroundDraft | null; look
                   formatValue={percent}
                   onChange={setIntensity}
                 />
+                {isIOS ? (
+                  <View style={styles.glassRow}>
+                    <Text style={styles.label}>{t('background.bubbleGlass')}</Text>
+                    <Switch value={bubbleGlass} onValueChange={setBubbleGlass} />
+                  </View>
+                ) : null}
                 <ParamSlider
                   label={t('background.bubbleTransparency')}
                   value={bubbleTransparency}
+                  disabled={bubbleGlass && isIOS}
                   min={0}
                   max={1}
                   step={0.05}
@@ -521,9 +540,16 @@ function BackgroundEditor({ draft, look }: { draft: BackgroundDraft | null; look
                 formatValue={percent}
                 onChange={setIntensity}
               />
+              {isIOS ? (
+                <View style={styles.glassRow}>
+                  <Text style={styles.label}>{t('background.bubbleGlass')}</Text>
+                  <Switch value={bubbleGlass} onValueChange={setBubbleGlass} />
+                </View>
+              ) : null}
               <ParamSlider
                 label={t('background.bubbleTransparency')}
                 value={bubbleTransparency}
+                disabled={bubbleGlass && isIOS}
                 min={0}
                 max={1}
                 step={0.05}
@@ -556,7 +582,10 @@ const createStyles = (colors: Colors) =>
     },
     sample: { position: 'absolute', top: '22%', right: 16, left: 56, alignItems: 'flex-end' },
     bubble: { borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10 },
+    glassBubble: { backgroundColor: withAlpha(colors.bubble, 0.25), borderColor: colors.borderStrong, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+    glassRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
     bubbleText: { color: colors.text, fontSize: 16, lineHeight: 22 },
+    label: { color: colors.text, fontSize: 16 },
     sidePanel: { position: 'absolute', bottom: 0, width: SIDE_PANEL },
     sidePanelContent: { flexGrow: 1, justifyContent: 'flex-end', paddingHorizontal: 10 },
     panel: { borderRadius: 24, padding: 12, gap: 10 },

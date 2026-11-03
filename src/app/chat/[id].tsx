@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
   ChatSurface,
+  bubbleGlassOf,
   bubbleOpacityOf,
   pictureOf,
   useChatBackdropTone,
@@ -185,7 +186,7 @@ const aheadOf = (chat: Chat, messages: Message[], look: Look, owner: Owner): Thr
 
 // How the rows of an owner look whatever their chat: the bubbles over its picture, and in
 // a room who said each line.
-type Look = Pick<RowConfig, 'bubbleOpacity' | 'sceneOf'>
+type Look = Pick<RowConfig, 'bubbleOpacity' | 'bubbleGlass' | 'sceneOf'>
 
 // How far aside the thread not on screen waits: moved, not faded, as Liquid Glass does not
 // render under a parent with opacity.
@@ -217,10 +218,11 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
   useEffect(() => setOwner(given), [given])
   const ownerRef = useRef(owner)
   ownerRef.current = owner
-  const { pattern, wallpaper } = useChatTextSettings()
+  const { pattern, wallpaper, bubbleGlass: globalBubbleGlass } = useChatTextSettings()
+  const bubbleGlass = bubbleGlassOf(lookOf(owner), wallpaper, pattern, globalBubbleGlass)
   const bubbleOpacity = bubbleOpacityOf(lookOf(owner), wallpaper, pattern)
   const sceneOf = useSceneOf(owner.kind === 'room' ? owner.members : null)
-  const look = useMemo<Look>(() => ({ bubbleOpacity, sceneOf }), [bubbleOpacity, sceneOf])
+  const look = useMemo<Look>(() => ({ bubbleOpacity, bubbleGlass, sceneOf }), [bubbleOpacity, bubbleGlass, sceneOf])
   const lookRef = useRef(look)
   lookRef.current = look
   const composerHeight = useSharedValue(0)
@@ -548,6 +550,7 @@ function ThreadSurface({ index, store, front, onScreen, frozen, listRef, owner, 
         onAction={config.onAction}
         onSelectVariant={config.onSelectVariant}
         bubbleOpacity={config.bubbleOpacity}
+        bubbleGlass={config.bubbleGlass}
         scene={config.sceneOf?.(row)}
         hydrate={onScreen ? 'go' : 'wait'}
       />
@@ -804,11 +807,12 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
 
   // Over a chat background the user's bubbles can be made see-through.
-  const { pattern, wallpaper } = useChatTextSettings()
+  const { pattern, wallpaper, bubbleGlass: globalBubbleGlass } = useChatTextSettings()
+  const bubbleGlass = bubbleGlassOf(character, wallpaper, pattern, globalBubbleGlass)
   const bubbleOpacity = bubbleOpacityOf(character, wallpaper, pattern)
   const config = useMemo<RowConfig>(
-    () => ({ regenerable, locked, onAction, onSelectVariant: selectVariant, bubbleOpacity }),
-    [regenerable, locked, onAction, selectVariant, bubbleOpacity]
+    () => ({ regenerable, locked, onAction, onSelectVariant: selectVariant, bubbleOpacity, bubbleGlass }),
+    [regenerable, locked, onAction, selectVariant, bubbleOpacity, bubbleGlass]
   )
 
   // Until its messages are in, the thread keeps what it shows: the chat as it was laid out

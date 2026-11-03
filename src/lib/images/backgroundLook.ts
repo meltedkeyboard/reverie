@@ -16,6 +16,8 @@ export type BackgroundLook = {
   setIntensity: (intensity: number) => void
   bubbleTransparency: number
   setBubbleTransparency: (value: number) => void
+  bubbleGlass: boolean
+  setBubbleGlass: (value: boolean) => void
   tone: BackgroundTone
   setTone: (tone: BackgroundTone) => void
   scheme: Scheme
@@ -46,7 +48,7 @@ export const lookSheetDown = createStore(false)
 const SHEET_BAR = 56
 const LOOK_SHEET_DOWN = SHEET_BAR + (initialWindowMetrics?.insets.bottom ?? 0)
 // The system's list of the sheet (with SwiftUI) has taller rows than the cards elsewhere.
-const LOOK_SHEET_UP = swiftUI ? 574 : 530
+const LOOK_SHEET_UP = swiftUI ? 640 : 580
 
 export function lookSheetDetents() {
   const height = Dimensions.get('window').height || 852

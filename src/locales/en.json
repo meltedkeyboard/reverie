@@ -1000,5 +1000,6 @@
   "archive.readOnly": "{{name}} is in the archive",
   "archive.archived": "In the archive",
   "archive.failed": "Couldn't change the archive",
-  "settings.dynamicAccent": "Dynamic accent"
+  "settings.dynamicAccent": "Dynamic accent",
+  "background.bubbleGlass": "Glass bubble"
 }

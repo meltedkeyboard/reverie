@@ -13,11 +13,13 @@ export type BackgroundDraft = {
   effect: BackgroundEffect
   intensity: number
   bubbleTransparency: number
+  bubbleGlass?: boolean
   tone: BackgroundTone
   onDone: (result: {
     effect: BackgroundEffect
     intensity: number
     bubbleTransparency: number
+    bubbleGlass?: boolean
     tone: BackgroundTone
     // The copy the chat shows, cut to the frame and shrunk, and the frame (null: all of it).
     uri: string

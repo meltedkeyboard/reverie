@@ -35,6 +35,7 @@ export type CharacterFields = {
   backgroundIntensity: number
   // 0 to 1: how see-through the user's message bubbles are over the picture.
   backgroundBubbleTransparency: number
+  backgroundBubbleGlass?: boolean
   backgroundTone: BackgroundTone
 }
 
@@ -85,6 +86,7 @@ export function newCharacterFields(name: string, systemPrompt: string): Characte
     backgroundEffect: 'blur',
     backgroundIntensity: 0.5,
     backgroundBubbleTransparency: 0.3,
+    backgroundBubbleGlass: false,
     backgroundTone: 'auto',
   }
 }
@@ -97,7 +99,7 @@ export const CHARACTER_COLUMNS = `
   thinking, background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
   background_effect AS backgroundEffect,
   background_intensity AS backgroundIntensity,
-  background_bubble_transparency AS backgroundBubbleTransparency, background_tone AS backgroundTone, created_at AS createdAt,
+  background_bubble_transparency AS backgroundBubbleTransparency, background_bubble_glass = 1 AS backgroundBubbleGlass, background_tone AS backgroundTone, created_at AS createdAt,
   archived_at AS archivedAt
 `
 
@@ -169,7 +171,7 @@ export function getAvatarOriginal(db: SQLiteDatabase, avatar: string) {
 }
 
 const FIELD_COLUMNS =
-  'name, avatar, avatar_original, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget, notes, background_tone'
+  'name, avatar, avatar_original, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, background_bubble_glass, reasoning_budget, notes, background_tone'
 
 function fieldValues(fields: CharacterFields) {
   return [
@@ -190,6 +192,7 @@ function fieldValues(fields: CharacterFields) {
     fields.backgroundEffect,
     fields.backgroundIntensity,
     fields.backgroundBubbleTransparency,
+    fields.backgroundBubbleGlass ? 1 : 0,
     fields.reasoningBudget,
     fields.notes,
     fields.backgroundTone,
@@ -210,7 +213,7 @@ export async function saveCharacter(db: SQLiteDatabase, id: number | null, field
     `UPDATE characters
      SET name = ?, avatar = ?, avatar_original = ?, avatar_crop = ?, system_prompt = ?, greeting = ?, temperature = ?, max_tokens = ?, top_p = ?, reply_limit = ?, thinking = ?,
          background = ?, background_original = ?, background_crop = ?, background_effect = ?, background_intensity = ?,
-         background_bubble_transparency = ?, reasoning_budget = ?, notes = ?, background_tone = ?
+         background_bubble_transparency = ?, background_bubble_glass = ?, reasoning_budget = ?, notes = ?, background_tone = ?
      WHERE id = ?`,
     [...fieldValues(fields), id]
   )

@@ -68,6 +68,7 @@ export type RowConfig = {
   onAction: (message: RowMessage, action: MessageAction) => void
   onSelectVariant: (id: number, variant: number) => void
   bubbleOpacity: number
+  bubbleGlass?: boolean
   sceneOf?: (message: Message) => RowScene
 }
 
@@ -102,6 +103,7 @@ export const EMPTY_CONFIG: RowConfig = {
   onAction: noop,
   onSelectVariant: noop,
   bubbleOpacity: 1,
+  bubbleGlass: false,
 }
 
 export const EMPTY_THREAD: ThreadData = { chat: null, rows: [], loaded: false, config: EMPTY_CONFIG, error: null, onRetry: noop, focusId: null }

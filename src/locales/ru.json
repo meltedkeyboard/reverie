@@ -999,5 +999,6 @@
   "archive.readOnly": "{{name}} в архиве",
   "archive.archived": "В архиве",
   "archive.failed": "Не удалось изменить архив",
-  "settings.dynamicAccent": "Динамический акцент"
+  "settings.dynamicAccent": "Динамический акцент",
+  "background.bubbleGlass": "Стеклянный пузырёк"
 }

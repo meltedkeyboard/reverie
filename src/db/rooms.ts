@@ -33,6 +33,7 @@ export type RoomFields = {
   backgroundEffect: BackgroundEffect
   backgroundIntensity: number
   backgroundBubbleTransparency: number
+  backgroundBubbleGlass?: boolean
   backgroundTone: BackgroundTone
 }
 
@@ -84,6 +85,7 @@ export const DEFAULT_ROOM: RoomFields = {
   backgroundEffect: 'blur',
   backgroundIntensity: 0.5,
   backgroundBubbleTransparency: 0.3,
+  backgroundBubbleGlass: false,
   backgroundTone: 'auto',
 }
 
@@ -101,7 +103,7 @@ export const ROOM_COLUMNS = `
   id, name, scenario, opening, user_name AS userName, floor, max_chain AS maxChain, director, plot,
   background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
   background_effect AS backgroundEffect, background_intensity AS backgroundIntensity,
-  background_bubble_transparency AS backgroundBubbleTransparency, background_tone AS backgroundTone, created_at AS createdAt
+  background_bubble_transparency AS backgroundBubbleTransparency, background_bubble_glass = 1 AS backgroundBubbleGlass, background_tone AS backgroundTone, created_at AS createdAt
 `
 
 type RoomRow = Omit<Room, 'director'> & { director: number }
@@ -169,7 +171,7 @@ export async function listRoomMembers(db: SQLiteDatabase, roomId: number): Promi
 }
 
 const FIELD_COLUMNS =
-  'name, scenario, opening, user_name, floor, max_chain, director, plot, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, background_tone'
+  'name, scenario, opening, user_name, floor, max_chain, director, plot, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, background_bubble_glass, background_tone'
 
 function fieldValues(fields: RoomFields) {
   return [
@@ -187,6 +189,7 @@ function fieldValues(fields: RoomFields) {
     fields.backgroundEffect,
     fields.backgroundIntensity,
     fields.backgroundBubbleTransparency,
+    fields.backgroundBubbleGlass ? 1 : 0,
     fields.backgroundTone,
   ]
 }

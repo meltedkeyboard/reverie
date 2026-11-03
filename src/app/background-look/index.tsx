@@ -9,6 +9,8 @@ import { LIST_TOP, NativeForm, NativeFreeSliderRow, NativeSection, NativeSegment
 import { NativeMenu } from '@/components/overlays/NativeMenu'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { ParamSlider } from '@/components/controls/ParamSlider'
+import { Switch } from '@/components/controls/Switch'
+import { isIOS } from '@/lib/core/platform'
 import { Segmented } from '@/components/controls/Segmented'
 import { useStore } from '@/components/chat/thread/store'
 import { useSheetTones } from '@/components/overlays/BottomSheet'
@@ -133,9 +135,17 @@ export default function BackgroundLookScreen() {
                 format={percent}
                 onChange={look.setIntensity}
               />
+              {isIOS ? (
+                <nativeForm.ui.Toggle
+                  label={t('background.bubbleGlass')}
+                  isOn={look.bubbleGlass}
+                  onIsOnChange={look.setBubbleGlass}
+                />
+              ) : null}
               <NativeFreeSliderRow
                 label={t('background.bubbleTransparency')}
                 value={look.bubbleTransparency}
+                disabled={look.bubbleGlass && isIOS}
                 min={0}
                 max={1}
                 step={0.05}
@@ -160,10 +170,20 @@ export default function BackgroundLookScreen() {
               formatValue={percent}
               onChange={look.setIntensity}
             />
+            {isIOS ? (
+              <>
+                <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+                <View style={styles.glassRow}>
+                  <Text style={styles.label}>{t('background.bubbleGlass')}</Text>
+                  <Switch value={look.bubbleGlass} onValueChange={look.setBubbleGlass} />
+                </View>
+              </>
+            ) : null}
             <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
             <ParamSlider
               label={t('background.bubbleTransparency')}
               value={look.bubbleTransparency}
+              disabled={look.bubbleGlass && isIOS}
               min={0}
               max={1}
               step={0.05}
@@ -217,6 +237,7 @@ const createStyles = (colors: Colors) =>
     separator: { height: StyleSheet.hairlineWidth, marginBottom: 12 },
     tone: { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
     label: { color: colors.text, fontSize: 17 },
+    glassRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
     save: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
     saveText: { color: ON_ACCENT, fontSize: 17, fontWeight: '600' },
     hint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },

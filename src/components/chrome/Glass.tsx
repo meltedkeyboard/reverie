@@ -3,7 +3,8 @@ import { createContext, useContext, type ComponentProps } from 'react'
 import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
 
 import { floatingBars, glassEffect, liquidGlass } from '@/lib/ui/nativeUI'
-import { isAndroid, isDesktop } from '@/lib/core/platform'
+import { isAndroid, isDesktop, isIOS } from '@/lib/core/platform'
+import { BlurView } from 'expo-blur'
 import { ON_ACCENT, useStyles, useTheme, type Colors } from '@/theme'
 
 import { IconButton } from '../controls/IconButton'
@@ -26,6 +27,45 @@ type SurfaceProps = ViewProps & {
 export function GlassMerge({ spacing = 8, ...props }: ViewProps & { spacing?: number }) {
   if (!glassEffect) return <View {...props} />
   return <glassEffect.GlassContainer spacing={spacing} {...props} />
+}
+
+
+// A glass bubble for user chat messages on iOS:
+// uses Liquid Glass (GlassView) if available, or Apple's native BlurView.
+export function GlassBubble({ style, children, ...rest }: ViewProps) {
+  const { scheme } = useTheme()
+  if (glassEffect) {
+    const { GlassView } = glassEffect
+    return (
+      <GlassView
+        glassEffectStyle="regular"
+        colorScheme={scheme}
+        isInteractive={false}
+        style={style}
+        {...rest}
+      >
+        {children}
+      </GlassView>
+    )
+  }
+  if (isIOS) {
+    const tint = scheme === 'dark' ? 'systemMaterialDark' : 'systemMaterialLight'
+    return (
+      <BlurView
+        tint={tint}
+        intensity={70}
+        style={style}
+        {...rest}
+      >
+        {children}
+      </BlurView>
+    )
+  }
+  return (
+    <View style={style} {...rest}>
+      {children}
+    </View>
+  )
 }
 
 export function GlassSurface({ style, fallbackStyle, interactive, tintColor, variant = 'regular', children, ...rest }: SurfaceProps) {
