@@ -48,12 +48,14 @@ export function Switch({
     progress.value = withTiming(value ? 1 : 0, { duration: DURATION, easing: EASING })
   }, [value, progress])
 
-  const inactiveTrack = trackColor?.false ?? colors.surfaceRaised
-  const activeTrack = trackColor?.true ?? colors.accent
-  const inactiveBorder = trackColor?.false ? trackColor.false : colors.borderStrong
-  const activeBorder = activeTrack
-  const inactiveThumb = colors.textMuted
-  const activeThumb = thumbColor ?? ON_ACCENT
+  const isElevated = value && !disabled
+
+  const inactiveTrack = disabled ? colors.surfaceRaised : (trackColor?.false ?? colors.surfaceRaised)
+  const activeTrack = disabled ? colors.borderStrong : (trackColor?.true ?? colors.accent)
+  const inactiveBorder = disabled ? colors.border : (trackColor?.false ? trackColor.false : colors.borderStrong)
+  const activeBorder = disabled ? colors.borderStrong : activeTrack
+  const inactiveThumb = disabled ? colors.textFaint : colors.textMuted
+  const activeThumb = disabled ? colors.surface : (thumbColor ?? ON_ACCENT)
 
   const trackStyle = useAnimatedStyle(() => {
     const p = progress.value
@@ -84,11 +86,11 @@ export function Switch({
       accessibilityState={{ checked: value, disabled }}
       accessibilityLabel={accessibilityLabel}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      style={[styles.container, disabled && styles.disabled, style]}
+      style={[styles.container, style]}
     >
       <Animated.View style={[styles.track, trackStyle]}>
         <View style={styles.thumbHolder}>
-          <Animated.View style={[styles.thumb, thumbStyle]} />
+          <Animated.View style={[styles.thumb, isElevated && styles.thumbElevated, thumbStyle]} />
         </View>
       </Animated.View>
     </Pressable>
@@ -101,9 +103,6 @@ const createStyles = (colors: Colors) =>
       width: TRACK_WIDTH,
       height: TRACK_HEIGHT,
       justifyContent: 'center',
-    },
-    disabled: {
-      opacity: 0.38,
     },
     track: {
       width: TRACK_WIDTH,
@@ -124,6 +123,8 @@ const createStyles = (colors: Colors) =>
       width: THUMB_HOLDER,
       height: THUMB_HOLDER,
       borderRadius: THUMB_HOLDER / 2,
+    },
+    thumbElevated: {
       elevation: 2,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
