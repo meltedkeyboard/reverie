@@ -209,6 +209,7 @@ export default function RoomsScreen() {
         ) : null}
         <GlassHeader
           floating
+          tabHeader
           fadeRgb={homeFadeRgb}
           right={
             // The edit and create buttons share one capsule, as on the Characters tab.

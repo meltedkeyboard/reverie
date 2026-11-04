@@ -1,5 +1,7 @@
 import { Modal, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { isAndroid } from '@/lib/core/platform'
 import { useStyles, type Colors } from '@/theme'
 
 type Props = {
@@ -16,6 +18,7 @@ type Props = {
 
 // A modal page sheet with a title bar, swipe-to-dismiss on iOS.
 export function PageSheet({ visible, onClose, title, left, right, background, children }: Props) {
+  const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   return (
     <Modal
@@ -27,8 +30,19 @@ export function PageSheet({ visible, onClose, title, left, right, background, ch
       allowSwipeDismissal
       onRequestClose={onClose}
     >
-      <View style={[styles.root, background !== undefined && { backgroundColor: background }]}>
-        <View style={styles.header}>
+      <View
+        style={[
+          styles.root,
+          background !== undefined && { backgroundColor: background },
+          isAndroid && { paddingBottom: insets.bottom },
+        ]}
+      >
+        <View
+          style={[
+            styles.header,
+            isAndroid && { paddingTop: Math.max(insets.top, 16) + 6 },
+          ]}
+        >
           {left !== undefined ? <View style={styles.side}>{left}</View> : null}
           <Text style={styles.title}>{title}</Text>
           <View style={[styles.side, styles.sideRight]}>{right}</View>

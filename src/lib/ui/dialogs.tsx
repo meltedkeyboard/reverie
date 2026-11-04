@@ -9,6 +9,8 @@ import { lastPointer } from './pointer'
 export type SheetAction = {
   label: string
   destructive?: boolean
+  systemImage?: string
+  separated?: boolean
   onSelect?: () => void
   // A submenu: choosing this action opens its own sheet with these.
   children?: SheetAction[]
@@ -50,9 +52,11 @@ export function showSheet(
   optionsOrCancel?: SheetOptions | (() => void)
 ) {
   const options = typeof optionsOrCancel === 'function' ? { onCancel: optionsOrCancel } : optionsOrCancel
-  const actions = items.map(({ label, destructive, onSelect, children }) => ({
+  const actions = items.map(({ label, destructive, systemImage, separated, onSelect, children }) => ({
     label,
     destructive,
+    systemImage,
+    separated,
     onSelect: children ? () => showSheet(label, children, options) : (onSelect ?? (() => {})),
   }))
   // Everywhere but iOS the sheet is drawn by the app; on the web it opens where the click was.
@@ -64,6 +68,7 @@ export function showSheet(
       actions,
       anchor: isWeb ? lastPointer() : undefined,
       onCancel: options?.onCancel,
+      scheme: options?.scheme,
     })
   }
   const destructive = actions.findIndex((action) => action.destructive)
@@ -87,9 +92,9 @@ export function showSheet(
 }
 
 export function confirm({ title, message, confirmLabel, cancelLabel, destructive, onConfirm, onCancel, scheme }: Confirmation) {
-  // Alert.alert does nothing on the web, so the question is a sheet with one answer.
-  if (isWeb) {
-    return openDialog({ kind: 'confirm', title, message, confirmLabel, cancelLabel, destructive, cancelable: true, onConfirm, onCancel })
+  // On web and Android the dialog is drawn by DialogHost; iOS uses the system alert.
+  if (!isIOS) {
+    return openDialog({ kind: 'confirm', title, message, confirmLabel, cancelLabel, destructive, cancelable: true, onConfirm, onCancel, scheme })
   }
   Alert.alert(
     title,
@@ -119,7 +124,7 @@ export function confirmAsync(options: {
 }
 
 export function promptText(prompt: TextPrompt) {
-  if (!isIOS) return openDialog({ kind: 'prompt', prompt })
+  if (!isIOS) return openDialog({ kind: 'prompt', prompt, scheme: prompt.scheme })
   const { title, message, initial, confirmLabel, onSubmit, scheme } = prompt
   Alert.prompt(
     title,
@@ -136,9 +141,8 @@ export function promptText(prompt: TextPrompt) {
 }
 
 export function showMessage(title: string, message: string) {
-  if (isWeb) {
+  if (!isIOS) {
     return openDialog({ kind: 'confirm', title, message, confirmLabel: t('common.ok'), cancelable: false, onConfirm: () => {} })
   }
   Alert.alert(title, message)
 }
-

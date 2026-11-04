@@ -7,12 +7,13 @@ export type AppDialog =
       kind: 'sheet'
       title?: string
       message?: string
-      actions: (Pick<SheetAction, 'label' | 'destructive'> & { onSelect: () => void })[]
+      actions: (Pick<SheetAction, 'label' | 'destructive' | 'systemImage' | 'separated'> & { onSelect: () => void })[]
       // Web: where the click was, so the menu opens there instead of at the bottom.
       anchor?: { x: number; y: number } | null
       onCancel?: () => void
+      scheme?: 'light' | 'dark' | null
     }
-  // Web: a question with a confirm button and, if cancelable, a cancel one; a notice has none.
+  // A question or alert with a confirm button and, if cancelable, a cancel one; a notice has none.
   | {
       kind: 'confirm'
       title: string
@@ -23,8 +24,9 @@ export type AppDialog =
       cancelable: boolean
       onConfirm: () => void
       onCancel?: () => void
+      scheme?: 'light' | 'dark' | null
     }
-  | { kind: 'prompt'; prompt: TextPrompt }
+  | { kind: 'prompt'; prompt: TextPrompt; scheme?: 'light' | 'dark' | null }
 
 let current: AppDialog | null = null
 const listeners = new Set<() => void>()

@@ -25,6 +25,8 @@ type Props = {
   // Whether to draw the edge fade behind the floating bar. Defaults to true.
   fade?: boolean
   fadeRgb?: string
+  // Restores the floating header of release 7.0 on Android for tab screens.
+  tabHeader?: boolean
 }
 
 const FADE_OVERHANG = 28
@@ -109,11 +111,22 @@ export function BackButton({ close }: { close?: boolean }) {
   return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
 }
 
-export function GlassHeader({ left, right, children, floating, centerTitle, fade = true, fadeRgb }: Props) {
+export function GlassHeader({ left, right, children, floating, centerTitle, fade = true, fadeRgb, tabHeader }: Props) {
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const pathname = usePathname()
   const isChat = pathname?.startsWith('/chat/')
+  const isTab =
+    tabHeader ||
+    pathname === '/' ||
+    pathname === '/rooms' ||
+    pathname === '/settings' ||
+    pathname === '/search' ||
+    pathname === '/(tabs)' ||
+    pathname === '/(tabs)/index' ||
+    pathname === '/(tabs)/rooms' ||
+    pathname === '/(tabs)/settings' ||
+    pathname === '/(tabs)/search'
   const row = (
     <View
       style={[
@@ -152,7 +165,7 @@ export function GlassHeader({ left, right, children, floating, centerTitle, fade
     </View>
   )
 
-  if (isAndroid && !isChat) {
+  if (isAndroid && !isChat && !isTab) {
     return (
       <HeaderContext.Provider value={true}>
         <View style={[styles.androidBar, { paddingTop: insets.top }]}>
@@ -173,7 +186,7 @@ export function GlassHeader({ left, right, children, floating, centerTitle, fade
     </BlurBar>
   )
 
-  return isChat ? content : <HeaderContext.Provider value={true}>{content}</HeaderContext.Provider>
+  return isChat || isTab ? content : <HeaderContext.Provider value={true}>{content}</HeaderContext.Provider>
 }
 
 const createStyles = (colors: Colors) =>

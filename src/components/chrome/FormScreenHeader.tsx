@@ -62,6 +62,7 @@ export function DrawnFormScreenHeader({
   avatar,
   clearAtTop = false,
   fadeRgb,
+  profileHeader,
 }: {
   title: string
   right?: React.ReactNode
@@ -74,6 +75,8 @@ export function DrawnFormScreenHeader({
   clearAtTop?: boolean
   // The color the fade under the bar takes, as "r, g, b", in place of the page's.
   fadeRgb?: string
+  // Restores floating header and circle buttons of release 7.0 on Android for profile screens.
+  profileHeader?: boolean
 }) {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
@@ -86,9 +89,11 @@ export function DrawnFormScreenHeader({
     return { opacity: clearAtTop && scrollY ? shown * interpolate(scrollY.value, [0, FADE_IN], [0, 1], 'clamp') : shown }
   })
   const colors = useColors()
+  const isProfile = profileHeader || Boolean(overPhoto)
+  const isSolidBar = isAndroid && !isProfile
   return (
-    <HeaderContext.Provider value={true}>
-      {!isAndroid && (
+    <HeaderContext.Provider value={isSolidBar}>
+      {(!isAndroid || isProfile) && (
         <Animated.View style={[styles.fade, { height: headerHeight + 28 }, fadeShown]}>
           <EdgeFade edge="top" rgb={fadeRgb} style={StyleSheet.absoluteFill} />
         </Animated.View>
@@ -97,7 +102,7 @@ export function DrawnFormScreenHeader({
         style={[
           styles.bar,
           { paddingTop: insets.top },
-          isAndroid && {
+          isSolidBar && {
             backgroundColor: colors.surface,
             borderBottomWidth: StyleSheet.hairlineWidth,
             borderBottomColor: colors.border,

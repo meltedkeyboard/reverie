@@ -24,7 +24,7 @@ import { useDatabase } from '@/db/provider'
 import { isAttachGalleryEnabled, isRecentAttachmentsEnabled, loadRecentSettings } from '@/db/recentAttachments'
 import { useTranslation } from '@/i18n'
 import { choosePersona, type AttachGallery, type AttachSession } from '@/lib/chat/attachSession'
-import { isDesktop, isIOS, isWeb } from '@/lib/core/platform'
+import { isAndroid, isDesktop, isIOS, isWeb } from '@/lib/core/platform'
 import { pictureUri } from '@/lib/images/attachments'
 import { isGalleryVideo } from '@/lib/images/gallery'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
@@ -343,15 +343,10 @@ export function AttachMenu({
     )
   }
 
-  return (
-    <View style={[styles.menuContainer, scrollStyle]}>
-      <ScrollView
-        style={[styles.scroll, scrollStyle]}
-        contentContainerStyle={[styles.content, showRow ? { paddingBottom: Math.max(76, insets.bottom + 68) } : null]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {tiles}
+  const isFill = scrollStyle === fillScreen
+  const menuContent = (
+    <>
+      {tiles}
 
         <View style={[styles.card, { backgroundColor: tones.card }]}>
           {/* Without the pictures row, the camera is a row of its own here. */}
@@ -466,7 +461,26 @@ export function AttachMenu({
             </View>
           </View>
         ) : null}
-      </ScrollView>
+    </>
+  )
+  const contentPadding = showRow ? { paddingBottom: Math.max(76, insets.bottom + 68) } : null
+
+  return (
+    <View style={[styles.menuContainer, isFill ? scrollStyle : null]}>
+      {isFill ? (
+        <ScrollView
+          style={[styles.scroll, scrollStyle]}
+          contentContainerStyle={[styles.content, contentPadding]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {menuContent}
+        </ScrollView>
+      ) : (
+        <View style={[styles.content, contentPadding]}>
+          {menuContent}
+        </View>
+      )}
       {footer}
     </View>
   )
@@ -865,6 +879,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
         progress.value = 0
         onDismissed()
       }}
+      minHeight={attachHeight ?? (isAndroid ? 340 : undefined)}
       title={
         screen === 'direction'
           ? t('direction.title')
@@ -996,7 +1011,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    menuContainer: { flex: 1, position: 'relative' },
+    menuContainer: { position: 'relative' },
     actionFooter: {
       position: 'absolute',
       left: 0,

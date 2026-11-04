@@ -838,6 +838,7 @@ export default function RoomEditorScreen() {
       <DrawnFormScreenHeader
         title={title}
         overPhoto={still}
+        profileHeader
         scrollY={scrollY}
         avatar={headerAvatar}
         clearAtTop={!editing}

@@ -839,6 +839,7 @@ export default function CharacterEditorScreen() {
       <DrawnFormScreenHeader
         title={title}
         overPhoto={photoSpread}
+        profileHeader
         scrollY={scrollY}
         // A name of its own moves down onto the photo; a fallback title only gives way.
         nameSpot={name.trim() ? nameSpot : undefined}

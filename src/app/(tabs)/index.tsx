@@ -556,6 +556,7 @@ export default function CharactersScreen() {
       ) : null}
       <GlassHeader
         floating
+        tabHeader
         fadeRgb={homeFadeRgb}
         right={
           <GlassGroup interactive={false}>

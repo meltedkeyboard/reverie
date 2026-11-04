@@ -5,7 +5,7 @@ import { showSheet } from '@/lib/ui/dialogs'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
 import { useColors } from '@/theme'
 
-import { GlassSurface, useGlassStyles } from './Glass'
+import { GlassSurface, useGlassStyles, useInHeader } from './Glass'
 import { IconButton } from '../controls/IconButton'
 import { NativeMenu, nativeMenuGlass, type MenuItem } from '../overlays/NativeMenu'
 
@@ -29,7 +29,8 @@ export function MenuGlassButton({ icon, items, size = 44, disabled }: Props) {
     </GlassSurface>
   )
 
-  if (isAndroid) {
+  const inHeader = useInHeader()
+  if (isAndroid && inHeader) {
     return (
       <NativeMenu items={items} disabled={disabled}>
         <IconButton name={icon} size={22} disabled={disabled} />
