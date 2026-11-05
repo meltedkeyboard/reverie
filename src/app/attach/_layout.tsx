@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View, type ViewInstance } from 'react-native'
 
 import { AttachStackContext } from '@/components/chat/AttachMenu'
-import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, useChatWallpaperAccent } from '@/components/chrome/ChatChrome'
+import { AccentProvider, ChatBackdrop, useChatBackdrop, useChatBackdropTone, useChatWallpaperAccent } from '@/components/chrome/ChatChrome'
 import { SheetBackdropContext, useSheetTones } from '@/components/overlays/BottomSheet'
 import { attachSession, finishAttachSession, type AttachSession } from '@/lib/chat/attachSession'
 import { SchemeOverride, useColors, useTheme } from '@/theme'
@@ -16,11 +16,13 @@ export default function AttachLayout() {
   const [session] = useState(attachSession)
   const scheme = useChatBackdropTone(session?.look)
   return (
-    <SchemeOverride scheme={scheme}>
-      <SheetBackdropContext.Provider value={scheme !== null}>
-        <AttachStack session={session} />
-      </SheetBackdropContext.Provider>
-    </SchemeOverride>
+    <AccentProvider look={session?.look}>
+      <SchemeOverride scheme={scheme}>
+        <SheetBackdropContext.Provider value={scheme !== null}>
+          <AttachStack session={session} />
+        </SheetBackdropContext.Provider>
+      </SchemeOverride>
+    </AccentProvider>
   )
 }
 

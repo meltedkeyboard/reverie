@@ -44,7 +44,6 @@ import {
   rubber,
   transformFromCrop,
 } from '@/lib/images/backgroundFrame'
-import { useChatTextSettings } from '@/lib/chat/chatText'
 import { withAlpha } from '@/lib/core/color'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
@@ -107,8 +106,7 @@ function BackgroundEditor({ draft, look }: { draft: BackgroundDraft | null; look
   const [moving] = useState(() => (draft ? movingKind(draft.uri) : null))
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [bubbleTransparency, setBubbleTransparency] = useState(draft?.bubbleTransparency ?? 0.3)
-  const { bubbleGlass: globalBubbleGlass } = useChatTextSettings()
-  const [bubbleGlass, setBubbleGlass] = useState(draft?.bubbleGlass ?? globalBubbleGlass)
+  const [bubbleGlass, setBubbleGlass] = useState(draft?.bubbleGlass ?? false)
 
   const [saving, setSaving] = useState(false)
 
@@ -355,9 +353,9 @@ function BackgroundEditor({ draft, look }: { draft: BackgroundDraft | null; look
         const crop = natural ? cropFromTransform(natural, frame, { k: zoom, x: clamp(x.value, -limit.x, limit.x), y: clamp(y.value, -limit.y, limit.y) }) : null
         if (moving) {
           const framed = crop && natural ? { ...crop, sourceWidth: natural.width, sourceHeight: natural.height } : null
-          draft.onDone({ effect, intensity, bubbleTransparency, tone, uri: draft.uri, crop: framed })
+          draft.onDone({ effect, intensity, bubbleTransparency, bubbleGlass, tone, uri: draft.uri, crop: framed })
         } else {
-          draft.onDone({ effect, intensity, bubbleTransparency, tone, uri: await frameBackground(draft.uri, crop), crop })
+          draft.onDone({ effect, intensity, bubbleTransparency, bubbleGlass, tone, uri: await frameBackground(draft.uri, crop), crop })
         }
       }
       close()

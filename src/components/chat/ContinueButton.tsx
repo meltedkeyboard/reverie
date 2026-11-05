@@ -202,7 +202,7 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.bg,
       padding: 8,
       paddingRight: 16,
-      overflow: 'hidden',
+      // No overflow:'hidden': UIKit paints interactive glass layers outside view bounds when dragged.
     },
     solid: {
       backgroundColor: colors.accent,

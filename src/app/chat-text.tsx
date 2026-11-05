@@ -19,7 +19,7 @@ import { useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Markdown } from '@/components/chat/Markdown'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { LIST_CORNER_RANGE, setListCorner, setListSpacing, useListLook, type ListSpacing } from '@/db/prefs/listLook'
-import { CHAT_PATTERNS, CHAT_TEXT_SCALE_RANGE, DEFAULT_CHAT_FONT, SYSTEM_FONT } from '@/db/prefs/settings'
+import { CHAT_PATTERNS, CHAT_TEXT_SCALE_RANGE, DEFAULT_CHAT_FONT, SYSTEM_FONT, type AccentMode } from '@/db/prefs/settings'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { CHAT_METRICS, useChatTextSettings } from '@/lib/chat/chatText'
@@ -56,6 +56,19 @@ const FALLBACK_FAMILIES =
   isAndroid
     ? ['serif', 'sans-serif', 'sans-serif-light', 'sans-serif-condensed', 'serif-monospace', 'monospace', 'casual', 'cursive']
     : ['Georgia', 'Palatino', 'Iowan Old Style', 'Charter', 'Avenir Next', 'Times New Roman', 'Helvetica Neue', 'Menlo']
+
+const ACCENT_SWATCHES = [
+  '#007AFF',
+  '#5856D6',
+  '#AF52DE',
+  '#FF2D55',
+  '#FF3B30',
+  '#FF9500',
+  '#FFCC00',
+  '#34C759',
+  '#00C7BE',
+  '#30B0C7',
+]
 
 // Rounded to a percent, and caught by the regular size when the slider passes near it.
 function snap(value: number) {
@@ -96,13 +109,12 @@ function ChoiceMark({ selected }: { selected: boolean }) {
 
 // The preview card, a component of its own so that it reads the colors of the scheme set
 // around it.
-function ChatPreview({ flush = false, bubbleGlass: bubbleGlassProp }: { flush?: boolean; bubbleGlass?: boolean }) {
+function ChatPreview({ flush = false }: { flush?: boolean }) {
   const colors = useColors()
   const glass = useGlassStyles()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const { font, userFont, userMarkdown, bubbleGlass: bubbleGlassContext, pattern, wallpaper, scale } = useChatTextSettings()
-  const bubbleGlass = bubbleGlassProp !== undefined ? bubbleGlassProp : bubbleGlassContext
+  const { font, userFont, userMarkdown, bubbleGlass, pattern, wallpaper, scale } = useChatTextSettings()
   const wallpaperUri = wallpaper?.file ? avatarUri(wallpaper.file, 'backgrounds') : null
   const fontFamily = font
   const scaled = (value: number) => value * scale
@@ -122,6 +134,8 @@ function ChatPreview({ flush = false, bubbleGlass: bubbleGlassProp }: { flush?: 
     lineHeight: scaled(CHAT_METRICS.user.line),
   }
 
+  const isGlass = isIOS && (bubbleGlass || (pattern === 'custom' && !!wallpaper?.file && !!wallpaper?.bubbleGlass))
+
   return (
     <View style={[styles.card, flush && styles.cardFlush]}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -137,7 +151,7 @@ function ChatPreview({ flush = false, bubbleGlass: bubbleGlassProp }: { flush?: 
         )}
       </View>
       <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
-        {(bubbleGlass || (wallpaper?.bubbleGlass && pattern === 'custom')) && isIOS ? (
+        {isGlass ? (
           <GlassBubble style={[styles.bubble, styles.glassBubble]}>
             {userMarkdown ? (
               <Markdown text={t('chatPreview.user')} style={user} selectable={false} />
@@ -220,8 +234,10 @@ function Appearance() {
     setBackdrop,
     homeBackground,
     setHomeBackground,
-    dynamicAccent,
-    setDynamicAccent,
+    accentMode,
+    setAccentMode,
+    customAccentColor,
+    setCustomAccentColor,
     bubbleGlass,
     setBubbleGlass,
     scale,
@@ -229,6 +245,12 @@ function Appearance() {
     setScale,
     reset,
   } = useChatTextSettings()
+
+  const accentOptions: { value: AccentMode; label: string }[] = [
+    { value: 'theme', label: t('settings.accentTheme') },
+    { value: 'dynamic', label: t('settings.accentDynamic') },
+    { value: 'custom', label: t('settings.accentCustom') },
+  ]
 
   const wallpaperUri = wallpaper?.file ? avatarUri(wallpaper.file, 'backgrounds') : null
   // The switches that carry the background elsewhere wait for a picture of one's own.
@@ -243,7 +265,7 @@ function Appearance() {
       effect: wallpaper?.effect ?? 'blur',
       intensity: wallpaper?.intensity ?? 0.5,
       bubbleTransparency: wallpaper?.bubbleTransparency ?? 0.3,
-      bubbleGlass: wallpaper?.bubbleGlass ?? false,
+      bubbleGlass: wallpaper?.bubbleGlass ?? bubbleGlass,
       tone: wallpaper?.tone ?? 'auto',
       onDone: async (result) => {
         try {
@@ -254,6 +276,7 @@ function Appearance() {
           const originalFile = moving ? null : original ? await persistOriginal(original, 'backgrounds') : (wallpaper?.original ?? null)
           const oldFile = wallpaper?.file
           const oldOriginal = wallpaper?.original
+          const nextGlass = result.bubbleGlass ?? false
           const nextWallpaper = {
             file,
             original: originalFile,
@@ -261,10 +284,12 @@ function Appearance() {
             effect: result.effect,
             intensity: result.intensity,
             bubbleTransparency: result.bubbleTransparency,
+            bubbleGlass: nextGlass,
             tone: result.tone,
           }
           setWallpaper(nextWallpaper)
           setPattern('custom')
+          setBubbleGlass(nextGlass)
           if (oldFile && oldFile !== file) removeAvatar(oldFile, 'backgrounds')
           if (oldOriginal && oldOriginal !== originalFile && (!original || oldOriginal !== original)) {
             removeAvatar(oldOriginal, 'backgrounds')
@@ -360,7 +385,7 @@ function Appearance() {
   // controls the system's, and what it has none for, the preview and the tiles, React Native
   // views in rows of their own.
   const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
-    const { Picker, Text: SwiftText, HStack, Toggle, Slider: SwiftSlider, Button: SwiftButton, Image } = ui
+    const { Picker, Text: SwiftText, HStack, Toggle, Slider: SwiftSlider, Button: SwiftButton, Image, ColorPicker } = ui
     const { pickerStyle, tag, labelsHidden, font: swiftFont, foregroundStyle, buttonStyle, disabled, accessibilityLabel } = modifiers
     const secondary = { type: 'hierarchical', style: 'secondary' } as const
     return (
@@ -398,10 +423,37 @@ function Appearance() {
           </Picker>
         </NativeSection>
 
+        <NativeSection title={t('settings.accentTitle')}>
+          <Picker
+            selection={accentMode}
+            onSelectionChange={(next: AccentMode) => {
+              Haptics.selectionAsync()
+              setAccentMode(next)
+            }}
+            modifiers={[pickerStyle('segmented'), labelsHidden()]}
+          >
+            {accentOptions.map((option) => (
+              <SwiftText key={option.value} modifiers={[tag(option.value)]}>
+                {option.label}
+              </SwiftText>
+            ))}
+          </Picker>
+          {accentMode === 'custom' && ColorPicker ? (
+            <ColorPicker
+              label={t('settings.accentColor')}
+              selection={customAccentColor}
+              onSelectionChange={(next: string) => {
+                setCustomAccentColor(next)
+              }}
+              supportsOpacity={false}
+            />
+          ) : null}
+        </NativeSection>
+
         <NativeSection>
           <NativeHostedRow height={PREVIEW_HEIGHT} clear>
             <SchemeOverride scheme={previewScheme}>
-              <ChatPreview flush bubbleGlass={bubbleGlass} />
+              <ChatPreview flush />
             </SchemeOverride>
           </NativeHostedRow>
         </NativeSection>
@@ -441,9 +493,6 @@ function Appearance() {
           </Picker>
           <Toggle label={t('settings.chatUserFont')} isOn={userFont} onIsOnChange={setUserFont} />
           <Toggle label={t('settings.chatUserMarkdown')} isOn={userMarkdown} onIsOnChange={setUserMarkdown} />
-          {isIOS ? (
-            <Toggle label={t('background.bubbleGlass')} isOn={bubbleGlass} onIsOnChange={setBubbleGlass} />
-          ) : null}
         </NativeSection>
 
         {/* The look of the system's lists of characters, groups and rooms, which only iOS has. */}
@@ -493,7 +542,6 @@ function Appearance() {
           {wallpaper?.file ? <SwiftButton label={t('background.remove')} role="destructive" onPress={onRemoveBackground} /> : null}
           <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} modifiers={[disabled(noPicture)]} />
           <Toggle label={t('settings.homeBackground')} isOn={homeBackground} onIsOnChange={setHomeBackground} modifiers={[disabled(noPicture)]} />
-          <Toggle label={t('settings.dynamicAccent')} isOn={dynamicAccent} onIsOnChange={setDynamicAccent} modifiers={[disabled(noPicture)]} />
         </NativeSection>
 
         <NativeSection>
@@ -593,10 +641,31 @@ function Appearance() {
             </View>
           </ListSection>
 
+          <ListSection header={t('settings.accentTitle')}>
+            <View style={styles.themeMode}>
+              <Segmented options={accentOptions} value={accentMode} onChange={setAccentMode} />
+            </View>
+            {accentMode === 'custom' ? (
+              <View style={styles.customAccentRow}>
+                {ACCENT_SWATCHES.map((swatch) => (
+                  <Pressable
+                    key={swatch}
+                    onPress={() => setCustomAccentColor(swatch)}
+                    style={[
+                      styles.accentSwatch,
+                      { backgroundColor: swatch },
+                      customAccentColor.toLowerCase() === swatch.toLowerCase() && styles.accentSwatchActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </ListSection>
+
           {/* A made-up exchange, so a change shows at once as it will look in a chat, in the
               scheme the chat takes over the wallpaper. */}
           <SchemeOverride scheme={previewScheme}>
-            <ChatPreview bubbleGlass={bubbleGlass} />
+            <ChatPreview />
           </SchemeOverride>
 
           <ListSection>
@@ -635,9 +704,6 @@ function Appearance() {
             <MenuCell label={t('settings.chatFontField')} value={font === SYSTEM_FONT ? t('chatFont.system') : font} items={items} />
             <SwitchCell label={t('settings.chatUserFont')} value={userFont} onValueChange={setUserFont} />
             <SwitchCell label={t('settings.chatUserMarkdown')} value={userMarkdown} onValueChange={setUserMarkdown} />
-            {isIOS ? (
-              <SwitchCell label={t('background.bubbleGlass')} value={bubbleGlass} onValueChange={setBubbleGlass} />
-            ) : null}
           </ListSection>
 
           {nativeCardList ? (
@@ -694,7 +760,6 @@ function Appearance() {
             {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
             <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} disabled={noPicture} />
             <SwitchCell label={t('settings.homeBackground')} value={homeBackground} onValueChange={setHomeBackground} disabled={noPicture} />
-            <SwitchCell label={t('settings.dynamicAccent')} value={dynamicAccent} onValueChange={setDynamicAccent} disabled={noPicture} />
           </ListSection>
 
           <ListSection>
@@ -803,4 +868,21 @@ const createStyles = (colors: Colors) =>
     themeIcon: { width: 29, height: 29, borderRadius: 7, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center' },
     themeIconDot: { width: 11, height: 11, borderRadius: 5.5 },
     themeIconEdge: { borderRadius: 7 },
+    customAccentRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingBottom: 14,
+      alignItems: 'center',
+    },
+    accentSwatch: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+    },
+    accentSwatchActive: {
+      borderWidth: 3,
+      borderColor: colors.text,
+    },
   })

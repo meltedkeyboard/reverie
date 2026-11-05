@@ -11,6 +11,9 @@ import { hexRgb, MAX_DIM, schemeOver } from '@/lib/images/backgroundTone'
 import { usePictureColor, type Rgb } from '@/lib/images/pictureColor'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import { FILL, paletteOf, useColors, useTheme, type Scheme } from '@/theme'
+import { AccentProvider, DynamicAccentProvider, useAccent, useDynamicAccent, useDynamicAccentContext, DynamicAccentContext } from './Accent'
+
+export { AccentProvider, DynamicAccentProvider, useAccent, useDynamicAccent, useDynamicAccentContext, DynamicAccentContext }
 
 // What a character or a room says about the look of its chats.
 export type ChatLook = Pick<
@@ -128,8 +131,8 @@ export const bubbleGlassOf = (
 ) => {
   if (!isIOS) return false
   if (globalBubbleGlass) return true
+  if (wallpaper?.bubbleGlass) return true
   if (owner.background) return !!owner.backgroundBubbleGlass
-  if (pattern === 'custom' && wallpaper?.file) return !!wallpaper.bubbleGlass
   return false
 }
 
@@ -188,29 +191,19 @@ export function toWallpaperAccent(color: Rgb): { accent: string; accentSoft: str
 // Global dynamic accent for the entire app:
 // extracted from the custom wallpaper whenever Dynamic Accent is enabled.
 export function useAppDynamicAccent(): { accent: string; accentSoft: string; accentBorder: string } | null {
-  const { dynamicAccent, wallpaper } = useChatTextSettings()
-  const uri = dynamicAccent && wallpaper?.file ? avatarUri(wallpaper.file, 'backgrounds') : null
-  const color = usePictureColor(uri)
-  if (!dynamicAccent || !uri || !color) return null
-  return toWallpaperAccent(color)
+  return useDynamicAccent().accent
 }
 
 // The accent color for home tabs chrome (tab bar and continue button):
 // uses the global dynamic wallpaper accent whenever dynamic accent is enabled.
 export function useHomeWallpaperAccent(): { accent: string; accentSoft: string; accentBorder: string } | null {
-  return useAppDynamicAccent()
+  return useDynamicAccent().accent
 }
 
 // The accent color for chat chrome (such as Composer):
 // the average color of the chat's or custom wallpaper when dynamic accent is enabled, or null.
 export function useChatWallpaperAccent(look?: ChatLook | null): { accent: string; accentSoft: string; accentBorder: string } | null {
-  const { dynamicAccent, pattern, wallpaper } = useChatTextSettings()
-  const picture = dynamicAccent
-    ? pictureOf(look ?? NO_PICTURE, wallpaper, pattern)
-    : null
-  const color = usePictureColor(picture?.uri ?? null)
-  if (!dynamicAccent || !picture || !color) return null
-  return toWallpaperAccent(color)
+  return useDynamicAccent(look).accent
 }
 
 // Behind the lists of those screens: the chats' wallpaper or pattern as a chat with no picture

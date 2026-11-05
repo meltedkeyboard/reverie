@@ -14,6 +14,11 @@ import {
   loadChatWallpaper,
   loadDynamicAccent,
   loadHomeBackground,
+  loadAccentMode,
+  saveAccentMode,
+  loadCustomAccentColor,
+  saveCustomAccentColor,
+  type AccentMode,
   saveChatBackdrop,
   saveChatBubbleGlass,
   saveChatFont,
@@ -59,6 +64,10 @@ type ChatTextValue = {
   setHomeBackground: (on: boolean) => void
   dynamicAccent: boolean
   setDynamicAccent: (on: boolean) => void
+  accentMode: AccentMode
+  setAccentMode: (mode: AccentMode) => void
+  customAccentColor: string
+  setCustomAccentColor: (color: string) => void
   bubbleGlass: boolean
   setBubbleGlass: (on: boolean) => void
   // How much the chat text is enlarged: 1 is the regular size.
@@ -82,15 +91,29 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
   const [backdrop, setBackdropState] = useState(true)
   const [homeBackground, setHomeBackgroundState] = useState(false)
   const [dynamicAccent, setDynamicAccentState] = useState(false)
+  const [accentMode, setAccentModeState] = useState<AccentMode>('theme')
+  const [customAccentColor, setCustomAccentColorState] = useState<string>('#007AFF')
   const [bubbleGlass, setBubbleGlassState] = useState(false)
 
   useEffect(() => {
     loadChatPattern(db).then(setPatternState)
-    loadChatWallpaper(db).then(setWallpaperState)
+    loadChatWallpaper(db).then((wp) => {
+      setWallpaperState(wp)
+      if (wp?.bubbleGlass !== undefined) {
+        setBubbleGlassState(wp.bubbleGlass)
+      }
+    })
     loadChatBackdrop(db).then(setBackdropState)
     loadHomeBackground(db).then(setHomeBackgroundState)
     loadDynamicAccent(db).then(setDynamicAccentState)
-    loadChatBubbleGlass(db).then(setBubbleGlassState)
+    loadAccentMode(db).then((m) => {
+      setAccentModeState(m)
+      setDynamicAccentState(m === 'dynamic')
+    })
+    loadCustomAccentColor(db).then(setCustomAccentColorState)
+    loadChatBubbleGlass(db).then((glass) => {
+      setBubbleGlassState((prev) => prev || glass)
+    })
     loadChatFont(db).then(setFontState)
     loadChatTextScale(db).then(setScaleState)
     loadChatUserFont(db).then(setUserFontState)
@@ -136,6 +159,10 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     (next: ChatWallpaper | null) => {
       setWallpaperState(next)
       saveChatWallpaper(db, next)
+      if (next?.bubbleGlass !== undefined) {
+        setBubbleGlassState(next.bubbleGlass)
+        saveChatBubbleGlass(db, next.bubbleGlass)
+      }
     },
     [db]
   )
@@ -153,17 +180,37 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     },
     [db]
   )
-  const setDynamicAccent = useCallback(
-    (on: boolean) => {
-      setDynamicAccentState(on)
-      saveDynamicAccent(db, on)
+  const setAccentMode = useCallback(
+    (next: AccentMode) => {
+      setAccentModeState(next)
+      setDynamicAccentState(next === 'dynamic')
+      saveAccentMode(db, next)
     },
     [db]
+  )
+  const setCustomAccentColor = useCallback(
+    (color: string) => {
+      setCustomAccentColorState(color)
+      saveCustomAccentColor(db, color)
+    },
+    [db]
+  )
+  const setDynamicAccent = useCallback(
+    (on: boolean) => {
+      setAccentMode(on ? 'dynamic' : 'theme')
+    },
+    [setAccentMode]
   )
   const setBubbleGlass = useCallback(
     (on: boolean) => {
       setBubbleGlassState(on)
       saveChatBubbleGlass(db, on)
+      setWallpaperState((prev) => {
+        if (!prev || prev.bubbleGlass === on) return prev
+        const updated = { ...prev, bubbleGlass: on }
+        saveChatWallpaper(db, updated)
+        return updated
+      })
     },
     [db]
   )
@@ -171,7 +218,8 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
     setFont(DEFAULT_CHAT_FONT)
     setUserFont(false)
     setScale(CHAT_TEXT_SCALE_RANGE.default)
-  }, [setFont, setScale, setUserFont])
+    setAccentMode('theme')
+  }, [setFont, setScale, setUserFont, setAccentMode])
 
   const value = useMemo(
     () => ({
@@ -190,6 +238,10 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
       setHomeBackground,
       dynamicAccent,
       setDynamicAccent,
+      accentMode,
+      setAccentMode,
+      customAccentColor,
+      setCustomAccentColor,
       bubbleGlass,
       setBubbleGlass,
       scale,
@@ -213,6 +265,10 @@ export function ChatTextProvider({ children }: { children: React.ReactNode }) {
       setHomeBackground,
       dynamicAccent,
       setDynamicAccent,
+      accentMode,
+      setAccentMode,
+      customAccentColor,
+      setCustomAccentColor,
       bubbleGlass,
       setBubbleGlass,
       scale,

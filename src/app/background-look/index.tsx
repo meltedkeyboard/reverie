@@ -238,7 +238,7 @@ const createStyles = (colors: Colors) =>
     tone: { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
     label: { color: colors.text, fontSize: 17 },
     glassRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-    save: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+    save: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
     saveText: { color: ON_ACCENT, fontSize: 17, fontWeight: '600' },
     hint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
     hintText: { color: colors.textFaint, fontSize: 13 },

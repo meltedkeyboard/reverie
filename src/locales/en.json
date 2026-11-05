@@ -1001,5 +1001,10 @@
   "archive.archived": "In the archive",
   "archive.failed": "Couldn't change the archive",
   "settings.dynamicAccent": "Dynamic accent",
+  "settings.accentTitle": "Accent color",
+  "settings.accentTheme": "Theme",
+  "settings.accentDynamic": "Dynamic",
+  "settings.accentCustom": "Custom",
+  "settings.accentColor": "Color",
   "background.bubbleGlass": "Glass bubble"
 }

@@ -439,6 +439,31 @@ const homeBackground = defineFlag('home_background', false)
 export const loadHomeBackground = homeBackground.load
 export const saveHomeBackground = homeBackground.save
 
+// Accent color mode: default palette theme color, dynamic from wallpaper, or custom hex color.
+export const ACCENT_MODES = ['theme', 'dynamic', 'custom'] as const
+export type AccentMode = (typeof ACCENT_MODES)[number]
+
+const accentMode = defineChoice('accent_mode', ACCENT_MODES, 'theme')
+export const loadAccentMode = async (db: SQLiteDatabase): Promise<AccentMode> => {
+  const stored = await getSetting(db, 'accent_mode')
+  if (stored && (ACCENT_MODES as readonly string[]).includes(stored)) {
+    return stored as AccentMode
+  }
+  const isDynamic = await getFlag(db, 'dynamic_accent', false)
+  return isDynamic ? 'dynamic' : 'theme'
+}
+export const saveAccentMode = async (db: SQLiteDatabase, mode: AccentMode) => {
+  await accentMode.save(db, mode)
+  await setFlag(db, 'dynamic_accent', mode === 'dynamic')
+}
+
+export const loadCustomAccentColor = async (db: SQLiteDatabase): Promise<string> => {
+  const val = await getSetting(db, 'custom_accent_color')
+  return val ?? '#007AFF'
+}
+export const saveCustomAccentColor = (db: SQLiteDatabase, hex: string) =>
+  setSetting(db, 'custom_accent_color', hex)
+
 // Whether the chrome (tab bar, continue button, composer, attach menu) takes its accent color
 // from the wallpaper's average color, off by default.
 const dynamicAccent = defineFlag('dynamic_accent', false)

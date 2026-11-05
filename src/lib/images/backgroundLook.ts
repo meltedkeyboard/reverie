@@ -48,7 +48,7 @@ export const lookSheetDown = createStore(false)
 const SHEET_BAR = 56
 const LOOK_SHEET_DOWN = SHEET_BAR + (initialWindowMetrics?.insets.bottom ?? 0)
 // The system's list of the sheet (with SwiftUI) has taller rows than the cards elsewhere.
-const LOOK_SHEET_UP = swiftUI ? 640 : 580
+const LOOK_SHEET_UP = swiftUI ? 610 : 560
 
 export function lookSheetDetents() {
   const height = Dimensions.get('window').height || 852

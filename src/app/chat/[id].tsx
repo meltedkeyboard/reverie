@@ -8,6 +8,7 @@ import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
+  AccentProvider,
   ChatSurface,
   bubbleGlassOf,
   bubbleOpacityOf,
@@ -418,7 +419,8 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
   const chatAccent = useChatWallpaperAccent(lookOf(owner))
 
   return (
-    <SchemeOverride scheme={wide ? null : backdrop} accent={chatAccent}>
+    <AccentProvider look={lookOf(owner)}>
+      <SchemeOverride scheme={wide ? null : backdrop} accent={chatAccent}>
       <ChatDrawer
         owner={owner}
         chatId={active.chat.id}
@@ -494,6 +496,7 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
         </SchemeOverride>
       </ChatDrawer>
     </SchemeOverride>
+  </AccentProvider>
   )
 }
 

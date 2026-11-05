@@ -1000,5 +1000,10 @@
   "archive.archived": "В архиве",
   "archive.failed": "Не удалось изменить архив",
   "settings.dynamicAccent": "Динамический акцент",
+  "settings.accentTitle": "Акцентный цвет",
+  "settings.accentTheme": "Тема",
+  "settings.accentDynamic": "Динамический",
+  "settings.accentCustom": "Свой",
+  "settings.accentColor": "Цвет",
   "background.bubbleGlass": "Стеклянный пузырёк"
 }

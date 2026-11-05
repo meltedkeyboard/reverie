@@ -439,7 +439,7 @@ export function SchemeOverride({
   const value = useMemo(() => {
     const nextScheme = scheme ?? outer.scheme
     const baseColors = palettes[outer.theme][nextScheme]
-    const effectiveAccent = accent !== undefined ? accent : outer.accent
+    const effectiveAccent = accent !== undefined ? (accent ?? outer.accent) : outer.accent
     const nextColors = effectiveAccent
       ? {
           ...baseColors,
