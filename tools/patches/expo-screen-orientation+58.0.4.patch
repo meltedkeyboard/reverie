@@ -1,0 +1,17 @@
+diff --git a/node_modules/expo-screen-orientation/ios/ScreenOrientationViewController.swift b/node_modules/expo-screen-orientation/ios/ScreenOrientationViewController.swift
+index a49bc29..84b5402 100644
+--- a/node_modules/expo-screen-orientation/ios/ScreenOrientationViewController.swift
++++ b/node_modules/expo-screen-orientation/ios/ScreenOrientationViewController.swift
+@@ -1,10 +1,11 @@
+ import ExpoModulesCore
++import UIKit
+ 
+ let defaultScreenOrientationMaskKey = "EXDefaultScreenOrientationMask"
+ let supportedOrientationsKey = "UISupportedInterfaceOrientations"
+ let ipadSupportedOrientationsKey = "UISupportedInterfaceOrientations~ipad"
+ 
+-class ScreenOrientationViewController: ExpoRootViewController {
++class ScreenOrientationViewController: UIViewController {
+   let screenOrientationRegistry = ScreenOrientationRegistry.shared
+   private var defaultOrientationMask: UIInterfaceOrientationMask
+   private var previousInterfaceOrientation: UIInterfaceOrientation = .unknown
