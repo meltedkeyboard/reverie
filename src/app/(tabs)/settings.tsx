@@ -44,10 +44,16 @@ import { useDatabase } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveContextLimits, serverName, typedCount, updateServer, type ContextLimits } from '@/db/prefs/settings'
 import {
   isSuggestionsEnabled,
+  loadSuggestionContextMode,
+  loadSuggestionMessages,
   loadSuggestionTokens,
+  saveSuggestionContextMode,
+  saveSuggestionMessages,
   saveSuggestionTokens,
   setSuggestionsEnabled,
+  SUGGESTION_MESSAGES,
   SUGGESTION_TOKENS,
+  type SuggestionContextMode,
 } from '@/db/prefs/suggestions'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useServers } from '@/hooks/features/useServers'
@@ -195,9 +201,26 @@ export default function SettingsScreen() {
   const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
   const [suggestions, toggleSuggestions] = useStoredFlag(isSuggestionsEnabled, setSuggestionsEnabled, false)
   const [suggestionTokens, setSuggestionTokens] = useState<number>(SUGGESTION_TOKENS.default)
+  const [suggestionContextMode, setSuggestionContextMode] = useState<SuggestionContextMode>('limit')
+  const [suggestionMessages, setSuggestionMessages] = useState<number>(SUGGESTION_MESSAGES.default)
+  const [suggestionMessagesDraft, setSuggestionMessagesDraft] = useState<string>()
   useEffect(() => {
     loadSuggestionTokens(db).then(setSuggestionTokens)
+    loadSuggestionContextMode(db).then(setSuggestionContextMode)
+    loadSuggestionMessages(db).then(setSuggestionMessages)
   }, [db])
+  const typeSuggestionMessages = (text: string) => {
+    const { digits, count } = typedCount(text)
+    setSuggestionMessagesDraft(digits)
+    if (!count) return
+    setSuggestionMessages(count)
+    saveSuggestionMessages(db, count)
+  }
+  const pickSuggestionMode = (mode: SuggestionContextMode) => {
+    selectionAsync()
+    setSuggestionContextMode(mode)
+    saveSuggestionContextMode(db, mode)
+  }
   const [recentPictures, toggleRecentPictures] = useStoredFlag(isRecentAttachmentsEnabled, setRecentAttachmentsEnabled, true)
   const [personasOn, togglePersonas] = useStoredFlag(isPersonasEnabled, setPersonasEnabled, true)
   const [directionOn, toggleDirection] = useStoredFlag(isDirectionEnabled, setDirectionEnabled, true)
@@ -448,21 +471,51 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
+  const SUGGEST_MODE_OPTIONS: { value: SuggestionContextMode; label: string }[] = [
+    { value: 'limit', label: t('settings.suggestContextModeLimit') },
+    { value: 'all', label: t('settings.suggestContextModeAll') },
+  ]
+
+  const suggestFooter = (
+    <>
+      <ListFooter>{t('settings.suggestButtonNote')}</ListFooter>
+      {suggestions && suggestionContextMode === 'all' ? (
+        <ListFooter danger>{t('settings.suggestContextAllWarning')}</ListFooter>
+      ) : null}
+    </>
+  )
+
   const suggestRow = (
-    <ListSection footer={t('settings.suggestButtonNote')}>
+    <ListSection footer={suggestFooter}>
       <SwitchCell label={t('settings.suggestButton')} value={suggestions} onValueChange={toggleSuggestions} />
       {suggestions ? (
-        <SliderCell
-          label={t('settings.suggestTokens')}
-          value={suggestionTokens}
-          min={SUGGESTION_TOKENS.min}
-          max={SUGGESTION_TOKENS.max}
-          step={SUGGESTION_TOKENS.step}
-          onChange={(tokens) => {
-            setSuggestionTokens(tokens)
-            saveSuggestionTokens(db, tokens)
-          }}
-        />
+        <>
+          <SegmentCell
+            label={t('settings.suggestContextMode')}
+            options={SUGGEST_MODE_OPTIONS}
+            value={suggestionContextMode}
+            onChange={pickSuggestionMode}
+          />
+          {suggestionContextMode === 'limit' ? (
+            <InputCell
+              label={t('settings.suggestMessagesCount')}
+              value={suggestionMessagesDraft ?? String(suggestionMessages)}
+              onChangeText={typeSuggestionMessages}
+              keyboardType="number-pad"
+            />
+          ) : null}
+          <SliderCell
+            label={t('settings.suggestTokens')}
+            value={suggestionTokens}
+            min={SUGGESTION_TOKENS.min}
+            max={SUGGESTION_TOKENS.max}
+            step={SUGGESTION_TOKENS.step}
+            onChange={(tokens) => {
+              setSuggestionTokens(tokens)
+              saveSuggestionTokens(db, tokens)
+            }}
+          />
+        </>
       ) : null}
     </ListSection>
   )
@@ -707,7 +760,7 @@ export default function SettingsScreen() {
     const toggle = (name: string | null, label: string, isOn: boolean, onChange: (on: boolean) => void, off = false) => (
       <Toggle label={label} isOn={isOn} onIsOnChange={onChange} modifiers={[disabled(off), ...(name ? [id(name)] : [])]} />
     )
-    const numberRow = (label: string, value: string, onChange: (text: string) => void, off: boolean) => (
+    const numberRow = (label: string, value: string, onChange: (text: string) => void, off = false) => (
       <NativeTextRow label={label} value={value} onChangeText={onChange} keyboard="number-pad" disabled={off} />
     )
     return (
@@ -788,20 +841,43 @@ export default function SettingsScreen() {
           {toggle(null, t('direction.title'), directionOn, toggleDirection)}
         </NativeSection>
 
-        <NativeSection id="suggest" footer={t('settings.suggestButtonNote')}>
+        <NativeSection
+          id="suggest"
+          footer={[
+            { text: t('settings.suggestButtonNote') },
+            ...(suggestions && suggestionContextMode === 'all'
+              ? [{ text: t('settings.suggestContextAllWarning'), danger: true }]
+              : []),
+          ]}
+        >
           {toggle(null, t('settings.suggestButton'), suggestions, toggleSuggestions)}
           {suggestions ? (
-            <NativeSliderRow
-              label={t('settings.suggestTokens')}
-              value={suggestionTokens}
-              min={SUGGESTION_TOKENS.min}
-              max={SUGGESTION_TOKENS.max}
-              step={SUGGESTION_TOKENS.step}
-              onChange={(tokens) => {
-                setSuggestionTokens(tokens)
-                saveSuggestionTokens(db, tokens)
-              }}
-            />
+            <>
+              <NativeSegmentRow
+                label={t('settings.suggestContextMode')}
+                options={SUGGEST_MODE_OPTIONS}
+                value={suggestionContextMode}
+                onChange={pickSuggestionMode}
+              />
+              {suggestionContextMode === 'limit'
+                ? numberRow(
+                    t('settings.suggestMessagesCount'),
+                    suggestionMessagesDraft ?? String(suggestionMessages),
+                    typeSuggestionMessages
+                  )
+                : null}
+              <NativeSliderRow
+                label={t('settings.suggestTokens')}
+                value={suggestionTokens}
+                min={SUGGESTION_TOKENS.min}
+                max={SUGGESTION_TOKENS.max}
+                step={SUGGESTION_TOKENS.step}
+                onChange={(tokens) => {
+                  setSuggestionTokens(tokens)
+                  saveSuggestionTokens(db, tokens)
+                }}
+              />
+            </>
           ) : null}
         </NativeSection>
 

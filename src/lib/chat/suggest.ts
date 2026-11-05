@@ -1,11 +1,9 @@
 import type { Message } from '@/db/messages'
 import type { ServerSettings } from '@/db/prefs/settings'
+import type { SuggestionContextMode } from '@/db/prefs/suggestions'
 import type { AsideScene } from '@/lib/chat/aside'
 import { runReplyStream } from '@/lib/chat/replyStream'
 
-// Only the tail of the scene matters for guessing what comes next, and it keeps the
-// request fast on a local server.
-const TRANSCRIPT_LINES = 6
 const LINE_MAX = 800
 
 const SYSTEM = [
@@ -20,13 +18,15 @@ const SYSTEM = [
 export async function suggestReply(
   cfg: ServerSettings,
   maxTokens: number,
+  contextMode: SuggestionContextMode,
+  messageCount: number,
   scene: AsideScene,
   history: Message[],
   signal: AbortSignal,
   onText: (text: string) => void
 ) {
-  const transcript = history
-    .slice(-TRANSCRIPT_LINES)
+  const lines = contextMode === 'all' ? history : history.slice(-Math.max(1, messageCount))
+  const transcript = lines
     .map((m) => `${scene.label(m)}: ${m.content.trim().slice(0, LINE_MAX)}${m.images.length ? ' [photo]' : ''}`.trim())
     .join('\n\n')
   const req = {
