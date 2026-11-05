@@ -53,6 +53,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            SWIFT_ENABLE_EXPLICIT_MODULES=NO \
             | xcbeautify
 
       # An .ipa is the .app inside a Payload folder, zipped.
