@@ -1,4 +1,4 @@
-import { Platform } from 'react-native'
+import { Dimensions, Platform } from 'react-native'
 
 export const isIOS = Platform.OS === 'ios'
 export const isAndroid = Platform.OS === 'android'
@@ -8,6 +8,13 @@ export const isDesktop = isWeb
 // The web build in the Electron window, which has no frame: the page draws the title bar,
 // and the main process passes on what the window's menu would take (Ctrl+W).
 export const isElectron = isWeb && typeof globalThis !== 'undefined' && 'reverieDesktop' in globalThis
+
+// Android tablets are defined by sw600dp (smallest dimension >= 600dp).
+export const isTablet =
+  !isWeb &&
+  (Platform.OS === 'ios'
+    ? Boolean(Platform.isPad)
+    : Math.min(Dimensions.get('screen').width, Dimensions.get('screen').height) >= 600)
 
 export const FONTS = {
   // Android has no Georgia; its serif is the closest system face.

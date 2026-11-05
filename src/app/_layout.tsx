@@ -23,6 +23,7 @@ import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemeMode, loadThemeName, saveLocalePreference, saveThemeMode, saveThemeName } from '@/db/prefs/settings'
 import { CloudSyncProvider } from '@/hooks/features/useCloudSync'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
+import { useScreenOrientation } from '@/hooks/util/useScreenOrientation'
 import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
 import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
@@ -103,6 +104,7 @@ function StoredTheme({ children }: { children: ReactNode }) {
 const WITHOUT_SIDEBAR = ['/onboarding', '/background', '/background-look', '/avatar-crop', '/avatar-crop-look']
 
 function AppShell() {
+  useScreenOrientation()
   const { colors, scheme } = useTheme()
   const sheetTones = useSheetTones({ noGlass: true })
   const wide = useLayoutMode() === 'wide'

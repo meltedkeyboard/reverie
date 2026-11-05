@@ -11,7 +11,7 @@
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#0F0F12",
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "reverie.app",
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -53,6 +53,12 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ],
       [
         "expo-splash-screen",
         {
