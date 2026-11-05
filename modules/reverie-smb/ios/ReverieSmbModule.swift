@@ -17,28 +17,47 @@ public class ReverieSmbModule: Module {
       self.queue.async {
         #if canImport(AMSMB2)
         do {
-          let client = try self.makeClient(from: config)
-          client.connect { error in
-            if let error = error {
-              promise.resolve([
-                "ok": false,
-                "error": error.localizedDescription
-              ])
-              return
-            }
-            // Connected successfully. Check if share path can be listed or probed.
-            client.contentsOfDirectory(atPath: "") { entries, listError in
-              client.disconnect()
-              if let listError = listError {
-                promise.resolve([
-                  "ok": false,
-                  "error": listError.localizedDescription
-                ])
-              } else {
+          let (client, share) = try self.makeClient(from: config)
+          if share.isEmpty {
+            client.listShares { result in
+              client.disconnectShare()
+              switch result {
+              case .success:
                 promise.resolve([
                   "ok": true,
                   "protocol": "SMB 2/3"
                 ])
+              case .failure(let error):
+                promise.resolve([
+                  "ok": false,
+                  "error": error.localizedDescription
+                ])
+              }
+            }
+          } else {
+            client.connectShare(name: share) { error in
+              if let error = error {
+                client.disconnectShare()
+                promise.resolve([
+                  "ok": false,
+                  "error": error.localizedDescription
+                ])
+                return
+              }
+              client.contentsOfDirectory(atPath: "") { result in
+                client.disconnectShare()
+                switch result {
+                case .success:
+                  promise.resolve([
+                    "ok": true,
+                    "protocol": "SMB 2/3"
+                  ])
+                case .failure(let listError):
+                  promise.resolve([
+                    "ok": false,
+                    "error": listError.localizedDescription
+                  ])
+                }
               }
             }
           }
@@ -61,25 +80,15 @@ public class ReverieSmbModule: Module {
       self.queue.async {
         #if canImport(AMSMB2)
         do {
-          // Connect to the root host to enumerate shares.
-          var rootConfig = config
-          rootConfig["share"] = ""
-          let client = try self.makeClient(from: rootConfig)
-          client.connect { error in
-            if let error = error {
-              promise.reject("E_SMB_CONNECT", error.localizedDescription)
-              return
-            }
-            client.contentsOfDirectory(atPath: "") { entries, listError in
-              client.disconnect()
-              if let listError = listError {
-                promise.reject("E_SMB_LIST", listError.localizedDescription)
-              } else {
-                let shares = (entries ?? []).compactMap { dict -> String? in
-                  return dict[.nameKey] as? String
-                }
-                promise.resolve(shares)
-              }
+          let (client, _) = try self.makeClient(from: config)
+          client.listShares { result in
+            client.disconnectShare()
+            switch result {
+            case .success(let shares):
+              let names = shares.map { $0.name }
+              promise.resolve(names)
+            case .failure(let error):
+              promise.reject("E_SMB_LIST", error.localizedDescription)
             }
           }
         } catch {
@@ -95,20 +104,23 @@ public class ReverieSmbModule: Module {
       self.queue.async {
         #if canImport(AMSMB2)
         do {
-          let client = try self.makeClient(from: config)
-          client.connect { error in
+          let (client, share) = try self.makeClient(from: config)
+          guard !share.isEmpty else {
+            promise.reject("E_SMB_NOSHARE", "Share name is required to list directory")
+            return
+          }
+          client.connectShare(name: share) { error in
             if let error = error {
+              client.disconnectShare()
               promise.reject("E_SMB_CONNECT", error.localizedDescription)
               return
             }
-            client.contentsOfDirectory(atPath: path) { entries, listError in
-              client.disconnect()
-              if let listError = listError {
-                promise.reject("E_SMB_LIST", listError.localizedDescription)
-              } else {
-                let items: [[String: Any]] = (entries ?? []).compactMap { dict -> [String: Any]? in
+            client.contentsOfDirectory(atPath: path) { result in
+              client.disconnectShare()
+              switch result {
+              case .success(let entries):
+                let items: [[String: Any]] = entries.compactMap { dict -> [String: Any]? in
                   guard let name = dict[.nameKey] as? String else { return nil }
-                  // Skip hidden dotfiles
                   if name.hasPrefix(".") { return nil }
                   let isDir = (dict[.fileResourceTypeKey] as? URLFileResourceType) == .directory
                   let size = (dict[.fileSizeKey] as? NSNumber)?.int64Value ?? 0
@@ -121,6 +133,8 @@ public class ReverieSmbModule: Module {
                   ]
                 }
                 promise.resolve(items)
+              case .failure(let listError):
+                promise.reject("E_SMB_LIST", listError.localizedDescription)
               }
             }
           }
@@ -137,14 +151,19 @@ public class ReverieSmbModule: Module {
       self.queue.async {
         #if canImport(AMSMB2)
         do {
-          let client = try self.makeClient(from: config)
-          client.connect { error in
+          let (client, share) = try self.makeClient(from: config)
+          guard !share.isEmpty else {
+            promise.reject("E_SMB_NOSHARE", "Share name is required to create directory")
+            return
+          }
+          client.connectShare(name: share) { error in
             if let error = error {
+              client.disconnectShare()
               promise.reject("E_SMB_CONNECT", error.localizedDescription)
               return
             }
             client.createDirectory(atPath: path) { createError in
-              client.disconnect()
+              client.disconnectShare()
               if let createError = createError {
                 promise.reject("E_SMB_MKDIR", createError.localizedDescription)
               } else {
@@ -166,24 +185,30 @@ public class ReverieSmbModule: Module {
       self.queue.async {
         #if canImport(AMSMB2)
         do {
-          let client = try self.makeClient(from: config)
+          let (client, share) = try self.makeClient(from: config)
+          guard !share.isEmpty else {
+            promise.resolve([])
+            return
+          }
           let targetPath = self.resolveSubpath(config: config, path: path)
-          client.connect { error in
+          client.connectShare(name: share) { error in
             if let error = error {
+              client.disconnectShare()
               promise.reject("E_SMB_CONNECT", error.localizedDescription)
               return
             }
-            client.contentsOfDirectory(atPath: targetPath) { entries, listError in
-              client.disconnect()
-              if let listError = listError {
-                // If directory doesn't exist yet, return empty list
-                promise.resolve([])
-              } else {
-                let names = (entries ?? []).compactMap { dict -> String? in
+            client.contentsOfDirectory(atPath: targetPath) { result in
+              client.disconnectShare()
+              switch result {
+              case .success(let entries):
+                let names = entries.compactMap { dict -> String? in
                   guard let name = dict[.nameKey] as? String else { return nil }
                   return name.hasPrefix(".") ? nil : name
                 }
                 promise.resolve(names)
+              case .failure:
+                // If directory doesn't exist yet, return empty list
+                promise.resolve([])
               }
             }
           }
@@ -200,19 +225,22 @@ public class ReverieSmbModule: Module {
       self.queue.async {
         #if canImport(AMSMB2)
         do {
-          let client = try self.makeClient(from: config)
+          let (client, share) = try self.makeClient(from: config)
+          guard !share.isEmpty else {
+            promise.reject("E_SMB_NOSHARE", "Share name is required to copy file")
+            return
+          }
           let remotePath = self.resolveSubpath(config: config, path: path)
-          client.connect { error in
+          client.connectShare(name: share) { error in
             if let error = error {
+              client.disconnectShare()
               promise.reject("E_SMB_CONNECT", error.localizedDescription)
               return
             }
-            // Ensure local parent directory exists
             try? FileManager.default.createDirectory(at: localUri.deletingLastPathComponent(), withIntermediateDirectories: true)
-            // If local file exists, remove it before downloading to replace atomically
             try? FileManager.default.removeItem(at: localUri)
             client.downloadItem(atPath: remotePath, to: localUri, progress: nil) { downloadError in
-              client.disconnect()
+              client.disconnectShare()
               if let downloadError = downloadError {
                 promise.reject("E_SMB_DOWNLOAD", downloadError.localizedDescription)
               } else {
@@ -233,18 +261,22 @@ public class ReverieSmbModule: Module {
       self.queue.async {
         #if canImport(AMSMB2)
         do {
-          let client = try self.makeClient(from: config)
+          let (client, share) = try self.makeClient(from: config)
+          guard !share.isEmpty else {
+            promise.reject("E_SMB_NOSHARE", "Share name is required to upload file")
+            return
+          }
           let remotePath = self.resolveSubpath(config: config, path: path)
-          client.connect { error in
+          client.connectShare(name: share) { error in
             if let error = error {
+              client.disconnectShare()
               promise.reject("E_SMB_CONNECT", error.localizedDescription)
               return
             }
-            // Ensure remote directory exists if path contains subfolders
             let remoteDir = (remotePath as NSString).deletingLastPathComponent
             let upload = {
               client.uploadItem(at: localUri, toPath: remotePath, progress: nil) { uploadError in
-                client.disconnect()
+                client.disconnectShare()
                 if let uploadError = uploadError {
                   promise.reject("E_SMB_UPLOAD", uploadError.localizedDescription)
                 } else {
@@ -273,15 +305,20 @@ public class ReverieSmbModule: Module {
       self.queue.async {
         #if canImport(AMSMB2)
         do {
-          let client = try self.makeClient(from: config)
+          let (client, share) = try self.makeClient(from: config)
+          guard !share.isEmpty else {
+            promise.resolve()
+            return
+          }
           let remotePath = self.resolveSubpath(config: config, path: path)
-          client.connect { error in
+          client.connectShare(name: share) { error in
             if let error = error {
+              client.disconnectShare()
               promise.reject("E_SMB_CONNECT", error.localizedDescription)
               return
             }
             client.removeItem(atPath: remotePath) { _ in
-              client.disconnect()
+              client.disconnectShare()
               promise.resolve()
             }
           }
@@ -342,31 +379,31 @@ public class ReverieSmbModule: Module {
   }
 
   #if canImport(AMSMB2)
-  private func makeClient(from config: [String: Any]) throws -> AMSMB2 {
+  private func makeClient(from config: [String: Any]) throws -> (client: AMSMB2, share: String) {
     guard let host = config["host"] as? String, !host.isEmpty else {
       throw Exception(name: "InvalidHost", description: "Host address is required")
     }
     let port = config["port"] as? Int ?? 445
     let share = (config["share"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
 
-    let urlString: String
-    if share.isEmpty {
-      urlString = "smb://\(host):\(port)"
-    } else {
-      urlString = "smb://\(host):\(port)/\(share)"
-    }
+    let urlString = "smb://\(host):\(port)"
     guard let url = URL(string: urlString) else {
       throw Exception(name: "InvalidURL", description: "Invalid SMB URL for \(urlString)")
     }
-    guard let client = AMSMB2(url: url) else {
+
+    let credential: URLCredential?
+    if let username = config["username"] as? String, !username.isEmpty {
+      let password = config["password"] as? String ?? ""
+      credential = URLCredential(user: username, password: password, persistence: .none)
+    } else {
+      credential = nil
+    }
+
+    guard let client = AMSMB2(url: url, credential: credential) else {
       throw Exception(name: "ClientInitFailed", description: "Failed to initialize AMSMB2 client")
     }
 
-    if let username = config["username"] as? String, !username.isEmpty {
-      let password = config["password"] as? String ?? ""
-      client.credential = URLCredential(user: username, password: password, persistence: .none)
-    }
-    return client
+    return (client, share)
   }
   #endif
 }
