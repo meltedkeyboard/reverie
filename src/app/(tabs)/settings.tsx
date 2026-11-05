@@ -313,8 +313,17 @@ export default function SettingsScreen() {
     }
   }
 
+  const destinationLabel =
+    cloudSync.provider === 'smb'
+      ? cloudSync.smb.host
+        ? `SMB: ${cloudSync.smb.host}`
+        : t('sync.smbNotConfigured')
+      : cloudSync.folder
+        ? t('settings.folderSyncFolder', { folder: cloudSync.folder })
+        : t('settings.folderSyncNoFolder')
+
   const cloudStatus = [
-    cloudSync.folder ? t('settings.folderSyncFolder', { folder: cloudSync.folder }) : t('settings.folderSyncNoFolder'),
+    destinationLabel,
     cloudSync.syncedAt ? t('settings.folderSyncSyncedAt', { when: formatWhen(cloudSync.syncedAt, locale) }) : null,
   ]
     .filter(Boolean)
@@ -629,9 +638,9 @@ export default function SettingsScreen() {
           disabled: cloudBusy || cloudAction === 'push',
         },
         {
-          label: t('settings.folderSyncChangeFolder'),
-          icon: { symbol: 'folder', fallback: 'folder-outline' },
-          onPress: () => cloudSync.changeFolder().catch((err) => reportError(t('sync.failedTitle'), err)),
+          label: t('sync.manage'),
+          icon: { symbol: 'slider.horizontal.3', fallback: 'options-outline' },
+          onPress: () => router.push('/sync'),
           disabled: cloudBusy || cloudAction !== null,
         },
       ]}
@@ -648,6 +657,13 @@ export default function SettingsScreen() {
         onValueChange={toggleCloudSync}
         disabled={cloudBusy || cloudAction !== null}
       />
+      {cloudSync.enabled || cloudPreview ? (
+        <LinkCell
+          label={t('sync.destination')}
+          value={destinationLabel}
+          onPress={() => router.push('/sync')}
+        />
+      ) : null}
       {cloudSync.enabled || cloudPreview ? cloudChips : null}
     </ListSection>
   )
@@ -945,6 +961,13 @@ export default function SettingsScreen() {
             footer={cloudSync.enabled || cloudPreview ? `${t('settings.folderSyncSyncNote')}\n\n${cloudStatus}` : t('settings.folderSyncSyncNote')}
           >
             {toggle(null, t('settings.folderSyncSync'), cloudSync.enabled, toggleCloudSync, cloudBusy || cloudAction !== null)}
+            {cloudSync.enabled || cloudPreview ? (
+              <NativeLinkRow
+                label={t('sync.destination')}
+                value={destinationLabel}
+                onPress={() => router.push('/sync')}
+              />
+            ) : null}
             {cloudSync.enabled || cloudPreview ? <NativeHostedRow>{cloudChips}</NativeHostedRow> : null}
           </NativeSection>
         ) : null}

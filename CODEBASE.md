@@ -191,12 +191,22 @@ Flags that many call sites need synchronously keep an in-memory copy, which the 
 - `settle()` runs once on import, before the database opens. It moves the files to where the marker says and picks up what older versions left behind (`Application Support/Reverie`, `Application%20Support/Reverie`, Documents). If several databases turn up, the one the app was last showing is kept, and the others are moved to `Library/Reverie/earlier-databases/`, never deleted.
 - The toggle works without a restart: `useShowInFiles` calls `moveStorage`, which copies the open database with `VACUUM INTO`, moves the images and flips the marker. Then `DatabaseProvider` opens the copy and hands it down in place of the old one, and screens reload through their `[db]` effects. The old database is closed after that re-render, and `discardInactiveDatabase` removes it.
 
-## Folder sync
+## Folder and SMB sync
 
-A folder the user picks, on either platform: in iCloud Drive or Google Drive, in any other storage the system picker offers, or a plain local one. Not the iCloud entitlement: that one needs a paid developer account, and the app is signed with a free Apple ID. `modules/reverie-cloud-folder` is a local Expo module (autolinked from `modules/`) with one JS interface and two native sides:
+A folder the user picks (in iCloud Drive, Google Drive or local storage) or a direct network **SMB server** (Home NAS: Synology, TrueNAS, QNAP, Windows Share) over TCP port 445. The choice is managed in `/sync` (`src/app/sync/index.tsx`) and configured in `/sync/smb` (`src/app/sync/smb.tsx`).
 
-- iOS (`ios/ReverieCloudFolderModule.swift`): the document picker, a bookmark in `UserDefaults`, and every read and write under `NSFileCoordinator`, which is what makes iCloud download a placeholder and upload a new file.
-- Android (`android/.../ReverieCloudFolderModule.kt`): `ACTION_OPEN_DOCUMENT_TREE`, a persisted permission on the tree uri (kept in `SharedPreferences`), and `DocumentFile` for the reads and writes. A file is written over in the `wt` mode instead of being deleted and made again, which some providers turn into a copy under a new name.
+Two native modules handle storage backends:
+- `modules/reverie-cloud-folder`: local Expo module for folder storage.
+  - iOS (`ios/ReverieCloudFolderModule.swift`): document picker, bookmark in `UserDefaults`, `NSFileCoordinator`.
+  - Android (`android/.../ReverieCloudFolderModule.kt`): `ACTION_OPEN_DOCUMENT_TREE`, persisted SAF tree uri.
+- `modules/reverie-smb`: direct in-app SMB2/3 client.
+  - iOS (`ios/ReverieSmbModule.swift`): uses `AMSMB2` (wrapping `libsmb2`) over direct TCP sockets to bypass the iOS Files app read-only quirks and session drops. Passwords are saved in iOS Keychain (`kSecClassGenericPassword`). Includes directory listing, folder creation, connection probing, and atomic snapshot transfers.
+  - Web/Dev (`index.web.ts`): in-memory simulation for local development.
+
+- Settings and screens:
+  - Settings (`(tabs)/settings.tsx`) has a unified Sync block showing the active destination (`iCloud: folder` or `SMB: host`) and link row to `/sync`.
+  - `/sync` (`src/app/sync/index.tsx`): provider switcher (`SegmentCell`: Folder vs SMB), active status, Push / Pull chips.
+  - `/sync/smb` (`src/app/sync/smb.tsx`): Wi-Fi LAN discovery (`discoverSmbServers`), Host/Port/Domain inputs, Guest vs User/Password authentication, interactive share picker (`listSmbShares`), modal folder browser (`SmbFolderBrowser`), connection testing (`testSmbConnection`), and a "Sync on Wi-Fi only" toggle.
 
 It is missing in Expo Go, and then the Settings block is hidden (`cloudSyncAvailable`). The switch was stored as `icloud_sync` before the sync stopped being iCloud only; the key was renamed to `folder_sync` without a migration, so a device that had it on shows it off once, and turning it on again picks up the folder that is still remembered.
 

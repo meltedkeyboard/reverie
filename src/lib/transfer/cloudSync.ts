@@ -1,7 +1,17 @@
+import * as Network from 'expo-network'
 import { Directory, File, Paths } from 'expo-file-system'
 import { deserializeDatabaseAsync, openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite'
 
-import { getSyncState, markChecked, markSynced, setDirty } from '@/db/prefs/cloudSync'
+import {
+  getSmbPassword,
+  getSmbSettings,
+  getSyncProvider,
+  getSyncState,
+  markChecked,
+  markSynced,
+  setDirty,
+  type SyncProvider,
+} from '@/db/prefs/cloudSync'
 import { migrate, SCHEMA_VERSION } from '@/db/schema'
 import { t } from '@/i18n'
 import { convertLegacyAttachments } from '@/db/attachments'
@@ -9,9 +19,10 @@ import { avatarUri, type ImageKind } from '@/lib/images/avatarStore'
 import { dataDirectory, databaseDirectory, keepCopy } from '@/lib/core/storage'
 import { isWeb } from '@/lib/core/platform'
 import { cloudFolder } from '../../../modules/reverie-cloud-folder'
+import { reverieSmb, type SmbConfig } from '../../../modules/reverie-smb'
 
-// Sync with a folder the user picked (iCloud Drive, Google Drive, a local one), as whole
-// snapshots. The folder holds:
+// Sync with a folder the user picked (iCloud Drive, Google Drive, local) or an SMB server,
+// as whole snapshots. The destination holds:
 //
 //   manifest.json          which revision is there; written last, so it is the commit point
 //   reverie.db             the database without app_settings (API key, this device's flags)
@@ -22,28 +33,63 @@ import { cloudFolder } from '../../../modules/reverie-cloud-folder'
 // the user picks one, and the data here is put aside first if it is the one that loses.
 // The database in the folder is never opened in place: SQLite over a synced file corrupts.
 
-export const cloudSyncAvailable = cloudFolder !== null
+export const cloudSyncAvailable = cloudFolder !== null || reverieSmb !== null
 
-// 'behind': a push was refused because the folder has a revision this device has not seen;
-// 'empty': a pull found nothing in the folder.
 export type SyncOutcome = 'pushed' | 'pulled' | 'unchanged' | 'conflict' | 'behind' | 'empty'
 
-// 'push' and 'pull' are the buttons: one way only, and they stop where they would throw
-// away changes. 'local' and 'cloud' go ahead anyway, and settle a conflict; 'push-only' is
-// for going to the background, where there is no time to replace the data under the screens.
 export type SyncMode = 'auto' | 'push-only' | 'push' | 'pull' | 'local' | 'cloud'
+
+export type SyncBackend = {
+  list(path: string): Promise<string[]>
+  copyIn(path: string, localUri: string): Promise<void>
+  copyOut(localUri: string, path: string): Promise<void>
+  remove(path: string): Promise<void>
+}
 
 type Manifest = { app: 'reverie'; rev: string; schema: number; savedAt: number }
 
 const MANIFEST = 'manifest.json'
 const DATABASE = 'reverie.db'
 const IMAGE_KINDS: ImageKind[] = ['avatars', 'backgrounds', 'attachments', 'gallery']
-// Parents first, so rows can be put back in this order and deleted in the reverse one.
 const TABLES = ['characters', 'character_gallery', 'rooms', 'room_members', 'chats', 'messages', 'lorebooks', 'lore_entries', 'lorebook_links']
-// Tables whose insert trigger puts each new row on top and so scrambles a copied order.
 const ORDERED_TABLES = ['characters', 'rooms', 'chats']
 
-function folder() {
+async function getBackend(db: SQLiteDatabase, mode: SyncMode): Promise<SyncBackend | null> {
+  const provider = await getSyncProvider(db)
+  if (provider === 'smb') {
+    const smb = reverieSmb
+    if (!smb) throw new Error(t('sync.unavailable'))
+    const settings = await getSmbSettings(db)
+    if (!settings.host.trim() || !settings.share.trim()) {
+      if (mode === 'auto' || mode === 'push-only') return null
+      throw new Error(t('sync.smbNotConfigured'))
+    }
+    if (settings.wifiOnly && !isWeb) {
+      const net = await Network.getNetworkStateAsync().catch(() => null)
+      const isWifi = net?.type === Network.NetworkStateType.WIFI || net?.type === Network.NetworkStateType.ETHERNET
+      if (!isWifi) {
+        if (mode === 'auto' || mode === 'push-only') return null
+        throw new Error(t('sync.wifiRequired'))
+      }
+    }
+    const password = await getSmbPassword(db)
+    const config: SmbConfig = {
+      host: settings.host.trim(),
+      port: settings.port,
+      share: settings.share.trim(),
+      path: settings.path.trim(),
+      username: settings.username.trim(),
+      password,
+      domain: settings.domain.trim(),
+    }
+    return {
+      list: (p) => smb.list(config, p),
+      copyIn: (p, localUri) => smb.copyIn(config, p, localUri),
+      copyOut: (localUri, p) => smb.copyOut(config, localUri, p),
+      remove: (p) => smb.remove(config, p),
+    }
+  }
+
   if (!cloudFolder) throw new Error(t('sync.unavailable'))
   return cloudFolder
 }
@@ -54,7 +100,6 @@ function workFile(name: string) {
   return new File(dir, name)
 }
 
-// SQLite wants a plain path, without the scheme or a trailing slash.
 function plainPath(uri: string) {
   return decodeURIComponent(uri.replace(/^file:\/\//, '').replace(/\/$/, ''))
 }
@@ -63,7 +108,6 @@ function sqlPath(file: File) {
   return `'${plainPath(file.uri).replace(/'/g, "''")}'`
 }
 
-// A database left over from an interrupted run must not meet its old journal.
 function freshFile(name: string) {
   for (const suffix of ['', '-wal', '-shm', '-journal']) {
     const file = workFile(name + suffix)
@@ -100,16 +144,15 @@ async function referencedImages(db: SQLiteDatabase, schema: string) {
        FROM ${schema}.messages m, json_each(m.images) j WHERE m.images IS NOT NULL AND json_valid(m.images)`
   )
   const images: Record<ImageKind, Set<string>> = { avatars: new Set(), backgrounds: new Set(), attachments: new Set(), gallery: new Set() }
-  // A message of an older database has base64 in its row and no file yet.
   for (const row of rows) if (row.name) images[row.kind].add(row.name)
   return images
 }
 
-async function readManifest(): Promise<Manifest | null> {
-  const names = await folder().list('')
+async function readManifest(backend: SyncBackend): Promise<Manifest | null> {
+  const names = await backend.list('')
   if (!names.includes(MANIFEST)) return null
   const file = workFile(MANIFEST)
-  await folder().copyIn(MANIFEST, file.uri)
+  await backend.copyIn(MANIFEST, file.uri)
   let manifest: Manifest
   try {
     manifest = JSON.parse(await file.text())
@@ -125,9 +168,6 @@ async function isEmpty(db: SQLiteDatabase) {
   return !row?.n
 }
 
-// The isWeb has no files SQLite can write or attach (the database sits in the browser's own
-// storage), so there the snapshot is made in memory, and the rows come over one by one.
-
 async function makeSnapshot(db: SQLiteDatabase, snapshot: File) {
   if (isWeb) {
     const copy = await deserializeDatabaseAsync(await db.serializeAsync('main'))
@@ -142,15 +182,12 @@ async function makeSnapshot(db: SQLiteDatabase, snapshot: File) {
   }
   await db.execAsync(`VACUUM INTO ${sqlPath(snapshot)}`)
   return withAttached(db, snapshot, 'snap', async () => {
-    // secure_delete zeroes the rows, so the API key is not left in free pages of the file.
     await db.execAsync('PRAGMA snap.secure_delete = ON; DELETE FROM snap.app_settings;')
     return referencedImages(db, 'snap')
   })
 }
 
-async function push(db: SQLiteDatabase) {
-  // Cleared before the snapshot is taken, so a change made while the upload runs sets it
-  // again and goes up next time instead of being lost.
+async function push(db: SQLiteDatabase, backend: SyncBackend) {
   await setDirty(db, false)
   try {
     const snapshot = freshFile('outgoing.db')
@@ -158,45 +195,42 @@ async function push(db: SQLiteDatabase) {
 
     const stale: string[] = []
     for (const kind of IMAGE_KINDS) {
-      const there = new Set(await folder().list(kind))
+      const there = new Set(await backend.list(kind))
       for (const name of images[kind]) {
         if (there.has(name)) continue
         const local = new File(avatarUri(name, kind)!)
-        if (local.exists) await folder().copyOut(local.uri, `${kind}/${name}`)
+        if (local.exists) await backend.copyOut(local.uri, `${kind}/${name}`)
       }
       for (const name of there) if (!images[kind].has(name)) stale.push(`${kind}/${name}`)
     }
 
-    await folder().copyOut(snapshot.uri, DATABASE)
+    await backend.copyOut(snapshot.uri, DATABASE)
     const manifest: Manifest = { app: 'reverie', rev: newRev(), schema: SCHEMA_VERSION, savedAt: Date.now() }
     const manifestFile = workFile(MANIFEST)
     manifestFile.create({ overwrite: true })
     manifestFile.writeSync(JSON.stringify(manifest))
-    await folder().copyOut(manifestFile.uri, MANIFEST)
+    await backend.copyOut(manifestFile.uri, MANIFEST)
     await markSynced(db, manifest.rev)
     snapshot.delete()
 
-    // Only once the new manifest is up: a device still reading the old one may need them.
-    for (const path of stale) await folder().remove(path).catch(() => {})
+    for (const path of stale) await backend.remove(path).catch(() => {})
   } catch (err) {
     await setDirty(db, true)
     throw err
   }
 }
 
-async function copyImagesIn(images: Record<ImageKind, Set<string>>) {
+async function copyImagesIn(backend: SyncBackend, images: Record<ImageKind, Set<string>>) {
   for (const kind of IMAGE_KINDS) {
     const dir = new Directory(dataDirectory(), kind)
     dir.create({ intermediates: true, idempotent: true })
     for (const name of images[kind]) {
       if (new File(avatarUri(name, kind)!).exists) continue
-      await folder().copyIn(`${kind}/${name}`, new File(dir, name).uri)
+      await backend.copyIn(`${kind}/${name}`, new File(dir, name).uri)
     }
   }
 }
 
-// Written straight into the open database rather than swapping the file, so the screens
-// keep a working connection; the caller then hands them a fresh one.
 async function replaceRows(db: SQLiteDatabase, manifest: Manifest, copyTable: (table: string) => Promise<void>) {
   await db.execAsync('BEGIN IMMEDIATE')
   try {
@@ -210,7 +244,7 @@ async function replaceRows(db: SQLiteDatabase, manifest: Manifest, copyTable: (t
   }
 }
 
-async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: File) {
+async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: File, backend: SyncBackend) {
   const copy = await deserializeDatabaseAsync(await incoming.bytes())
   try {
     const row = await copy.getFirstAsync<{ user_version: number }>('PRAGMA user_version')
@@ -218,7 +252,7 @@ async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: Fi
     if (version > SCHEMA_VERSION) throw new Error(t('sync.newerApp'))
     if (version < SCHEMA_VERSION) await migrate(copy)
 
-    await copyImagesIn(await referencedImages(copy, 'main'))
+    await copyImagesIn(backend, await referencedImages(copy, 'main'))
     await replaceRows(db, manifest, async (table) => {
       const rows = await copy.getAllAsync<Record<string, unknown>>(`SELECT * FROM ${table}`)
       if (!rows.length) return
@@ -241,16 +275,15 @@ async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: Fi
   }
 }
 
-async function pull(db: SQLiteDatabase, manifest: Manifest) {
+async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest) {
   const incoming = freshFile('incoming.db')
-  await folder().copyIn(DATABASE, incoming.uri)
+  await backend.copyIn(DATABASE, incoming.uri)
   if (isWeb) {
-    await pullInMemory(db, manifest, incoming)
+    await pullInMemory(db, manifest, incoming, backend)
     incoming.delete()
     return
   }
 
-  // A copy from an older version of the app is brought up to this one first.
   const copy = await openDatabaseAsync(incoming.name, { useNewConnection: true }, plainPath(incoming.parentDirectory.uri))
   try {
     const row = await copy.getFirstAsync<{ user_version: number }>('PRAGMA user_version')
@@ -262,7 +295,7 @@ async function pull(db: SQLiteDatabase, manifest: Manifest) {
   }
 
   await withAttached(db, incoming, 'remote', async () => {
-    await copyImagesIn(await referencedImages(db, 'remote'))
+    await copyImagesIn(backend, await referencedImages(db, 'remote'))
     await replaceRows(db, manifest, async (table) => {
       const columns = await db.getAllAsync<{ name: string }>(`PRAGMA main.table_info(${table})`)
       const list = columns.map((c) => `"${c.name}"`).join(', ')
@@ -271,21 +304,19 @@ async function pull(db: SQLiteDatabase, manifest: Manifest) {
         await db.execAsync(`UPDATE main.${table} SET sort_order = (SELECT r.sort_order FROM remote.${table} r WHERE r.id = ${table}.id)`)
       }
     })
-    // Rows from a database older than the files for pictures still carry them in base64.
     await convertLegacyAttachments(db)
   })
   incoming.delete()
 }
 
 async function run(mode: SyncMode): Promise<SyncOutcome> {
-  // A connection of its own: ATTACH fails inside a transaction, and the app's connection
-  // may be in one at any moment.
   const db = await openDatabaseAsync('reverie.db', { useNewConnection: true }, databaseDirectory())
   try {
     await db.execAsync('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = OFF;')
-    // Read side by side, but the state's query must be done before `finally` closes the
-    // connection: with Promise.all a failed manifest read let the close run under it.
-    const manifestRead = readManifest().then(
+    const backend = await getBackend(db, mode)
+    if (!backend) return 'unchanged'
+
+    const manifestRead = readManifest(backend).then(
       (value) => ({ value }),
       (error: unknown) => ({ error })
     )
@@ -293,7 +324,6 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
     const read = await manifestRead
     if ('error' in read) throw read.error
     const manifest = read.value
-    // Data from before sync was turned on counts as changed: it has never been anywhere.
     const changedHere = state.dirty || state.rev === null
     const changedThere = manifest !== null && manifest.rev !== state.rev
 
@@ -303,7 +333,7 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
         await markChecked(db)
         return 'unchanged'
       }
-      await push(db)
+      await push(db, backend)
       return 'pushed'
     }
     if (mode === 'pull') {
@@ -312,9 +342,8 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
         await markChecked(db)
         return 'unchanged'
       }
-      // Nothing here yet on a fresh device: nothing to lose, so no need to ask.
       if (changedHere && !(state.rev === null && (await isEmpty(db)))) return 'conflict'
-      await pull(db, manifest)
+      await pull(db, backend, manifest)
       return 'pulled'
     }
 
@@ -323,7 +352,7 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
         await markChecked(db)
         return 'unchanged'
       }
-      await push(db)
+      await push(db, backend)
       return 'pushed'
     }
 
@@ -331,12 +360,12 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
     if (!side && (!changedHere || (state.rev === null && (await isEmpty(db))))) side = 'cloud'
     if (!side) return 'conflict'
     if (side === 'local') {
-      await push(db)
+      await push(db, backend)
       return 'pushed'
     }
     if (mode === 'push-only') return 'unchanged'
     if (changedHere) await keepCopy(db)
-    await pull(db, manifest)
+    await pull(db, backend, manifest)
     return 'pulled'
   } finally {
     await db.closeAsync()
@@ -345,7 +374,6 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
 
 let running: Promise<SyncOutcome> | null = null
 
-// One sync at a time: a second call while one runs gets the result of the first.
 export function syncWithCloud(mode: SyncMode = 'auto') {
   running ??= run(mode).finally(() => {
     running = null
@@ -354,7 +382,8 @@ export function syncWithCloud(mode: SyncMode = 'auto') {
 }
 
 export function pickCloudFolder() {
-  return folder().pickFolder()
+  if (!cloudFolder) throw new Error(t('sync.unavailable'))
+  return cloudFolder.pickFolder()
 }
 
 export function cloudFolderName() {
