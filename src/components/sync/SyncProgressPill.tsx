@@ -35,8 +35,7 @@ export function SyncProgressPill() {
 
   useEffect(() => {
     let pct = 0
-    if (progress.stage === 'checking') pct = 15
-    else if (progress.stage === 'uploading_media') {
+    if (progress.stage === 'uploading_media') {
       const ratio = progress.total ? (progress.current ?? 0) / progress.total : 0.5
       pct = 20 + ratio * 60
     } else if (progress.stage === 'uploading_db') pct = 88
@@ -59,9 +58,7 @@ export function SyncProgressPill() {
   }))
 
   let label = ''
-  if (progress.stage === 'checking') {
-    label = t('sync.progressChecking')
-  } else if (progress.stage === 'uploading_media') {
+  if (progress.stage === 'uploading_media') {
     label = t('sync.progressUploadingMedia', { current: progress.current ?? 1, total: progress.total ?? 1 })
   } else if (progress.stage === 'uploading_db') {
     label = t('sync.progressUploadingDb')

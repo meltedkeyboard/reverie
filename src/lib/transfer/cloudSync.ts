@@ -41,7 +41,6 @@ export type SyncMode = 'auto' | 'push-only' | 'push' | 'pull' | 'local' | 'cloud
 
 export type SyncStage =
   | 'idle'
-  | 'checking'
   | 'uploading_media'
   | 'uploading_db'
   | 'downloading_db'
@@ -381,8 +380,6 @@ let mockCloudFolder: string | null = 'iCloud Drive (Expo Go)'
 
 export async function simulateSyncProgress(mode: 'push' | 'pull' | 'auto' = 'push'): Promise<void> {
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-  setSyncProgress({ active: true, stage: 'checking' })
-  await sleep(600)
   if (mode === 'pull') {
     setSyncProgress({ active: true, stage: 'downloading_db' })
     await sleep(500)
@@ -417,15 +414,11 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
   if (!cloudFolder && !reverieSmb) {
     return simulateSync(mode)
   }
-  setSyncProgress({ active: true, stage: 'checking' })
   const db = await openDatabaseAsync('reverie.db', { useNewConnection: true }, databaseDirectory())
   try {
     await db.execAsync('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = OFF;')
     const backend = await getBackend(db, mode)
-    if (!backend) {
-      setSyncProgress({ active: false, stage: 'idle' })
-      return 'unchanged'
-    }
+    if (!backend) return 'unchanged'
 
     const manifestRead = readManifest(backend).then(
       (value) => ({ value }),
