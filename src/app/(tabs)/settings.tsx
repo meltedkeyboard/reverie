@@ -69,7 +69,6 @@ import { alternateIconsAvailable, currentAppIcon } from '@/lib/settings/appIcons
 import { confirm } from '@/lib/ui/dialogs'
 import { showToast } from '@/lib/ui/toast'
 import { useChatTextSettings } from '@/lib/chat/chatText'
-import { formatWhen } from '@/lib/core/format'
 import { NotificationFeedbackType, notificationAsync, selectionAsync } from '@/lib/ui/haptics'
 import type { SettingsSection } from '@/lib/core/searchScope'
 
@@ -85,7 +84,7 @@ export default function SettingsScreen() {
   const colors = useColors()
   const padding = useScreenPadding('form')
   const styles = useStyles(createStyles)
-  const { t, locale, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
+  const { t, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
   const headerHeight = useHeaderHeight()
   const { section } = useLocalSearchParams<{ section?: SettingsSection }>()
   const scrollRef = useRef<KeyboardAwareScrollViewRef>(null)
@@ -301,18 +300,6 @@ export default function SettingsScreen() {
     }
   }
 
-  // Which of the two buttons shows the spinner; a quiet sync only dims both.
-  const [cloudAction, setCloudAction] = useState<'push' | 'pull' | null>(null)
-  const runCloud = async (action: 'push' | 'pull', run: () => Promise<void>) => {
-    setCloudAction(action)
-    try {
-      if (cloudPreview) await new Promise((resolve) => setTimeout(resolve, 3000))
-      else await run()
-    } finally {
-      setCloudAction(null)
-    }
-  }
-
   const destinationLabel =
     cloudSync.provider === 'smb'
       ? cloudSync.smb.host
@@ -320,14 +307,7 @@ export default function SettingsScreen() {
         : t('sync.smbNotConfigured')
       : cloudSync.folder
         ? t('settings.folderSyncFolder', { folder: cloudSync.folder })
-        : t('settings.folderSyncNoFolder')
-
-  const cloudStatus = [
-    destinationLabel,
-    cloudSync.syncedAt ? t('settings.folderSyncSyncedAt', { when: formatWhen(cloudSync.syncedAt, locale) }) : null,
-  ]
-    .filter(Boolean)
-    .join('\n')
+        : t('sync.noFolder')
 
   // The sheet with what to take or bring in: open while there is a tree.
   const [exportTree, setExportTree] = useState<BackupTree | null>(null)
@@ -618,53 +598,23 @@ export default function SettingsScreen() {
 
   const showCloud = cloudSync.available || cloudPreview
   const cloudBusy = cloudSync.syncing || backingUp
-  const cloudChips = (
-    <ChipRowCell
-      actions={[
-        {
-          label: t('settings.folderSyncPush'),
-          icon: { symbol: 'arrow.up', fallback: 'arrow-up' },
-          slide: 'up',
-          onPress: () => runCloud('push', cloudSync.pushNow),
-          loading: cloudAction === 'push',
-          disabled: cloudBusy || cloudAction === 'pull',
-        },
-        {
-          label: t('settings.folderSyncPull'),
-          icon: { symbol: 'arrow.down', fallback: 'arrow-down' },
-          slide: 'down',
-          onPress: () => runCloud('pull', cloudSync.pullNow),
-          loading: cloudAction === 'pull',
-          disabled: cloudBusy || cloudAction === 'push',
-        },
-        {
-          label: t('sync.manage'),
-          icon: { symbol: 'slider.horizontal.3', fallback: 'options-outline' },
-          onPress: () => router.push('/sync'),
-          disabled: cloudBusy || cloudAction !== null,
-        },
-      ]}
-    />
-  )
+
   const folderSync = (
     <ListSection
-      header={t('settings.folderSync')}
-      footer={cloudSync.enabled || cloudPreview ? `${t('settings.folderSyncSyncNote')}\n\n${cloudStatus}` : t('settings.folderSyncSyncNote')}
+      header={t('sync.title')}
+      footer={t('settings.folderSyncSyncNote')}
     >
       <SwitchCell
-        label={t('settings.folderSyncSync')}
+        label={t('sync.enabled')}
         value={cloudSync.enabled}
         onValueChange={toggleCloudSync}
-        disabled={cloudBusy || cloudAction !== null}
+        disabled={cloudBusy}
       />
-      {cloudSync.enabled || cloudPreview ? (
-        <LinkCell
-          label={t('sync.destination')}
-          value={destinationLabel}
-          onPress={() => router.push('/sync')}
-        />
-      ) : null}
-      {cloudSync.enabled || cloudPreview ? cloudChips : null}
+      <LinkCell
+        label={t('sync.title')}
+        value={destinationLabel}
+        onPress={() => router.push('/sync')}
+      />
     </ListSection>
   )
 
@@ -712,7 +662,7 @@ export default function SettingsScreen() {
           labeled: true,
           onPress: onExport,
           loading: exporting,
-          disabled: cloudAction !== null || importing,
+          disabled: cloudBusy || importing,
         },
         {
           label: t('settings.importJson'),
@@ -720,7 +670,7 @@ export default function SettingsScreen() {
           labeled: true,
           onPress: backupImport.pick,
           loading: importing,
-          disabled: cloudAction !== null || exporting,
+          disabled: cloudBusy || exporting,
         },
       ]}
     />
@@ -957,18 +907,15 @@ export default function SettingsScreen() {
         {showCloud ? (
           <NativeSection
             id="folderSync"
-            title={t('settings.folderSync')}
-            footer={cloudSync.enabled || cloudPreview ? `${t('settings.folderSyncSyncNote')}\n\n${cloudStatus}` : t('settings.folderSyncSyncNote')}
+            title={t('sync.title')}
+            footer={t('settings.folderSyncSyncNote')}
           >
-            {toggle(null, t('settings.folderSyncSync'), cloudSync.enabled, toggleCloudSync, cloudBusy || cloudAction !== null)}
-            {cloudSync.enabled || cloudPreview ? (
-              <NativeLinkRow
-                label={t('sync.destination')}
-                value={destinationLabel}
-                onPress={() => router.push('/sync')}
-              />
-            ) : null}
-            {cloudSync.enabled || cloudPreview ? <NativeHostedRow>{cloudChips}</NativeHostedRow> : null}
+            {toggle(null, t('sync.enabled'), cloudSync.enabled, toggleCloudSync, cloudBusy)}
+            <NativeLinkRow
+              label={t('sync.title')}
+              value={destinationLabel}
+              onPress={() => router.push('/sync')}
+            />
           </NativeSection>
         ) : null}
 

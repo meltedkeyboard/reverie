@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
@@ -13,7 +13,7 @@ import { getSmbPassword, getSmbSettings, saveSmbPassword, saveSmbSettings, type 
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useTranslation } from '@/i18n'
 import { discoverSmbServers, listSmbShares, testSmbConnection, type DiscoveredSmbServer, type SmbConfig, type SmbTestResult } from '@/lib/transfer/smbClient'
-import { showSheet } from '@/lib/ui/dialogs'
+import { showMessage, showSheet } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, useColors, useStyles } from '@/theme'
 
@@ -80,6 +80,9 @@ export default function SmbScreen() {
     return () => ctrl.abort()
   }, [])
 
+  const refreshSync = useRef(cloudSync.refresh)
+  refreshSync.current = cloudSync.refresh
+
   // Auto-save settings
   const persist = useCallback(
     async (override?: Partial<SmbSettings>, overridePass?: string) => {
@@ -97,9 +100,9 @@ export default function SmbScreen() {
       await saveSmbSettings(db, s)
       const passToSave = overridePass !== undefined ? overridePass : (authMode === 'user' ? password : '')
       await saveSmbPassword(db, passToSave)
-      cloudSync.refresh().catch(() => {})
+      refreshSync.current().catch(() => {})
     },
-    [db, host, port, share, path, authMode, username, password, domain, wifiOnly, cloudSync]
+    [db, host, port, share, path, authMode, username, password, domain, wifiOnly]
   )
 
   useEffect(() => {
@@ -108,15 +111,18 @@ export default function SmbScreen() {
     }
   }, [host, port, share, path, username, password, domain, wifiOnly, authMode, persist])
 
-  const currentConfig: SmbConfig = {
-    host: host.trim(),
-    port: parseInt(port, 10) || 445,
-    share: share.trim(),
-    path: path.trim(),
-    username: authMode === 'user' ? username.trim() : '',
-    password: authMode === 'user' ? password : '',
-    domain: domain.trim(),
-  }
+  const currentConfig: SmbConfig = useMemo(
+    () => ({
+      host: host.trim(),
+      port: parseInt(port, 10) || 445,
+      share: share.trim(),
+      path: path.trim(),
+      username: authMode === 'user' ? username.trim() : '',
+      password: authMode === 'user' ? password : '',
+      domain: domain.trim(),
+    }),
+    [host, port, share, path, authMode, username, password, domain]
+  )
 
   const pickDiscovered = (serverHost: string) => {
     Haptics.selectionAsync()
@@ -133,9 +139,7 @@ export default function SmbScreen() {
       const shares = await listSmbShares(currentConfig)
       if (!shares.length) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
-        showSheet(t('sync.noSharesFound'), [
-          { label: t('dialog.cancel') }
-        ])
+        showMessage(t('sync.smbSettingsTitle'), t('sync.noSharesFound'))
         return
       }
       Haptics.selectionAsync()
@@ -151,10 +155,7 @@ export default function SmbScreen() {
       )
     } catch (err: unknown) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-      showSheet(t('sync.failedListShares'), [
-        { label: err instanceof Error ? err.message : String(err) },
-        { label: t('dialog.cancel') },
-      ])
+      showMessage(t('sync.failedListShares'), err instanceof Error ? err.message : String(err))
     } finally {
       setListingShares(false)
     }

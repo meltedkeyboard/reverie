@@ -17,7 +17,7 @@ import {
 import { useDatabase, useReloadDatabase } from '@/db/provider'
 import { t } from '@/i18n'
 import { cloudFolderName, cloudSyncAvailable, forgetCloudFolder, pickCloudFolder, syncWithCloud, type SyncMode } from '@/lib/transfer/cloudSync'
-import { showSheet } from '@/lib/ui/dialogs'
+import { confirm } from '@/lib/ui/dialogs'
 import { showToast } from '@/lib/ui/toast'
 import { reportError } from '@/lib/transfer/report'
 import { createRequiredContext } from '@/lib/core/requiredContext'
@@ -82,7 +82,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       try {
         const outcome = await syncWithCloud(mode)
         if (outcome === 'pulled') await reloadRef.current()
-        if (outcome === 'conflict' && mode === 'auto' && (loud || !conflictDismissed.current)) askConflict(loud)
+        if (outcome === 'conflict' && mode === 'auto' && (loud || !conflictDismissed.current)) askConflict()
         return outcome
       } catch (err) {
         if (loud) reportError(t('sync.failedTitle'), err)
@@ -98,14 +98,15 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     [refresh]
   )
 
-  const askConflict = (loud: boolean) => {
+  const askConflict = () => {
     conflictDismissed.current = true
-    const choices = [
-      { label: t('sync.keepDevice'), onPress: () => sync('local', true) },
-      { label: t('sync.takeCloud'), onPress: () => sync('cloud', true) },
-    ]
-    if (loud) showToast({ tone: 'info', title: t('sync.conflictTitle'), actions: choices })
-    else showSheet(t('sync.conflictTitle'), choices.map(({ label, onPress }) => ({ label, onSelect: onPress })))
+    confirm({
+      title: t('sync.conflictTitle'),
+      confirmLabel: t('sync.takeCloud'),
+      cancelLabel: t('sync.keepDevice'),
+      onConfirm: () => sync('cloud', true),
+      onCancel: () => sync('local', true),
+    })
   }
 
   useEffect(() => {

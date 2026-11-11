@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
 import { Button } from '@/components/controls/Button/Button'
@@ -27,37 +27,44 @@ export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, o
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const configRef = useRef(config)
+  configRef.current = config
+
   // Creation of a new directory inside current folder
   const [creating, setCreating] = useState(false)
   const [newDirName, setNewDirName] = useState('')
   const [submittingCreate, setSubmittingCreate] = useState(false)
 
-  const loadDirectory = useCallback(
-    async (path: string) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const list = await listSmbDirectory(config, path)
-        // Folders first, sorted alphabetically
-        list.sort((a, b) => {
-          if (a.isDirectory && !b.isDirectory) return -1
-          if (!a.isDirectory && b.isDirectory) return 1
-          return a.name.localeCompare(b.name)
-        })
-        setItems(list)
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : String(err))
-      } finally {
-        setLoading(false)
+  const loadDirectory = useCallback(async (path: string, isFallback = false) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const list = await listSmbDirectory(configRef.current, path)
+      // Folders first, sorted alphabetically
+      list.sort((a, b) => {
+        if (a.isDirectory && !b.isDirectory) return -1
+        if (!a.isDirectory && b.isDirectory) return 1
+        return a.name.localeCompare(b.name)
+      })
+      setItems(list)
+    } catch (err: unknown) {
+      // If requested subfolder does not exist yet on the share, gracefully fall back to root
+      if (path && !isFallback) {
+        setCurrentPath('')
+        loadDirectory('', true)
+        return
       }
-    },
-    [config]
-  )
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (visible) {
-      setCurrentPath(initialPath.trim() || '')
-      loadDirectory(initialPath.trim() || '')
+      const initial = initialPath.trim() || ''
+      setCurrentPath(initial)
+      loadDirectory(initial)
     }
   }, [visible, initialPath, loadDirectory])
 
@@ -84,7 +91,7 @@ export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, o
     setSubmittingCreate(true)
     try {
       const fullPath = currentPath ? `${currentPath.replace(/\/$/, '')}/${trimmed}` : trimmed
-      await createSmbDirectory(config, fullPath)
+      await createSmbDirectory(configRef.current, fullPath)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setNewDirName('')
       setCreating(false)
@@ -119,7 +126,7 @@ export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, o
             size={20}
             color={colors.accent}
           />
-          <Text style={styles.navButtonText}>{canGoUp ? t('sync.browserUp') : t('dialog.cancel')}</Text>
+          <Text style={styles.navButtonText}>{canGoUp ? t('sync.browserUp') : t('common.cancel')}</Text>
         </Pressable>
       }
       right={

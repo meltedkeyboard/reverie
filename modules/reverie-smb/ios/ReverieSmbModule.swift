@@ -162,7 +162,7 @@ public class ReverieSmbModule: Module {
               promise.reject("E_SMB_CONNECT", error.localizedDescription)
               return
             }
-            client.createDirectory(atPath: path) { createError in
+            self.createDirectoryRecursively(client: client, path: path) { createError in
               client.disconnectShare()
               if let createError = createError {
                 promise.reject("E_SMB_MKDIR", createError.localizedDescription)
@@ -285,7 +285,7 @@ public class ReverieSmbModule: Module {
               }
             }
             if !remoteDir.isEmpty && remoteDir != "/" && remoteDir != "." {
-              client.createDirectory(atPath: remoteDir) { _ in
+              self.createDirectoryRecursively(client: client, path: remoteDir) { _ in
                 upload()
               }
             } else {
@@ -379,12 +379,40 @@ public class ReverieSmbModule: Module {
   }
 
   #if canImport(AMSMB2)
+  private func createDirectoryRecursively(client: AMSMB2, path: String, completion: @escaping (Error?) -> Void) {
+    let cleanPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    guard !cleanPath.isEmpty else {
+      completion(nil)
+      return
+    }
+    let parts = cleanPath.split(separator: "/").map(String.init)
+    var currentPath = ""
+    var index = 0
+
+    func step() {
+      guard index < parts.count else {
+        completion(nil)
+        return
+      }
+      let part = parts[index]
+      currentPath = currentPath.isEmpty ? part : "\(currentPath)/\(part)"
+      index += 1
+      client.createDirectory(atPath: currentPath) { _ in
+        // Intermediate directory may already exist, ignore errors and proceed
+        step()
+      }
+    }
+
+    step()
+  }
+
   private func makeClient(from config: [String: Any]) throws -> (client: AMSMB2, share: String) {
     guard let host = config["host"] as? String, !host.isEmpty else {
       throw Exception(name: "InvalidHost", description: "Host address is required")
     }
     let port = config["port"] as? Int ?? 445
     let share = (config["share"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
+    let domain = (config["domain"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
     let urlString = "smb://\(host):\(port)"
     guard let url = URL(string: urlString) else {
@@ -399,7 +427,7 @@ public class ReverieSmbModule: Module {
       credential = nil
     }
 
-    guard let client = AMSMB2(url: url, credential: credential) else {
+    guard let client = AMSMB2(url: url, domain: domain, credential: credential) else {
       throw Exception(name: "ClientInitFailed", description: "Failed to initialize AMSMB2 client")
     }
 
