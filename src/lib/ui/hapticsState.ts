@@ -3,6 +3,7 @@
 let enabled = true
 let streamHapticsEnabled = true
 let suggestionHapticsEnabled = true
+let suggestionOverflowed = false
 
 export const isHapticsOn = () => enabled
 export const setHapticsOn = (on: boolean) => {
@@ -17,4 +18,9 @@ export const setStreamHapticsOn = (on: boolean) => {
 export const isSuggestionHapticsOn = () => suggestionHapticsEnabled
 export const setSuggestionHapticsOn = (on: boolean) => {
   suggestionHapticsEnabled = on
+}
+
+export const isSuggestionOverflowed = () => suggestionOverflowed
+export const setSuggestionOverflowed = (overflowed: boolean) => {
+  suggestionOverflowed = overflowed
 }

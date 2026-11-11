@@ -248,7 +248,11 @@ export function Composer({
   suggestingRef.current = suggesting
   // The suggestion ending (taken, dismissed, a new message) lets the wrapped state go.
   useEffect(() => {
-    if (!suggesting && !textRef.current) setWraps(false)
+    if (!suggesting) {
+      if (!textRef.current) setWraps(false)
+      setGhostHeight(0)
+      Haptics.setSuggestionOverflowed(false)
+    }
   }, [suggesting])
   // Height of the suggestion as drawn over the field. It is not the placeholder: on iOS a
   // multiline field grows to fit a long placeholder and never shrinks back after it.
@@ -633,7 +637,16 @@ export function Composer({
                 style={[styles.ghost, { left: textLeft, top: textTop, right: textRight }]}
                 pointerEvents="none"
               >
-                <Text style={styles.ghostText} onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}>
+                <Text
+                  style={styles.ghostText}
+                  onLayout={(e) => {
+                    const h = e.nativeEvent.layout.height
+                    setGhostHeight(h)
+                    if (h > GHOST_MAX_HEIGHT) {
+                      Haptics.setSuggestionOverflowed(true)
+                    }
+                  }}
+                >
                   {suggestion}
                 </Text>
               </Animated.View>
@@ -836,6 +849,7 @@ const NO_FADES = { top: false, bottom: false }
 // The input's own height with a single line: padding 8 + a 22 line + 8 (docked: 12 on top).
 const ONE_LINE_INPUT = 38
 const DOCKED_INPUT = 42
+const GHOST_MAX_HEIGHT = 164
 // The bar's padding around the field (the bottom one comes on top of the safe area).
 const BAR_PAD_TOP = 8
 const BAR_PAD_BOTTOM = 8
@@ -943,7 +957,7 @@ const createStyles = (colors: Colors) =>
     // The browser's own focus ring and white fill would show through the glass fallback.
     ...(isWeb ? ({ outlineStyle: 'none', backgroundColor: 'transparent', resize: 'none' } as object) : null),
   },
-  ghost: { position: 'absolute', maxHeight: 164, overflow: 'hidden' },
+  ghost: { position: 'absolute', maxHeight: GHOST_MAX_HEIGHT, overflow: 'hidden' },
   ghostText: { color: colors.textMuted, fontSize: 17, lineHeight: 22 },
   inputDocked: { paddingTop: 12, paddingBottom: 8 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },

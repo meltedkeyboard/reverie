@@ -6,6 +6,7 @@ import { loadSettings } from '@/db/prefs/settings'
 import { loadSuggestionContextMode, loadSuggestionMessages, loadSuggestionTokens } from '@/db/prefs/suggestions'
 import type { AsideScene } from '@/lib/chat/aside'
 import { suggestReply } from '@/lib/chat/suggest'
+import { isSuggestionOverflowed, setSuggestionOverflowed, suggestionFinishAsync } from '@/lib/ui/haptics'
 
 // A guess at the user's next message, asked for once the characters have finished their
 // turn and streamed into the field as it is written. A failed request just leaves the
@@ -26,6 +27,7 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
 
   useEffect(() => {
     setSuggestion(null)
+    setSuggestionOverflowed(false)
     if (!source) return
     const ctrl = new AbortController()
     ctrlRef.current = ctrl
@@ -41,15 +43,27 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
       .then(([cfg, maxTokens, contextMode, messageCount]) =>
         suggestReply(cfg, maxTokens, contextMode, messageCount, sceneRef.current, messagesRef.current, ctrl.signal, show)
       )
-      .then(show)
+      .then((finalText) => {
+        show(finalText)
+        if (finalText && !ctrl.signal.aborted && isSuggestionOverflowed()) {
+          suggestionFinishAsync()
+        }
+      })
       .catch(() => show(null))
-    return () => ctrl.abort()
+      .finally(() => {
+        setSuggestionOverflowed(false)
+      })
+    return () => {
+      ctrl.abort()
+      setSuggestionOverflowed(false)
+    }
   }, [db, source?.id, source?.content])
 
   // Taking a suggestion that is still streaming must stop it, or it would come back.
   const clear = useCallback(() => {
     ctrlRef.current?.abort()
     setSuggestion(null)
+    setSuggestionOverflowed(false)
   }, [])
   const dismiss = useCallback(() => {
     clear()
