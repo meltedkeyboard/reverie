@@ -42,10 +42,7 @@ export type SyncMode = 'auto' | 'push-only' | 'push' | 'pull' | 'local' | 'cloud
 export type SyncStage =
   | 'idle'
   | 'uploading_media'
-  | 'uploading_db'
-  | 'downloading_db'
   | 'downloading_media'
-  | 'applying'
   | 'done'
 
 export type SyncProgress = {
@@ -224,7 +221,7 @@ async function makeSnapshot(db: SQLiteDatabase, snapshot: File) {
   })
 }
 
-async function push(db: SQLiteDatabase, backend: SyncBackend) {
+async function push(db: SQLiteDatabase, backend: SyncBackend): Promise<boolean> {
   await setDirty(db, false)
   try {
     const snapshot = freshFile('outgoing.db')
@@ -242,7 +239,8 @@ async function push(db: SQLiteDatabase, backend: SyncBackend) {
       for (const name of there) if (!images[kind].has(name)) stale.push(`${kind}/${name}`)
     }
 
-    if (toUpload.length) {
+    const hadFiles = toUpload.length > 0
+    if (hadFiles) {
       for (let i = 0; i < toUpload.length; i++) {
         setSyncProgress({
           active: true,
@@ -254,7 +252,6 @@ async function push(db: SQLiteDatabase, backend: SyncBackend) {
       }
     }
 
-    setSyncProgress({ active: true, stage: 'uploading_db' })
     await backend.copyOut(snapshot.uri, DATABASE)
     const manifest: Manifest = { app: 'reverie', rev: newRev(), schema: SCHEMA_VERSION, savedAt: Date.now() }
     const manifestFile = workFile(MANIFEST)
@@ -265,13 +262,14 @@ async function push(db: SQLiteDatabase, backend: SyncBackend) {
     snapshot.delete()
 
     for (const path of stale) await backend.remove(path).catch(() => {})
+    return hadFiles
   } catch (err) {
     await setDirty(db, true)
     throw err
   }
 }
 
-async function copyImagesIn(backend: SyncBackend, images: Record<ImageKind, Set<string>>) {
+async function copyImagesIn(backend: SyncBackend, images: Record<ImageKind, Set<string>>): Promise<boolean> {
   const toDownload: { src: string; dest: string }[] = []
   for (const kind of IMAGE_KINDS) {
     const dir = new Directory(dataDirectory(), kind)
@@ -282,7 +280,8 @@ async function copyImagesIn(backend: SyncBackend, images: Record<ImageKind, Set<
     }
   }
 
-  if (toDownload.length) {
+  const hadFiles = toDownload.length > 0
+  if (hadFiles) {
     for (let i = 0; i < toDownload.length; i++) {
       setSyncProgress({
         active: true,
@@ -293,6 +292,7 @@ async function copyImagesIn(backend: SyncBackend, images: Record<ImageKind, Set<
       await backend.copyIn(toDownload[i].src, toDownload[i].dest)
     }
   }
+  return hadFiles
 }
 
 async function replaceRows(db: SQLiteDatabase, manifest: Manifest, copyTable: (table: string) => Promise<void>) {
@@ -308,7 +308,7 @@ async function replaceRows(db: SQLiteDatabase, manifest: Manifest, copyTable: (t
   }
 }
 
-async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: File, backend: SyncBackend) {
+async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: File, backend: SyncBackend): Promise<boolean> {
   const copy = await deserializeDatabaseAsync(await incoming.bytes())
   try {
     const row = await copy.getFirstAsync<{ user_version: number }>('PRAGMA user_version')
@@ -316,8 +316,7 @@ async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: Fi
     if (version > SCHEMA_VERSION) throw new Error(t('sync.newerApp'))
     if (version < SCHEMA_VERSION) await migrate(copy)
 
-    await copyImagesIn(backend, await referencedImages(copy, 'main'))
-    setSyncProgress({ active: true, stage: 'applying' })
+    const hadFiles = await copyImagesIn(backend, await referencedImages(copy, 'main'))
     await replaceRows(db, manifest, async (table) => {
       const rows = await copy.getAllAsync<Record<string, unknown>>(`SELECT * FROM ${table}`)
       if (!rows.length) return
@@ -335,19 +334,19 @@ async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: Fi
       }
     })
     await convertLegacyAttachments(db)
+    return hadFiles
   } finally {
     await copy.closeAsync()
   }
 }
 
-async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest) {
-  setSyncProgress({ active: true, stage: 'downloading_db' })
+async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest): Promise<boolean> {
   const incoming = freshFile('incoming.db')
   await backend.copyIn(DATABASE, incoming.uri)
   if (isWeb) {
-    await pullInMemory(db, manifest, incoming, backend)
+    const hadFiles = await pullInMemory(db, manifest, incoming, backend)
     incoming.delete()
-    return
+    return hadFiles
   }
 
   const copy = await openDatabaseAsync(incoming.name, { useNewConnection: true }, plainPath(incoming.parentDirectory.uri))
@@ -360,9 +359,9 @@ async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest
     await copy.closeAsync()
   }
 
+  let hadFiles = false
   await withAttached(db, incoming, 'remote', async () => {
-    await copyImagesIn(backend, await referencedImages(db, 'remote'))
-    setSyncProgress({ active: true, stage: 'applying' })
+    hadFiles = await copyImagesIn(backend, await referencedImages(db, 'remote'))
     await replaceRows(db, manifest, async (table) => {
       const columns = await db.getAllAsync<{ name: string }>(`PRAGMA main.table_info(${table})`)
       const list = columns.map((c) => `"${c.name}"`).join(', ')
@@ -374,6 +373,7 @@ async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest
     await convertLegacyAttachments(db)
   })
   incoming.delete()
+  return hadFiles
 }
 
 let mockCloudFolder: string | null = 'iCloud Drive (Expo Go)'
@@ -381,26 +381,22 @@ let mockCloudFolder: string | null = 'iCloud Drive (Expo Go)'
 export async function simulateSyncProgress(mode: 'push' | 'pull' | 'auto' = 'push'): Promise<void> {
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
   if (mode === 'pull') {
-    setSyncProgress({ active: true, stage: 'downloading_db' })
-    await sleep(500)
-    setSyncProgress({ active: true, stage: 'downloading_media', current: 1, total: 2 })
-    await sleep(400)
-    setSyncProgress({ active: true, stage: 'downloading_media', current: 2, total: 2 })
-    await sleep(400)
-    setSyncProgress({ active: true, stage: 'applying' })
-    await sleep(500)
+    setSyncProgress({ active: true, stage: 'downloading_media', current: 1, total: 3 })
+    await sleep(600)
+    setSyncProgress({ active: true, stage: 'downloading_media', current: 2, total: 3 })
+    await sleep(600)
+    setSyncProgress({ active: true, stage: 'downloading_media', current: 3, total: 3 })
+    await sleep(600)
   } else {
     setSyncProgress({ active: true, stage: 'uploading_media', current: 1, total: 3 })
-    await sleep(400)
+    await sleep(600)
     setSyncProgress({ active: true, stage: 'uploading_media', current: 2, total: 3 })
-    await sleep(400)
+    await sleep(600)
     setSyncProgress({ active: true, stage: 'uploading_media', current: 3, total: 3 })
-    await sleep(400)
-    setSyncProgress({ active: true, stage: 'uploading_db' })
-    await sleep(500)
+    await sleep(600)
   }
   setSyncProgress({ active: true, stage: 'done' })
-  setTimeout(() => {
+  progressTimer = setTimeout(() => {
     setSyncProgress({ active: false, stage: 'idle' })
   }, 1800)
 }
@@ -431,8 +427,8 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
     const changedHere = state.dirty || state.rev === null
     const changedThere = manifest !== null && manifest.rev !== state.rev
 
-    const finish = (outcome: SyncOutcome) => {
-      if (outcome === 'pushed' || outcome === 'pulled') {
+    const finish = (outcome: SyncOutcome, hadFiles = false) => {
+      if (hadFiles && (outcome === 'pushed' || outcome === 'pulled')) {
         setSyncProgress({ active: true, stage: 'done' })
         progressTimer = setTimeout(() => {
           setSyncProgress({ active: false, stage: 'idle' })
@@ -449,8 +445,8 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
         await markChecked(db)
         return finish('unchanged')
       }
-      await push(db, backend)
-      return finish('pushed')
+      const hadFiles = await push(db, backend)
+      return finish('pushed', hadFiles)
     }
     if (mode === 'pull') {
       if (!manifest) return finish('empty')
@@ -459,8 +455,8 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
         return finish('unchanged')
       }
       if (changedHere && !(state.rev === null && (await isEmpty(db)))) return finish('conflict')
-      await pull(db, backend, manifest)
-      return finish('pulled')
+      const hadFiles = await pull(db, backend, manifest)
+      return finish('pulled', hadFiles)
     }
 
     if (!changedThere) {
@@ -468,21 +464,21 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
         await markChecked(db)
         return finish('unchanged')
       }
-      await push(db, backend)
-      return finish('pushed')
+      const hadFiles = await push(db, backend)
+      return finish('pushed', hadFiles)
     }
 
     let side: 'local' | 'cloud' | null = mode === 'local' || mode === 'cloud' ? mode : null
     if (!side && (!changedHere || (state.rev === null && (await isEmpty(db))))) side = 'cloud'
     if (!side) return finish('conflict')
     if (side === 'local') {
-      await push(db, backend)
-      return finish('pushed')
+      const hadFiles = await push(db, backend)
+      return finish('pushed', hadFiles)
     }
     if (mode === 'push-only') return finish('unchanged')
     if (changedHere) await keepCopy(db)
-    await pull(db, backend, manifest)
-    return finish('pulled')
+    const hadFiles = await pull(db, backend, manifest)
+    return finish('pulled', hadFiles)
   } catch (err) {
     setSyncProgress({ active: false, stage: 'idle' })
     throw err

@@ -35,16 +35,12 @@ export function SyncProgressPill() {
 
   useEffect(() => {
     let pct = 0
-    if (progress.stage === 'uploading_media') {
+    if (progress.stage === 'uploading_media' || progress.stage === 'downloading_media') {
       const ratio = progress.total ? (progress.current ?? 0) / progress.total : 0.5
-      pct = 20 + ratio * 60
-    } else if (progress.stage === 'uploading_db') pct = 88
-    else if (progress.stage === 'downloading_db') pct = 25
-    else if (progress.stage === 'downloading_media') {
-      const ratio = progress.total ? (progress.current ?? 0) / progress.total : 0.5
-      pct = 30 + ratio * 55
-    } else if (progress.stage === 'applying') pct = 92
-    else if (progress.stage === 'done') pct = 100
+      pct = Math.min(100, Math.max(8, ratio * 95))
+    } else if (progress.stage === 'done') {
+      pct = 100
+    }
     progressRatio.value = withTiming(pct, { duration: 200 })
   }, [progress, progressRatio])
 
@@ -60,14 +56,8 @@ export function SyncProgressPill() {
   let label = ''
   if (progress.stage === 'uploading_media') {
     label = t('sync.progressUploadingMedia', { current: progress.current ?? 1, total: progress.total ?? 1 })
-  } else if (progress.stage === 'uploading_db') {
-    label = t('sync.progressUploadingDb')
-  } else if (progress.stage === 'downloading_db') {
-    label = t('sync.progressDownloadingDb')
   } else if (progress.stage === 'downloading_media') {
     label = t('sync.progressDownloadingMedia', { current: progress.current ?? 1, total: progress.total ?? 1 })
-  } else if (progress.stage === 'applying') {
-    label = t('sync.progressApplying')
   } else if (progress.stage === 'done') {
     label = t('sync.progressDone')
   }
