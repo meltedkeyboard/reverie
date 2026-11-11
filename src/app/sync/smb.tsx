@@ -12,9 +12,10 @@ import { useDatabase } from '@/db/provider'
 import { getSmbPassword, getSmbSettings, saveSmbPassword, saveSmbSettings, type SmbSettings } from '@/db/prefs/cloudSync'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useTranslation } from '@/i18n'
-import { discoverSmbServers, listSmbShares, testSmbConnection, type DiscoveredSmbServer, type SmbConfig, type SmbTestResult } from '@/lib/transfer/smbClient'
+import { discoverSmbServers, listSmbShares, testSmbConnection, type DiscoveredSmbServer, type SmbConfig } from '@/lib/transfer/smbClient'
 import { showMessage, showSheet } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
+import { showToast } from '@/lib/ui/toast'
 import { type Colors, useColors, useStyles } from '@/theme'
 
 type AuthMode = 'user' | 'guest'
@@ -47,7 +48,6 @@ export default function SmbScreen() {
   const [browserVisible, setBrowserVisible] = useState(false)
   const [listingShares, setListingShares] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<SmbTestResult | null>(null)
 
   // Loaded initial state
   const loaded = useRef(false)
@@ -164,15 +164,37 @@ export default function SmbScreen() {
   const onTest = async () => {
     if (!host.trim()) return
     setTesting(true)
-    setTestResult(null)
+    const start = Date.now()
     try {
       const res = await testSmbConnection(currentConfig)
-      setTestResult(res)
+      const pingMs = Date.now() - start
+      const serverPort = port.trim() || '445'
+      const locParts = [share.trim(), path.trim()].filter(Boolean)
+      const locPath = locParts.length ? `/${locParts.join('/').replace(/\/+/g, '/')}` : ''
+      const endpoint = `${host.trim()}:${serverPort}${locPath}`
+
       if (res.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        showToast({
+          tone: 'success',
+          title: t('sync.testSuccess'),
+          message: `${endpoint}, ${pingMs} ms`,
+        })
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+        showToast({
+          tone: 'error',
+          title: t('sync.testFailed'),
+          message: res.error || t('sync.testFailed'),
+        })
       }
+    } catch (err: unknown) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      showToast({
+        tone: 'error',
+        title: t('sync.testFailed'),
+        message: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setTesting(false)
     }
@@ -320,21 +342,6 @@ export default function SmbScreen() {
             disabled={!host.trim()}
             icon={{ symbol: 'antenna.radiowaves.left.and.right', fallback: 'wifi' }}
           />
-          {testResult && (
-            <View style={[styles.statusCard, testResult.ok ? styles.statusCardSuccess : styles.statusCardError]}>
-              <SFIcon
-                name={testResult.ok ? 'checkmark.circle.fill' : 'exclamationmark.triangle.fill'}
-                fallback={testResult.ok ? 'checkmark-circle' : 'alert-circle'}
-                size={20}
-                color={testResult.ok ? colors.success : colors.danger}
-              />
-              <Text style={[styles.statusText, testResult.ok ? styles.statusTextSuccess : styles.statusTextError]}>
-                {testResult.ok
-                  ? `${t('sync.testSuccess')} (${testResult.protocol ?? 'SMB'})`
-                  : testResult.error ?? t('sync.testFailed')}
-              </Text>
-            </View>
-          )}
         </ListSection>
 
         {/* Network and Security */}
@@ -406,31 +413,5 @@ const createStyles = (colors: Colors) =>
     },
     discoveryHostActive: {
       color: colors.accent,
-    },
-    statusCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      padding: 12,
-      marginHorizontal: 16,
-      marginBottom: 12,
-      borderRadius: 12,
-    },
-    statusCardSuccess: {
-      backgroundColor: 'rgba(95, 203, 139, 0.12)',
-    },
-    statusCardError: {
-      backgroundColor: 'rgba(240, 97, 109, 0.12)',
-    },
-    statusText: {
-      flex: 1,
-      fontSize: 14,
-      fontWeight: '500',
-    },
-    statusTextSuccess: {
-      color: colors.success,
-    },
-    statusTextError: {
-      color: colors.danger,
     },
   })
