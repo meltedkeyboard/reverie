@@ -380,7 +380,7 @@ async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest
   return hadFiles
 }
 
-let mockCloudFolder: string | null = 'iCloud Drive (Expo Go)'
+let mockCloudFolder: string | null = __DEV__ ? 'iCloud Drive (Expo Go)' : null
 
 export async function simulateSyncProgress(mode: 'push' | 'pull' | 'auto' = 'push'): Promise<void> {
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -419,7 +419,8 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
       if (!auto) return 'unchanged'
     }
     if (!cloudFolder && !reverieSmb) {
-      return simulateSync(mode)
+      if (__DEV__) return simulateSync(mode)
+      throw new Error(t('sync.unavailable'))
     }
     const backend = await getBackend(db, mode)
     if (!backend) return 'unchanged'
@@ -506,14 +507,17 @@ export function syncWithCloud(mode: SyncMode = 'auto') {
 
 export function pickCloudFolder() {
   if (!cloudFolder) {
-    mockCloudFolder = 'iCloud Drive (Expo Go)'
-    return Promise.resolve(mockCloudFolder)
+    if (__DEV__) {
+      mockCloudFolder = 'iCloud Drive (Expo Go)'
+      return Promise.resolve(mockCloudFolder)
+    }
+    return Promise.resolve(null)
   }
   return cloudFolder.pickFolder()
 }
 
 export function cloudFolderName() {
-  return cloudFolder?.folderName() ?? (cloudFolder ? null : mockCloudFolder)
+  return cloudFolder?.folderName() ?? (__DEV__ ? mockCloudFolder : null)
 }
 
 export function forgetCloudFolder() {

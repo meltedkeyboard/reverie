@@ -160,14 +160,16 @@ export default function SyncScreen() {
             />
           </ListSection>
         )}
-        {/* Test UI in Expo Go / Dev */}
-        <ListSection header={t('sync.sectionTestUi')} footer={t('sync.testUiFooter')}>
-          <ButtonCell
-            label={t('sync.testProgressPill')}
-            onPress={() => simulateSyncProgress()}
-            icon={{ symbol: 'play.circle', fallback: 'play-circle-outline' }}
-          />
-        </ListSection>
+        {/* Test UI in Expo Go / Dev only */}
+        {__DEV__ && (
+          <ListSection header={t('sync.sectionTestUi')} footer={t('sync.testUiFooter')}>
+            <ButtonCell
+              label={t('sync.testProgressPill')}
+              onPress={() => simulateSyncProgress()}
+              icon={{ symbol: 'play.circle', fallback: 'play-circle-outline' }}
+            />
+          </ListSection>
+        )}
       </ScrollView>
     </>
   )
