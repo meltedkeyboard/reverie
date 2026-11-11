@@ -39,6 +39,44 @@ export type SyncOutcome = 'pushed' | 'pulled' | 'unchanged' | 'conflict' | 'behi
 
 export type SyncMode = 'auto' | 'push-only' | 'push' | 'pull' | 'local' | 'cloud'
 
+export type SyncStage =
+  | 'idle'
+  | 'checking'
+  | 'uploading_media'
+  | 'uploading_db'
+  | 'downloading_db'
+  | 'downloading_media'
+  | 'applying'
+  | 'done'
+
+export type SyncProgress = {
+  active: boolean
+  stage: SyncStage
+  current?: number
+  total?: number
+}
+
+let currentProgress: SyncProgress = { active: false, stage: 'idle' }
+let progressTimer: ReturnType<typeof setTimeout> | undefined
+const progressListeners = new Set<() => void>()
+
+export function getSyncProgress(): SyncProgress {
+  return currentProgress
+}
+
+export function subscribeSyncProgress(fn: () => void): () => void {
+  progressListeners.add(fn)
+  return () => {
+    progressListeners.delete(fn)
+  }
+}
+
+export function setSyncProgress(progress: SyncProgress) {
+  clearTimeout(progressTimer)
+  currentProgress = progress
+  progressListeners.forEach((fn) => fn())
+}
+
 export type SyncBackend = {
   list(path: string): Promise<string[]>
   copyIn(path: string, localUri: string): Promise<void>
@@ -194,16 +232,30 @@ async function push(db: SQLiteDatabase, backend: SyncBackend) {
     const images = await makeSnapshot(db, snapshot)
 
     const stale: string[] = []
+    const toUpload: { uri: string; dest: string }[] = []
     for (const kind of IMAGE_KINDS) {
       const there = new Set(await backend.list(kind))
       for (const name of images[kind]) {
         if (there.has(name)) continue
         const local = new File(avatarUri(name, kind)!)
-        if (local.exists) await backend.copyOut(local.uri, `${kind}/${name}`)
+        if (local.exists) toUpload.push({ uri: local.uri, dest: `${kind}/${name}` })
       }
       for (const name of there) if (!images[kind].has(name)) stale.push(`${kind}/${name}`)
     }
 
+    if (toUpload.length) {
+      for (let i = 0; i < toUpload.length; i++) {
+        setSyncProgress({
+          active: true,
+          stage: 'uploading_media',
+          current: i + 1,
+          total: toUpload.length,
+        })
+        await backend.copyOut(toUpload[i].uri, toUpload[i].dest)
+      }
+    }
+
+    setSyncProgress({ active: true, stage: 'uploading_db' })
     await backend.copyOut(snapshot.uri, DATABASE)
     const manifest: Manifest = { app: 'reverie', rev: newRev(), schema: SCHEMA_VERSION, savedAt: Date.now() }
     const manifestFile = workFile(MANIFEST)
@@ -221,12 +273,25 @@ async function push(db: SQLiteDatabase, backend: SyncBackend) {
 }
 
 async function copyImagesIn(backend: SyncBackend, images: Record<ImageKind, Set<string>>) {
+  const toDownload: { src: string; dest: string }[] = []
   for (const kind of IMAGE_KINDS) {
     const dir = new Directory(dataDirectory(), kind)
     dir.create({ intermediates: true, idempotent: true })
     for (const name of images[kind]) {
       if (new File(avatarUri(name, kind)!).exists) continue
-      await backend.copyIn(`${kind}/${name}`, new File(dir, name).uri)
+      toDownload.push({ src: `${kind}/${name}`, dest: new File(dir, name).uri })
+    }
+  }
+
+  if (toDownload.length) {
+    for (let i = 0; i < toDownload.length; i++) {
+      setSyncProgress({
+        active: true,
+        stage: 'downloading_media',
+        current: i + 1,
+        total: toDownload.length,
+      })
+      await backend.copyIn(toDownload[i].src, toDownload[i].dest)
     }
   }
 }
@@ -253,6 +318,7 @@ async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: Fi
     if (version < SCHEMA_VERSION) await migrate(copy)
 
     await copyImagesIn(backend, await referencedImages(copy, 'main'))
+    setSyncProgress({ active: true, stage: 'applying' })
     await replaceRows(db, manifest, async (table) => {
       const rows = await copy.getAllAsync<Record<string, unknown>>(`SELECT * FROM ${table}`)
       if (!rows.length) return
@@ -276,6 +342,7 @@ async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: Fi
 }
 
 async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest) {
+  setSyncProgress({ active: true, stage: 'downloading_db' })
   const incoming = freshFile('incoming.db')
   await backend.copyIn(DATABASE, incoming.uri)
   if (isWeb) {
@@ -296,6 +363,7 @@ async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest
 
   await withAttached(db, incoming, 'remote', async () => {
     await copyImagesIn(backend, await referencedImages(db, 'remote'))
+    setSyncProgress({ active: true, stage: 'applying' })
     await replaceRows(db, manifest, async (table) => {
       const columns = await db.getAllAsync<{ name: string }>(`PRAGMA main.table_info(${table})`)
       const list = columns.map((c) => `"${c.name}"`).join(', ')
@@ -310,11 +378,15 @@ async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest
 }
 
 async function run(mode: SyncMode): Promise<SyncOutcome> {
+  setSyncProgress({ active: true, stage: 'checking' })
   const db = await openDatabaseAsync('reverie.db', { useNewConnection: true }, databaseDirectory())
   try {
     await db.execAsync('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = OFF;')
     const backend = await getBackend(db, mode)
-    if (!backend) return 'unchanged'
+    if (!backend) {
+      setSyncProgress({ active: false, stage: 'idle' })
+      return 'unchanged'
+    }
 
     const manifestRead = readManifest(backend).then(
       (value) => ({ value }),
@@ -327,46 +399,61 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
     const changedHere = state.dirty || state.rev === null
     const changedThere = manifest !== null && manifest.rev !== state.rev
 
+    const finish = (outcome: SyncOutcome) => {
+      if (outcome === 'pushed' || outcome === 'pulled') {
+        setSyncProgress({ active: true, stage: 'done' })
+        progressTimer = setTimeout(() => {
+          setSyncProgress({ active: false, stage: 'idle' })
+        }, 1800)
+      } else {
+        setSyncProgress({ active: false, stage: 'idle' })
+      }
+      return outcome
+    }
+
     if (mode === 'push') {
-      if (changedThere) return 'behind'
+      if (changedThere) return finish('behind')
       if (manifest && !changedHere) {
         await markChecked(db)
-        return 'unchanged'
+        return finish('unchanged')
       }
       await push(db, backend)
-      return 'pushed'
+      return finish('pushed')
     }
     if (mode === 'pull') {
-      if (!manifest) return 'empty'
+      if (!manifest) return finish('empty')
       if (!changedThere) {
         await markChecked(db)
-        return 'unchanged'
+        return finish('unchanged')
       }
-      if (changedHere && !(state.rev === null && (await isEmpty(db)))) return 'conflict'
+      if (changedHere && !(state.rev === null && (await isEmpty(db)))) return finish('conflict')
       await pull(db, backend, manifest)
-      return 'pulled'
+      return finish('pulled')
     }
 
     if (!changedThere) {
       if (manifest && !changedHere) {
         await markChecked(db)
-        return 'unchanged'
+        return finish('unchanged')
       }
       await push(db, backend)
-      return 'pushed'
+      return finish('pushed')
     }
 
     let side: 'local' | 'cloud' | null = mode === 'local' || mode === 'cloud' ? mode : null
     if (!side && (!changedHere || (state.rev === null && (await isEmpty(db))))) side = 'cloud'
-    if (!side) return 'conflict'
+    if (!side) return finish('conflict')
     if (side === 'local') {
       await push(db, backend)
-      return 'pushed'
+      return finish('pushed')
     }
-    if (mode === 'push-only') return 'unchanged'
+    if (mode === 'push-only') return finish('unchanged')
     if (changedHere) await keepCopy(db)
     await pull(db, backend, manifest)
-    return 'pulled'
+    return finish('pulled')
+  } catch (err) {
+    setSyncProgress({ active: false, stage: 'idle' })
+    throw err
   } finally {
     await db.closeAsync()
   }

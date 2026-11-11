@@ -13,6 +13,7 @@ import { StartupBoundary } from '@/components/startup/StartupBoundary'
 import { TabBar } from '@/components/chrome/TabBar'
 import { TitleBar } from '@/components/chrome/TitleBar'
 import { ToastHost } from '@/components/overlays/ToastHost'
+import { SyncProgressPill } from '@/components/sync/SyncProgressPill'
 import { isConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { loadFileLimits } from '@/db/prefs/fileLimits'
 import { loadListLook } from '@/db/prefs/listLook'
@@ -268,6 +269,7 @@ function AppShell() {
         </View>
         <DialogHost />
         <ToastHost />
+        <SyncProgressPill />
       </ThemeProvider>
     </>
   )
