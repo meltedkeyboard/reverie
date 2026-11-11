@@ -22,7 +22,7 @@ import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEn
 import { getFileLimits } from '@/lib/settings/fileLimits'
 import { loadFileLimits, setAttachmentLimitMb, setAvatarLimitMb, setBackgroundLimitMb, setLimitsOff } from '@/db/prefs/fileLimits'
 import { isDirectionEnabled, isPersonasEnabled, setDirectionEnabled, setPersonasEnabled } from '@/db/prefs/features'
-import { isHapticsEnabled, setHapticsEnabled } from '@/db/prefs/haptics'
+import { isHapticsEnabled, isStreamHapticsEnabled, setHapticsEnabled, setStreamHapticsEnabled } from '@/db/prefs/haptics'
 import {
   isAttachGalleryEnabled,
   isRecentAttachmentsEnabled,
@@ -239,6 +239,7 @@ export default function SettingsScreen() {
   }
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
+  const [streamHaptics, toggleStreamHaptics] = useStoredFlag(isStreamHapticsEnabled, setStreamHapticsEnabled, true)
 
   const [personas, setPersonas] = useState<Persona[]>([])
   useEffect(() => {
@@ -541,8 +542,15 @@ export default function SettingsScreen() {
   )
 
   const hapticsRow = (
-    <ListSection header={t('settings.feedback')}>
+    <ListSection header={t('settings.feedback')} footer={haptics ? t('settings.streamHapticsNote') : undefined}>
       <SwitchCell label={t('settings.haptics')} value={haptics} onValueChange={toggleHaptics} />
+      {haptics ? (
+        <SwitchCell
+          label={t('settings.streamHaptics')}
+          value={streamHaptics}
+          onValueChange={toggleStreamHaptics}
+        />
+      ) : null}
     </ListSection>
   )
 
@@ -864,8 +872,9 @@ export default function SettingsScreen() {
 
         <NativeSection id="confirmDelete">{toggle(null, t('settings.confirmDelete'), confirmDelete, toggleConfirmDelete)}</NativeSection>
 
-        <NativeSection id="haptics" title={t('settings.feedback')}>
+        <NativeSection id="haptics" title={t('settings.feedback')} footer={haptics ? t('settings.streamHapticsNote') : undefined}>
           {toggle(null, t('settings.haptics'), haptics, toggleHaptics)}
+          {haptics ? toggle(null, t('settings.streamHaptics'), streamHaptics, toggleStreamHaptics) : null}
         </NativeSection>
 
 

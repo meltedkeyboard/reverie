@@ -32,6 +32,8 @@
   "settings.showInFilesFailedTitle": "Could not move the files",
   "settings.feedback": "Feedback",
   "settings.haptics": "Haptics",
+  "settings.streamHaptics": "Haptics on reply generation",
+  "settings.streamHapticsNote": "Haptic pulse for each generated token",
   "settings.privateButton": "Private question",
   "settings.privateButtonNote": "The eye icon in a chat's header: ask the model about the chat privately, without the characters hearing",
   "settings.suggestButton": "Reply suggestion",

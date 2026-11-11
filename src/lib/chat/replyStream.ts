@@ -2,6 +2,7 @@ import { streamChat, type ChatRequest, type ChatTurn, type ContentPart } from '@
 import type { Message, Thought } from '@/db/messages'
 import type { ServerSettings } from '@/db/prefs/settings'
 import { attachmentUri, withInlinedImages } from '@/lib/images/attachments'
+import { streamTokenAsync } from '@/lib/ui/haptics'
 
 export type ReplyFrame = {
   text: string
@@ -41,7 +42,8 @@ export async function runReplyStream(
   }
 
   try {
-    for await (const part of streamChat(cfg, await withInlinedImages(req), signal, { interactive: options?.interactive ?? true })) {
+    const isInteractive = options?.interactive ?? true
+    for await (const part of streamChat(cfg, await withInlinedImages(req), signal, { interactive: isInteractive })) {
       if (part.kind === 'cutoff') {
         cutoff = true
         continue
@@ -52,12 +54,14 @@ export async function runReplyStream(
           thinkingSince = Date.now()
         }
         thought += part.text
+        if (isInteractive && part.text) streamTokenAsync()
         if (!frame) frame = requestAnimationFrame(flush)
         continue
       }
       if (thought && thinkingMs === null) thinkingMs = Date.now() - thinkingSince
       const wasEmpty = !text.trim()
       text += part.text
+      if (isInteractive && part.text) streamTokenAsync()
       if (wasEmpty && text.trim()) {
         cb.onStart?.()
         cb.onFirstWords?.()
