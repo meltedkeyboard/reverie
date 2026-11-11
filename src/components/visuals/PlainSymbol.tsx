@@ -22,7 +22,7 @@ export function PlainSymbol({ name, fallback, size, box, color }: Props) {
   if (!swiftUI) return <Icon name={fallback} size={size} color={color as string} />
   return (
     <View pointerEvents="none" style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}>
-      <SymbolView name={name} size={size} tintColor={color} />
+      <SymbolView name={name} size={size} tintColor={color} style={{ width: box, height: box }} />
     </View>
   )
 }

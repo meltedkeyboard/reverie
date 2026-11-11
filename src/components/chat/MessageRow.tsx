@@ -471,8 +471,7 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }
       ) : null}
       {menu.length && rich ? (
         <NativeMenu items={menu} style={styles.barButton}>
-          {/* A plain glyph: a SwiftUI symbol inside the menu's label gets the accent tint. */}
-          <Icon name="ellipsis-horizontal" size={17} color={colors.textFaint} />
+          <PlainSymbol name="ellipsis" fallback="ellipsis-horizontal" size={ICON_SYMBOL * 17} box={17} color={colors.textFaint} />
         </NativeMenu>
       ) : menu.length ? (
         <TapTrigger onPress={() => showSheet(undefined, menu, { scheme })} style={styles.barButton}>

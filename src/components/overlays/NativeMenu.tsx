@@ -114,7 +114,7 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
   // gives the label its size, so the trigger keeps its flex sizing and text truncation.
   return (
     <View style={style} onLayout={onLayout}>
-      <View style={styles.hidden} pointerEvents="none">
+      <View style={size ? styles.hidden : styles.hosted} pointerEvents="none">
         {children}
       </View>
       {size ? (
@@ -152,5 +152,5 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
 const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   hosted: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  triggerContent: { alignSelf: 'stretch', flexGrow: 1 },
+  triggerContent: { alignSelf: 'stretch', flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
 })
