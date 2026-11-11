@@ -868,6 +868,7 @@
   "sync.enabled": "Включить синхронизацию",
   "sync.autoSync": "Автоматическая синхронизация",
   "sync.autoSyncFooter": "Синхронизировать при запуске и закрытии приложения. При выключении синхронизация работает только вручную кнопками Push и Pull.",
+  "sync.autoSyncDisabledFooter": "Автоматическая синхронизация выключена. Синхронизация выполняется только вручную кнопками Push и Pull.",
   "sync.progressChecking": "Проверка синхронизации...",
   "sync.progressUploadingMedia": "Выгрузка: {{current}} из {{total}}...",
   "sync.progressUploadingDb": "Сохранение базы данных...",

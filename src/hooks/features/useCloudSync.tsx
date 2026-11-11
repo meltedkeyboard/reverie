@@ -160,7 +160,9 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     enabledRef.current = true
     setEnabled(true)
     conflictDismissed.current = false
-    await sync('auto', true)
+    if (autoSyncRef.current) {
+      await sync('auto', true)
+    }
   }, [sync])
 
   const disable = useCallback(async () => {
@@ -179,7 +181,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       setProviderState(nextProvider)
       await forgetSyncRev(dbRef.current)
       await refresh()
-      if (enabledRef.current) {
+      if (enabledRef.current && autoSyncRef.current) {
         await sync('auto', true)
       }
     },
@@ -200,7 +202,9 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     await forgetSyncRev(dbRef.current)
     setFolder(name)
     conflictDismissed.current = false
-    await sync('auto', true)
+    if (autoSyncRef.current) {
+      await sync('auto', true)
+    }
   }, [sync])
 
   const pushNow = useCallback(async () => {

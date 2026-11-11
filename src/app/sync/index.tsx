@@ -51,7 +51,16 @@ export default function SyncScreen() {
       <FormScreenHeader title={t('sync.title')} />
       <ScrollView contentContainerStyle={padding}>
         {/* Main Enable / Provider Toggle */}
-        <ListSection header={t('sync.sectionGeneral')} footer={cloudSync.enabled ? t('sync.autoSyncFooter') : t('settings.folderSyncSyncNote')}>
+        <ListSection
+          header={t('sync.sectionGeneral')}
+          footer={
+            cloudSync.enabled
+              ? cloudSync.autoSync
+                ? t('sync.autoSyncFooter')
+                : t('sync.autoSyncDisabledFooter')
+              : t('settings.folderSyncSyncNote')
+          }
+        >
           <SwitchCell
             label={t('sync.enabled')}
             value={cloudSync.enabled}
@@ -63,6 +72,14 @@ export default function SyncScreen() {
               label={t('sync.autoSync')}
               value={cloudSync.autoSync}
               onValueChange={cloudSync.toggleAutoSync}
+              disabled={cloudSync.syncing}
+            />
+          )}
+          {cloudSync.enabled && cloudSync.provider === 'smb' && cloudSync.autoSync && (
+            <SwitchCell
+              label={t('sync.wifiOnly')}
+              value={cloudSync.smb.wifiOnly}
+              onValueChange={(val) => cloudSync.updateSmb({ wifiOnly: val })}
               disabled={cloudSync.syncing}
             />
           )}

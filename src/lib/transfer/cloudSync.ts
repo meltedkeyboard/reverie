@@ -7,6 +7,7 @@ import {
   getSmbSettings,
   getSyncProvider,
   getSyncState,
+  isAutoSyncEnabled,
   markChecked,
   markSynced,
   setDirty,
@@ -407,12 +408,16 @@ async function simulateSync(mode: SyncMode): Promise<SyncOutcome> {
 }
 
 async function run(mode: SyncMode): Promise<SyncOutcome> {
-  if (!cloudFolder && !reverieSmb) {
-    return simulateSync(mode)
-  }
   const db = await openDatabaseAsync('reverie.db', { useNewConnection: true }, databaseDirectory())
   try {
     await db.execAsync('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = OFF;')
+    if (mode === 'auto' || mode === 'push-only') {
+      const auto = await isAutoSyncEnabled(db)
+      if (!auto) return 'unchanged'
+    }
+    if (!cloudFolder && !reverieSmb) {
+      return simulateSync(mode)
+    }
     const backend = await getBackend(db, mode)
     if (!backend) return 'unchanged'
 

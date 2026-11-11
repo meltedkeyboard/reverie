@@ -345,12 +345,22 @@ export default function SmbScreen() {
         </ListSection>
 
         {/* Network and Security */}
-        <ListSection header={t('sync.sectionNetwork')} footer={t('sync.wifiOnlyFooter')}>
+        <ListSection
+          header={t('sync.sectionNetwork')}
+          footer={cloudSync.autoSync ? t('sync.wifiOnlyFooter') : t('sync.autoSyncDisabledFooter')}
+        >
           <SwitchCell
-            label={t('sync.wifiOnly')}
-            value={wifiOnly}
-            onValueChange={setWifiOnly}
+            label={t('sync.autoSync')}
+            value={cloudSync.autoSync}
+            onValueChange={cloudSync.toggleAutoSync}
           />
+          {cloudSync.autoSync && (
+            <SwitchCell
+              label={t('sync.wifiOnly')}
+              value={wifiOnly}
+              onValueChange={setWifiOnly}
+            />
+          )}
         </ListSection>
       </KeyboardAwareScrollView>
 
