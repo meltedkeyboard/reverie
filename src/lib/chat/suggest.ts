@@ -48,7 +48,7 @@ export async function suggestReply(
     req,
     signal,
     { onFrame: (frame) => onText(clean(frame.text)) },
-    { interactive: false },
+    { interactive: false, suggestion: true },
   )
   if (streamed.error) throw streamed.error
   return clean(streamed.text) || null

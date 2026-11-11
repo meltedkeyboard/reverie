@@ -32,6 +32,7 @@
   "settings.feedback": "Отклик",
   "settings.haptics": "Вибрация",
   "settings.streamHaptics": "Вибрация при генерации ответов",
+  "settings.suggestionHaptics": "Вибрация при подсказках ответа",
   "settings.streamHapticsNote": "Тактильный отклик на каждый сгенерированный токен",
   "settings.privateButton": "Приватный вопрос",
   "settings.privateButtonNote": "Глаз в шапке чата: спросить модель о чате в стороне, так что персонажи не услышат",

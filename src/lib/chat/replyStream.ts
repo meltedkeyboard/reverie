@@ -2,7 +2,7 @@ import { streamChat, type ChatRequest, type ChatTurn, type ContentPart } from '@
 import type { Message, Thought } from '@/db/messages'
 import type { ServerSettings } from '@/db/prefs/settings'
 import { attachmentUri, withInlinedImages } from '@/lib/images/attachments'
-import { streamTokenAsync } from '@/lib/ui/haptics'
+import { streamTokenAsync, suggestionTokenAsync } from '@/lib/ui/haptics'
 
 export type ReplyFrame = {
   text: string
@@ -27,7 +27,7 @@ export async function runReplyStream(
   req: ChatRequest,
   signal: AbortSignal,
   cb: Callbacks,
-  options?: { interactive?: boolean },
+  options?: { interactive?: boolean; suggestion?: boolean },
 ) {
   let text = ''
   let thought = ''
@@ -43,6 +43,7 @@ export async function runReplyStream(
 
   try {
     const isInteractive = options?.interactive ?? true
+    const isSuggestion = options?.suggestion ?? false
     for await (const part of streamChat(cfg, await withInlinedImages(req), signal, { interactive: isInteractive })) {
       if (part.kind === 'cutoff') {
         cutoff = true
@@ -54,14 +55,20 @@ export async function runReplyStream(
           thinkingSince = Date.now()
         }
         thought += part.text
-        if (isInteractive && part.text) streamTokenAsync()
+        if (part.text) {
+          if (isSuggestion) suggestionTokenAsync()
+          else if (isInteractive) streamTokenAsync()
+        }
         if (!frame) frame = requestAnimationFrame(flush)
         continue
       }
       if (thought && thinkingMs === null) thinkingMs = Date.now() - thinkingSince
       const wasEmpty = !text.trim()
       text += part.text
-      if (isInteractive && part.text) streamTokenAsync()
+      if (part.text) {
+        if (isSuggestion) suggestionTokenAsync()
+        else if (isInteractive) streamTokenAsync()
+      }
       if (wasEmpty && text.trim()) {
         cb.onStart?.()
         cb.onFirstWords?.()
