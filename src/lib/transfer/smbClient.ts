@@ -38,7 +38,7 @@ export async function createSmbDirectory(config: SmbConfig, path: string): Promi
 async function getWifiHosts(): Promise<string[] | null> {
   if (isWeb) return ['127.0.0.1']
   const state = await Network.getNetworkStateAsync().catch(() => null)
-  if (state?.type !== Network.NetworkStateType.WIFI && state?.type !== Network.NetworkStateType.ETHERNET) return null
+  if (state?.type === Network.NetworkStateType.CELLULAR) return null
   const ip = await Network.getIpAddressAsync().catch(() => '')
   const parts = ip.split('.')
   if (parts.length !== 4 || ip === '0.0.0.0') return null

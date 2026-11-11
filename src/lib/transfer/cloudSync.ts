@@ -99,14 +99,6 @@ async function getBackend(db: SQLiteDatabase, mode: SyncMode): Promise<SyncBacke
       if (mode === 'auto' || mode === 'push-only') return null
       throw new Error(t('sync.smbNotConfigured'))
     }
-    if (settings.wifiOnly && !isWeb) {
-      const net = await Network.getNetworkStateAsync().catch(() => null)
-      const isWifi = net?.type === Network.NetworkStateType.WIFI || net?.type === Network.NetworkStateType.ETHERNET
-      if (!isWifi) {
-        if (mode === 'auto' || mode === 'push-only') return null
-        throw new Error(t('sync.wifiRequired'))
-      }
-    }
     const password = await getSmbPassword(db)
     const config: SmbConfig = {
       host: settings.host.trim(),
@@ -116,6 +108,17 @@ async function getBackend(db: SQLiteDatabase, mode: SyncMode): Promise<SyncBacke
       username: settings.username.trim(),
       password,
       domain: settings.domain.trim(),
+    }
+    if (settings.wifiOnly && !isWeb) {
+      const net = await Network.getNetworkStateAsync().catch(() => null)
+      const isCellular = net?.type === Network.NetworkStateType.CELLULAR
+      if (isCellular) {
+        if (mode === 'auto' || mode === 'push-only') return null
+        const reachable = await smb.testConnection(config).then((r) => r.ok).catch(() => false)
+        if (!reachable) {
+          throw new Error(t('sync.wifiRequired'))
+        }
+      }
     }
     return {
       list: (p) => smb.list(config, p),
