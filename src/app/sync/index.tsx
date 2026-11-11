@@ -9,6 +9,7 @@ import { ChipRowCell } from '@/components/lists/PictureCells'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useTranslation } from '@/i18n'
 import { formatWhen } from '@/lib/core/format'
+import { simulateSyncProgress } from '@/lib/transfer/cloudSync'
 import { reportError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, useColors, useStyles } from '@/theme'
@@ -142,6 +143,14 @@ export default function SyncScreen() {
             />
           </ListSection>
         )}
+        {/* Test UI in Expo Go / Dev */}
+        <ListSection header={t('sync.sectionTestUi')} footer={t('sync.testUiFooter')}>
+          <ButtonCell
+            label={t('sync.testProgressPill')}
+            onPress={() => simulateSyncProgress()}
+            icon={{ symbol: 'play.circle', fallback: 'play-circle-outline' }}
+          />
+        </ListSection>
       </ScrollView>
     </>
   )

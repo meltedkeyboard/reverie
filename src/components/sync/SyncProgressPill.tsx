@@ -80,11 +80,13 @@ export function SyncProgressPill() {
       <Animated.View style={[styles.pill, pillStyle]}>
         <GlassSurface style={styles.glass} fallbackStyle={glass.solid}>
           <View style={styles.content}>
-            {progress.stage === 'done' ? (
-              <SFIcon name="checkmark.circle.fill" fallback="checkmark-circle" size={14} color={colors.success} />
-            ) : (
-              <ActivityIndicator size="small" color={colors.accent} style={styles.spinner} />
-            )}
+            <View style={styles.iconBox}>
+              {progress.stage === 'done' ? (
+                <SFIcon name="checkmark.circle.fill" fallback="checkmark-circle" size={14} color={colors.success} />
+              ) : (
+                <ActivityIndicator size="small" color={colors.accent} style={styles.spinner} />
+              )}
+            </View>
             <Text style={styles.label} numberOfLines={1}>
               {label}
             </Text>
@@ -110,7 +112,8 @@ const createStyles = (colors: Colors) =>
     pill: {
       minWidth: 160,
       maxWidth: 320,
-      borderRadius: 18,
+      height: 34,
+      borderRadius: 17,
       overflow: 'hidden',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
@@ -119,15 +122,22 @@ const createStyles = (colors: Colors) =>
       elevation: 6,
     },
     glass: {
+      height: 34,
       paddingHorizontal: 12,
-      paddingTop: 7,
-      paddingBottom: 9,
-      borderRadius: 18,
+      justifyContent: 'center',
+      borderRadius: 17,
     },
     content: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 7,
+      height: 20,
+    },
+    iconBox: {
+      width: 16,
+      height: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     spinner: {
       transform: [{ scale: 0.72 }],
@@ -139,6 +149,7 @@ const createStyles = (colors: Colors) =>
       fontWeight: '600',
       color: colors.text,
       letterSpacing: 0.2,
+      lineHeight: 16,
     },
     track: {
       position: 'absolute',

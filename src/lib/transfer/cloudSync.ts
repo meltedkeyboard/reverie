@@ -33,7 +33,7 @@ import { reverieSmb, type SmbConfig } from '../../../modules/reverie-smb'
 // the user picks one, and the data here is put aside first if it is the one that loses.
 // The database in the folder is never opened in place: SQLite over a synced file corrupts.
 
-export const cloudSyncAvailable = cloudFolder !== null || reverieSmb !== null
+export const cloudSyncAvailable = cloudFolder !== null || reverieSmb !== null || __DEV__
 
 export type SyncOutcome = 'pushed' | 'pulled' | 'unchanged' | 'conflict' | 'behind' | 'empty'
 
@@ -377,7 +377,46 @@ async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest
   incoming.delete()
 }
 
+let mockCloudFolder: string | null = 'iCloud Drive (Expo Go)'
+
+export async function simulateSyncProgress(mode: 'push' | 'pull' | 'auto' = 'push'): Promise<void> {
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+  setSyncProgress({ active: true, stage: 'checking' })
+  await sleep(600)
+  if (mode === 'pull') {
+    setSyncProgress({ active: true, stage: 'downloading_db' })
+    await sleep(500)
+    setSyncProgress({ active: true, stage: 'downloading_media', current: 1, total: 2 })
+    await sleep(400)
+    setSyncProgress({ active: true, stage: 'downloading_media', current: 2, total: 2 })
+    await sleep(400)
+    setSyncProgress({ active: true, stage: 'applying' })
+    await sleep(500)
+  } else {
+    setSyncProgress({ active: true, stage: 'uploading_media', current: 1, total: 3 })
+    await sleep(400)
+    setSyncProgress({ active: true, stage: 'uploading_media', current: 2, total: 3 })
+    await sleep(400)
+    setSyncProgress({ active: true, stage: 'uploading_media', current: 3, total: 3 })
+    await sleep(400)
+    setSyncProgress({ active: true, stage: 'uploading_db' })
+    await sleep(500)
+  }
+  setSyncProgress({ active: true, stage: 'done' })
+  setTimeout(() => {
+    setSyncProgress({ active: false, stage: 'idle' })
+  }, 1800)
+}
+
+async function simulateSync(mode: SyncMode): Promise<SyncOutcome> {
+  await simulateSyncProgress(mode === 'pull' ? 'pull' : 'push')
+  return mode === 'pull' ? 'pulled' : 'pushed'
+}
+
 async function run(mode: SyncMode): Promise<SyncOutcome> {
+  if (!cloudFolder && !reverieSmb) {
+    return simulateSync(mode)
+  }
   setSyncProgress({ active: true, stage: 'checking' })
   const db = await openDatabaseAsync('reverie.db', { useNewConnection: true }, databaseDirectory())
   try {
@@ -469,14 +508,18 @@ export function syncWithCloud(mode: SyncMode = 'auto') {
 }
 
 export function pickCloudFolder() {
-  if (!cloudFolder) throw new Error(t('sync.unavailable'))
+  if (!cloudFolder) {
+    mockCloudFolder = 'iCloud Drive (Expo Go)'
+    return Promise.resolve(mockCloudFolder)
+  }
   return cloudFolder.pickFolder()
 }
 
 export function cloudFolderName() {
-  return cloudFolder?.folderName() ?? null
+  return cloudFolder?.folderName() ?? (cloudFolder ? null : mockCloudFolder)
 }
 
 export function forgetCloudFolder() {
-  cloudFolder?.forgetFolder()
+  if (cloudFolder) cloudFolder.forgetFolder()
+  mockCloudFolder = null
 }
