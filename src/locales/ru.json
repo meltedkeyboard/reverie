@@ -866,6 +866,8 @@
   "sync.destination": "Хранилище",
   "sync.manage": "Настроить",
   "sync.enabled": "Включить синхронизацию",
+  "sync.autoSync": "Автоматическая синхронизация",
+  "sync.autoSyncFooter": "Синхронизировать при запуске и закрытии приложения. При выключении синхронизация работает только вручную кнопками Push и Pull.",
   "sync.sectionGeneral": "Основные",
   "sync.storageType": "Тип хранилища",
   "sync.providerFolder": "Папка / iCloud",

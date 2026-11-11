@@ -7,8 +7,10 @@ import {
   getSmbSettings,
   getSyncProvider,
   getSyncState,
+  isAutoSyncEnabled,
   isCloudSyncEnabled,
   saveSmbSettings,
+  setAutoSyncEnabled,
   setCloudSyncEnabled,
   setSyncProvider,
   type SmbSettings,
@@ -25,6 +27,7 @@ import { createRequiredContext } from '@/lib/core/requiredContext'
 type CloudSync = {
   available: boolean
   enabled: boolean
+  autoSync: boolean
   provider: SyncProvider
   folder: string | null
   smb: SmbSettings
@@ -32,6 +35,7 @@ type CloudSync = {
   syncedAt: number | null
   enable: () => Promise<void>
   disable: () => Promise<void>
+  toggleAutoSync: (on: boolean) => Promise<void>
   switchProvider: (provider: SyncProvider) => Promise<void>
   updateSmb: (settings: Partial<SmbSettings>) => Promise<void>
   changeFolder: () => Promise<void>
@@ -48,6 +52,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
   const db = useDatabase()
   const reload = useReloadDatabase()
   const [enabled, setEnabled] = useState(false)
+  const [autoSync, setAutoSync] = useState(true)
   const [provider, setProviderState] = useState<SyncProvider>('folder')
   const [folder, setFolder] = useState<string | null>(null)
   const [smb, setSmbState] = useState<SmbSettings>(DEFAULT_SMB_SETTINGS)
@@ -60,19 +65,23 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
   const reloadRef = useRef(reload)
   reloadRef.current = reload
   const enabledRef = useRef(false)
+  const autoSyncRef = useRef(true)
   // A conflict dismissed once is not asked about again on every return to the app.
   const conflictDismissed = useRef(false)
 
   const refresh = useCallback(async () => {
-    const [state, currentProvider, currentSmb] = await Promise.all([
+    const [state, currentProvider, currentSmb, currentAuto] = await Promise.all([
       getSyncState(dbRef.current),
       getSyncProvider(dbRef.current),
       getSmbSettings(dbRef.current),
+      isAutoSyncEnabled(dbRef.current),
     ])
     setSyncedAt(state.syncedAt)
     setFolder(cloudFolderName())
     setProviderState(currentProvider)
     setSmbState(currentSmb)
+    setAutoSync(currentAuto)
+    autoSyncRef.current = currentAuto
   }, [])
 
   const sync = useCallback(
@@ -111,18 +120,30 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!cloudSyncAvailable) return
-    isCloudSyncEnabled(dbRef.current).then((on) => {
+    Promise.all([
+      isCloudSyncEnabled(dbRef.current),
+      isAutoSyncEnabled(dbRef.current),
+    ]).then(([on, auto]) => {
       enabledRef.current = on
+      autoSyncRef.current = auto
       setEnabled(on)
+      setAutoSync(auto)
       refresh().catch(() => {})
-      if (on) sync('auto', false)
+      if (on && auto) sync('auto', false)
     })
     const subscription = AppState.addEventListener('change', (state) => {
+      if (!autoSyncRef.current) return
       if (state === 'active') sync('auto', false)
       else if (state === 'background') sync('push-only', false)
     })
     return () => subscription.remove()
   }, [refresh, sync])
+
+  const toggleAutoSync = useCallback(async (on: boolean) => {
+    await setAutoSyncEnabled(dbRef.current, on)
+    autoSyncRef.current = on
+    setAutoSync(on)
+  }, [])
 
   const enable = useCallback(async () => {
     const currentProvider = await getSyncProvider(dbRef.current)
@@ -213,6 +234,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     () => ({
       available: cloudSyncAvailable,
       enabled,
+      autoSync,
       provider,
       folder,
       smb,
@@ -220,6 +242,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       syncedAt,
       enable,
       disable,
+      toggleAutoSync,
       switchProvider,
       updateSmb,
       changeFolder,
@@ -227,7 +250,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       pullNow,
       refresh,
     }),
-    [enabled, provider, folder, smb, syncing, syncedAt, enable, disable, switchProvider, updateSmb, changeFolder, pushNow, pullNow, refresh]
+    [enabled, autoSync, provider, folder, smb, syncing, syncedAt, enable, disable, toggleAutoSync, switchProvider, updateSmb, changeFolder, pushNow, pullNow, refresh]
   )
 
   return <CloudSyncContext.Provider value={value}>{children}</CloudSyncContext.Provider>

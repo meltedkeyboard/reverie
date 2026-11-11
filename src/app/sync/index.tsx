@@ -50,13 +50,21 @@ export default function SyncScreen() {
       <FormScreenHeader title={t('sync.title')} />
       <ScrollView contentContainerStyle={padding}>
         {/* Main Enable / Provider Toggle */}
-        <ListSection header={t('sync.sectionGeneral')} footer={t('settings.folderSyncSyncNote')}>
+        <ListSection header={t('sync.sectionGeneral')} footer={cloudSync.enabled ? t('sync.autoSyncFooter') : t('settings.folderSyncSyncNote')}>
           <SwitchCell
             label={t('sync.enabled')}
             value={cloudSync.enabled}
             onValueChange={toggleSync}
             disabled={cloudSync.syncing}
           />
+          {cloudSync.enabled && (
+            <SwitchCell
+              label={t('sync.autoSync')}
+              value={cloudSync.autoSync}
+              onValueChange={cloudSync.toggleAutoSync}
+              disabled={cloudSync.syncing}
+            />
+          )}
           {cloudSync.enabled && (
             <SegmentCell<SyncProvider>
               label={t('sync.storageType')}

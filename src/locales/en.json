@@ -867,6 +867,8 @@
   "sync.destination": "Storage",
   "sync.manage": "Configure",
   "sync.enabled": "Enable sync",
+  "sync.autoSync": "Automatic sync",
+  "sync.autoSyncFooter": "Sync automatically when opening or closing the app. When turned off, sync only runs manually with Push and Pull buttons.",
   "sync.sectionGeneral": "General",
   "sync.storageType": "Storage type",
   "sync.providerFolder": "Folder / iCloud",

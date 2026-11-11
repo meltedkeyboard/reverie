@@ -47,10 +47,13 @@ export const DEFAULT_SMB_SETTINGS: SmbSettings = {
 }
 
 const cloudSync = defineFlag(ENABLED_KEY, false)
+const autoSync = defineFlag('sync_auto', true)
 const syncProvider = defineChoice<SyncProvider>(PROVIDER_KEY, ['folder', 'smb'], 'folder')
 
 export const isCloudSyncEnabled = cloudSync.load
 export const setCloudSyncEnabled = cloudSync.save
+export const isAutoSyncEnabled = autoSync.load
+export const setAutoSyncEnabled = autoSync.save
 export const getSyncProvider = syncProvider.load
 export const setSyncProvider = syncProvider.save
 
