@@ -185,6 +185,7 @@
   "characters.edit": "Edit",
   "characters.delete": "Delete",
   "characters.duplicate": "Duplicate",
+  "characters.duplicateFailed": "Couldn't duplicate the character",
   "characters.copySuffix": "copy",
   "characters.deleteConfirmTitle": "Delete character?",
   "characters.deleteConfirmMessage": "{{name}} and all chats will be gone for good",

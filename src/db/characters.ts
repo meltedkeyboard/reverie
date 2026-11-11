@@ -237,7 +237,7 @@ export async function duplicateCharacter(db: SQLiteDatabase, id: number, name: s
       // The copy stays in the original's group.
       `INSERT INTO characters (${FIELD_COLUMNS}, created_at, group_id)
        SELECT ?, ?, ?, avatar_crop, system_prompt, greeting, temperature, max_tokens, top_p, reply_limit, thinking,
-         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, reasoning_budget, notes, background_tone, ?, group_id
+         ?, ?, background_crop, background_effect, background_intensity, background_bubble_transparency, background_bubble_glass, reasoning_budget, notes, background_tone, ?, group_id
        FROM characters WHERE id = ?`,
       [name, images.avatar, images.avatarOriginal, images.background, images.backgroundOriginal, Date.now(), id]
     )

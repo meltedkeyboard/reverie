@@ -287,7 +287,7 @@ export async function duplicateRoom(
     const res = await db.runAsync(
       `INSERT INTO rooms (${FIELD_COLUMNS}, created_at)
        SELECT ?, scenario, opening, user_name, floor, max_chain, director, plot, ?, ?, background_crop, background_effect,
-         background_intensity, background_bubble_transparency, background_tone, ?
+         background_intensity, background_bubble_transparency, background_bubble_glass, background_tone, ?
        FROM rooms WHERE id = ?`,
       [name, images.background, images.backgroundOriginal, Date.now(), id]
     )

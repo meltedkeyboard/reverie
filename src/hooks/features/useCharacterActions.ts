@@ -38,13 +38,17 @@ export function useCharacterActions(reload: () => void) {
   }
 
   const duplicate = async (character: CharacterPreview) => {
-    await duplicateCharacter(db, character.id, `${character.name} (${t('characters.copySuffix')})`, {
-      avatar: await copyStoredImage(character.avatar),
-      avatarOriginal: await copyStoredImage(character.avatarOriginal),
-      background: await copyStoredImage(character.background, 'backgrounds'),
-      backgroundOriginal: await copyStoredImage(character.backgroundOriginal, 'backgrounds'),
-    })
-    reload()
+    try {
+      await duplicateCharacter(db, character.id, `${character.name} (${t('characters.copySuffix')})`, {
+        avatar: await copyStoredImage(character.avatar),
+        avatarOriginal: await copyStoredImage(character.avatarOriginal),
+        background: await copyStoredImage(character.background, 'backgrounds'),
+        backgroundOriginal: await copyStoredImage(character.backgroundOriginal, 'backgrounds'),
+      })
+      reload()
+    } catch (err) {
+      reportError(t('characters.duplicateFailed'), err)
+    }
   }
 
   const archive = (character: CharacterPreview) =>

@@ -184,6 +184,7 @@
   "characters.edit": "Изменить",
   "characters.delete": "Удалить",
   "characters.duplicate": "Дублировать",
+  "characters.duplicateFailed": "Не удалось дублировать персонажа",
   "characters.copySuffix": "копия",
   "characters.deleteConfirmTitle": "Удалить персонажа?",
   "characters.deleteConfirmMessage": "{{name}} и все чаты удалятся безвозвратно",
