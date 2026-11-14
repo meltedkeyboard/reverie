@@ -35,6 +35,7 @@ export default function PersonaEditorScreen() {
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [notes, setNotes] = useState('')
   const [isDefault, setIsDefault] = useState(false)
   const [beforeGen, setBeforeGen] = useState<string | null>(null)
 
@@ -56,6 +57,7 @@ export default function PersonaEditorScreen() {
       if (!found) return router.back()
       setName(found.name)
       setDescription(found.description)
+      setNotes(found.notes)
       setIsDefault(found.isDefault)
       setAvatar(found.avatar)
       setAvatarOriginal(found.avatarOriginal)
@@ -137,6 +139,7 @@ export default function PersonaEditorScreen() {
           avatarOriginal: nextAvatarOriginal,
           avatarCrop: nextAvatarCrop,
           description,
+          notes,
           isDefault,
         })
       } else {
@@ -146,6 +149,7 @@ export default function PersonaEditorScreen() {
           avatarOriginal: nextAvatarOriginal,
           avatarCrop: nextAvatarCrop,
           description,
+          notes,
           isDefault,
         })
       }
@@ -249,6 +253,16 @@ export default function PersonaEditorScreen() {
     />
   )
 
+  const notesText = (
+    <TextCell
+      title={t('editor.notesLabel')}
+      value={notes}
+      placeholder={t('editor.notesPlaceholder')}
+      onChangeText={setNotes}
+      lines={4}
+    />
+  )
+
   // The same page as the system's own list (iOS with SwiftUI). The photo and the
   // description's preview stay React Native views in rows of their own: the photo as it is
   // laid out here, the preview for the zoom into the editor.
@@ -266,6 +280,10 @@ export default function PersonaEditorScreen() {
         <NativeHostedRow>{descriptionText}</NativeHostedRow>
         <NativeActionRow label={description.trim() ? t('editor.improveWithAi') : t('editor.generateWithAi')} onPress={openPersonaGen} />
         {beforeGen !== null ? <NativeActionRow label={t('editor.undoGenerated')} onPress={undoGenerated} /> : null}
+      </NativeSection>
+
+      <NativeSection title={t('editor.notesLabel')} footer={t('persona.notesHint')}>
+        <NativeHostedRow>{notesText}</NativeHostedRow>
       </NativeSection>
 
       <NativeSection footer={t('persona.defaultHint')}>
@@ -309,6 +327,10 @@ export default function PersonaEditorScreen() {
               onPress={openPersonaGen}
             />
             {beforeGen !== null ? <ButtonCell label={t('editor.undoGenerated')} onPress={undoGenerated} /> : null}
+          </ListSection>
+
+          <ListSection header={t('editor.notesLabel')} footer={t('persona.notesHint')}>
+            {notesText}
           </ListSection>
 
           <ListSection footer={<ListFooter>{t('persona.defaultHint')}</ListFooter>}>

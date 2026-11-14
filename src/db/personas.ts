@@ -8,6 +8,7 @@ export type Persona = {
   avatarOriginal: string | null
   avatarCrop: string | null
   description: string
+  notes: string
   isDefault: boolean
   sortOrder: number
   createdAt: number
@@ -19,11 +20,12 @@ export type PersonaFields = {
   avatarOriginal?: string | null
   avatarCrop?: string | null
   description?: string
+  notes?: string
   isDefault?: boolean
 }
 
 export const PERSONA_COLUMNS =
-  'p.id, p.name, p.avatar, p.avatar_original AS avatarOriginal, p.avatar_crop AS avatarCrop, p.description, p.is_default AS isDefault, p.sort_order AS sortOrder, p.created_at AS createdAt'
+  'p.id, p.name, p.avatar, p.avatar_original AS avatarOriginal, p.avatar_crop AS avatarCrop, p.description, p.notes, p.is_default AS isDefault, p.sort_order AS sortOrder, p.created_at AS createdAt'
 
 const listeners = new Set<() => void>()
 
@@ -52,6 +54,7 @@ export async function listPersonas(db: SQLiteDatabase): Promise<Persona[]> {
     avatarOriginal: string | null
     avatarCrop: string | null
     description: string
+    notes: string
     isDefault: number
     sortOrder: number
     createdAt: number
@@ -70,6 +73,7 @@ export async function getPersona(db: SQLiteDatabase, id: number): Promise<Person
     avatarOriginal: string | null
     avatarCrop: string | null
     description: string
+    notes: string
     isDefault: number
     sortOrder: number
     createdAt: number
@@ -89,6 +93,7 @@ export async function getDefaultPersona(db: SQLiteDatabase): Promise<Persona | n
     avatarOriginal: string | null
     avatarCrop: string | null
     description: string
+    notes: string
     isDefault: number
     sortOrder: number
     createdAt: number
@@ -104,14 +109,15 @@ export async function getDefaultPersona(db: SQLiteDatabase): Promise<Persona | n
 // default is not cleared from the others and nobody is told.
 export async function insertPersona(db: SQLiteDatabase, fields: PersonaFields, createdAt = Date.now()): Promise<number> {
   const res = await db.runAsync(
-    `INSERT INTO personas (name, avatar, avatar_original, avatar_crop, description, is_default, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO personas (name, avatar, avatar_original, avatar_crop, description, notes, is_default, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       fields.name.trim(),
       fields.avatar ?? null,
       fields.avatarOriginal ?? null,
       fields.avatarCrop ?? null,
       (fields.description ?? '').trim(),
+      (fields.notes ?? '').trim(),
       fields.isDefault ? 1 : 0,
       createdAt,
     ]
@@ -138,7 +144,7 @@ export async function updatePersona(db: SQLiteDatabase, id: number, fields: Pers
     }
     await db.runAsync(
       `UPDATE personas
-       SET name = ?, avatar = ?, avatar_original = ?, avatar_crop = ?, description = ?, is_default = ?
+       SET name = ?, avatar = ?, avatar_original = ?, avatar_crop = ?, description = ?, notes = ?, is_default = ?
        WHERE id = ?`,
       [
         fields.name.trim(),
@@ -146,6 +152,7 @@ export async function updatePersona(db: SQLiteDatabase, id: number, fields: Pers
         fields.avatarOriginal ?? null,
         fields.avatarCrop ?? null,
         (fields.description ?? '').trim(),
+        (fields.notes ?? '').trim(),
         fields.isDefault ? 1 : 0,
         id,
       ]

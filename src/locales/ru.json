@@ -939,6 +939,7 @@
   "persona.descriptionLabel": "О персоне",
   "persona.descriptionHint": "Внешность, характер, роль, привычки, как персонажи воспринимают вас...",
   "persona.descriptionPlaceholder": "Опишите себя: внешность, характер, особенности или предысторию...",
+  "persona.notesHint": "Только для вас: модель их не видит",
   "persona.defaultLabel": "По умолчанию",
   "persona.defaultHint": "Использовать эту персону во всех новых чатах",
   "persona.delete": "Удалить персону",

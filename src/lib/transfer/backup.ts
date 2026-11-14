@@ -19,10 +19,10 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 16: the user's notes on each room. 15: whether a character is in the archive. 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
+// 17: the user's notes on each persona. 16: the user's notes on each room. 15: whether a character is in the archive. 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
 // each chat's long memory and direction, and lorebooks. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 16
+const BACKUP_VERSION = 17
 
 type BackupCharacter = {
   id: number
@@ -103,6 +103,8 @@ type BackupPersona = {
   avatarOriginal: string | null
   avatarCrop: string | null
   description: string
+  // Version 17: the user's own notes on the persona.
+  notes?: string
   isDefault: boolean | number
   createdAt: number
 }
@@ -187,7 +189,7 @@ type Backup = {
 }
 
 // The personas as the export takes them: top down like their screen.
-const PERSONA_ROWS = `SELECT id, name, avatar, avatar_original AS avatarOriginal, avatar_crop AS avatarCrop, description,
+const PERSONA_ROWS = `SELECT id, name, avatar, avatar_original AS avatarOriginal, avatar_crop AS avatarCrop, description, notes,
   is_default AS isDefault, created_at AS createdAt FROM personas ORDER BY sort_order DESC, id DESC`
 
 // The tree the export sheet shows: characters and rooms with their chats and the personas, from the database.
@@ -541,6 +543,7 @@ export async function importBackup(
           avatarOriginal: await importImage(persona.avatarOriginal),
           avatarCrop: persona.avatarCrop ?? null,
           description: persona.description ?? '',
+          notes: persona.notes ?? '',
           isDefault,
         },
         persona.createdAt

@@ -16,6 +16,7 @@ import {
 import { migrate, SCHEMA_VERSION } from '@/db/schema'
 import { t } from '@/i18n'
 import { convertLegacyAttachments } from '@/db/attachments'
+import { notifyPersonasChanged } from '@/db/personas'
 import { avatarUri, type ImageKind } from '@/lib/images/avatarStore'
 import { dataDirectory, databaseDirectory, keepCopy } from '@/lib/core/storage'
 import { isWeb } from '@/lib/core/platform'
@@ -86,8 +87,8 @@ type Manifest = { app: 'reverie'; rev: string; schema: number; savedAt: number }
 const MANIFEST = 'manifest.json'
 const DATABASE = 'reverie.db'
 const IMAGE_KINDS: ImageKind[] = ['avatars', 'backgrounds', 'attachments', 'gallery']
-const TABLES = ['characters', 'character_gallery', 'rooms', 'room_members', 'chats', 'messages', 'lorebooks', 'lore_entries', 'lorebook_links']
-const ORDERED_TABLES = ['characters', 'rooms', 'chats']
+const TABLES = ['personas', 'characters', 'character_gallery', 'rooms', 'room_members', 'chats', 'messages', 'lorebooks', 'lore_entries', 'lorebook_links']
+const ORDERED_TABLES = ['characters', 'rooms', 'chats', 'personas']
 
 async function getBackend(db: SQLiteDatabase, mode: SyncMode): Promise<SyncBackend | null> {
   const provider = await getSyncProvider(db)
@@ -171,6 +172,8 @@ async function referencedImages(db: SQLiteDatabase, schema: string) {
   const rows = await db.getAllAsync<{ name: string; kind: ImageKind }>(
     `SELECT avatar AS name, 'avatars' AS kind FROM ${schema}.characters WHERE avatar IS NOT NULL
      UNION SELECT avatar_original, 'avatars' FROM ${schema}.characters WHERE avatar_original IS NOT NULL
+     UNION SELECT avatar AS name, 'avatars' AS kind FROM ${schema}.personas WHERE avatar IS NOT NULL
+     UNION SELECT avatar_original, 'avatars' FROM ${schema}.personas WHERE avatar_original IS NOT NULL
      UNION SELECT background, 'backgrounds' FROM ${schema}.characters WHERE background IS NOT NULL
      UNION SELECT background_original, 'backgrounds' FROM ${schema}.characters WHERE background_original IS NOT NULL
      UNION SELECT file, 'gallery' FROM ${schema}.character_gallery
@@ -338,6 +341,7 @@ async function pullInMemory(db: SQLiteDatabase, manifest: Manifest, incoming: Fi
       }
     })
     await convertLegacyAttachments(db)
+    notifyPersonasChanged()
     return hadFiles
   } finally {
     await copy.closeAsync()
@@ -375,6 +379,7 @@ async function pull(db: SQLiteDatabase, backend: SyncBackend, manifest: Manifest
       }
     })
     await convertLegacyAttachments(db)
+    notifyPersonasChanged()
   })
   incoming.delete()
   return hadFiles

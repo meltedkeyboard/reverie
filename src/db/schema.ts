@@ -380,6 +380,20 @@ const MIGRATIONS = [
   `
     ALTER TABLE rooms ADD COLUMN notes TEXT NOT NULL DEFAULT '';
   `,
+  // The user's own notes on a persona. Never sent to the model. Also sync triggers for personas.
+  `
+    ALTER TABLE personas ADD COLUMN notes TEXT NOT NULL DEFAULT '';
+  ` +
+    ['INSERT', 'UPDATE', 'DELETE']
+      .map(
+        (op) => `
+    CREATE TRIGGER personas_${op.toLowerCase()}_sync AFTER ${op} ON personas
+      WHEN (SELECT value FROM app_settings WHERE key = 'sync_dirty') IS NOT '1'
+    BEGIN
+      INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_dirty', '1');
+    END;`
+      )
+      .join('\n'),
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

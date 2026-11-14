@@ -940,6 +940,7 @@
   "persona.descriptionLabel": "About persona",
   "persona.descriptionHint": "Appearance, personality, role, habits, how characters view you...",
   "persona.descriptionPlaceholder": "Describe yourself: appearance, traits, background...",
+  "persona.notesHint": "Only for you: never sent to the model",
   "persona.defaultLabel": "Default",
   "persona.defaultHint": "Use this persona in all new chats",
   "persona.delete": "Delete persona",
