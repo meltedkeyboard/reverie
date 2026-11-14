@@ -134,7 +134,7 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
                 ]}
               >
                 <RNHostView>
-                  <View style={styles.hosted} pointerEvents="none">
+                  <View style={[styles.hosted, size]} pointerEvents="none">
                     {children}
                   </View>
                 </RNHostView>

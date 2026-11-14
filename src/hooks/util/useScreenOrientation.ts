@@ -6,7 +6,16 @@ import { isTablet, isWeb } from '@/lib/core/platform'
 
 function allowsLandscape(path: string | null | undefined) {
   if (!path) return false
-  return path === '/viewer' || path === '/text-editor' || path === '/chat' || path.startsWith('/chat/')
+  return (
+    path === '/viewer' ||
+    path === '/text-editor' ||
+    path === '/chat' ||
+    path.startsWith('/chat/') ||
+    path === '/attach' ||
+    path === '/cast' ||
+    path === '/gallery-pick' ||
+    path === '/generate'
+  )
 }
 
 export function useScreenOrientation() {
