@@ -16,6 +16,8 @@ export type RoomFields = {
   scenario: string
   // Narration a new scene opens with.
   opening: string
+  // The user's own notes on the room, for nobody but them: never in a prompt or a scene.
+  notes: string
   // How the characters call the user; empty falls back to a neutral name.
   userName: string
   floor: FloorMode
@@ -74,6 +76,7 @@ export const DEFAULT_ROOM: RoomFields = {
   name: '',
   scenario: '',
   opening: '',
+  notes: '',
   userName: '',
   floor: 'addressee',
   maxChain: 3,
@@ -100,7 +103,7 @@ export const DEFAULT_MEMBER: Omit<MemberSettings, 'characterId'> = {
 }
 
 export const ROOM_COLUMNS = `
-  id, name, scenario, opening, user_name AS userName, floor, max_chain AS maxChain, director, plot,
+  id, name, scenario, opening, notes, user_name AS userName, floor, max_chain AS maxChain, director, plot,
   background, background_original AS backgroundOriginal, background_crop AS backgroundCrop,
   background_effect AS backgroundEffect, background_intensity AS backgroundIntensity,
   background_bubble_transparency AS backgroundBubbleTransparency, background_bubble_glass = 1 AS backgroundBubbleGlass, background_tone AS backgroundTone, created_at AS createdAt
@@ -171,13 +174,14 @@ export async function listRoomMembers(db: SQLiteDatabase, roomId: number): Promi
 }
 
 const FIELD_COLUMNS =
-  'name, scenario, opening, user_name, floor, max_chain, director, plot, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, background_bubble_glass, background_tone'
+  'name, scenario, opening, notes, user_name, floor, max_chain, director, plot, background, background_original, background_crop, background_effect, background_intensity, background_bubble_transparency, background_bubble_glass, background_tone'
 
 function fieldValues(fields: RoomFields) {
   return [
     fields.name.trim(),
     fields.scenario,
     fields.opening,
+    fields.notes,
     fields.userName.trim(),
     fields.floor,
     fields.maxChain,
@@ -286,7 +290,7 @@ export async function duplicateRoom(
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
       `INSERT INTO rooms (${FIELD_COLUMNS}, created_at)
-       SELECT ?, scenario, opening, user_name, floor, max_chain, director, plot, ?, ?, background_crop, background_effect,
+       SELECT ?, scenario, opening, notes, user_name, floor, max_chain, director, plot, ?, ?, background_crop, background_effect,
          background_intensity, background_bubble_transparency, background_bubble_glass, background_tone, ?
        FROM rooms WHERE id = ?`,
       [name, images.background, images.backgroundOriginal, Date.now(), id]

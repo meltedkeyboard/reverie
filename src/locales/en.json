@@ -781,6 +781,7 @@
   "roomEditor.userName": "Your name",
   "roomEditor.userNameHint": "What the characters call you in this room",
   "roomEditor.userNamePlaceholder": "E.g. Sam",
+  "roomEditor.notesHint": "Only for you: never sent to the model",
   "roomEditor.deleteRoom": "Delete room",
   "roomEditor.deleteConfirmTitle": "Delete room?",
   "roomEditor.deleteConfirmMessage": "The room and all its scenes will be deleted permanently. The characters stay",

@@ -376,6 +376,10 @@ const MIGRATIONS = [
     ALTER TABLE characters ADD COLUMN background_bubble_glass INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE rooms ADD COLUMN background_bubble_glass INTEGER NOT NULL DEFAULT 0;
   `,
+  // The user's own notes on a room. Never sent to the model.
+  `
+    ALTER TABLE rooms ADD COLUMN notes TEXT NOT NULL DEFAULT '';
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

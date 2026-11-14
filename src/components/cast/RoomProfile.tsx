@@ -99,6 +99,7 @@ export function RoomProfile({ fields, members, background, exportItems, system =
       )}
       <ProfileText header={t('roomEditor.scenario')} text={fields.scenario} lines={6} system={system} ink={ink} />
       <ProfileText header={t('roomEditor.opening')} text={fields.opening} lines={4} system={system} ink={ink} />
+      <ProfileText header={t('editor.notesLabel')} text={fields.notes} lines={4} system={system} ink={ink} />
       {system ? (
         <SystemProfileRest
           paramsHeader={t('roomProfile.settings')}

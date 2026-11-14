@@ -431,6 +431,14 @@ export default function RoomEditorScreen() {
       onChangeText={(v) => set('opening', v)}
     />
   )
+  const notesText = (
+    <TextCell
+      title={t('editor.notesLabel')}
+      value={fields.notes}
+      placeholder={t('editor.notesPlaceholder')}
+      onChangeText={(v) => set('notes', v)}
+    />
+  )
 
   // What a member feels about the others and what only they know, as previews that open the
   // editor over the whole screen.
@@ -600,6 +608,10 @@ export default function RoomEditorScreen() {
           placeholder={t('roomEditor.userNamePlaceholder')}
           capitalize="words"
         />
+      </NativeSection>
+
+      <NativeSection title={t('editor.notesLabel')} footer={t('roomEditor.notesHint')}>
+        <NativeHostedRow>{notesText}</NativeHostedRow>
       </NativeSection>
 
       <NativeSection title={t('background.title')}>
@@ -783,6 +795,10 @@ export default function RoomEditorScreen() {
                   placeholder={t('roomEditor.userNamePlaceholder')}
                   autoCapitalize="words"
                 />
+              </ListSection>
+
+              <ListSection header={t('editor.notesLabel')} footer={t('roomEditor.notesHint')}>
+                {notesText}
               </ListSection>
 
               <BackgroundSection

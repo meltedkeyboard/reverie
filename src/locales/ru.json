@@ -780,6 +780,7 @@
   "roomEditor.userName": "Ваше имя",
   "roomEditor.userNameHint": "Как персонажи обращаются к вам в этой комнате",
   "roomEditor.userNamePlaceholder": "Например, Саша",
+  "roomEditor.notesHint": "Только для вас: модель их не видит",
   "roomEditor.deleteRoom": "Удалить комнату",
   "roomEditor.deleteConfirmTitle": "Удалить комнату?",
   "roomEditor.deleteConfirmMessage": "Комната и все её сцены удалятся безвозвратно. Персонажи останутся",

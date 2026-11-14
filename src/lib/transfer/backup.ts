@@ -19,10 +19,10 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 15: whether a character is in the archive. 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
+// 16: the user's notes on each room. 15: whether a character is in the archive. 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
 // each chat's long memory and direction, and lorebooks. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 15
+const BACKUP_VERSION = 16
 
 type BackupCharacter = {
   id: number
@@ -112,6 +112,8 @@ type BackupRoom = {
   name: string
   scenario: string
   opening: string
+  // Version 16: the user's own notes on the room.
+  notes?: string
   userName: string
   floor: FloorMode
   maxChain: number
@@ -603,6 +605,7 @@ export async function importBackup(
           ...room,
           director: Boolean(room.director),
           plot: room.plot ?? 0,
+          notes: room.notes ?? '',
           background: await importImage(room.background, 'backgrounds'),
           backgroundOriginal: await importImage(room.backgroundOriginal, 'backgrounds'),
           backgroundCrop: room.backgroundCrop ?? null,
