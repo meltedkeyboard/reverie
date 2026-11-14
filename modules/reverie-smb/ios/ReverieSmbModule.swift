@@ -109,13 +109,14 @@ public class ReverieSmbModule: Module {
             promise.reject("E_SMB_NOSHARE", "Share name is required to list directory")
             return
           }
+          let cleanPath = path.replacingOccurrences(of: "\\", with: "/").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
           client.connectShare(name: share) { error in
             if let error = error {
               client.disconnectShare()
               promise.reject("E_SMB_CONNECT", error.localizedDescription)
               return
             }
-            client.contentsOfDirectory(atPath: path) { result in
+            client.contentsOfDirectory(atPath: cleanPath) { result in
               client.disconnectShare()
               switch result {
               case .success(let entries):
@@ -275,13 +276,39 @@ public class ReverieSmbModule: Module {
             }
             let remoteDir = (remotePath as NSString).deletingLastPathComponent
             let upload = {
-              client.uploadItem(at: localUri, toPath: remotePath, progress: nil) { uploadError in
-                client.disconnectShare()
-                if let uploadError = uploadError {
-                  promise.reject("E_SMB_UPLOAD", uploadError.localizedDescription)
-                } else {
-                  promise.resolve()
+              let startUpload = {
+                client.uploadItem(at: localUri, toPath: remotePath, progress: nil) { uploadError in
+                  if let uploadError = uploadError {
+                    let nsError = uploadError as NSError
+                    let isCollision = nsError.code == 17
+                      || nsError.localizedDescription.contains("0xc0000035")
+                      || nsError.localizedDescription.contains("STATUS_OBJECT_NAME_COLLISION")
+                    if isCollision {
+                      client.removeItem(atPath: remotePath) { _ in
+                        client.uploadItem(at: localUri, toPath: remotePath, progress: nil) { retryError in
+                          client.disconnectShare()
+                          if let retryError = retryError {
+                            promise.reject("E_SMB_UPLOAD", retryError.localizedDescription)
+                          } else {
+                            promise.resolve()
+                          }
+                        }
+                      }
+                      return
+                    }
+                    client.disconnectShare()
+                    promise.reject("E_SMB_UPLOAD", uploadError.localizedDescription)
+                  } else {
+                    client.disconnectShare()
+                    promise.resolve()
+                  }
                 }
+              }
+
+              // Overwrite destination file: remove it first because AMSMB2 uploadItem
+              // opens with FILE_CREATE and fails with STATUS_OBJECT_NAME_COLLISION (0xc0000035).
+              client.removeItem(atPath: remotePath) { _ in
+                startUpload()
               }
             }
             if !remoteDir.isEmpty && remoteDir != "/" && remoteDir != "." {
@@ -371,8 +398,10 @@ public class ReverieSmbModule: Module {
   }
 
   private func resolveSubpath(config: [String: Any], path: String) -> String {
-    let base = (config["path"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
-    let cleanPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    let rawBase = (config["path"] as? String)?.replacingOccurrences(of: "\\", with: "/") ?? ""
+    let rawPath = path.replacingOccurrences(of: "\\", with: "/")
+    let base = rawBase.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    let cleanPath = rawPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     if base.isEmpty { return cleanPath }
     if cleanPath.isEmpty { return base }
     return "\(base)/\(cleanPath)"
@@ -380,7 +409,8 @@ public class ReverieSmbModule: Module {
 
   #if canImport(AMSMB2)
   private func createDirectoryRecursively(client: AMSMB2, path: String, completion: @escaping (Error?) -> Void) {
-    let cleanPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    let normalized = path.replacingOccurrences(of: "\\", with: "/")
+    let cleanPath = normalized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     guard !cleanPath.isEmpty else {
       completion(nil)
       return
@@ -411,7 +441,8 @@ public class ReverieSmbModule: Module {
       throw Exception(name: "InvalidHost", description: "Host address is required")
     }
     let port = config["port"] as? Int ?? 445
-    let share = (config["share"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
+    let rawShare = (config["share"] as? String)?.replacingOccurrences(of: "\\", with: "/") ?? ""
+    let share = rawShare.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     let domain = (config["domain"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
     let urlString = "smb://\(host):\(port)"
