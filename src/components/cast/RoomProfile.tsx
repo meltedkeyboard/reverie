@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Character } from '@/db/characters'
 import type { MemberSettings, RoomFields } from '@/db/rooms'
 import { useTranslation, type t as translate } from '@/i18n'
-import { useColors, useStyles, type Colors } from '@/theme'
+import { useColors, useStyles, useTheme, type Colors } from '@/theme'
 
 import { ListSection } from '../lists/GroupedList'
 import type { MenuItem } from '../overlays/NativeMenu'
@@ -13,6 +13,7 @@ import { Avatar } from '../visuals/Avatar'
 import { Icon } from '../visuals/Icon'
 import { NativeHostedRow, NativeSection } from '../lists/NativeForm'
 import { ProfileActions, ProfileBackground, ProfileParams, ProfileText, SystemListBlock, SystemProfileRest } from './CharacterProfile'
+import { castShades, hexRgb } from './ProfileGlow'
 
 type Member = MemberSettings & { character: Character }
 
@@ -46,9 +47,11 @@ export function memberSummary(member: MemberSettings, t: typeof translate) {
 export function RoomProfile({ fields, members, background, exportItems, system = false, ink, systemStyle }: Props) {
   const router = useRouter()
   const colors = useColors()
+  const { scheme } = useTheme()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const onOff = (on: boolean) => (on ? t('editor.thinkingOn') : t('editor.thinkingOff'))
+  const memberColors = ink ? castShades(hexRgb(ink), scheme, members.length) : colors.cast
   // A member's row, which opens their profile. In the system's list it does not light up under
   // the touch, as in the room's editor.
   const memberRow = (member: Member, index: number) => (
@@ -61,7 +64,7 @@ export function RoomProfile({ fields, members, background, exportItems, system =
       <Avatar name={member.character.name} file={member.character.avatar} size={36} />
       <View style={styles.memberBody}>
         <View style={styles.memberNameLine}>
-          <Text style={[styles.memberName, { color: colors.cast[index % colors.cast.length] }]} numberOfLines={1}>
+          <Text style={[styles.memberName, { color: memberColors[index % memberColors.length] }]} numberOfLines={1}>
             {member.character.name}
           </Text>
           {member.character.archivedAt !== null ? <ArchivedMark /> : null}

@@ -69,6 +69,23 @@ export function profileTint(average: Rgb): Rgb {
   return rgb(h, Math.min(1, s * 1.6 + 0.15), Math.min(0.62, Math.max(0.38, l)))
 }
 
+// Analogous shades of the profile's glow tint for a room's cast members in the profile list,
+// keeping them within the gradient's family while making each member distinct and readable.
+const CAST_HUE_OFFSETS = [0, 0.06, -0.06, 0.12, -0.12, 0.18, -0.18, 0.24]
+
+export function castShades(base: Rgb, scheme: Scheme, count = 6): string[] {
+  const [h, s] = hsl(base)
+  const targetL = scheme === 'dark' ? 0.70 : 0.40
+  const targetS = Math.max(0.7, Math.min(0.92, s * 1.2))
+  return Array.from({ length: count }, (_, i) => {
+    const offset = CAST_HUE_OFFSETS[i % CAST_HUE_OFFSETS.length]
+    const shiftedH = ((h + offset) % 1 + 1) % 1
+    const shiftedL = targetL + (i % 2 === 0 ? 0.02 : -0.02)
+    const [r, g, b] = rgb(shiftedH, targetS, shiftedL).map((c) => Math.max(0, Math.min(255, Math.round(c))))
+    return `#${[r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('')}`
+  })
+}
+
 function hsl([r, g, b]: Rgb): [number, number, number] {
   const [rr, gg, bb] = [r / 255, g / 255, b / 255]
   const max = Math.max(rr, gg, bb)
