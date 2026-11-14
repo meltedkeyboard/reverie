@@ -19,8 +19,6 @@ import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/prefs/continue'
-import { getFileLimits } from '@/lib/settings/fileLimits'
-import { loadFileLimits, setAttachmentLimitMb, setAvatarLimitMb, setBackgroundLimitMb, setLimitsOff } from '@/db/prefs/fileLimits'
 import { isDirectionEnabled, isPersonasEnabled, setDirectionEnabled, setPersonasEnabled } from '@/db/prefs/features'
 import { isHapticsEnabled, isStreamHapticsEnabled, isSuggestionHapticsEnabled, setHapticsEnabled, setStreamHapticsEnabled, setSuggestionHapticsEnabled } from '@/db/prefs/haptics'
 import {
@@ -174,21 +172,6 @@ export default function SettingsScreen() {
     const { digits, count } = typedCount(text)
     setMessageDrafts((d) => ({ ...d, [field]: digits }))
     if (count) update({ [field]: count })
-  }
-  // The size limits: the numbers may be empty while being retyped, a number below 1 is not kept.
-  const [limits, setLimits] = useState(getFileLimits)
-  const [limitDrafts, setLimitDrafts] = useState<{ avatarMb?: string; backgroundMb?: string; attachmentMb?: string }>({})
-  useEffect(() => {
-    loadFileLimits(db).then(setLimits)
-  }, [db])
-  const typeLimit = (field: 'avatarMb' | 'backgroundMb' | 'attachmentMb', text: string) => {
-    const { digits, count } = typedCount(text)
-    setLimitDrafts((d) => ({ ...d, [field]: digits }))
-    if (!count) return
-    setLimits((l) => ({ ...l, [field]: count }))
-    if (field === 'avatarMb') setAvatarLimitMb(db, count)
-    else if (field === 'backgroundMb') setBackgroundLimitMb(db, count)
-    else setAttachmentLimitMb(db, count)
   }
   const [exporting, setExporting] = useState(false)
   const backupImport = useBackupImport()
@@ -641,41 +624,6 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
-  const limitRows = (
-    <ListSection header={t('settings.limitsTitle')} footer={t('settings.limitsNote')}>
-      <SwitchCell
-        label={t('settings.limitsOff')}
-        value={limits.off}
-        onValueChange={(off) => {
-          setLimits((l) => ({ ...l, off }))
-          setLimitsOff(db, off)
-        }}
-      />
-      {/* Switched off, the numbers stay as they were but cannot be touched. */}
-      <InputCell
-        label={t('settings.limitAvatar')}
-        value={limitDrafts.avatarMb ?? String(limits.avatarMb)}
-        onChangeText={(text) => typeLimit('avatarMb', text)}
-        keyboardType="number-pad"
-        disabled={limits.off}
-      />
-      <InputCell
-        label={t('settings.limitBackground')}
-        value={limitDrafts.backgroundMb ?? String(limits.backgroundMb)}
-        onChangeText={(text) => typeLimit('backgroundMb', text)}
-        keyboardType="number-pad"
-        disabled={limits.off}
-      />
-      <InputCell
-        label={t('settings.limitAttachment')}
-        value={limitDrafts.attachmentMb ?? String(limits.attachmentMb)}
-        onChangeText={(text) => typeLimit('attachmentMb', text)}
-        keyboardType="number-pad"
-        disabled={limits.off}
-      />
-    </ListSection>
-  )
-
   const backupChips = (
     <ChipRowCell
       actions={[
@@ -895,16 +843,6 @@ export default function SettingsScreen() {
         </NativeSection>
 
 
-        <NativeSection id="limits" title={t('settings.limitsTitle')} footer={t('settings.limitsNote')}>
-          {toggle(null, t('settings.limitsOff'), limits.off, (off) => {
-            setLimits((l) => ({ ...l, off }))
-            setLimitsOff(db, off)
-          })}
-          {numberRow(t('settings.limitAvatar'), limitDrafts.avatarMb ?? String(limits.avatarMb), (text) => typeLimit('avatarMb', text), limits.off)}
-          {numberRow(t('settings.limitBackground'), limitDrafts.backgroundMb ?? String(limits.backgroundMb), (text) => typeLimit('backgroundMb', text), limits.off)}
-          {numberRow(t('settings.limitAttachment'), limitDrafts.attachmentMb ?? String(limits.attachmentMb), (text) => typeLimit('attachmentMb', text), limits.off)}
-        </NativeSection>
-
         <NativeSection
           id="server"
           title={t('settings.contextLabel')}
@@ -995,7 +933,6 @@ export default function SettingsScreen() {
           {block('attachGallery', attachGalleryRow)}
           {block('confirmDelete', confirmDeleteRow)}
           {block('haptics', hapticsRow)}
-          {block('limits', limitRows)}
           {block('server', server)}
           {showCloud ? block('folderSync', folderSync) : null}
           {block('backup', backup)}

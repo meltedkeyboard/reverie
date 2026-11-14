@@ -15,7 +15,6 @@ import { TitleBar } from '@/components/chrome/TitleBar'
 import { ToastHost } from '@/components/overlays/ToastHost'
 import { SyncProgressPill } from '@/components/sync/SyncProgressPill'
 import { isConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
-import { loadFileLimits } from '@/db/prefs/fileLimits'
 import { loadListLook } from '@/db/prefs/listLook'
 import { loadLongMemory } from '@/db/prefs/memory'
 import { isDirectionEnabled, isPersonasEnabled } from '@/db/prefs/features'
@@ -66,7 +65,6 @@ function ThemedApp() {
     isPersonasEnabled(db)
     isDirectionEnabled(db)
     isConfirmDeleteEnabled(db)
-    loadFileLimits(db)
     loadLongMemory(db)
     loadListLook(db)
   }, [db])

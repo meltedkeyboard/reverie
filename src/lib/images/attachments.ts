@@ -4,9 +4,6 @@ import type { ChatRequest, ChatTurn } from '@/api/llm'
 import type { MessageImage } from '@/db/messages'
 import { avatarUri, persistAvatar } from '@/lib/images/avatarStore'
 import { imageDataUrl, pickUris, resizedJpeg, type ImageSource } from '@/lib/images/images'
-import { showToast } from '@/lib/ui/toast'
-import { t } from '@/i18n'
-import { attachmentLimitBytes } from '@/lib/settings/fileLimits'
 import { movingKind } from '@/lib/images/media'
 import { galleryUri } from '@/lib/images/gallery'
 
@@ -41,11 +38,9 @@ async function storeMessageImage(uri: string): Promise<MessageImage> {
     height: saved.height,
   }
   // A moving picture is stored as a still, which is all the model gets, and also as it
-  // is, for the screen. Too big a one stays a still.
+  // is, for the screen.
   if (movingKind(uri) === 'image') {
-    const limit = attachmentLimitBytes()
-    if ((new File(uri).size ?? 0) <= limit) picture.moving = await persistAvatar(uri, 'attachments')
-    else showToast({ title: t('composer.movingTooBig', { mb: Math.round(limit / 1024 / 1024) }), tone: 'info' })
+    picture.moving = await persistAvatar(uri, 'attachments')
   }
   return picture
 }

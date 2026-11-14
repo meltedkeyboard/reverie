@@ -1,5 +1,4 @@
 import * as DocumentPicker from 'expo-document-picker'
-import { File } from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
 
 import type { NewGalleryItem } from '@/db/gallery'
@@ -8,7 +7,6 @@ import { avatarUri, persistAvatar } from '@/lib/images/avatarStore'
 import { pictureSize } from '@/lib/images/avatars'
 import { requireCamera, resizedJpeg, type ImageSource } from '@/lib/images/images'
 import { extensionOf, isVideo, movingKind } from '@/lib/images/media'
-import { attachmentLimitBytes } from '@/lib/settings/fileLimits'
 import { showToast } from '@/lib/ui/toast'
 
 // A still picture of the gallery is kept large enough to look at full screen, but not as
@@ -37,11 +35,10 @@ async function pickMedia(source: ImageSource): Promise<Picked[]> {
 }
 
 // Stores what was picked in the `gallery` folder: a still picture shrunk to a JPEG, a GIF,
-// moving WebP or APNG and a video as they are, up to the size limit of message pictures. What
-// cannot be kept is left out with a word why, and the rest still comes in.
+// moving WebP or APNG and a video as they are. What cannot be kept (e.g. WebM) is left out,
+// and the rest still comes in.
 export async function pickGalleryItems(source: ImageSource): Promise<NewGalleryItem[]> {
   const picked = await pickMedia(source)
-  const limit = attachmentLimitBytes()
   const stored: NewGalleryItem[] = []
   let refused = 0
   for (const item of picked) {
@@ -53,10 +50,6 @@ export async function pickGalleryItems(source: ImageSource): Promise<NewGalleryI
       }
       const moving = movingKind(item.uri)
       if (moving) {
-        if ((new File(item.uri).size ?? 0) > limit) {
-          refused++
-          continue
-        }
         // A video picked from Files has no size until its first frame is shown.
         const size = item.width && item.height ? item : moving === 'image' ? await pictureSize(item.uri) : { width: null, height: null }
         stored.push({ file: await persistAvatar(item.uri, 'gallery'), width: size.width, height: size.height })
@@ -69,7 +62,7 @@ export async function pickGalleryItems(source: ImageSource): Promise<NewGalleryI
       refused++
     }
   }
-  if (refused) showToast({ title: t('gallery.someRefused', { count: refused, mb: Math.round(limit / 1024 / 1024) }), tone: 'info' })
+  if (refused) showToast({ title: t('gallery.someRefused', { count: refused }), tone: 'info' })
   return stored
 }
 

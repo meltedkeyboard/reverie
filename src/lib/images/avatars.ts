@@ -1,9 +1,7 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
-import { File } from 'expo-file-system'
 
 import { t } from '@/i18n'
 import { newAvatarName, pickUris, type ImageSource } from '@/lib/images/images'
-import { avatarLimitBytes, backgroundLimitBytes } from '@/lib/settings/fileLimits'
 import { extensionOf, movingKind } from '@/lib/images/media'
 import { readAvatarBase64, removeAvatar, writeAvatarBase64, type ImageKind } from './avatarStore'
 
@@ -42,16 +40,11 @@ export async function pickAvatar(source: ImageSource) {
   return uri ?? null
 }
 
-// Whether the file is a moving avatar to be stored untouched. Throws when it is too big.
+// Whether the file is a moving avatar to be stored untouched.
 export function acceptMoving(uri: string) {
   const ext = extensionOf(uri)
   if (ext === 'webm') throw new Error(t('editor.avatarWebm'))
-  if (!movingKind(uri)) return false
-  const limit = avatarLimitBytes()
-  if ((new File(uri).size ?? 0) > limit) {
-    throw new Error(t('editor.avatarTooBig', { mb: Math.round(limit / 1024 / 1024) }))
-  }
-  return true
+  return movingKind(uri) !== null
 }
 
 // Cuts the square out of the picture (the middle one unless given) and shrinks it to the
@@ -98,14 +91,9 @@ export async function pickBackground(source: ImageSource) {
   return uri
 }
 
-// Whether a picture or video can go behind a chat, also one taken from the gallery, whose
-// limit is the larger one of attachments.
+// Whether a picture or video can go behind a chat, also one taken from the gallery.
 export function checkBackground(uri: string) {
   if (extensionOf(uri) === 'webm') throw new Error(t('background.webm'))
-  const limit = backgroundLimitBytes()
-  if (movingKind(uri) && (new File(uri).size ?? 0) > limit) {
-    throw new Error(t('background.tooBig', { mb: Math.round(limit / 1024 / 1024) }))
-  }
 }
 
 // The part of the original the chat shows (all of it without a frame), shrunk to a size a
