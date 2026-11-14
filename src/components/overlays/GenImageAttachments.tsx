@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { SourceCell } from '@/components/lists/PictureCells'
 import { Icon } from '@/components/visuals/Icon'
+import { ImageLink, useImageGroup } from '@/components/visuals/ImageLink'
 import type { GalleryItem } from '@/db/gallery'
 import type { MessageImage } from '@/db/messages'
 import { useGalleryPicks } from '@/hooks/features/useGalleryPicks'
@@ -35,6 +36,7 @@ export function GenImageAttachments({ characterId, images, onImagesChange, heade
   const { t } = useTranslation()
   const router = useRouter()
   const gallery = useGalleryPicks(characterId)
+  const group = useImageGroup()
   // Which attachment each picked gallery picture became, so its tile shows it as attached
   // when the sheet opens again, and unticking it there takes that attachment off.
   const [fromGallery, setFromGallery] = useGenInput<Record<string, string>>('fromGallery', {})
@@ -97,20 +99,33 @@ export function GenImageAttachments({ characterId, images, onImagesChange, heade
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.scrollContent}
             >
-              {images.map((item, index) => (
-                <View key={item.file || index} style={styles.thumbWrapper}>
-                  <Image source={{ uri: pictureUri(item) }} style={styles.thumb} contentFit="cover" />
-                  <Pressable
-                    onPress={() => removeAt(index)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('promptGen.removePhoto')}
-                    style={styles.removeBtn}
-                  >
-                    <Icon name="close" size={13} color={colors.text} />
-                  </Pressable>
-                </View>
-              ))}
+              {images.map((item, index) => {
+                const uri = pictureUri(item)
+                const aspect = item.width && item.height ? item.width / item.height : 1
+                return (
+                  <View key={item.file || index} style={styles.thumbWrapper}>
+                    <ImageLink
+                      uri={uri}
+                      aspect={aspect}
+                      group={group}
+                      index={index}
+                      corners={14}
+                      accessibilityLabel={t('composer.openPicture')}
+                    >
+                      <Image source={{ uri }} style={styles.thumb} contentFit="cover" />
+                    </ImageLink>
+                    <Pressable
+                      onPress={() => removeAt(index)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('promptGen.removePhoto')}
+                      style={styles.removeBtn}
+                    >
+                      <Icon name="close" size={13} color={colors.text} />
+                    </Pressable>
+                  </View>
+                )
+              })}
             </ScrollView>
           </View>
         </GenRow>
@@ -156,6 +171,7 @@ const createStyles = (colors: Colors) =>
       width: 22,
       height: 22,
       borderRadius: 11,
+      zIndex: 1,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surfaceRaised,
