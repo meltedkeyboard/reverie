@@ -803,7 +803,7 @@ export function AttachScreenFrame({ look, children }: { look: ChatLook | null | 
         requestAnimationFrame(measure)
       }}
     >
-      <View pointerEvents="none" style={[FILL, { top: -bar }]}>
+      <View pointerEvents="none" style={[FILL, { top: -bar, bottom: -Math.max(bar, 80), left: -20, right: -20 }]}>
         <ChatBackdrop owner={look} />
       </View>
       {children}

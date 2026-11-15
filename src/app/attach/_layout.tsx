@@ -68,5 +68,5 @@ function AttachStack({ session }: { session: AttachSession | null }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { ...StyleSheet.absoluteFill },
 })
