@@ -27,6 +27,9 @@ type Props = {
   fadeRgb?: string
   // Restores the floating header of release 7.0 on Android for tab screens.
   tabHeader?: boolean
+  // Explicitly marks the header as belonging to a chat or group thread, so sub-sheets (like /attach)
+  // pushing onto the navigation stack do not toggle isChat or cause the header to remount.
+  chatHeader?: boolean
 }
 
 const FADE_OVERHANG = 28
@@ -111,11 +114,11 @@ export function BackButton({ close }: { close?: boolean }) {
   return <GlassButton icon={name} iconSize={size} onPress={() => router.back()} />
 }
 
-export function GlassHeader({ left, right, children, floating, centerTitle, fade = true, fadeRgb, tabHeader }: Props) {
+export function GlassHeader({ left, right, children, floating, centerTitle, fade = true, fadeRgb, tabHeader, chatHeader }: Props) {
   const insets = useSafeAreaInsets()
   const styles = useStyles(createStyles)
   const pathname = usePathname()
-  const isChat = pathname?.startsWith('/chat/')
+  const isChat = chatHeader ?? (pathname?.startsWith('/chat/') || pathname?.startsWith('/groups/'))
   const isTab =
     tabHeader ||
     pathname === '/' ||
@@ -186,7 +189,7 @@ export function GlassHeader({ left, right, children, floating, centerTitle, fade
     </BlurBar>
   )
 
-  return isChat || isTab ? content : <HeaderContext.Provider value={true}>{content}</HeaderContext.Provider>
+  return <HeaderContext.Provider value={!isChat && !isTab}>{content}</HeaderContext.Provider>
 }
 
 const createStyles = (colors: Colors) =>

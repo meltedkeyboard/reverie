@@ -318,6 +318,7 @@ export default function GroupScreen() {
         </Animated.View>
       ) : null}
       <GlassHeader
+        chatHeader
         floating
         fadeRgb={homeFadeRgb}
         centerTitle

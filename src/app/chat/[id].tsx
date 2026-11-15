@@ -657,6 +657,7 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
   return (
     <>
       <GlassHeader
+        chatHeader
         floating
         centerTitle
         fade={!hasCustomBackground}
