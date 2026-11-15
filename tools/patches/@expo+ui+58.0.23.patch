@@ -1,3 +1,25 @@
+diff --git a/node_modules/@expo/ui/ios/RNHostView.swift b/node_modules/@expo/ui/ios/RNHostView.swift
+index dfcd9d1..693b570 100644
+--- a/node_modules/@expo/ui/ios/RNHostView.swift
++++ b/node_modules/@expo/ui/ios/RNHostView.swift
+@@ -129,16 +129,9 @@ private struct PublishContentOriginModifier: ViewModifier {
+     }
+   }
+ 
+-  // Relative to the `Host`'s UIKit view, which Yoga laid out, so a safe-area inset is included.
++  // Relative to the `Host`'s coordinate space.
+   private func originInHost(_ proxy: GeometryProxy) -> CGPoint? {
+-    #if os(macOS)
+     return proxy.frame(in: .named(expoHostCoordinateSpace)).origin
+-    #else
+-    guard let hostView = hostingView?.view, let window = hostView.window else {
+-      return nil
+-    }
+-    return hostView.convert(proxy.frame(in: .global).origin, from: window)
+-    #endif
+   }
+ }
+ 
 diff --git a/node_modules/@expo/ui/ios/TextFieldView.swift b/node_modules/@expo/ui/ios/TextFieldView.swift
 index 3461009..b299bcf 100644
 --- a/node_modules/@expo/ui/ios/TextFieldView.swift
