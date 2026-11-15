@@ -32,7 +32,10 @@ type Props = {
 }
 
 // Whether NativeMenu draws the glass behind its children itself when given glassRadius.
-export const nativeMenuGlass = swiftUI !== null && liquidGlass
+// Always false: hosting React Native children in SwiftUI (RNHostView) causes layout coordinate
+// jumps during iOS card-stack / formSheet transitions. Using GlassSurface directly in React Native
+// keeps the trigger rock-solid across all animations.
+export const nativeMenuGlass = false
 
 // A trigger that simply runs `onPress`, dimming while it is held: what a menu is where there
 // is no native menu to open.
@@ -101,45 +104,23 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
     setSize((prev) => (prev?.width === width && prev.height === height ? prev : { width, height }))
   }
 
-  const { Host, Menu, Section } = swiftUI.ui
+  const { Host, Menu, Section, Text } = swiftUI.ui
   const m = swiftUI.modifiers
   const buttons = menuItemViews(items)
   const content = title ? <Section title={title}>{buttons}</Section> : buttons
+  const shape = m.shapes.rectangle()
 
-  const { Group, RNHostView } = swiftUI.ui
-  const glass = glassRadius !== undefined && liquidGlass
-  const shape = glass ? m.shapes.roundedRectangle({ cornerRadius: glassRadius }) : m.shapes.rectangle()
-  // The children go inside the menu's label, so the menu grows out of them and they morph
-  // into it together with the glass. A hidden copy stays in the React Native layout and
-  // gives the label its size, so the trigger keeps its flex sizing and text truncation.
+  // The trigger is drawn by React Native, so it matches the rest of the screen exactly
+  // and stays rock-solid during modal sheet presentations. An invisible SwiftUI Menu
+  // covers it and takes the tap, which makes the system menu grow out of the trigger.
   return (
     <View style={style} onLayout={onLayout}>
-      <View style={size ? styles.hidden : styles.hosted} pointerEvents="none">
-        {children}
-      </View>
+      {children}
       {size ? (
-        // A transform moves the composer above the keyboard, but SwiftUI keeps seeing
-        // the untransformed frame under the keyboard and would shift its content up.
         <Host style={StyleSheet.absoluteFill} alignment="center" ignoreSafeArea="all" colorScheme={scheme}>
           <Menu
             modifiers={[m.disabled(disabled)]}
-            label={
-              <Group
-                modifiers={[
-                  m.frame(size),
-                  m.contentShape(shape),
-                  ...(glass
-                    ? [m.glassEffect({ glass: { variant: 'regular' }, shape: 'roundedRectangle', cornerRadius: glassRadius })]
-                    : []),
-                ]}
-              >
-                <RNHostView>
-                  <View style={[styles.hosted, size]} pointerEvents="none">
-                    {children}
-                  </View>
-                </RNHostView>
-              </Group>
-            }
+            label={<Text modifiers={[m.frame(size), m.contentShape(shape)]}> </Text>}
           >
             {content}
           </Menu>
@@ -150,7 +131,5 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
 }
 
 const styles = StyleSheet.create({
-  hidden: { opacity: 0 },
-  hosted: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   triggerContent: { alignSelf: 'stretch', flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
 })
