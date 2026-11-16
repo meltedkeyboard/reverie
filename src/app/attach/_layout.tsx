@@ -1,6 +1,6 @@
 import { Stack, ThemeProvider, useTheme as useNavigationTheme } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { StyleSheet, View, type ViewInstance } from 'react-native'
+import { Dimensions, StyleSheet, View, useWindowDimensions, type ViewInstance } from 'react-native'
 
 import { AttachStackContext } from '@/components/chat/AttachMenu'
 import { AccentProvider, ChatBackdrop, useChatBackdrop, useChatBackdropTone, useChatWallpaperAccent } from '@/components/chrome/ChatChrome'
@@ -40,6 +40,8 @@ function AttachStack({ session }: { session: AttachSession | null }) {
   const wallpaperColors = useChatWallpaperAccent(session?.look)
   const backdrop = useChatBackdrop(session?.look)
   const root = useRef<ViewInstance>(null)
+  const { height: windowHeight } = useWindowDimensions()
+  const screenHeight = Math.max(windowHeight, Dimensions.get('screen').height)
 
   // The root layout runs what follows the menu once the sheet has finished going away;
   // should that report never come, the menu still lets go a moment after it is gone.
@@ -47,7 +49,7 @@ function AttachStack({ session }: { session: AttachSession | null }) {
 
   return (
     <AttachStackContext.Provider value={root}>
-      <View ref={root} style={styles.root}>
+      <View ref={root} style={[styles.root, { minHeight: screenHeight }]}>
         <ChatBackdrop owner={session?.look} />
         <ThemeProvider value={navigationTheme}>
           <Stack
@@ -68,5 +70,5 @@ function AttachStack({ session }: { session: AttachSession | null }) {
 }
 
 const styles = StyleSheet.create({
-  root: { ...StyleSheet.absoluteFill },
+  root: { flex: 1 },
 })

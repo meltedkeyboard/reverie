@@ -1,6 +1,6 @@
 import { Stack, ThemeProvider, useTheme as useNavigationTheme } from 'expo-router'
 import { useEffect, useMemo, useRef } from 'react'
-import { StyleSheet, View, type ViewInstance } from 'react-native'
+import { Dimensions, StyleSheet, View, useWindowDimensions, type ViewInstance } from 'react-native'
 
 import { AttachStackContext } from '@/components/chat/AttachMenu'
 import { useStore } from '@/components/chat/thread/store'
@@ -36,6 +36,8 @@ function CastStack() {
   // from under it (AttachScreenFrame).
   const backdrop = useChatBackdrop(cast?.look)
   const root = useRef<ViewInstance>(null)
+  const { height: windowHeight } = useWindowDimensions()
+  const screenHeight = Math.max(windowHeight, Dimensions.get('screen').height)
 
   // The root layout tells the scene once the sheet has finished going away; should that
   // report never come, the scene still hears it a moment after the sheet is gone.
@@ -43,7 +45,7 @@ function CastStack() {
 
   return (
     <AttachStackContext.Provider value={root}>
-      <View ref={root} style={styles.root}>
+      <View ref={root} style={[styles.root, { minHeight: screenHeight }]}>
         <ChatBackdrop owner={cast?.look} />
         <ThemeProvider value={navigationTheme}>
           <Stack
@@ -63,5 +65,5 @@ function CastStack() {
 }
 
 const styles = StyleSheet.create({
-  root: { ...StyleSheet.absoluteFill },
+  root: { flex: 1 },
 })

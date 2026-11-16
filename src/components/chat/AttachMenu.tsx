@@ -4,7 +4,7 @@ import { Image } from 'expo-image'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useRouter } from 'expo-router'
 import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type StyleProp, type ViewStyle, type ViewInstance } from 'react-native'
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type StyleProp, type ViewStyle, type ViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 
@@ -782,6 +782,8 @@ export function AttachScreenFrame({ look, children }: { look: ChatLook | null | 
   const stack = useContext(AttachStackContext)
   const self = useRef<ViewInstance>(null)
   const [bar, setBar] = useState(0)
+  const { height: windowHeight } = useWindowDimensions()
+  const screenHeight = Math.max(windowHeight, Dimensions.get('screen').height)
   const measure = () =>
     stack?.current?.measureInWindow((_x, top) =>
       self.current?.measureInWindow((_sx, y) => {
@@ -797,13 +799,13 @@ export function AttachScreenFrame({ look, children }: { look: ChatLook | null | 
     <View
       ref={self}
       collapsable={false}
-      style={fillScreen}
+      style={[fillScreen, { minHeight: screenHeight }]}
       onLayout={() => {
         measure()
         requestAnimationFrame(measure)
       }}
     >
-      <View pointerEvents="none" style={[FILL, { top: -bar, bottom: -Math.max(bar, 80), left: -20, right: -20 }]}>
+      <View pointerEvents="none" style={[FILL, { top: -bar, bottom: -screenHeight, left: -20, right: -20 }]}>
         <ChatBackdrop owner={look} />
       </View>
       {children}
