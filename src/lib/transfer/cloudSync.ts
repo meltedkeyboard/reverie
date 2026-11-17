@@ -241,7 +241,7 @@ async function push(db: SQLiteDatabase, backend: SyncBackend): Promise<boolean> 
       for (const name of images[kind]) {
         if (there.has(name)) continue
         const local = new File(avatarUri(name, kind)!)
-        if (local.exists) toUpload.push({ uri: local.uri, dest: `${kind}/${name}` })
+        if (local.exists && (local.size ?? 0) > 0) toUpload.push({ uri: local.uri, dest: `${kind}/${name}` })
       }
       for (const name of there) if (!images[kind].has(name)) stale.push(`${kind}/${name}`)
     }
@@ -282,7 +282,8 @@ async function copyImagesIn(backend: SyncBackend, images: Record<ImageKind, Set<
     const dir = new Directory(dataDirectory(), kind)
     dir.create({ intermediates: true, idempotent: true })
     for (const name of images[kind]) {
-      if (new File(avatarUri(name, kind)!).exists) continue
+      const file = new File(avatarUri(name, kind)!)
+      if (file.exists && (file.size ?? 0) > 0) continue
       toDownload.push({ src: `${kind}/${name}`, dest: new File(dir, name).uri })
     }
   }

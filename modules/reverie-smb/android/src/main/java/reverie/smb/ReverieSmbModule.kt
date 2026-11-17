@@ -25,6 +25,7 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.security.KeyStore
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
@@ -188,17 +189,34 @@ class ReverieSmbModule : Module() {
       val remoteFile = share.openFile(
         remotePath,
         setOf(AccessMask.GENERIC_READ),
-        setOf(FileAttributes.FILE_ATTRIBUTE_NORMAL),
-        SMB2ShareAccess.ALL,
+        null,
+        setOf(SMB2ShareAccess.FILE_SHARE_READ, SMB2ShareAccess.FILE_SHARE_WRITE),
         SMB2CreateDisposition.FILE_OPEN,
-        setOf(SMB2CreateOptions.FILE_RANDOM_ACCESS)
+        null
       )
-      remoteFile.use { rf ->
-        localFile.outputStream().use { out ->
-          rf.inputStream.use { inp ->
-            inp.copyTo(out)
+      val tempFile = File.createTempFile("smb_dl_", ".tmp", localFile.parentFile)
+      try {
+        remoteFile.use { rf ->
+          tempFile.outputStream().use { out ->
+            rf.inputStream.use { inp ->
+              inp.copyTo(out)
+            }
+            out.flush()
           }
         }
+        if (tempFile.length() == 0L) {
+          throw IOException("Downloaded file is empty: $path")
+        }
+        if (localFile.exists()) {
+          localFile.delete()
+        }
+        if (!tempFile.renameTo(localFile)) {
+          tempFile.copyTo(localFile, overwrite = true)
+          tempFile.delete()
+        }
+      } catch (e: Exception) {
+        tempFile.delete()
+        throw e
       }
     }
   }

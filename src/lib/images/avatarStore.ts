@@ -31,9 +31,20 @@ async function copyIntoStore(tempUri: string, kind: ImageKind, extension: string
 // folder is looked for there.
 function imageFile(name: string, kind: ImageKind) {
   const file = new File(folder(kind), name)
+  if (file.exists && (file.size ?? 0) === 0) {
+    try {
+      file.delete()
+    } catch {}
+  }
   if (kind === 'backgrounds' && !file.exists) {
     const legacy = new File(folder('avatars'), name)
-    if (legacy.exists) return legacy
+    if (legacy.exists && (legacy.size ?? 0) === 0) {
+      try {
+        legacy.delete()
+      } catch {}
+    } else if (legacy.exists) {
+      return legacy
+    }
   }
   return file
 }
