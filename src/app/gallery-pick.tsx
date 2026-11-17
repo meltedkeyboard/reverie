@@ -18,9 +18,8 @@ const COLUMNS = 3
 const GAP = 2
 
 // A character's gallery as a sheet to take one picture or video from, a grid as in Photos:
-// a tap ticks one, another tap moves the tick, and the check in the bar takes it. A
-// generator takes several: each tap adds one under its number in the order they go, as the
-// attach menu's gallery ticks them, and the check takes them all.
+// a tap picks it and confirms immediately. A generator takes several (`multiple`): each
+// tap adds one under its number in order and the check in the bar takes them all.
 export default function GalleryPickScreen() {
   const router = useRouter()
   const navigation = useNavigation()
@@ -67,17 +66,20 @@ export default function GalleryPickScreen() {
                 onPress: () => router.back(),
               },
             ],
-            unstable_headerRightItems: () => [
-              {
-                type: 'button',
-                label: t('common.done'),
-                icon: { type: 'sfSymbol', name: 'checkmark' },
-                variant: 'prominent',
-                tintColor: colors.accent,
-                disabled: !canConfirm,
-                onPress: () => confirmRef.current(),
-              },
-            ],
+            unstable_headerRightItems: () =>
+              multiple
+                ? [
+                    {
+                      type: 'button',
+                      label: t('common.done'),
+                      icon: { type: 'sfSymbol', name: 'checkmark' },
+                      variant: 'prominent',
+                      tintColor: colors.accent,
+                      disabled: !canConfirm,
+                      onPress: () => confirmRef.current(),
+                    },
+                  ]
+                : [],
           }
         : {
             title: pick?.title ?? '',
@@ -86,23 +88,29 @@ export default function GalleryPickScreen() {
                 <Text style={styles.headerButton}>{t('common.close')}</Text>
               </Pressable>
             ),
-            headerRight: () => (
-              <Pressable onPress={() => confirmRef.current()} disabled={!canConfirm} hitSlop={10}>
-                <Text style={[styles.headerButton, styles.headerDone, !canConfirm && styles.headerDisabled]}>{t('common.done')}</Text>
-              </Pressable>
-            ),
+            headerRight: () =>
+              multiple ? (
+                <Pressable onPress={() => confirmRef.current()} disabled={!canConfirm} hitSlop={10}>
+                  <Text style={[styles.headerButton, styles.headerDone, !canConfirm && styles.headerDisabled]}>{t('common.done')}</Text>
+                </Pressable>
+              ) : null,
           }
     )
-  }, [navigation, pick, router, styles, t, canConfirm, colors.accent])
+  }, [navigation, pick, router, styles, t, canConfirm, colors.accent, multiple])
 
   if (!pick) return null
 
-  const toggle = (item: GalleryItem) => {
+  const onSelect = (item: GalleryItem) => {
     selectionAsync()
-    setSelected((current) => {
-      if (current.some((other) => other.id === item.id)) return current.filter((other) => other.id !== item.id)
-      return multiple ? [...current, item] : [item]
-    })
+    if (multiple) {
+      setSelected((current) => {
+        if (current.some((other) => other.id === item.id)) return current.filter((other) => other.id !== item.id)
+        return [...current, item]
+      })
+      return
+    }
+    choose([item])
+    router.back()
   }
 
   return (
@@ -123,7 +131,7 @@ export default function GalleryPickScreen() {
         const ticked = order > 0
         return (
           <Pressable
-            onPress={() => toggle(item)}
+            onPress={() => onSelect(item)}
             accessibilityRole={multiple ? 'checkbox' : 'radio'}
             accessibilityState={multiple ? { checked: ticked } : { selected: ticked }}
             accessibilityValue={multiple && ticked ? { text: String(order) } : undefined}
