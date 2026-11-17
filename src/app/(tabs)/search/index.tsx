@@ -424,7 +424,7 @@ function RecentCard({
   const when = formatWhen(chat.lastActivity, locale)
   const hover = isWeb ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {}
   const displayTitle = chat.title || chat.ownerName
-  const displaySubtitle = chat.title && chat.ownerName !== chat.title ? chat.ownerName : null
+  const characterName = chat.title && chat.ownerName !== chat.title ? chat.ownerName : null
 
   return (
     <View style={styles.recentCardWrapper} {...hover}>
@@ -441,19 +441,21 @@ function RecentCard({
             <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={44} />
           )}
           <View style={styles.recentCardMeta}>
-            {chat.archived ? <ArchivedMark /> : null}
-            <Text style={styles.recentCardDate}>{when}</Text>
+            <View style={styles.recentCardDateRow}>
+              {chat.archived ? <ArchivedMark /> : null}
+              <Text style={styles.recentCardDate}>{when}</Text>
+            </View>
+            {characterName ? (
+              <Text style={styles.recentCardCharacter} numberOfLines={1}>
+                {characterName}
+              </Text>
+            ) : null}
           </View>
         </View>
         <View style={styles.recentCardBottom}>
           <Text style={styles.recentCardTitle}>
             {displayTitle}
           </Text>
-          {displaySubtitle ? (
-            <Text style={styles.recentCardSubtitle} numberOfLines={1}>
-              {displaySubtitle}
-            </Text>
-          ) : null}
         </View>
       </Pressable>
     </View>
@@ -670,8 +672,14 @@ const createStyles = (colors: Colors) =>
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
+      gap: 8,
     },
     recentCardMeta: {
+      alignItems: 'flex-end',
+      flexShrink: 1,
+      gap: 2,
+    },
+    recentCardDateRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
@@ -681,6 +689,12 @@ const createStyles = (colors: Colors) =>
       fontSize: 11.5,
       fontWeight: '500',
     },
+    recentCardCharacter: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '500',
+      maxWidth: 95,
+    },
     recentCardBottom: {
       gap: 2,
     },
@@ -689,10 +703,6 @@ const createStyles = (colors: Colors) =>
       fontSize: 14.5,
       fontWeight: '600',
       lineHeight: 18.5,
-    },
-    recentCardSubtitle: {
-      color: colors.textMuted,
-      fontSize: 12,
     },
     recentCardSpacer: {
       flex: 1,
