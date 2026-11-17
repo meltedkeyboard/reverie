@@ -915,7 +915,7 @@
   "sync.testFailed": "Connection failed",
   "sync.sectionNetwork": "Network & Security",
   "sync.wifiOnly": "Sync on Wi-Fi only",
-  "sync.wifiOnlyFooter": "Prevents timeouts outside your home network. Passwords are saved securely in the iOS Keychain",
+  "sync.wifiOnlyFooter": "Prevents timeouts outside your home network. Passwords are saved securely in device storage (Keychain / KeyStore)",
   "sync.browserUp": "Back",
   "sync.newFolderTitle": "New folder",
   "sync.newFolderPlaceholder": "Folder name",

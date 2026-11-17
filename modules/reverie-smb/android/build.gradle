@@ -1,0 +1,27 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'reverie.smb'
+version = '1.0.0'
+
+android {
+  namespace "reverie.smb"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+    consumerProguardFiles 'consumer-rules.pro'
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+}
+
+dependencies {
+  implementation 'com.hierynomus:smbj:0.13.0'
+  implementation('com.rapid7.client:dcerpc:0.12.13') {
+    exclude group: 'com.hierynomus', module: 'smbj'
+  }
+}

@@ -37,5 +37,5 @@ export type SmbNativeModule = {
   deletePassword(key: string): Promise<void>
 }
 
-// Missing in Expo Go or non-Apple builds unless mocked.
+// Missing in Expo Go unless mocked.
 export const reverieSmb = requireOptionalNativeModule<SmbNativeModule>('ReverieSmb')

@@ -914,7 +914,7 @@
   "sync.testFailed": "Не удалось подключиться",
   "sync.sectionNetwork": "Сеть и безопасность",
   "sync.wifiOnly": "Только по Wi-Fi",
-  "sync.wifiOnlyFooter": "Предотвращает зависания вне домашней сети. Пароль надежно хранится в Связке ключей iOS (Keychain)",
+  "sync.wifiOnlyFooter": "Предотвращает зависания вне домашней сети. Пароль надежно хранится в защищенном хранилище устройства",
   "sync.browserUp": "Назад",
   "sync.newFolderTitle": "Новая папка",
   "sync.newFolderPlaceholder": "Имя папки",
