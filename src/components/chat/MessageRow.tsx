@@ -414,7 +414,7 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }
         <IconButton
           name={copied ? 'checkmark' : 'copy-outline'}
           size={17}
-          color={copied ? colors.success : colors.textFaint}
+          color={copied ? colors.accent : colors.textFaint}
           onPress={copy}
           style={styles.barButton}
         >
@@ -423,7 +423,7 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }
               name={copied ? 'checkmark' : 'square.on.square'}
               fallback={copied ? 'checkmark' : 'copy-outline'}
               size={15}
-              color={copied ? colors.success : colors.textFaint}
+              color={copied ? colors.accent : colors.textFaint}
               effect={{ effect: 'bounce' }}
               trigger={copies}
             />
@@ -433,7 +433,7 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }
               fallback={copied ? 'checkmark' : 'copy-outline'}
               size={15}
               box={SF_BOX}
-              color={copied ? colors.success : colors.textFaint}
+              color={copied ? colors.accent : colors.textFaint}
             />
           )}
         </IconButton>
