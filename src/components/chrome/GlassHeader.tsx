@@ -61,7 +61,7 @@ export function HeaderTitle({ children }: { children: React.ReactNode }) {
 }
 
 // The large title of a tab or header: the name in the prose face, with the red star
-// kept on primary tabs and character/room profiles.
+// kept only on character and room profiles.
 // With `fit` a long name shrinks to the room it has instead of being cut off. `color` and
 // `starStyle` are for a title that moves out of the header (see DrawnFormScreenHeader).
 export function TabTitle({
@@ -69,7 +69,7 @@ export function TabTitle({
   maxWidth,
   fit,
   color,
-  star = true,
+  star = false,
   starColor,
   starStyle,
 }: {
