@@ -10,7 +10,7 @@ import { AvatarStack } from '@/components/cast/AvatarStack'
 import { CastMosaic } from '@/components/cast/CastMosaic'
 import { EmptyState } from '@/components/lists/EmptyState'
 import { EdgeFade } from '@/components/chrome/BarChrome'
-import { TabTitle, useHeaderHeight } from '@/components/chrome/GlassHeader'
+import { TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { columnInset, FORM_COLUMN } from '@/hooks/util/useLayoutMode'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SFIcon } from '@/components/visuals/SFIcon'
@@ -72,6 +72,7 @@ export default function SearchScreen() {
   const searchBar = useRef<SearchBarCommands>(null)
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
+  const padding = useScreenPadding('list')
   const { width, height } = useWindowDimensions()
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<SearchScope>(getSearchScope)
@@ -87,9 +88,10 @@ export default function SearchScreen() {
       ;(async () => {
         setLoaded({ characters: await listCharacters(db, 'all'), rooms: await listRooms(db), chats: await listSearchChats(db) })
       })()
-      // Opening search is asking to type, as with Spotlight.
-      const timer = setTimeout(() => searchBar.current?.focus(), 250)
-      return () => clearTimeout(timer)
+      if (!isIOS) {
+        const timer = setTimeout(() => searchBar.current?.focus(), 250)
+        return () => clearTimeout(timer)
+      }
     }, [db])
   )
 
@@ -242,7 +244,7 @@ export default function SearchScreen() {
     />
   ) : undefined
 
-  const list = (contentStyle: object) => (
+  const list = (contentStyle?: object) => (
     <SectionList
       sections={sections}
       keyExtractor={(item) => item.key}
@@ -256,14 +258,10 @@ export default function SearchScreen() {
       ListHeaderComponent={listHeader}
       contentContainerStyle={[
         styles.content,
-        {
-          paddingLeft: Math.max(16, insets.left + 4),
-          paddingRight: Math.max(16, insets.right + 4),
-        },
+        padding,
         isWeb && { paddingHorizontal: columnInset(width, FORM_COLUMN, 16), paddingTop: 16 },
         contentStyle,
       ]}
-      contentInsetAdjustmentBehavior="automatic"
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
     />
@@ -296,7 +294,8 @@ export default function SearchScreen() {
               ]
             : undefined,
           headerSearchBarOptions: isWeb ? undefined : {
-            placement: width > height ? 'inline' : 'stacked',
+            placement: isIOS ? 'integratedButton' : width > height ? 'inline' : 'stacked',
+            allowToolbarIntegration: false,
             ref: searchBar,
             placeholder,
             autoCapitalize: 'none',
@@ -309,7 +308,7 @@ export default function SearchScreen() {
           },
         }}
       />
-      {list({ paddingBottom: insets.bottom + 24 })}
+      {list()}
       <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
     </View>
   )
