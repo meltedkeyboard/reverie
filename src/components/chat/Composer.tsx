@@ -72,6 +72,7 @@ type Props = {
   // Drawn inside the field under the text, next to the send button, e.g. who a room's
   // message goes to.
   toolbar?: React.ReactNode
+  toolbarActive?: boolean
   placeholder?: string
   // A long press on the continue button, for a choice of how far to go on.
   onContinueLongPress?: () => void
@@ -125,6 +126,7 @@ export function Composer({
   onSubmitEdit,
   onCancelEdit,
   toolbar,
+  toolbarActive,
   placeholder,
   initialText = '',
   onTextChange,
@@ -310,14 +312,22 @@ export function Composer({
           ? 'continue'
           : 'idle'
 
+  // With a toolbar the field has two tiers: the text across the
+  // whole width, and under it the toolbar on the left and the send button on the right.
+  const docked = toolbar !== undefined && toolbar !== null && !editing
+
   const armed = useSharedValue(0)
   useEffect(() => {
     armed.value = withTiming(mode === 'idle' ? 0 : 1, { duration: 160 })
   }, [mode, armed])
 
   const buttonStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(armed.value, [0, 1], [colors.surfaceRaised, effectiveAccent]),
-    transform: [{ scale: 0.92 + armed.value * 0.08 }],
+    backgroundColor: interpolateColor(
+      armed.value,
+      [0, 1],
+      [docked ? 'transparent' : colors.surfaceRaised, effectiveAccent]
+    ),
+    transform: [{ scale: (docked ? 0.94 : 0.92) + armed.value * (docked ? 0.06 : 0.08) }],
   }))
 
   const onPress = () => {
@@ -356,7 +366,7 @@ export function Composer({
     <SFIcon
       name={ICONS[mode].sf}
       fallback={ICONS[mode].fallback}
-      size={mode === 'stop' ? 15 : 20}
+      size={docked ? (mode === 'stop' ? 13 : 17) : mode === 'stop' ? 15 : 20}
       color={mode === 'idle' ? colors.textFaint : ON_ACCENT}
       onAccent={accented}
     />
@@ -366,17 +376,13 @@ export function Composer({
       onPress={onPress}
       onLongPress={mode === 'continue' ? onContinueLongPress : undefined}
       disabled={mode === 'idle'}
-      hitSlop={6}
+      hitSlop={docked ? 8 : 6}
       accessibilityLabel={mode === 'continue' ? t('chat.continueAccessibility') : undefined}
       style={({ pressed }) => (pressed && mode !== 'idle' ? styles.pressed : null)}
     >
-      <Animated.View style={[styles.send, buttonStyle]}>{sendIcon}</Animated.View>
+      <Animated.View style={[styles.send, docked && styles.sendDocked, buttonStyle]}>{sendIcon}</Animated.View>
     </Pressable>
   )
-
-  // With a toolbar the field has two tiers: the text across the
-  // whole width, and under it the toolbar on the left and the send button on the right.
-  const docked = toolbar !== undefined && toolbar !== null && !editing
   // As in ChatGPT: one line is a capsule with the plus and the send button at the sides;
   // a second line (typed or wrapped) moves them under the text, which takes the full width.
   const pictured = images.length > 0 && !editing
@@ -677,8 +683,10 @@ export function Composer({
         {docked ? (
           <View style={styles.tools} onLayout={(e) => setToolsH(e.nativeEvent.layout.height)}>
             {plus}
-            <View style={styles.toolbar}>{toolbar}</View>
-            {sendButton}
+            <View style={[styles.dockGroup, toolbarActive && styles.dockGroupActive]}>
+              {toolbar}
+              {sendButton}
+            </View>
           </View>
         ) : (
           <>
@@ -969,8 +977,20 @@ const createStyles = (colors: Colors) =>
   ghost: { position: 'absolute', maxHeight: GHOST_MAX_HEIGHT, overflow: 'hidden' },
   ghostText: { color: colors.textMuted, fontSize: 17, lineHeight: 22 },
   inputDocked: { paddingTop: 12, paddingBottom: 8 },
-  tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  toolbar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tools: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  dockGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: SIDE,
+    borderRadius: SIDE / 2,
+    backgroundColor: colors.surfaceRaised,
+    overflow: 'hidden',
+    flexShrink: 1,
+  },
+  dockGroupActive: {
+    backgroundColor: colors.accentSoft,
+  },
   send: { width: SIDE, height: SIDE, borderRadius: SIDE / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  sendDocked: { width: 32, height: 32, borderRadius: 16, marginRight: 4 },
   pressed: { opacity: 0.85 },
 })

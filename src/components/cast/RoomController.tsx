@@ -492,6 +492,7 @@ export function RoomController({
               onOpen={openCast}
             />
           ) : null,
+        toolbarActive: !asideOpen && ((addressees.length > 0 && !narration) || narration),
         accessory: asidePanel ?? (
           <View style={styles.accessory} pointerEvents="box-none">
             {idle ? sceneState.trim() ? <SceneState text={sceneState.trim()} /> : null : status}

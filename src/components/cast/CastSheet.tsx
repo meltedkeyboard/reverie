@@ -1,6 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import { Fragment, useEffect } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
@@ -121,6 +122,7 @@ export function CastSheetContent({
   onChangeFloor,
   scrollStyle,
 }: CastProps & { scrollStyle?: StyleProp<ViewStyle> }) {
+  const insets = useSafeAreaInsets()
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
@@ -150,7 +152,7 @@ export function CastSheetContent({
   return (
     <ScrollView
       style={scrollStyle}
-      contentContainerStyle={styles.sheetContent}
+      contentContainerStyle={[styles.sheetContent, { paddingBottom: Math.max(36, insets.bottom + 20) }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="always"
       bounces={false}
@@ -301,6 +303,7 @@ export function NativeCastList({
   floor,
   onChangeFloor,
 }: CastProps) {
+  const insets = useSafeAreaInsets()
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
@@ -429,6 +432,12 @@ export function NativeCastList({
           />
         </NativeSection>
       ) : null}
+
+      <NativeSection fill="#00000000">
+        <NativeHostedRow clear height={Math.max(48, insets.bottom + 24)}>
+          <View />
+        </NativeHostedRow>
+      </NativeSection>
     </NativeSheetForm>
   )
 }
@@ -650,7 +659,7 @@ const ringStyle = StyleSheet.create({
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    sheetContent: { paddingHorizontal: 16, paddingBottom: 10 },
+    sheetContent: { paddingHorizontal: 16, paddingBottom: 16 },
     sheetCard: { borderRadius: 24, overflow: 'hidden' },
     sheetCardSecondary: { marginTop: 14 },
     floorCard: {
@@ -728,7 +737,7 @@ const createStyles = (colors: Colors) =>
       fontSize: 15,
       fontWeight: '600',
     },
-    hint: { color: colors.textMuted, fontSize: 14, lineHeight: 19, paddingHorizontal: 16, paddingTop: 12 },
+    hint: { color: colors.textMuted, fontSize: 14, lineHeight: 19, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
     memberLine: { flexDirection: 'row', alignItems: 'center' },
     // The ellipsis takes the row's padding at its end.
     memberPress: { flex: 1, paddingRight: 4 },

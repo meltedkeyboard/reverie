@@ -6,7 +6,6 @@ import { useTranslation } from '@/i18n'
 import { swiftUI } from '@/lib/ui/nativeUI'
 import { CONTROL_FONT_SCALE, useColors, useStyles, type Colors } from '@/theme'
 
-import { AvatarStack } from './AvatarStack'
 import { NativeMenu, type MenuItem } from '../overlays/NativeMenu'
 
 type Props = {
@@ -21,21 +20,14 @@ type Props = {
   floor?: FloorMode
 }
 
-const FACE = 24
-
 // Who a room's message goes to, as a pop-up button in the composer's lower tier: the
 // same height as the send button across from it.
-export function CastBar({ members, addressees, whisper, narration, onOpen, floor }: Props) {
+export function CastBar({ members, addressees, whisper, narration, onOpen }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const picked = narration ? [] : members.filter((m) => addressees.includes(m.characterId))
   const hushed = whisper && picked.length > 0
-  // Written to everyone, the faces are the ones in the scene, so leaving shows here too.
-  const faces = (picked.length ? picked : members.filter((m) => m.present)).map((m) => ({
-    name: m.character.name,
-    avatar: m.character.avatar,
-  }))
   const label = narration
     ? t('room.narration')
     : picked.length
@@ -51,19 +43,10 @@ export function CastBar({ members, addressees, whisper, narration, onOpen, floor
       accessibilityLabel={`${t('room.castTitle')}: ${hushed ? t('room.whisperTo', { names: label }) : label}`}
       style={({ pressed }) => [styles.button, on && styles.buttonOn, pressed && styles.pressed]}
     >
-      {narration || !faces.length ? (
-        <View style={[styles.icon, on && styles.iconOn]}>
-          <Icon name={narration ? 'book' : 'people'} size={14} color={on ? colors.accent : colors.textMuted} />
-        </View>
-      ) : (
-        <AvatarStack cast={faces} size={FACE} max={3} viewable={false} />
-      )}
       {hushed ? <Icon name="lock-closed" size={13} color={colors.accent} /> : null}
       <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={styles.label} numberOfLines={1}>
         {label}
       </Text>
-      {floor ? <Icon name={FLOOR_ICONS[floor].icon} size={14} color={colors.textMuted} /> : null}
-      <Icon name="chevron-expand" size={15} color={colors.textMuted} />
     </Pressable>
   )
 }
@@ -101,30 +84,18 @@ export function FloorButton({ floor, onChange }: { floor: FloorMode; onChange: (
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    round: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.border },
+    round: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
     button: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 7,
-      height: 34,
-      paddingLeft: 5,
-      paddingRight: 11,
-      borderRadius: 17,
-      // A translucent fill rather than an outline: it sits on glass and should read
-      // as part of it, like the send button's gray.
-      backgroundColor: colors.border,
+      justifyContent: 'center',
+      gap: 6,
+      height: 40,
+      paddingLeft: 14,
+      paddingRight: 8,
       flexShrink: 1,
     },
-    buttonOn: { backgroundColor: colors.accentSoft },
+    buttonOn: { backgroundColor: 'transparent' },
     pressed: { opacity: 0.6 },
-    icon: {
-      width: FACE,
-      height: FACE,
-      borderRadius: FACE / 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.border,
-    },
-    iconOn: { backgroundColor: colors.accentSoft },
     label: { flexShrink: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
   })

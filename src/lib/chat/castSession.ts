@@ -14,7 +14,7 @@ export const castSession = createStore<CastProps | null>(null)
 // strip over the home indicator.
 const BAR = 66
 const ROW = 72
-const REST = 175
+const REST = 200
 
 let detent = 0.6
 
@@ -35,7 +35,7 @@ export function openCastSession(cast: CastProps, onGone: () => void) {
   after = null
   gone = onGone
   const height = Dimensions.get('window').height
-  const floorHeight = cast.floor ? 120 : 0
+  const floorHeight = cast.floor ? 175 : 0
   const wanted = BAR + ROW * (cast.members.length + 2) + REST + floorHeight
   detent = height > 0 ? Math.min(1, wanted / height) : 0.6
 }
