@@ -899,6 +899,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
   const wallpaperColors = useChatWallpaperAccent(session?.look)
   const { width } = useWindowDimensions()
   const [screen, setScreen] = useState<'attach' | 'persona' | 'direction' | 'gallery'>('attach')
+  const [subscreen, setSubscreen] = useState<'persona' | 'direction' | 'gallery'>('persona')
   const [attachHeight, setAttachHeight] = useState<number | undefined>(undefined)
   const progress = useSharedValue(0)
   // Over the chat's background the main screen fades out under the picker instead of
@@ -916,6 +917,9 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
     if (to === 'gallery') {
       setGalleryVisit((n) => n + 1)
       setGallerySelectedCount(0)
+    }
+    if (to !== 'attach') {
+      setSubscreen(to)
     }
     setScreen(to)
     progress.value = withSpring(to === 'attach' ? 0 : 1, { stiffness: 280, damping: 28, mass: 0.9 })
@@ -941,6 +945,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
       onClose={() => onClose()}
       onDismissed={() => {
         setScreen('attach')
+        setSubscreen('persona')
         progress.value = 0
         onDismissed()
       }}
@@ -1029,62 +1034,68 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
           </Animated.View>
 
           {/* Keeps the height of the main screen, so the sheet does not jump as it slides. */}
-          <Animated.View
-            style={[
-              styles.pane,
-              screen === 'persona' ? styles.paneActive : styles.paneAbsolute,
-              attachHeight ? { minHeight: attachHeight } : null,
-              { backgroundColor: backdrop ? 'transparent' : tones.sheet },
-              personaPaneStyle,
-            ]}
-            pointerEvents={screen === 'persona' ? 'auto' : 'none'}
-          >
-            <PersonaPicker
-              session={session}
-              onClose={onClose}
-              onChosen={() => go('attach')}
-              // As tall as the pane even with one or two personas, so a drag anywhere below
-              // them scrolls the list instead of pulling the sheet down.
-              scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 380) } : null}
-            />
-          </Animated.View>
+          {subscreen === 'persona' ? (
+            <Animated.View
+              style={[
+                styles.pane,
+                screen === 'persona' ? styles.paneActive : styles.paneAbsolute,
+                attachHeight ? { minHeight: attachHeight } : null,
+                { backgroundColor: backdrop ? 'transparent' : tones.sheet },
+                personaPaneStyle,
+              ]}
+              pointerEvents={screen === 'persona' ? 'auto' : 'none'}
+            >
+              <PersonaPicker
+                session={session}
+                onClose={onClose}
+                onChosen={() => go('attach')}
+                // As tall as the pane even with one or two personas, so a drag anywhere below
+                // them scrolls the list instead of pulling the sheet down.
+                scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 380) } : null}
+              />
+            </Animated.View>
+          ) : null}
 
-          <Animated.View
-            style={[
-              styles.pane,
-              screen === 'direction' ? styles.paneActive : styles.paneAbsolute,
-              attachHeight ? { minHeight: attachHeight } : null,
-              { backgroundColor: backdrop ? 'transparent' : tones.sheet },
-              personaPaneStyle,
-            ]}
-            pointerEvents={screen === 'direction' ? 'auto' : 'none'}
-          >
-            <DirectionEditor
-              session={session}
-              onDone={() => go('attach')}
-              scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, suggestEnabled ? 480 : 380) } : null}
-            />
-          </Animated.View>
+          {subscreen === 'direction' ? (
+            <Animated.View
+              style={[
+                styles.pane,
+                screen === 'direction' ? styles.paneActive : styles.paneAbsolute,
+                attachHeight ? { minHeight: attachHeight } : null,
+                { backgroundColor: backdrop ? 'transparent' : tones.sheet },
+                personaPaneStyle,
+              ]}
+              pointerEvents={screen === 'direction' ? 'auto' : 'none'}
+            >
+              <DirectionEditor
+                session={session}
+                onDone={() => go('attach')}
+                scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, suggestEnabled ? 480 : 380) } : null}
+              />
+            </Animated.View>
+          ) : null}
 
-          <Animated.View
-            style={[
-              styles.pane,
-              screen === 'gallery' ? styles.paneActive : styles.paneAbsolute,
-              attachHeight ? { minHeight: attachHeight } : null,
-              { backgroundColor: backdrop ? 'transparent' : tones.sheet },
-              personaPaneStyle,
-            ]}
-            pointerEvents={screen === 'gallery' ? 'auto' : 'none'}
-          >
-            {/* Made anew each time it slides in, so nothing is left ticked from before. */}
-            <AttachGalleryPicker
-              key={galleryVisit}
-              session={session}
-              onClose={onClose}
-              onSelectionChange={handleGallerySelectionChange}
-              scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 480) } : null}
-            />
-          </Animated.View>
+          {subscreen === 'gallery' ? (
+            <Animated.View
+              style={[
+                styles.pane,
+                screen === 'gallery' ? styles.paneActive : styles.paneAbsolute,
+                attachHeight ? { minHeight: attachHeight } : null,
+                { backgroundColor: backdrop ? 'transparent' : tones.sheet },
+                personaPaneStyle,
+              ]}
+              pointerEvents={screen === 'gallery' ? 'auto' : 'none'}
+            >
+              {/* Made anew each time it slides in, so nothing is left ticked from before. */}
+              <AttachGalleryPicker
+                key={galleryVisit}
+                session={session}
+                onClose={onClose}
+                onSelectionChange={handleGallerySelectionChange}
+                scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 480) } : null}
+              />
+            </Animated.View>
+          ) : null}
         </View>
       ) : null}
     </BottomSheet>
