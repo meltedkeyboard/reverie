@@ -100,6 +100,8 @@ type Props = {
   onSelectPersona?: (personaId: number | null) => void
   direction?: string | null
   onSetDirection?: (direction: string) => void
+  suggestionDirection?: string | null
+  onSetSuggestionDirection?: (suggestionDirection: string) => void
   // Whether to draw the edge fade behind the floating bar. Defaults to true.
   fade?: boolean
   // The look of the chat, for the attach menu to carry its background.
@@ -140,6 +142,8 @@ export function Composer({
   onSelectPersona,
   direction,
   onSetDirection,
+  suggestionDirection,
+  onSetSuggestionDirection,
 }: Props) {
   const insets = useSafeAreaInsets()
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
@@ -410,6 +414,8 @@ export function Composer({
       onSelectPersona,
       direction,
       onSetDirection,
+      suggestionDirection,
+      onSetSuggestionDirection,
       // A picture picked from the menu leaves the keyboard down, as the picker left it.
       onPick: (source) => {
         restoreKeyboardOnClose.current = false

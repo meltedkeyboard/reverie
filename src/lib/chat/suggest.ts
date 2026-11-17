@@ -23,18 +23,22 @@ export async function suggestReply(
   scene: AsideScene,
   history: Message[],
   signal: AbortSignal,
-  onText: (text: string) => void
+  onText: (text: string) => void,
+  direction?: string | null
 ) {
   const lines = contextMode === 'all' ? history : history.slice(-Math.max(1, messageCount))
   const transcript = lines
     .map((m) => `${scene.label(m)}: ${m.content.trim().slice(0, LINE_MAX)}${m.images.length ? ' [photo]' : ''}`.trim())
     .join('\n\n')
+  const steer = direction?.trim()
+    ? `\n\n---\n\nUser's direction for their reply (steer the message according to this):\n${direction.trim()}`
+    : ''
   const req = {
     messages: [
       { role: 'system' as const, content: SYSTEM },
       {
         role: 'user' as const,
-        content: `Scene brief:\n${scene.brief}\n\n---\n\nTranscript of the latest lines:\n${transcript}\n\n---\n\nWrite the user's next message.`,
+        content: `Scene brief:\n${scene.brief}\n\n---\n\nTranscript of the latest lines:\n${transcript}${steer}\n\n---\n\nWrite the user's next message.`,
       },
     ],
     temperature: 0.8,

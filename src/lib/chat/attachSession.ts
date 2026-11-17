@@ -43,6 +43,8 @@ export type AttachSession = {
   onSelectPersona?: (personaId: number | null) => void
   direction?: string | null
   onSetDirection?: (direction: string) => void
+  suggestionDirection?: string | null
+  onSetSuggestionDirection?: (suggestionDirection: string) => void
   // The galleries of the chat's character, or of a scene's cast, with a picture in them;
   // their stills only, as a message takes no video.
   galleries?: AttachGallery[]

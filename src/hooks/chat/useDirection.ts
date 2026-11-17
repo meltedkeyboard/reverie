@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MenuItem } from '@/components/overlays/NativeMenu'
-import { setChatDirection, type Chat } from '@/db/chats'
+import { setChatDirection, setChatSuggestionDirection, type Chat } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { setTextDraft } from '@/lib/chat/textDraft'
@@ -18,23 +18,41 @@ export function useDirection(chat: Chat) {
   const chatId = chat.id
   const text = useRef(chat.direction ?? '')
   const [directionText, setDirectionText] = useState(chat.direction ?? '')
-  const [isSet, setIsSet] = useState(Boolean(chat.direction?.trim()))
+  const suggestionTextRef = useRef(chat.suggestionDirection ?? '')
+  const [suggestionDirectionText, setSuggestionDirectionText] = useState(chat.suggestionDirection ?? '')
+  const [isSet, setIsSet] = useState(Boolean(chat.direction?.trim() || chat.suggestionDirection?.trim()))
 
   useEffect(() => {
     text.current = chat.direction ?? ''
     setDirectionText(chat.direction ?? '')
-    setIsSet(Boolean(chat.direction?.trim()))
-  }, [chat.id, chat.direction])
+    suggestionTextRef.current = chat.suggestionDirection ?? ''
+    setSuggestionDirectionText(chat.suggestionDirection ?? '')
+    setIsSet(Boolean(chat.direction?.trim() || chat.suggestionDirection?.trim()))
+  }, [chat.id, chat.direction, chat.suggestionDirection])
 
   // Switched off in Settings, nothing is sent, the text kept for when it is on again.
   const current = useCallback(() => (isFeatureOn('direction') ? text.current.trim() : ''), [])
+  const suggestionCurrent = useCallback(() => (isFeatureOn('direction') ? suggestionTextRef.current.trim() : ''), [])
 
-  const set = useCallback((value: string) => {
-    text.current = value
-    setDirectionText(value)
-    setIsSet(Boolean(value.trim()))
-    setChatDirection(db, chatId, value)
-  }, [db, chatId])
+  const set = useCallback(
+    (value: string) => {
+      text.current = value
+      setDirectionText(value)
+      setIsSet(Boolean(value.trim() || suggestionTextRef.current.trim()))
+      setChatDirection(db, chatId, value)
+    },
+    [db, chatId]
+  )
+
+  const setSuggestionDirection = useCallback(
+    (value: string) => {
+      suggestionTextRef.current = value
+      setSuggestionDirectionText(value)
+      setIsSet(Boolean(text.current.trim() || value.trim()))
+      setChatSuggestionDirection(db, chatId, value)
+    },
+    [db, chatId]
+  )
 
   const open = useCallback(() => {
     setTextDraft({
@@ -54,7 +72,17 @@ export function useDirection(chat: Chat) {
   )
 
   return useMemo(
-    () => ({ current, set, open, isSet, text: directionText, menu }),
-    [current, set, open, isSet, directionText, menu]
+    () => ({
+      current,
+      suggestionCurrent,
+      set,
+      setSuggestionDirection,
+      open,
+      isSet,
+      text: directionText,
+      suggestionText: suggestionDirectionText,
+      menu,
+    }),
+    [current, suggestionCurrent, set, setSuggestionDirection, open, isSet, directionText, suggestionDirectionText, menu]
   )
 }

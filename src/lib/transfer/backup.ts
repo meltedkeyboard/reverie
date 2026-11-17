@@ -82,6 +82,7 @@ type BackupChat = {
   recap?: string | null
   recapUpto?: number
   direction?: string | null
+  suggestionDirection?: string | null
 }
 
 // Version 13.
@@ -305,7 +306,7 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       thinking?: ThinkingMode | null
     }>(
       `SELECT id, character_id AS characterId, room_id AS roomId, persona_id AS personaId, title, created_at AS createdAt, thinking,
-         scene_state AS sceneState, recap, recap_upto AS recapUpto, direction
+         scene_state AS sceneState, recap, recap_upto AS recapUpto, direction, suggestion_direction AS suggestionDirection
        FROM chats ORDER BY sort_order, id`
     ),
     messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
@@ -647,7 +648,7 @@ export async function importBackup(
       const characterId = chat.characterId ? characterIds.get(chat.characterId) : undefined
       if (!roomId && !characterId) continue
       const res = await db.runAsync(
-        'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction, suggestion_direction) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           roomId ? null : characterId!,
           roomId ?? null,
@@ -657,6 +658,7 @@ export async function importBackup(
           chat.personaId ? (personaIds.get(chat.personaId) ?? null) : null,
           roomId ? (chat.sceneState ?? null) : null,
           chat.direction ?? null,
+          chat.suggestionDirection ?? null,
         ]
       )
       chatIds.set(chat.id, res.lastInsertRowId)

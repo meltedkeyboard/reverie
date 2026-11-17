@@ -394,6 +394,10 @@ const MIGRATIONS = [
     END;`
       )
       .join('\n'),
+  // Direction vector specifically for reply suggestions.
+  `
+    ALTER TABLE chats ADD COLUMN suggestion_direction TEXT;
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

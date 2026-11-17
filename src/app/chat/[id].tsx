@@ -779,7 +779,12 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const idle = phase === 'idle'
   // The chat of a character in the archive is there to be read.
   const archived = character.archivedAt !== null
-  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(scene, messages, suggestEnabled && idle && !asideOpen && !editingRow && !archived)
+  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(
+    scene,
+    messages,
+    suggestEnabled && idle && !asideOpen && !editingRow && !archived,
+    direction.suggestionText
+  )
   // Changing the conversation while a reply streams or a message is edited would pull
   // the context out from under it, so only reading actions stay available then.
   const locked = archived || !idle || editingRow !== null
@@ -882,6 +887,8 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
         onSelectPersona: asideOpen ? undefined : selectPersona,
         direction: asideOpen ? undefined : direction.text,
         onSetDirection: asideOpen ? undefined : direction.set,
+        suggestionDirection: asideOpen ? undefined : direction.suggestionText,
+        onSetSuggestionDirection: asideOpen ? undefined : direction.setSuggestionDirection,
         onSend: (text, image) => {
           if (asideOpen) return void aside.ask(text, image)
           send(text, image)

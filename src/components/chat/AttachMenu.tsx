@@ -31,6 +31,7 @@ import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { useFeature } from '@/lib/settings/features'
+import { useChatSwitches } from '@/hooks/util/useStoredFlag'
 import { type Colors, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles, useTheme } from '@/theme'
 
 import { GlassButton } from '../chrome/Glass'
@@ -107,6 +108,8 @@ export function AttachMenu({
   const { t } = useTranslation()
   const backdrop = useContext(SheetBackdropContext)
   const db = useDatabase()
+  const { suggestEnabled } = useChatSwitches()
+  const directionSummary = session.direction?.trim() || session.suggestionDirection?.trim() || ''
   const [thinking, setThinking] = useState(!!session.thinking)
   // undefined while being read, null when the row is switched off in Settings.
   const [recents, setRecents] = useState<MessageImage[] | null | undefined>(session.recents)
@@ -316,7 +319,7 @@ export function AttachMenu({
                 systemImage="signpost.right"
                 onPress={openDirection}
                 modifiers={[
-                  ...(session.direction?.trim() ? [badge(session.direction.trim())] : []),
+                  ...(directionSummary ? [badge(directionSummary)] : []),
                   foregroundStyle(iconColor),
                   tint(iconColor),
                 ]}
@@ -434,9 +437,9 @@ export function AttachMenu({
                 <SFIcon name="signpost.right" fallback="compass-outline" size={22} color={iconColor} />
                 <Text style={styles.cardLabel}>{t('direction.title')}</Text>
                 <View style={styles.cardTrailing}>
-                  {session.direction?.trim() ? (
+                  {directionSummary ? (
                     <Text style={styles.cardTrailingText} numberOfLines={1}>
-                      {session.direction.trim()}
+                      {directionSummary}
                     </Text>
                   ) : null}
                   <Icon name="chevron-forward" size={17} color={colors.textFaint} />
@@ -703,7 +706,9 @@ export function DirectionEditor({
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const wallpaperColors = useChatWallpaperAccent(session.look)
+  const { suggestEnabled } = useChatSwitches()
   const [value, setValue] = useState(session.direction ?? '')
+  const [suggestionValue, setSuggestionValue] = useState(session.suggestionDirection ?? '')
 
   const handleChange = (text: string) => {
     setValue(text)
@@ -711,26 +716,48 @@ export function DirectionEditor({
     session.onSetDirection?.(text)
   }
 
+  const handleSuggestionChange = (text: string) => {
+    setSuggestionValue(text)
+    session.suggestionDirection = text
+    session.onSetSuggestionDirection?.(text)
+  }
+
   const handleClear = () => {
     Haptics.selectionAsync()
     setValue('')
+    setSuggestionValue('')
     session.direction = ''
+    session.suggestionDirection = ''
     session.onSetDirection?.('')
+    session.onSetSuggestionDirection?.('')
   }
+
+  const hasContent = Boolean(value.trim() || suggestionValue.trim())
 
   if (nativeForm) {
     return (
       <NativeSheetForm>
-        <NativeSection fill={tones.card} top>
+        <NativeSection title={suggestEnabled ? t('direction.storyTitle') : undefined} fill={tones.card} top>
           <NativeAreaRow
             value={value}
             onChangeText={handleChange}
             placeholder={t('direction.placeholder')}
-            lines={6}
+            lines={suggestEnabled ? 4 : 6}
             maxLines={15}
           />
         </NativeSection>
-        {value.trim() ? (
+        {suggestEnabled ? (
+          <NativeSection title={t('direction.suggestionTitle')} fill={tones.card}>
+            <NativeAreaRow
+              value={suggestionValue}
+              onChangeText={handleSuggestionChange}
+              placeholder={t('direction.suggestionPlaceholder')}
+              lines={3}
+              maxLines={12}
+            />
+          </NativeSection>
+        ) : null}
+        {hasContent ? (
           <NativeSection fill={tones.card}>
             <NativeActionRow label={t('direction.clear')} destructive onPress={handleClear} />
           </NativeSection>
@@ -746,6 +773,11 @@ export function DirectionEditor({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
+      {suggestEnabled ? (
+        <View style={styles.fieldSection}>
+          <Text style={[styles.fieldSectionTitle, { color: colors.textMuted }]}>{t('direction.storyTitle')}</Text>
+        </View>
+      ) : null}
       <View style={[styles.card, { backgroundColor: tones.card }]}>
         <TextInput
           value={value}
@@ -754,10 +786,28 @@ export function DirectionEditor({
           placeholderTextColor={colors.textFaint}
           selectionColor={wallpaperColors?.accent ?? colors.accent}
           multiline
-          style={[styles.directionInput, { color: colors.text }]}
+          style={[styles.directionInput, suggestEnabled && styles.directionInputCompact, { color: colors.text }]}
         />
       </View>
-      {value.trim() ? (
+      {suggestEnabled ? (
+        <>
+          <View style={[styles.fieldSection, styles.fieldSectionSpaced]}>
+            <Text style={[styles.fieldSectionTitle, { color: colors.textMuted }]}>{t('direction.suggestionTitle')}</Text>
+          </View>
+          <View style={[styles.card, { backgroundColor: tones.card }]}>
+            <TextInput
+              value={suggestionValue}
+              onChangeText={handleSuggestionChange}
+              placeholder={t('direction.suggestionPlaceholder')}
+              placeholderTextColor={colors.textFaint}
+              selectionColor={wallpaperColors?.accent ?? colors.accent}
+              multiline
+              style={[styles.directionInput, styles.directionInputCompact, { color: colors.text }]}
+            />
+          </View>
+        </>
+      ) : null}
+      {hasContent ? (
         <View style={[styles.card, styles.cardSecondary, { backgroundColor: tones.card }]}>
           <Pressable
             onPress={handleClear}
@@ -845,6 +895,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const router = useRouter()
+  const { suggestEnabled } = useChatSwitches()
   const wallpaperColors = useChatWallpaperAccent(session?.look)
   const { width } = useWindowDimensions()
   const [screen, setScreen] = useState<'attach' | 'persona' | 'direction' | 'gallery'>('attach')
@@ -986,7 +1037,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
             <DirectionEditor
               session={session}
               onDone={() => go('attach')}
-              scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 380) } : null}
+              scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, suggestEnabled ? 480 : 380) } : null}
             />
           </Animated.View>
 
@@ -1068,6 +1119,10 @@ const createStyles = (colors: Colors) =>
       minHeight: 120,
       textAlignVertical: 'top',
     },
+    directionInputCompact: { minHeight: 90 },
+    fieldSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
+    fieldSectionSpaced: { paddingTop: 16 },
+    fieldSectionTitle: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
     separator: { height: StyleSheet.hairlineWidth, marginLeft: 52 },
     cardLabel: { flex: 1, color: colors.text, fontSize: 17 },
     cardTrailing: { flexDirection: 'row', alignItems: 'center', gap: 6 },

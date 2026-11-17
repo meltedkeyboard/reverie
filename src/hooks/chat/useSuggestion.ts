@@ -11,16 +11,26 @@ import { isSuggestionOverflowed, setSuggestionOverflowed, suggestionFinishAsync 
 // A guess at the user's next message, asked for once the characters have finished their
 // turn and streamed into the field as it is written. A failed request just leaves the
 // field without a suggestion.
-export function useSuggestion(scene: AsideScene, messages: Message[], enabled: boolean) {
+export function useSuggestion(scene: AsideScene, messages: Message[], enabled: boolean, direction?: string | null) {
   const db = useDatabase()
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const sceneRef = useRef(scene)
   sceneRef.current = scene
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+  const directionRef = useRef(direction)
+  directionRef.current = direction
   const ctrlRef = useRef<AbortController | null>(null)
   // Lasts until the screen is left: the hook lives and dies with the chat.
   const [dismissed, setDismissed] = useState(false)
+
+  const prevDirection = useRef(direction)
+  useEffect(() => {
+    if (prevDirection.current !== direction) {
+      prevDirection.current = direction
+      setDismissed(false)
+    }
+  }, [direction])
 
   const last = messages[messages.length - 1]
   const source = enabled && !dismissed && last?.role === 'assistant' && last.content.trim() ? last : null
@@ -41,7 +51,7 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
       loadSuggestionMessages(db),
     ])
       .then(([cfg, maxTokens, contextMode, messageCount]) =>
-        suggestReply(cfg, maxTokens, contextMode, messageCount, sceneRef.current, messagesRef.current, ctrl.signal, show)
+        suggestReply(cfg, maxTokens, contextMode, messageCount, sceneRef.current, messagesRef.current, ctrl.signal, show, directionRef.current)
       )
       .then((finalText) => {
         show(finalText)
@@ -57,7 +67,7 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
       ctrl.abort()
       setSuggestionOverflowed(false)
     }
-  }, [db, source?.id, source?.content])
+  }, [db, source?.id, source?.content, direction])
 
   // Taking a suggestion that is still streaming must stop it, or it would come back.
   const clear = useCallback(() => {

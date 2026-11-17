@@ -22,6 +22,8 @@ export type Chat = {
   recapUpto?: number
   // The user's standing note to the model: where the story should go, the tone, the pace.
   direction?: string | null
+  // Direction vector specifically for reply suggestions.
+  suggestionDirection?: string | null
 }
 
 export type ChatPreview = Chat & {
@@ -36,7 +38,7 @@ export type ChatPreview = Chat & {
 export const PREVIEW = "CASE WHEN m.content = '' AND m.images IS NOT NULL THEN 'Фото' ELSE m.content END"
 
 export const CHAT_COLUMNS =
-  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId, ch.scene_state AS sceneState, ch.recap, ch.recap_upto AS recapUpto, ch.direction'
+  'ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.title, ch.created_at AS createdAt, ch.thinking, ch.persona_id AS personaId, ch.scene_state AS sceneState, ch.recap, ch.recap_upto AS recapUpto, ch.direction, ch.suggestion_direction AS suggestionDirection'
 
 export async function setChatRecap(db: SQLiteDatabase, chatId: number, recap: string, upto: number) {
   await db.runAsync('UPDATE chats SET recap = ?, recap_upto = ? WHERE id = ?', [recap.trim() || null, upto, chatId])
@@ -110,7 +112,7 @@ export async function duplicateChat(db: SQLiteDatabase, id: number, title: strin
   let chatId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction) SELECT character_id, room_id, ?, created_at, thinking, persona_id, scene_state, direction FROM chats WHERE id = ?',
+      'INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction, suggestion_direction) SELECT character_id, room_id, ?, created_at, thinking, persona_id, scene_state, direction, suggestion_direction FROM chats WHERE id = ?',
       [title, id]
     )
     chatId = res.lastInsertRowId
@@ -132,8 +134,8 @@ export async function branchChat(db: SQLiteDatabase, id: number, messageId: numb
   let chatId = 0
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      `INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction)
-       SELECT character_id, room_id, ?, ?, thinking, persona_id, scene_state, direction FROM chats WHERE id = ?`,
+      `INSERT INTO chats (character_id, room_id, title, created_at, thinking, persona_id, scene_state, direction, suggestion_direction)
+       SELECT character_id, room_id, ?, ?, thinking, persona_id, scene_state, direction, suggestion_direction FROM chats WHERE id = ?`,
       [title, Date.now(), id]
     )
     chatId = res.lastInsertRowId
@@ -158,6 +160,10 @@ export async function branchChat(db: SQLiteDatabase, id: number, messageId: numb
 
 export async function setChatDirection(db: SQLiteDatabase, chatId: number, direction: string) {
   await db.runAsync('UPDATE chats SET direction = ? WHERE id = ?', [direction.trim() || null, chatId])
+}
+
+export async function setChatSuggestionDirection(db: SQLiteDatabase, chatId: number, direction: string) {
+  await db.runAsync('UPDATE chats SET suggestion_direction = ? WHERE id = ?', [direction.trim() || null, chatId])
 }
 
 export async function deleteChat(db: SQLiteDatabase, id: number) {

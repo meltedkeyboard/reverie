@@ -214,7 +214,12 @@ export function RoomController({
   }, [members])
 
   const idle = phase === 'idle'
-  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(scene, messages, suggestEnabled && idle && !asideOpen && !editingRow)
+  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(
+    scene,
+    messages,
+    suggestEnabled && idle && !asideOpen && !editingRow,
+    direction.suggestionText
+  )
   const locked = !idle || editingRow !== null
   const byId = useMemo(() => new Map(members.map((m) => [m.characterId, m])), [members])
   const nameOf = useCallback((id: number) => byId.get(id)?.character.name ?? t('room.leftRoom'), [byId, t])
@@ -473,6 +478,8 @@ export function RoomController({
         onSelectPersona: asideOpen ? undefined : selectPersona,
         direction: asideOpen ? undefined : direction.text,
         onSetDirection: asideOpen ? undefined : direction.set,
+        suggestionDirection: asideOpen ? undefined : direction.suggestionText,
+        onSetSuggestionDirection: asideOpen ? undefined : direction.setSuggestionDirection,
         hushed: asideOpen || (whisper && addressees.length > 0 && !narration),
         toolbar:
           members.length && !asideOpen ? (
