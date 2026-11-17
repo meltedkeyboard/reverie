@@ -104,7 +104,7 @@ The home screen is the `(tabs)` group. Its `_layout.tsx` keeps first-run users o
 
 A Spotlight-like search over everything, in `(tabs)/search/index.tsx`.
 
-- Characters, rooms (by name or a member's name) and chat titles (a scene's with its cast, `cast` of `SearchChat`) are loaded whole on focus and matched in JS, where case folding works for Cyrillic. `listSearchChats` also serves the "Recent" list shown for an empty query.
+- Characters, rooms (by name or a member's name) and chat titles (a scene's with its cast, `cast` of `SearchChat`) are loaded whole on focus and matched in JS, where case folding works for Cyrillic. `listSearchChats` also serves the "Recent" list. On the main search screen, recent chats display in a 2-column grid of continuous rounded square cards (`RecentGrid`, `RecentCard`); tapping the native header search button opens a search overlay with row-by-row categorized results.
 - Message text is matched in SQL by `searchMessages` (`src/db/search.ts`), from two characters on, debounced. SQLite folds case only for ASCII, so the query is tried in four spellings (as typed, lower, capitalized, upper).
 - Settings results are a static list of entries with keywords, each pointing at `/settings?section=…` (`SettingsSection` in `src/lib/core/searchScope.ts`).
 - The order of sections follows the tab search was opened from: the tabs layout reports each focus to `noteTabFocus`, and search reads `getSearchScope` (`ORDER` in the screen).

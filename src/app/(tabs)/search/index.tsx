@@ -1,7 +1,8 @@
 import type { Icon } from '@/components/visuals/Icon'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native'
+import { Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native'
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 import type { SearchBarCommands } from 'react-native-screens'
 
 import { ArchivedMark } from '@/components/visuals/ArchivedMark'
@@ -78,9 +79,12 @@ export default function SearchScreen() {
   const [scope, setScope] = useState<SearchScope>(getSearchScope)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [messages, setMessages] = useState<SearchMessage[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
   const trimmed = query.trim()
   const needle = trimmed.toLocaleLowerCase()
+  const isSearchActive = isSearching || trimmed.length > 0
+  const recentChats = useMemo(() => loaded?.chats.slice(0, RECENT_COUNT) ?? [], [loaded])
 
   useFocusEffect(
     useCallback(() => {
@@ -234,11 +238,15 @@ export default function SearchScreen() {
   const listHeader = isWeb ? (
     <TextInput
       value={query}
-      onChangeText={setQuery}
+      onChangeText={(text) => {
+        setQuery(text)
+        if (text) setIsSearching(true)
+      }}
+      onFocus={() => setIsSearching(true)}
       placeholder={placeholder}
       placeholderTextColor={colors.textFaint}
       selectionColor={colors.accent}
-      autoFocus
+      autoFocus={isSearchActive}
       autoCapitalize="none"
       style={styles.field}
     />
@@ -303,13 +311,150 @@ export default function SearchScreen() {
             obscureBackground: false,
             tintColor: colors.accent,
             textColor: colors.text,
-            onChangeText: (e) => setQuery(e.nativeEvent.text),
-            onCancelButtonPress: () => setQuery(''),
+            onFocus: () => setIsSearching(true),
+            onClose: () => setIsSearching(false),
+            onChangeText: (e) => {
+              const text = e.nativeEvent.text
+              setQuery(text)
+              if (text) setIsSearching(true)
+            },
+            onCancelButtonPress: () => {
+              setQuery('')
+              setIsSearching(false)
+            },
           },
         }}
       />
-      {list()}
+
+      {/* Main search screen: 2-column rounded square grid for recent chats */}
+      {loaded ? (
+        recentChats.length > 0 ? (
+          <ScrollView
+            contentContainerStyle={[
+              styles.content,
+              padding,
+              isWeb && { paddingHorizontal: columnInset(width, FORM_COLUMN, 16), paddingTop: 16 },
+            ]}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {isWeb ? listHeader : null}
+            <Text style={[styles.section, styles.firstSection]}>{t('search.recent')}</Text>
+            <RecentGrid
+              chats={recentChats}
+              locale={locale}
+              onOpenChat={(id) => router.push(`/chat/${id}`)}
+            />
+          </ScrollView>
+        ) : (
+          <ScrollView
+            contentContainerStyle={[
+              styles.content,
+              padding,
+              isWeb && { paddingHorizontal: columnInset(width, FORM_COLUMN, 16), paddingTop: 16 },
+            ]}
+          >
+            {isWeb ? listHeader : null}
+            <EmptyState title={t('search.emptyTitle')} text={t('search.emptyText')} />
+          </ScrollView>
+        )
+      ) : null}
+
+      {/* Active search overlay: row-by-row categorized results */}
+      {isSearchActive ? (
+        <Animated.View
+          entering={FadeIn.duration(150)}
+          exiting={FadeOut.duration(100)}
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]}
+        >
+          {list()}
+          <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
+        </Animated.View>
+      ) : null}
+
       <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
+    </View>
+  )
+}
+
+function RecentGrid({
+  chats,
+  locale,
+  onOpenChat,
+}: {
+  chats: SearchChat[]
+  locale: ReturnType<typeof useTranslation>['locale']
+  onOpenChat: (id: number) => void
+}) {
+  const styles = useStyles(createStyles)
+  const rows: SearchChat[][] = []
+  for (let i = 0; i < chats.length; i += 2) {
+    rows.push(chats.slice(i, i + 2))
+  }
+
+  return (
+    <View style={styles.recentGrid}>
+      {rows.map((row, rowIndex) => (
+        <View key={rowIndex} style={styles.recentGridRow}>
+          {row.map((chat) => (
+            <RecentCard
+              key={chat.id}
+              chat={chat}
+              locale={locale}
+              onPress={() => onOpenChat(chat.id)}
+            />
+          ))}
+          {row.length === 1 && <View style={styles.recentCardSpacer} />}
+        </View>
+      ))}
+    </View>
+  )
+}
+
+function RecentCard({
+  chat,
+  locale,
+  onPress,
+}: {
+  chat: SearchChat
+  locale: ReturnType<typeof useTranslation>['locale']
+  onPress: () => void
+}) {
+  const styles = useStyles(createStyles)
+  const [hovered, setHovered] = useState(false)
+  const when = formatWhen(chat.lastActivity, locale)
+  const hover = isWeb ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {}
+
+  return (
+    <View style={styles.recentCardWrapper} {...hover}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.recentCard,
+          hovered && styles.recentCardHover,
+          pressed && styles.recentCardPressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={chat.title || chat.ownerName}
+      >
+        <View style={styles.recentCardTop}>
+          {chat.cast ? (
+            <CastMosaic cast={chat.cast} name={chat.ownerName} size={48} round />
+          ) : (
+            <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={48} />
+          )}
+          {chat.archived ? <ArchivedMark /> : null}
+        </View>
+        <View style={styles.recentCardBottom}>
+          <Text style={styles.recentCardTitle} numberOfLines={1}>
+            {chat.title || chat.ownerName}
+          </Text>
+          <Text style={styles.recentCardSubtitle} numberOfLines={1}>
+            {chat.title ? `${chat.ownerName} · ${when}` : when}
+          </Text>
+        </View>
+      </Pressable>
     </View>
   )
 }
@@ -495,6 +640,57 @@ const createStyles = (colors: Colors) =>
     },
     firstSection: {
       marginTop: 4,
+    },
+    recentGrid: {
+      gap: 12,
+      marginTop: 8,
+    },
+    recentGridRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    recentCardWrapper: {
+      flex: 1,
+      aspectRatio: 1,
+    },
+    recentCard: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: colors.surface,
+      borderRadius: 22,
+      borderCurve: 'continuous',
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+      justifyContent: 'space-between',
+    },
+    recentCardPressed: {
+      opacity: 0.7,
+      transform: [{ scale: 0.97 }],
+    },
+    recentCardHover: {
+      borderColor: colors.borderStrong,
+    },
+    recentCardTop: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+    },
+    recentCardBottom: {
+      gap: 2,
+    },
+    recentCardTitle: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    recentCardSubtitle: {
+      color: colors.textMuted,
+      fontSize: 12.5,
+    },
+    recentCardSpacer: {
+      flex: 1,
+      aspectRatio: 1,
     },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14, borderCurve: 'continuous', borderWidth: isWeb ? 1 : 0, borderColor: 'transparent' },
     rowPressed: { opacity: 0.65 },
