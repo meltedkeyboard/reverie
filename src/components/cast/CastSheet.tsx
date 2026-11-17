@@ -16,7 +16,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { ChatBackdrop, useChatBackdropTone, type ChatLook } from '@/components/chrome/ChatChrome'
-import type { RoomMember } from '@/db/rooms'
+import type { FloorMode, RoomMember } from '@/db/rooms'
 import { useTranslation } from '@/i18n'
 import { isDesktop, isIOS } from '@/lib/core/platform'
 import { showSheet } from '@/lib/ui/dialogs'
@@ -27,9 +27,10 @@ import { ArchivedMark } from '../visuals/ArchivedMark'
 import { Avatar } from '../visuals/Avatar'
 import { BottomSheet, SheetBackdropContext, useSheetTones } from '../overlays/BottomSheet'
 import { Check } from '../controls/Check'
+import { Segmented } from '../controls/Segmented'
 import { Switch } from '../controls/Switch'
 import { DraggableCard, systemCardMenu, unlessDragging } from '../lists/DraggableCard'
-import { NativeHostedRow, NativeSection, NativeSheetForm, nativeForm } from '../lists/NativeForm'
+import { NativeHostedRow, NativeSection, NativeSegmentRow, NativeSheetForm, nativeForm } from '../lists/NativeForm'
 import { menuItemViews, NativeMenu, type MenuItem } from '../overlays/NativeMenu'
 
 // What the sheet of the cast shows and what changes it, whether it is the app's own sheet or
@@ -53,6 +54,8 @@ export type CastProps = {
   memberMenu: (member: RoomMember) => MenuItem[]
   // The room's look, whose background the sheet carries.
   look?: ChatLook
+  floor?: FloorMode
+  onChangeFloor?: (mode: FloorMode) => void
 }
 
 type Props = CastProps & {
@@ -114,6 +117,8 @@ export function CastSheetContent({
   canMove,
   onTogglePresent,
   memberMenu,
+  floor,
+  onChangeFloor,
   scrollStyle,
 }: CastProps & { scrollStyle?: StyleProp<ViewStyle> }) {
   const colors = useColors()
@@ -210,6 +215,29 @@ export function CastSheetContent({
           </Animated.View>
         </View>
       </View>
+
+      {floor && onChangeFloor ? (
+        <>
+          <View style={[styles.sheetCard, styles.sheetCardSecondary, { backgroundColor: tones.card }]}>
+            <View style={styles.floorCard}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('room.floorTitle')}</Text>
+              <Segmented
+                options={[
+                  { value: 'addressee', label: t('room.floor.addressee') },
+                  { value: 'reactions', label: t('room.floor.reactions') },
+                  { value: 'open', label: t('room.floor.open') },
+                ]}
+                value={floor}
+                onChange={(next) => {
+                  Haptics.selectionAsync()
+                  onChangeFloor(next)
+                }}
+              />
+            </View>
+          </View>
+          <Text style={styles.hint}>{t(`room.floorHint.${floor}`)}</Text>
+        </>
+      ) : null}
     </ScrollView>
   )
 }
@@ -270,6 +298,8 @@ export function NativeCastList({
   canMove,
   onTogglePresent,
   memberMenu,
+  floor,
+  onChangeFloor,
 }: CastProps) {
   const colors = useColors()
   const tones = useSheetTones({ noGlass: true })
@@ -381,6 +411,24 @@ export function NativeCastList({
           modifiers={[disabled(!canWhisper)]}
         />
       </NativeSection>
+
+      {floor && onChangeFloor ? (
+        <NativeSection fill={tones.card} title={t('room.floorTitle')} footer={t(`room.floorHint.${floor}`)}>
+          <NativeSegmentRow
+            label={t('roomEditor.floorMode')}
+            options={[
+              { value: 'addressee', label: t('room.floor.addressee') },
+              { value: 'reactions', label: t('room.floor.reactions') },
+              { value: 'open', label: t('room.floor.open') },
+            ]}
+            value={floor}
+            onChange={(next) => {
+              Haptics.selectionAsync()
+              onChangeFloor(next)
+            }}
+          />
+        </NativeSection>
+      ) : null}
     </NativeSheetForm>
   )
 }
@@ -605,6 +653,17 @@ const createStyles = (colors: Colors) =>
     sheetContent: { paddingHorizontal: 16, paddingBottom: 10 },
     sheetCard: { borderRadius: 24, overflow: 'hidden' },
     sheetCardSecondary: { marginTop: 14 },
+    floorCard: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 10,
+    },
+    sectionTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

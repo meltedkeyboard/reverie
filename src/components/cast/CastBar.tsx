@@ -18,13 +18,14 @@ type Props = {
   // Opens the cast sheet, where the addressees, the narrator and the whisper are picked
   // and people walk in and out.
   onOpen: () => void
+  floor?: FloorMode
 }
 
 const FACE = 24
 
 // Who a room's message goes to, as a pop-up button in the composer's lower tier: the
 // same height as the send button across from it.
-export function CastBar({ members, addressees, whisper, narration, onOpen }: Props) {
+export function CastBar({ members, addressees, whisper, narration, onOpen, floor }: Props) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -61,6 +62,7 @@ export function CastBar({ members, addressees, whisper, narration, onOpen }: Pro
       <Text maxFontSizeMultiplier={CONTROL_FONT_SCALE} style={styles.label} numberOfLines={1}>
         {label}
       </Text>
+      {floor ? <Icon name={FLOOR_ICONS[floor].icon} size={14} color={colors.textMuted} /> : null}
       <Icon name="chevron-expand" size={15} color={colors.textMuted} />
     </Pressable>
   )

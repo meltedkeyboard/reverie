@@ -6,7 +6,7 @@ import Animated, { FadeIn, FadeOut, type SharedValue } from 'react-native-reanim
 
 import { castGallery } from '@/components/cast/AvatarStack'
 import { CastMosaic } from '@/components/cast/CastMosaic'
-import { CastBar, FloorButton, FLOOR_ICONS } from '@/components/cast/CastBar'
+import { CastBar, FLOOR_ICONS } from '@/components/cast/CastBar'
 import { CastSheet, type CastProps } from '@/components/cast/CastSheet'
 import { AsidePanel } from '@/components/chat/AsidePanel'
 import type { RowMessage, RowScene } from '@/components/chat/MessageRow'
@@ -483,10 +483,14 @@ export function RoomController({
         hushed: asideOpen || (whisper && addressees.length > 0 && !narration),
         toolbar:
           members.length && !asideOpen ? (
-            <>
-              <CastBar members={members} addressees={addressees} whisper={whisper} narration={narration} onOpen={openCast} />
-              <FloorButton floor={floor} onChange={changeFloor} />
-            </>
+            <CastBar
+              members={members}
+              addressees={addressees}
+              whisper={whisper}
+              narration={narration}
+              floor={floor}
+              onOpen={openCast}
+            />
           ) : null,
         accessory: asidePanel ?? (
           <View style={styles.accessory} pointerEvents="box-none">
@@ -542,6 +546,8 @@ export function RoomController({
       canMove: idle,
       onTogglePresent: togglePresent,
       memberMenu: memberItems,
+      floor,
+      onChangeFloor: changeFloor,
     }
   }
 

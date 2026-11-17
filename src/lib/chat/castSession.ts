@@ -35,7 +35,8 @@ export function openCastSession(cast: CastProps, onGone: () => void) {
   after = null
   gone = onGone
   const height = Dimensions.get('window').height
-  const wanted = BAR + ROW * (cast.members.length + 2) + REST
+  const floorHeight = cast.floor ? 120 : 0
+  const wanted = BAR + ROW * (cast.members.length + 2) + REST + floorHeight
   detent = height > 0 ? Math.min(1, wanted / height) : 0.6
 }
 
