@@ -198,7 +198,7 @@ export default function ArchiveScreen() {
           ) : null
         }
       >
-        <TabTitle>{t('archive.title')}</TabTitle>
+        <TabTitle star={false}>{t('archive.title')}</TabTitle>
       </GlassHeader>
     </View>
   )

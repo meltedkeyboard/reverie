@@ -60,7 +60,8 @@ export function HeaderTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-// The large title of a tab: a red star and the name in the prose face.
+// The large title of a tab or header: the name in the prose face, with the red star
+// kept on primary tabs and character/room profiles.
 // With `fit` a long name shrinks to the room it has instead of being cut off. `color` and
 // `starStyle` are for a title that moves out of the header (see DrawnFormScreenHeader).
 export function TabTitle({
@@ -68,6 +69,7 @@ export function TabTitle({
   maxWidth,
   fit,
   color,
+  star = true,
   starColor,
   starStyle,
 }: {
@@ -75,6 +77,7 @@ export function TabTitle({
   maxWidth?: number
   fit?: boolean
   color?: string
+  star?: boolean
   starColor?: string
   starStyle?: React.ComponentProps<typeof Animated.View>['style']
 }) {
@@ -84,9 +87,11 @@ export function TabTitle({
   const effectiveStarColor = starColor ?? homeAccent?.accent ?? colors.danger
   return (
     <View style={[styles.tabTitleRow, maxWidth !== undefined && { maxWidth }]}>
-      <Animated.View style={starStyle}>
-        <Star size={TAB_TITLE_STAR} color={effectiveStarColor} rotation={-14} style={styles.tabTitleStar} />
-      </Animated.View>
+      {star ? (
+        <Animated.View style={starStyle}>
+          <Star size={TAB_TITLE_STAR} color={effectiveStarColor} rotation={-14} style={styles.tabTitleStar} />
+        </Animated.View>
+      ) : null}
       <Text
         maxFontSizeMultiplier={HEADER_FONT_SCALE}
         style={[styles.tabTitle, color !== undefined && { color }]}

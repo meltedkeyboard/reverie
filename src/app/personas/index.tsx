@@ -237,7 +237,7 @@ export default function PersonasScreen() {
           </GlassGroup>
         }
       >
-        <TabTitle>{t('persona.title')}</TabTitle>
+        <TabTitle star={false}>{t('persona.title')}</TabTitle>
       </GlassHeader>
     </View>
   )

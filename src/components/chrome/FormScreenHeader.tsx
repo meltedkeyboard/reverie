@@ -15,7 +15,7 @@ import { IconButton } from '../controls/IconButton'
 import { SFIcon } from '../visuals/SFIcon'
 
 
-// The transparent native header of a form-style screen: a red star and a title on the
+// The transparent native header of a form-style screen: a title on the
 // left, with the content fading out underneath. Rendered inside the screen it belongs to.
 export function FormScreenHeader({ title }: { title: string }) {
   const headerHeight = useHeaderHeight()
@@ -63,6 +63,7 @@ export function DrawnFormScreenHeader({
   clearAtTop = false,
   fadeRgb,
   profileHeader,
+  star,
 }: {
   title: string
   right?: React.ReactNode
@@ -77,6 +78,7 @@ export function DrawnFormScreenHeader({
   fadeRgb?: string
   // Restores floating header and circle buttons of release 7.0 on Android for profile screens.
   profileHeader?: boolean
+  star?: boolean
 }) {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
@@ -91,6 +93,7 @@ export function DrawnFormScreenHeader({
   const colors = useColors()
   const isProfile = profileHeader || Boolean(overPhoto)
   const isSolidBar = isAndroid && !isProfile
+  const showStar = star ?? Boolean(profileHeader)
   return (
     <HeaderContext.Provider value={isSolidBar}>
       {(!isAndroid || isProfile) && (
@@ -123,11 +126,11 @@ export function DrawnFormScreenHeader({
           <BarButton symbol="chevron.backward" fallback="chevron-back" onPress={() => router.back()} accessibilityLabel={t('common.back')} />
           {overPhoto && scrollY ? (
             <View style={styles.titleSlot} pointerEvents="none">
-              <MovingTitle title={title} progress={overPhoto} scrollY={scrollY} spot={nameSpot} avatar={avatar} />
+              <MovingTitle title={title} progress={overPhoto} scrollY={scrollY} spot={nameSpot} avatar={avatar} showStar={showStar} />
             </View>
           ) : (
             <Animated.View style={[styles.titleSlot, giveWay]} pointerEvents="none">
-              <FormTitle title={title} />
+              <FormTitle title={title} star={showStar} />
             </Animated.View>
           )}
           {right}
@@ -223,12 +226,14 @@ function MovingTitle({
   scrollY,
   spot,
   avatar,
+  showStar = true,
 }: {
   title: string
   progress: SharedValue<number>
   scrollY: SharedValue<number>
   spot?: NameSpot
   avatar?: PageAvatar
+  showStar?: boolean
 }) {
   const insets = useSafeAreaInsets()
   const titleMaxWidth = useWindowDimensions().width - 160 - insets.left - insets.right
@@ -287,12 +292,12 @@ function MovingTitle({
           setFrom({ x, y, height })
         }}
       >
-        <TabTitle maxWidth={titleMaxWidth} fit starStyle={star}>
+        <TabTitle maxWidth={titleMaxWidth} fit starStyle={star} star={showStar}>
           {title}
         </TabTitle>
         {spot ? (
           <Animated.View style={[StyleSheet.absoluteFill, white]}>
-            <TabTitle maxWidth={titleMaxWidth} fit color={ON_ACCENT} starStyle={hidden}>
+            <TabTitle maxWidth={titleMaxWidth} fit color={ON_ACCENT} starStyle={hidden} star={showStar}>
               {title}
             </TabTitle>
           </Animated.View>
@@ -318,11 +323,11 @@ function MovingTitle({
   )
 }
 
-function FormTitle({ title }: { title: string }) {
+function FormTitle({ title, star = false }: { title: string; star?: boolean }) {
   const insets = useSafeAreaInsets()
   const titleMaxWidth = useWindowDimensions().width - 160 - insets.left - insets.right
   return (
-    <TabTitle maxWidth={titleMaxWidth} fit>
+    <TabTitle maxWidth={titleMaxWidth} fit star={star}>
       {title}
     </TabTitle>
   )

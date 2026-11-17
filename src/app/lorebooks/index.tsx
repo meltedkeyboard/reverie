@@ -100,7 +100,7 @@ export default function LorebooksScreen() {
           </Link>
         }
       >
-        <TabTitle>{t('lore.title')}</TabTitle>
+        <TabTitle star={false}>{t('lore.title')}</TabTitle>
       </GlassHeader>
     </View>
   )
