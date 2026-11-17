@@ -191,6 +191,7 @@ export function Composer({
   // Whether a suggestion stands in for the empty text, which is then what gets measured.
   const suggestingRef = useRef(false)
   const change = (next: string) => {
+    Haptics.setComposerHasText(Boolean(next.trim()))
     // With pictures attached the field is already open, so Enter is a plain line break.
     if (!textRef.current && next.includes('\n') && !next.trim() && !picturedRef.current) {
       setOpened(true)
@@ -237,6 +238,7 @@ export function Composer({
 
   // An empty text may not be laid out again, so it ends the wrapped state itself.
   useEffect(() => {
+    Haptics.setComposerHasText(Boolean(text.trim()))
     if (text) hadText.current = true
     else {
       if (!suggestingRef.current) setWraps(false)
@@ -245,6 +247,7 @@ export function Composer({
         setOpened(false)
       }
     }
+    return () => Haptics.setComposerHasText(false)
   }, [text])
 
   const value = text.trim()

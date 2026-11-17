@@ -4,6 +4,7 @@ let enabled = true
 let streamHapticsEnabled = true
 let suggestionHapticsEnabled = true
 let suggestionOverflowed = false
+let composerHasText = false
 
 export const isHapticsOn = () => enabled
 export const setHapticsOn = (on: boolean) => {
@@ -23,4 +24,9 @@ export const setSuggestionHapticsOn = (on: boolean) => {
 export const isSuggestionOverflowed = () => suggestionOverflowed
 export const setSuggestionOverflowed = (overflowed: boolean) => {
   suggestionOverflowed = overflowed
+}
+
+export const isComposerHasText = () => composerHasText
+export const setComposerHasText = (hasText: boolean) => {
+  composerHasText = hasText
 }

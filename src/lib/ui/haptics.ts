@@ -1,14 +1,16 @@
 import * as Native from 'expo-haptics'
 
 import {
+  isComposerHasText,
   isHapticsOn,
   isStreamHapticsOn,
   isSuggestionHapticsOn,
   isSuggestionOverflowed,
+  setComposerHasText,
   setSuggestionOverflowed,
 } from '@/lib/ui/hapticsState'
 
-export { isSuggestionOverflowed, setSuggestionOverflowed }
+export { isComposerHasText, isSuggestionOverflowed, setComposerHasText, setSuggestionOverflowed }
 
 export const { ImpactFeedbackStyle, NotificationFeedbackType } = Native
 
@@ -38,7 +40,7 @@ export function streamTokenAsync() {
 
 // Fast, subtle haptic pulse for tokens streaming during reply suggestion.
 export function suggestionTokenAsync() {
-  if (!isHapticsOn() || !isSuggestionHapticsOn() || isSuggestionOverflowed()) return
+  if (!isHapticsOn() || !isSuggestionHapticsOn() || isSuggestionOverflowed() || isComposerHasText()) return
   const now = Date.now()
   if (now - lastSuggestionHaptic < 20) return
   lastSuggestionHaptic = now
@@ -47,6 +49,6 @@ export function suggestionTokenAsync() {
 
 // Distinct, solid haptic pulse when reply suggestion finishes after overflowing visible area.
 export function suggestionFinishAsync() {
-  if (!isHapticsOn() || !isSuggestionHapticsOn()) return
+  if (!isHapticsOn() || !isSuggestionHapticsOn() || isComposerHasText()) return
   Native.impactAsync(Native.ImpactFeedbackStyle.Medium).catch(() => {})
 }
