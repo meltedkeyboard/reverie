@@ -386,26 +386,31 @@ function RecentGrid({
   onOpenChat: (id: number) => void
 }) {
   const styles = useStyles(createStyles)
-  const rows: SearchChat[][] = []
-  for (let i = 0; i < chats.length; i += 2) {
-    rows.push(chats.slice(i, i + 2))
-  }
+  const left = chats.filter((_, i) => i % 2 === 0)
+  const right = chats.filter((_, i) => i % 2 === 1)
 
   return (
     <View style={styles.recentGrid}>
-      {rows.map((row, rowIndex) => (
-        <View key={rowIndex} style={styles.recentGridRow}>
-          {row.map((chat) => (
-            <RecentCard
-              key={chat.id}
-              chat={chat}
-              locale={locale}
-              onPress={() => onOpenChat(chat.id)}
-            />
-          ))}
-          {row.length === 1 && <View style={styles.recentCardSpacer} />}
-        </View>
-      ))}
+      <View style={styles.recentGridColumn}>
+        {left.map((chat) => (
+          <RecentCard
+            key={chat.id}
+            chat={chat}
+            locale={locale}
+            onPress={() => onOpenChat(chat.id)}
+          />
+        ))}
+      </View>
+      <View style={styles.recentGridColumn}>
+        {right.map((chat) => (
+          <RecentCard
+            key={chat.id}
+            chat={chat}
+            locale={locale}
+            onPress={() => onOpenChat(chat.id)}
+          />
+        ))}
+      </View>
     </View>
   )
 }
@@ -436,7 +441,7 @@ function RecentCard({
       >
         <View style={styles.recentCardTop}>
           {chat.cast ? (
-            <CastMosaic cast={chat.cast} name={chat.ownerName} size={44} round />
+            <CastMosaic cast={chat.cast} name={chat.ownerName} size={44} round viewable />
           ) : (
             <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={44} />
           )}
@@ -645,25 +650,23 @@ const createStyles = (colors: Colors) =>
       marginTop: 4,
     },
     recentGrid: {
+      flexDirection: 'row',
       gap: 12,
       marginTop: 8,
     },
-    recentGridRow: {
-      flexDirection: 'row',
+    recentGridColumn: {
+      flex: 1,
       gap: 12,
     },
     recentCardWrapper: {
-      flex: 1,
-      aspectRatio: 1,
+      flex: 0,
     },
     recentCard: {
-      width: '100%',
-      height: '100%',
       backgroundColor: colors.surface,
       borderRadius: 22,
       borderCurve: 'continuous',
       padding: 14,
-      justifyContent: 'space-between',
+      gap: 12,
     },
     recentCardHover: {
       backgroundColor: colors.surfaceRaised,
@@ -706,7 +709,6 @@ const createStyles = (colors: Colors) =>
     },
     recentCardSpacer: {
       flex: 1,
-      aspectRatio: 1,
     },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14, borderCurve: 'continuous', borderWidth: isWeb ? 1 : 0, borderColor: 'transparent' },
     rowPressed: { opacity: 0.65 },
