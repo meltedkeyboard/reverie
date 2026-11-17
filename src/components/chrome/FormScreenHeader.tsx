@@ -23,13 +23,12 @@ export function FormScreenHeader({ title }: { title: string }) {
   const styles = useStyles(createStyles)
   return (
     <>
-      {!isAndroid && <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />}
+      <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTransparent: !isAndroid,
+          headerTransparent: true,
           headerShadowVisible: false,
-          headerStyle: isAndroid ? { backgroundColor: colors.surface } : undefined,
           // Like the glass buttons everywhere else, not the accent the navigation theme tints with.
           headerTintColor: colors.text,
           headerBackButtonDisplayMode: 'minimal',
