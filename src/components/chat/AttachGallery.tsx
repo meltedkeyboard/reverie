@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur'
 import { Image } from 'expo-image'
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -29,10 +29,12 @@ export function AttachGalleryPicker({
   session,
   onClose,
   scrollStyle,
+  onSelectionChange,
 }: {
   session: AttachSession
   onClose: (then?: () => void) => void
   scrollStyle?: StyleProp<ViewStyle>
+  onSelectionChange?: (count: number, confirm: () => void) => void
 }) {
   const colors = useColors()
   const wallpaperColors = useChatWallpaperAccent(session.look)
@@ -68,6 +70,13 @@ export function AttachGalleryPicker({
       alertError(t('composer.attachFailedTitle'), err)
     }
   }
+
+  const confirmRef = useRef(confirm)
+  confirmRef.current = confirm
+
+  useEffect(() => {
+    onSelectionChange?.(selected.length, () => confirmRef.current())
+  }, [selected.length, onSelectionChange])
 
   const hasSelection = selected.length > 0
   const footerProgress = useSharedValue(0)

@@ -3,7 +3,7 @@ import { BlurView } from 'expo-blur'
 import { Image } from 'expo-image'
 import type { SQLiteDatabase } from 'expo-sqlite'
 import { useRouter } from 'expo-router'
-import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type RefObject } from 'react'
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type StyleProp, type ViewStyle, type ViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
@@ -906,8 +906,17 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
   const backdrop = useChatBackdrop(session?.look)
 
   const [galleryVisit, setGalleryVisit] = useState(0)
+  const [gallerySelectedCount, setGallerySelectedCount] = useState(0)
+  const galleryConfirmRef = useRef<() => void>(() => {})
+  const handleGallerySelectionChange = useCallback((count: number, confirm: () => void) => {
+    setGallerySelectedCount(count)
+    galleryConfirmRef.current = confirm
+  }, [])
   const go = (to: 'attach' | 'persona' | 'direction' | 'gallery') => {
-    if (to === 'gallery') setGalleryVisit((n) => n + 1)
+    if (to === 'gallery') {
+      setGalleryVisit((n) => n + 1)
+      setGallerySelectedCount(0)
+    }
     setScreen(to)
     progress.value = withSpring(to === 'attach' ? 0 : 1, { stiffness: 280, damping: 28, mass: 0.9 })
   }
@@ -952,7 +961,23 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
       contentPaddingBottom={0}
       underlay={<ChatBackdrop owner={session?.look} />}
       rightItem={
-        screen === 'persona' ? (
+        screen === 'gallery' && gallerySelectedCount > 0 ? (
+          liquidGlass ? (
+            <Animated.View entering={ZoomIn.springify().stiffness(280).damping(24).mass(0.85)} exiting={ZoomOut.duration(140)}>
+              <GlassButton icon="checkmark" onPress={() => galleryConfirmRef.current()} accessibilityLabel={t('common.done')} />
+            </Animated.View>
+          ) : (
+            <Pressable
+              onPress={() => galleryConfirmRef.current()}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.done')}
+              style={({ pressed }) => [styles.headerIconBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Icon name="checkmark" size={24} color={wallpaperColors?.accent ?? colors.accent} />
+            </Pressable>
+          )
+        ) : screen === 'persona' ? (
           liquidGlass ? (
             // Glass like the back button beside it, and for the same reason it comes in
             // by scale alone: glass does not render under a parent with opacity.
@@ -1056,6 +1081,7 @@ function AttachSheetBody({ visible, session, onClose, onDismissed }: AttachSheet
               key={galleryVisit}
               session={session}
               onClose={onClose}
+              onSelectionChange={handleGallerySelectionChange}
               scrollStyle={attachHeight ? { minHeight: attachHeight, maxHeight: Math.max(attachHeight, 480) } : null}
             />
           </Animated.View>
