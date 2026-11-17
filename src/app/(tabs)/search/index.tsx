@@ -2,7 +2,6 @@ import type { Icon } from '@/components/visuals/Icon'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native'
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 import type { SearchBarCommands } from 'react-native-screens'
 
 import { ArchivedMark } from '@/components/visuals/ArchivedMark'
@@ -95,8 +94,10 @@ export default function SearchScreen() {
       if (!isIOS) {
         const timer = setTimeout(() => searchBar.current?.focus(), 250)
         return () => clearTimeout(timer)
+      } else {
+        setIsSearching((searching) => (trimmed.length > 0 ? searching : false))
       }
-    }, [db])
+    }, [db, trimmed])
   )
 
   // The only query that reads the whole history, so it waits for a pause in typing and
@@ -312,11 +313,19 @@ export default function SearchScreen() {
             tintColor: colors.accent,
             textColor: colors.text,
             onFocus: () => setIsSearching(true),
-            onClose: () => setIsSearching(false),
+            onClose: () => {
+              setQuery('')
+              setIsSearching(false)
+            },
+            onBlur: () => {
+              setIsSearching((prev) => (trimmed.length > 0 ? prev : false))
+            },
             onChangeText: (e) => {
               const text = e.nativeEvent.text
               setQuery(text)
-              if (text) setIsSearching(true)
+              if (text.trim().length > 0) {
+                setIsSearching(true)
+              }
             },
             onCancelButtonPress: () => {
               setQuery('')
@@ -326,8 +335,9 @@ export default function SearchScreen() {
         }}
       />
 
-      {/* Main search screen: 2-column rounded square grid for recent chats */}
-      {loaded ? (
+      {isSearchActive ? (
+        list()
+      ) : loaded ? (
         recentChats.length > 0 ? (
           <ScrollView
             contentContainerStyle={[
@@ -359,18 +369,6 @@ export default function SearchScreen() {
             <EmptyState title={t('search.emptyTitle')} text={t('search.emptyText')} />
           </ScrollView>
         )
-      ) : null}
-
-      {/* Active search overlay: row-by-row categorized results */}
-      {isSearchActive ? (
-        <Animated.View
-          entering={FadeIn.duration(150)}
-          exiting={FadeOut.duration(100)}
-          style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]}
-        >
-          {list()}
-          <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
-        </Animated.View>
       ) : null}
 
       <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
@@ -425,34 +423,37 @@ function RecentCard({
   const [hovered, setHovered] = useState(false)
   const when = formatWhen(chat.lastActivity, locale)
   const hover = isWeb ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {}
+  const displayTitle = chat.title || chat.ownerName
+  const displaySubtitle = chat.title && chat.ownerName !== chat.title ? chat.ownerName : null
 
   return (
     <View style={styles.recentCardWrapper} {...hover}>
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [
-          styles.recentCard,
-          hovered && styles.recentCardHover,
-          pressed && styles.recentCardPressed,
-        ]}
+        style={[styles.recentCard, hovered && styles.recentCardHover]}
         accessibilityRole="button"
-        accessibilityLabel={chat.title || chat.ownerName}
+        accessibilityLabel={displayTitle}
       >
         <View style={styles.recentCardTop}>
           {chat.cast ? (
-            <CastMosaic cast={chat.cast} name={chat.ownerName} size={48} round />
+            <CastMosaic cast={chat.cast} name={chat.ownerName} size={44} round />
           ) : (
-            <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={48} />
+            <Avatar name={chat.ownerName} file={chat.ownerAvatar} size={44} />
           )}
-          {chat.archived ? <ArchivedMark /> : null}
+          <View style={styles.recentCardMeta}>
+            {chat.archived ? <ArchivedMark /> : null}
+            <Text style={styles.recentCardDate}>{when}</Text>
+          </View>
         </View>
         <View style={styles.recentCardBottom}>
-          <Text style={styles.recentCardTitle} numberOfLines={1}>
-            {chat.title || chat.ownerName}
+          <Text style={styles.recentCardTitle}>
+            {displayTitle}
           </Text>
-          <Text style={styles.recentCardSubtitle} numberOfLines={1}>
-            {chat.title ? `${chat.ownerName} · ${when}` : when}
-          </Text>
+          {displaySubtitle ? (
+            <Text style={styles.recentCardSubtitle} numberOfLines={1}>
+              {displaySubtitle}
+            </Text>
+          ) : null}
         </View>
       </Pressable>
     </View>
@@ -659,34 +660,39 @@ const createStyles = (colors: Colors) =>
       backgroundColor: colors.surface,
       borderRadius: 22,
       borderCurve: 'continuous',
-      borderWidth: 1,
-      borderColor: colors.border,
       padding: 14,
       justifyContent: 'space-between',
     },
-    recentCardPressed: {
-      opacity: 0.7,
-      transform: [{ scale: 0.97 }],
-    },
     recentCardHover: {
-      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceRaised,
     },
     recentCardTop: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
     },
+    recentCardMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    recentCardDate: {
+      color: colors.textFaint,
+      fontSize: 11.5,
+      fontWeight: '500',
+    },
     recentCardBottom: {
       gap: 2,
     },
     recentCardTitle: {
       color: colors.text,
-      fontSize: 15,
+      fontSize: 14.5,
       fontWeight: '600',
+      lineHeight: 18.5,
     },
     recentCardSubtitle: {
       color: colors.textMuted,
-      fontSize: 12.5,
+      fontSize: 12,
     },
     recentCardSpacer: {
       flex: 1,
