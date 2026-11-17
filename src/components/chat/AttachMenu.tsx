@@ -12,7 +12,7 @@ import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, useChatWallpaperAcc
 import { Button } from '@/components/controls/Button'
 import { Switch } from '@/components/controls/Switch'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
-import { NativeActionRow, NativeAreaRow, NativeHostedRow, NativeLinkRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
+import { NativeActionRow, NativeAreaRow, NativeHostedRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
 import { NativeMenu, type MenuItem } from '@/components/overlays/NativeMenu'
 import { Avatar } from '@/components/visuals/Avatar'
 import { Star } from '@/components/visuals/motifs/Star'
@@ -265,8 +265,8 @@ export function AttachMenu({
   // them are the app's own, in rows of the list with nothing drawn under them; the camera
   // without the row, files, the persona and the thinking switch are the system's rows.
   if (nativeForm) {
-    const { Toggle, HStack, Text: SwiftText, Image } = nativeForm.ui
-    const { foregroundStyle, tint } = nativeForm.modifiers
+    const { Button: SwiftButton, Toggle, HStack, Text: SwiftText, Image } = nativeForm.ui
+    const { badge, foregroundStyle, tint } = nativeForm.modifiers
     return (
       <View style={[styles.menuContainer, scrollStyle]}>
         <NativeSheetForm>
@@ -277,46 +277,49 @@ export function AttachMenu({
           ) : null}
           <NativeSection fill={tones.card} top={!tiles} footer={recents === null ? t('attach.recentsOff') : undefined}>
             {!showRow ? (
-              <NativeLinkRow
+              <SwiftButton
                 label={t('imageSource.camera')}
-                symbol="camera"
-                color={iconColor}
-                chevron={false}
+                systemImage="camera"
                 onPress={() => onClose(() => session.onPick('camera'))}
+                modifiers={[foregroundStyle(iconColor), tint(iconColor)]}
               />
             ) : null}
-            <NativeLinkRow
+            <SwiftButton
               label={t('attach.addFiles')}
-              symbol="doc"
-              color={iconColor}
-              chevron={false}
+              systemImage="doc"
               onPress={() => onClose(() => session.onPick('files'))}
+              modifiers={[foregroundStyle(iconColor), tint(iconColor)]}
             />
             {showGallery ? (
-              <NativeLinkRow
+              <SwiftButton
                 label={t('gallery.title')}
-                symbol="photo.on.rectangle.angled"
-                color={iconColor}
-                value={String(galleryCount)}
+                systemImage="photo.on.rectangle.angled"
                 onPress={openGallery}
+                modifiers={[badge(String(galleryCount)), foregroundStyle(iconColor), tint(iconColor)]}
               />
             ) : null}
             {showPersona ? (
-              <NativeLinkRow
+              <SwiftButton
                 label={t('attach.persona')}
-                symbol="person"
-                color={iconColor}
-                value={session.persona?.name ? session.persona.name : t('attach.personaNone')}
+                systemImage="person"
                 onPress={openPersonas}
+                modifiers={[
+                  badge(session.persona?.name ? session.persona.name : t('attach.personaNone')),
+                  foregroundStyle(iconColor),
+                  tint(iconColor),
+                ]}
               />
             ) : null}
             {showDirection ? (
-              <NativeLinkRow
+              <SwiftButton
                 label={t('direction.title')}
-                symbol="signpost.right"
-                color={iconColor}
-                value={session.direction?.trim() || undefined}
+                systemImage="signpost.right"
                 onPress={openDirection}
+                modifiers={[
+                  ...(session.direction?.trim() ? [badge(session.direction.trim())] : []),
+                  foregroundStyle(iconColor),
+                  tint(iconColor),
+                ]}
               />
             ) : null}
           </NativeSection>
