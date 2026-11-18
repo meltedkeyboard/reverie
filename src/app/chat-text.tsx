@@ -9,13 +9,13 @@ import { ChatBackground } from '@/components/chat/ChatBackground'
 import { Pattern } from '@/components/visuals/Pattern'
 import { NO_PICTURE, useChatScheme } from '@/components/chrome/ChatChrome'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
-import { GlassBubble, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
+import { GlassBubble, GlassButton, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { ButtonCell, CheckCell, ListSection, MenuCell, SwitchCell } from '@/components/lists/GroupedList'
 import { nativeCardList, NativeListPreview } from '@/components/lists/NativeCardList'
 import { nativeForm, NativeForm, NativeHostedRow, NativeSection, NativeSegmentRow } from '@/components/lists/NativeForm'
 import { Segmented } from '@/components/controls/Segmented'
 import { SourceCell } from '@/components/lists/PictureCells'
-import { useScreenPadding } from '@/components/chrome/GlassHeader'
+import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Markdown } from '@/components/chat/Markdown'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { LIST_CORNER_RANGE, setListCorner, setListSpacing, useListLook, type ListSpacing } from '@/db/prefs/listLook'
@@ -767,7 +767,17 @@ function Appearance() {
           </ListSection>
         </ScrollView>
       )}
-      <FormScreenHeader title={t('settings.chatFont')} />
+      {isAndroid ? (
+        <GlassHeader
+          floating
+          centerTitle
+          left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
+        >
+          <TabTitle star={false}>{t('settings.chatFont')}</TabTitle>
+        </GlassHeader>
+      ) : (
+        <FormScreenHeader title={t('settings.chatFont')} />
+      )}
     </View>
   )
 }

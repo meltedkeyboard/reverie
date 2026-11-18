@@ -4,7 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
-import { useScreenPadding } from '@/components/chrome/GlassHeader'
+import { GlassButton } from '@/components/chrome/Glass'
+import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { ButtonCell, InputCell, ListSection, SegmentCell, SwitchCell } from '@/components/lists/GroupedList'
 import { SmbFolderBrowser } from '@/components/sync/SmbFolderBrowser'
 import { SFIcon } from '@/components/visuals/SFIcon'
@@ -12,6 +13,7 @@ import { useDatabase } from '@/db/provider'
 import { getSmbPassword, getSmbSettings, saveSmbPassword, saveSmbSettings, type SmbSettings } from '@/db/prefs/cloudSync'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useTranslation } from '@/i18n'
+import { isAndroid } from '@/lib/core/platform'
 import { discoverSmbServers, listSmbShares, testSmbConnection, type DiscoveredSmbServer, type SmbConfig } from '@/lib/transfer/smbClient'
 import { showMessage, showSheet } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
@@ -201,8 +203,7 @@ export default function SmbScreen() {
   }
 
   return (
-    <>
-      <FormScreenHeader title={t('sync.smbSettingsTitle')} />
+    <View style={styles.screen}>
       <KeyboardAwareScrollView contentContainerStyle={padding} bottomOffset={32}>
         {/* Local Network Discovery Carousel */}
         {discovered.length > 0 && (
@@ -374,12 +375,24 @@ export default function SmbScreen() {
           onClose={() => setBrowserVisible(false)}
         />
       )}
-    </>
+      {isAndroid ? (
+        <GlassHeader
+          floating
+          centerTitle
+          left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
+        >
+          <TabTitle star={false}>{t('sync.smbSettingsTitle')}</TabTitle>
+        </GlassHeader>
+      ) : (
+        <FormScreenHeader title={t('sync.smbSettingsTitle')} />
+      )}
+    </View>
   )
 }
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.bg },
     discoverySection: {
       marginBottom: 20,
     },

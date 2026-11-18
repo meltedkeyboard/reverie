@@ -19,10 +19,11 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { Button } from '@/components/controls/Button'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
-import { useHeaderHeight } from '@/components/chrome/GlassHeader'
+import { GlassButton } from '@/components/chrome/Glass'
+import { GlassHeader, TabTitle, useHeaderHeight } from '@/components/chrome/GlassHeader'
 import { Icon } from '@/components/visuals/Icon'
 import { useTranslation } from '@/i18n'
-import { isWeb } from '@/lib/core/platform'
+import { isAndroid, isWeb } from '@/lib/core/platform'
 import { APP_ICONS, currentAppIcon, followsLook, previewFor, setAppIcon, type AppIcon } from '@/lib/settings/appIcons'
 import * as Haptics from '@/lib/ui/haptics'
 import { reportError } from '@/lib/transfer/report'
@@ -310,7 +311,17 @@ export default function AppIconScreen() {
           />
         </View>
       </View>
-      <FormScreenHeader title={t('settings.appIcon')} />
+      {isAndroid ? (
+        <GlassHeader
+          floating
+          centerTitle
+          left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
+        >
+          <TabTitle star={false}>{t('settings.appIcon')}</TabTitle>
+        </GlassHeader>
+      ) : (
+        <FormScreenHeader title={t('settings.appIcon')} />
+      )}
     </View>
   )
 }

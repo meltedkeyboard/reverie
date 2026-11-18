@@ -3,12 +3,14 @@ import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
-import { useScreenPadding } from '@/components/chrome/GlassHeader'
+import { GlassButton } from '@/components/chrome/Glass'
+import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { ButtonCell, LinkCell, ListSection, SegmentCell, SwitchCell, ValueCell } from '@/components/lists/GroupedList'
 import { ChipRowCell } from '@/components/lists/PictureCells'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useTranslation } from '@/i18n'
 import { formatWhen } from '@/lib/core/format'
+import { isAndroid } from '@/lib/core/platform'
 import { simulateSyncProgress } from '@/lib/transfer/cloudSync'
 import { reportError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
@@ -47,8 +49,7 @@ export default function SyncScreen() {
     : t('sync.neverSynced')
 
   return (
-    <>
-      <FormScreenHeader title={t('sync.title')} />
+    <View style={styles.screen}>
       <ScrollView contentContainerStyle={padding}>
         {/* Main Enable / Provider Toggle */}
         <ListSection
@@ -171,11 +172,22 @@ export default function SyncScreen() {
           </ListSection>
         )}
       </ScrollView>
-    </>
+      {isAndroid ? (
+        <GlassHeader
+          floating
+          centerTitle
+          left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
+        >
+          <TabTitle star={false}>{t('sync.title')}</TabTitle>
+        </GlassHeader>
+      ) : (
+        <FormScreenHeader title={t('sync.title')} />
+      )}
+    </View>
   )
 }
 
-const createStyles = (_colors: Colors) =>
+const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    // Follows GroupedList styling natively
+    screen: { flex: 1, backgroundColor: colors.bg },
   })

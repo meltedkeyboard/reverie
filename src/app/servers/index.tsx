@@ -6,7 +6,8 @@ import ReorderableList from 'react-native-reorderable-list'
 import type { FoundServer } from '@/api/discover'
 import { normalizeBaseUrl, probeServer } from '@/api/llm'
 import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
-import { useScreenPadding } from '@/components/chrome/GlassHeader'
+import { GlassButton, GlassGroup } from '@/components/chrome/Glass'
+import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { Button } from '@/components/controls/Button'
 import { IconButton } from '@/components/controls/IconButton'
 import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/EmptyState'
@@ -21,7 +22,7 @@ import { addServer, DEFAULT_SERVER, deleteServer, orderServers, saveFailover, se
 import { useServerDiscovery } from '@/hooks/features/useServerDiscovery'
 import { useServers } from '@/hooks/features/useServers'
 import { useTranslation } from '@/i18n'
-import { isIOS } from '@/lib/core/platform'
+import { isAndroid, isIOS } from '@/lib/core/platform'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import { useColors, useStyles, type Colors } from '@/theme'
@@ -169,41 +170,37 @@ export default function ServersScreen() {
   const subtitle = (server: ServerProfile) =>
     [server.name.trim() ? server.baseUrl.trim() : '', server.model.trim()].filter(Boolean).join(' · ')
 
+  const toggleEditing = () => {
+    Haptics.selectionAsync()
+    setEditing((on) => !on)
+  }
+
   // The bar's buttons: Edit while there is an order to change, and the plus. Edit is left
   // when the list falls to one server, so the list is not stuck in it.
   useLayoutEffect(() => {
+    if (!isIOS) return
     if (editing && !canEdit) setEditing(false)
-    const toggleEditing = () => {
-      Haptics.selectionAsync()
-      setEditing((on) => !on)
-    }
-    navigation.setOptions(
-      isIOS
-        ? {
-            unstable_headerRightItems: () => [
-              ...(canEdit
-                ? [
-                    {
-                      type: 'button' as const,
-                      label: editing ? t('common.done') : t('servers.edit'),
-                      ...(editing ? { variant: 'prominent' as const, tintColor: colors.accent } : {}),
-                      onPress: toggleEditing,
-                    },
-                  ]
-                : []),
+    navigation.setOptions({
+      unstable_headerRightItems: () => [
+        ...(canEdit
+          ? [
               {
                 type: 'button' as const,
-                label: t('servers.add'),
-                icon: { type: 'sfSymbol' as const, name: 'plus' as const },
-                onPress: add,
+                label: editing ? t('common.done') : t('servers.edit'),
+                ...(editing ? { variant: 'prominent' as const, tintColor: colors.accent } : {}),
+                onPress: toggleEditing,
               },
-            ],
-          }
-        : {
-            headerRight: () => <IconButton name="add" size={26} onPress={add} accessibilityLabel={t('servers.add')} />,
-          }
-    )
-  }, [navigation, editing, canEdit, colors.accent, t])
+            ]
+          : []),
+        {
+          type: 'button' as const,
+          label: t('servers.add'),
+          icon: { type: 'sfSymbol' as const, name: 'plus' as const },
+          onPress: add,
+        },
+      ],
+    })
+  }, [navigation, editing, canEdit, colors.accent, t, add])
 
   const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
     const { List, HStack, VStack, Spacer, Text: SwiftText, Button: SwiftButton, Image, Toggle, SwipeActions, ContextMenu } = ui
@@ -361,7 +358,32 @@ export default function ServersScreen() {
   return (
     <View style={styles.screen}>
       {servers && nativeForm ? renderNative(nativeForm) : fallback}
-      <FormScreenHeader title={t('servers.title')} />
+      {isAndroid ? (
+        <GlassHeader
+          floating
+          centerTitle
+          left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
+          right={
+            <GlassGroup interactive={false}>
+              {canEdit ? (
+                <IconButton
+                  name={editing ? 'checkmark' : 'list'}
+                  color={editing ? colors.accent : undefined}
+                  onPress={toggleEditing}
+                  accessibilityLabel={editing ? t('common.done') : t('servers.edit')}
+                />
+              ) : null}
+              {editing ? null : (
+                <IconButton name="add" size={26} onPress={add} accessibilityLabel={t('servers.add')} />
+              )}
+            </GlassGroup>
+          }
+        >
+          <TabTitle star={false}>{t('servers.title')}</TabTitle>
+        </GlassHeader>
+      ) : (
+        <FormScreenHeader title={t('servers.title')} />
+      )}
     </View>
   )
 }
