@@ -779,7 +779,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const idle = phase === 'idle'
   // The chat of a character in the archive is there to be read.
   const archived = character.archivedAt !== null
-  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(
+  const [suggestion, clearSuggestion, dismissSuggestion, refineSuggestion] = useSuggestion(
     scene,
     messages,
     suggestEnabled && idle && !asideOpen && !editingRow && !archived,
@@ -880,6 +880,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
         suggestion,
         onSuggestionTaken: clearSuggestion,
         onSuggestionDismissed: dismissSuggestion,
+        onSuggestionRefine: refineSuggestion,
         thinking: asideOpen ? undefined : thinking,
         onToggleThinking: asideOpen ? undefined : toggleThinking,
         persona: asideOpen ? undefined : persona,

@@ -214,7 +214,7 @@ export function RoomController({
   }, [members])
 
   const idle = phase === 'idle'
-  const [suggestion, clearSuggestion, dismissSuggestion] = useSuggestion(
+  const [suggestion, clearSuggestion, dismissSuggestion, refineSuggestion] = useSuggestion(
     scene,
     messages,
     suggestEnabled && idle && !asideOpen && !editingRow,
@@ -471,6 +471,7 @@ export function RoomController({
         suggestion,
         onSuggestionTaken: clearSuggestion,
         onSuggestionDismissed: dismissSuggestion,
+        onSuggestionRefine: refineSuggestion,
         thinking: asideOpen ? undefined : thinking,
         onToggleThinking: asideOpen ? undefined : toggleThinking,
         persona: asideOpen ? undefined : persona,
