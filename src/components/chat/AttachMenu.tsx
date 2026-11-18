@@ -699,10 +699,12 @@ export function DirectionEditor({
   session,
   onDone,
   scrollStyle,
+  editorRef,
 }: {
   session: AttachSession
   onDone?: () => void
   scrollStyle?: StyleProp<ViewStyle>
+  editorRef?: { current: { commit: () => void } | null }
 }) {
   const colors = useColors()
   const { scheme } = useTheme()
@@ -715,26 +717,61 @@ export function DirectionEditor({
   const [value, setValue] = useState(session.direction ?? '')
   const [suggestionValue, setSuggestionValue] = useState(session.suggestionDirection ?? '')
 
+  const initialDirection = useRef(session.direction ?? '')
+  const initialSuggestion = useRef(session.suggestionDirection ?? '')
+  const latestDirection = useRef(session.direction ?? '')
+  const latestSuggestion = useRef(session.suggestionDirection ?? '')
+  const committed = useRef(false)
+
+  const commit = useCallback(() => {
+    if (committed.current) return
+    committed.current = true
+    const nextDir = latestDirection.current
+    const nextSugg = latestSuggestion.current
+    if (nextDir !== initialDirection.current) {
+      session.direction = nextDir
+      session.onSetDirection?.(nextDir)
+      initialDirection.current = nextDir
+    }
+    if (nextSugg !== initialSuggestion.current) {
+      session.suggestionDirection = nextSugg
+      session.onSetSuggestionDirection?.(nextSugg)
+      initialSuggestion.current = nextSugg
+    }
+  }, [session])
+
+  useEffect(() => {
+    if (editorRef) {
+      editorRef.current = { commit }
+    }
+    return () => {
+      commit()
+      if (editorRef) {
+        editorRef.current = null
+      }
+    }
+  }, [commit, editorRef])
+
   const handleChange = (text: string) => {
     setValue(text)
+    latestDirection.current = text
     session.direction = text
-    session.onSetDirection?.(text)
   }
 
   const handleSuggestionChange = (text: string) => {
     setSuggestionValue(text)
+    latestSuggestion.current = text
     session.suggestionDirection = text
-    session.onSetSuggestionDirection?.(text)
   }
 
   const handleClear = () => {
     Haptics.selectionAsync()
     setValue('')
     setSuggestionValue('')
+    latestDirection.current = ''
+    latestSuggestion.current = ''
     session.direction = ''
     session.suggestionDirection = ''
-    session.onSetDirection?.('')
-    session.onSetSuggestionDirection?.('')
   }
 
   const hasContent = Boolean(value.trim() || suggestionValue.trim())

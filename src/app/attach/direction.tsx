@@ -1,5 +1,5 @@
 import { useNavigation, useRouter } from 'expo-router'
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 
 import { AttachScreenFrame, DirectionEditor, fillScreen } from '@/components/chat/AttachMenu'
 import { useTranslation } from '@/i18n'
@@ -12,6 +12,7 @@ export default function AttachDirectionScreen() {
   const navigation = useNavigation()
   const { t } = useTranslation()
   const [session] = useState(attachSession)
+  const editorRef = useRef<{ commit: () => void } | null>(null)
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -22,6 +23,7 @@ export default function AttachDirectionScreen() {
           label: t('common.done'),
           onPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            editorRef.current?.commit()
             router.back()
           },
         },
@@ -32,7 +34,7 @@ export default function AttachDirectionScreen() {
   if (!session) return null
   return (
     <AttachScreenFrame look={session.look}>
-      <DirectionEditor session={session} onDone={() => router.back()} scrollStyle={fillScreen} />
+      <DirectionEditor session={session} onDone={() => router.back()} editorRef={editorRef} scrollStyle={fillScreen} />
     </AttachScreenFrame>
   )
 }
