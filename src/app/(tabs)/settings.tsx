@@ -454,7 +454,7 @@ export default function SettingsScreen() {
   const suggestFooter = (
     <>
       <ListFooter>{t('settings.suggestIntro')}</ListFooter>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginTop: 4 }}>
         <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipe')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
           <Icon name="arrow-forward-outline" size={13} color={colors.textMuted} />
