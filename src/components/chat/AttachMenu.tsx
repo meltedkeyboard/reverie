@@ -101,8 +101,8 @@ export function AttachMenu({
   const { scheme } = useTheme()
   const tones = useSheetTones({ noGlass: true })
   const wallpaperColors = useChatWallpaperAccent(session.look)
-  const iconColor = wallpaperColors?.accent ?? colors.text
   const effectiveAccent = wallpaperColors?.accent ?? colors.accent
+  const iconColor = effectiveAccent
   const styles = useStyles(createStyles)
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
@@ -280,50 +280,48 @@ export function AttachMenu({
           ) : null}
           <NativeSection fill={tones.card} top={!tiles} footer={recents === null ? t('attach.recentsOff') : undefined}>
             {!showRow ? (
-              <SwiftButton
-                label={t('imageSource.camera')}
-                systemImage="camera"
-                onPress={() => onClose(() => session.onPick('camera'))}
-                modifiers={[foregroundStyle(iconColor), tint(iconColor)]}
-              />
+              <SwiftButton onPress={() => onClose(() => session.onPick('camera'))}>
+                <HStack spacing={10}>
+                  <Image systemName="camera" size={18} color={effectiveAccent} />
+                  <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('imageSource.camera')}</SwiftText>
+                </HStack>
+              </SwiftButton>
             ) : null}
-            <SwiftButton
-              label={t('attach.addFiles')}
-              systemImage="doc"
-              onPress={() => onClose(() => session.onPick('files'))}
-              modifiers={[foregroundStyle(iconColor), tint(iconColor)]}
-            />
+            <SwiftButton onPress={() => onClose(() => session.onPick('files'))}>
+              <HStack spacing={10}>
+                <Image systemName="doc" size={18} color={effectiveAccent} />
+                <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('attach.addFiles')}</SwiftText>
+              </HStack>
+            </SwiftButton>
             {showGallery ? (
-              <SwiftButton
-                label={t('gallery.title')}
-                systemImage="photo.on.rectangle.angled"
-                onPress={openGallery}
-                modifiers={[badge(String(galleryCount)), foregroundStyle(iconColor), tint(iconColor)]}
-              />
+              <SwiftButton onPress={openGallery} modifiers={[badge(String(galleryCount))]}>
+                <HStack spacing={10}>
+                  <Image systemName="photo.on.rectangle.angled" size={18} color={effectiveAccent} />
+                  <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('gallery.title')}</SwiftText>
+                </HStack>
+              </SwiftButton>
             ) : null}
             {showPersona ? (
               <SwiftButton
-                label={t('attach.persona')}
-                systemImage="person"
                 onPress={openPersonas}
-                modifiers={[
-                  badge(session.persona?.name ? session.persona.name : t('attach.personaNone')),
-                  foregroundStyle(iconColor),
-                  tint(iconColor),
-                ]}
-              />
+                modifiers={[badge(session.persona?.name ? session.persona.name : t('attach.personaNone'))]}
+              >
+                <HStack spacing={10}>
+                  <Image systemName="person" size={18} color={effectiveAccent} />
+                  <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('attach.persona')}</SwiftText>
+                </HStack>
+              </SwiftButton>
             ) : null}
             {showDirection ? (
               <SwiftButton
-                label={t('direction.title')}
-                systemImage="signpost.right"
                 onPress={openDirection}
-                modifiers={[
-                  ...(directionSummary ? [badge(directionSummary)] : []),
-                  foregroundStyle(iconColor),
-                  tint(iconColor),
-                ]}
-              />
+                modifiers={directionSummary ? [badge(directionSummary)] : []}
+              >
+                <HStack spacing={10}>
+                  <Image systemName="signpost.right" size={18} color={effectiveAccent} />
+                  <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('direction.title')}</SwiftText>
+                </HStack>
+              </SwiftButton>
             ) : null}
           </NativeSection>
           {session.onToggleThinking ? (
