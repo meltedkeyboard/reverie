@@ -136,7 +136,7 @@ export function Slider({
   const gesture = Gesture.Race(pan, tap)
 
   const activeTrackStyle = useAnimatedStyle(() => ({
-    width: Math.max(THUMB_SIZE, Math.min(trackWidth, thumbX.value + THUMB_SIZE)) + 2,
+    width: trackWidth > 0 ? Math.min(trackWidth + 2, Math.max(0, thumbX.value + THUMB_SIZE / 2 + 2)) : 0,
   }))
 
   const thumbStyle = useAnimatedStyle(() => ({
