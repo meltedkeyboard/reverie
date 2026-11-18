@@ -49,8 +49,10 @@ function AttachStack({ session }: { session: AttachSession | null }) {
 
   return (
     <AttachStackContext.Provider value={root}>
-      <View ref={root} style={[styles.root, { minHeight: screenHeight }]}>
-        <ChatBackdrop owner={session?.look} />
+      <View ref={root} style={styles.root}>
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: -screenHeight, left: -20, right: -20 }]}>
+          <ChatBackdrop owner={session?.look} />
+        </View>
         <ThemeProvider value={navigationTheme}>
           <Stack
             screenOptions={{
@@ -70,5 +72,5 @@ function AttachStack({ session }: { session: AttachSession | null }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { ...StyleSheet.absoluteFill },
 })

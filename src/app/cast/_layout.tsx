@@ -45,8 +45,10 @@ function CastStack() {
 
   return (
     <AttachStackContext.Provider value={root}>
-      <View ref={root} style={[styles.root, { minHeight: screenHeight }]}>
-        <ChatBackdrop owner={cast?.look} />
+      <View ref={root} style={styles.root}>
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: -screenHeight, left: -20, right: -20 }]}>
+          <ChatBackdrop owner={cast?.look} />
+        </View>
         <ThemeProvider value={navigationTheme}>
           <Stack
             screenOptions={{
@@ -65,5 +67,5 @@ function CastStack() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { ...StyleSheet.absoluteFill },
 })

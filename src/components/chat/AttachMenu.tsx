@@ -857,7 +857,7 @@ export function AttachScreenFrame({ look, children }: { look: ChatLook | null | 
     <View
       ref={self}
       collapsable={false}
-      style={[fillScreen, { minHeight: screenHeight }]}
+      style={fillScreen}
       onLayout={() => {
         measure()
         requestAnimationFrame(measure)
