@@ -368,7 +368,7 @@ export function AttachMenu({
                 <Text style={styles.cardLabel}>{t('imageSource.camera')}</Text>
               </Pressable>
 
-              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+              {!isIOS ? <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} /> : null}
             </>
           ) : null}
 
@@ -384,7 +384,7 @@ export function AttachMenu({
 
           {showGallery ? (
             <>
-              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+              {!isIOS ? <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} /> : null}
 
               <Pressable
                 onPress={openGallery}
@@ -404,7 +404,7 @@ export function AttachMenu({
 
           {showPersona ? (
             <>
-              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+              {!isIOS ? <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} /> : null}
 
               <Pressable
                 onPress={openPersonas}
@@ -426,7 +426,7 @@ export function AttachMenu({
 
           {showDirection ? (
             <>
-              <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} />
+              {!isIOS ? <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} /> : null}
 
               <Pressable
                 onPress={openDirection}
