@@ -45,6 +45,7 @@ import { withAlpha } from '@/lib/core/color'
 import { pickMessageImages, pictureUri } from '@/lib/images/attachments'
 import type { ImageSource } from '@/lib/images/images'
 import * as Haptics from '@/lib/ui/haptics'
+import { promptText } from '@/lib/ui/dialogs'
 import { showToast } from '@/lib/ui/toast'
 import { liquidGlass } from '@/lib/ui/nativeUI'
 import { alertError } from '@/lib/transfer/report'
@@ -92,6 +93,8 @@ type Props = {
   onSuggestionTaken?: () => void
   // A swipe to the left turns the suggestion down.
   onSuggestionDismissed?: () => void
+  // A swipe up opens the refine prompt to rewrite the suggestion.
+  onSuggestionRefine?: (wish: string) => void
   // Whether reasoning / thinking is active for this chat.
   thinking?: boolean
   onToggleThinking?: (thinking: boolean) => void
@@ -137,6 +140,7 @@ export function Composer({
   suggestion,
   onSuggestionTaken,
   onSuggestionDismissed,
+  onSuggestionRefine,
   thinking,
   onToggleThinking,
   persona,
@@ -286,6 +290,19 @@ export function Composer({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onSuggestionDismissed?.()
   }
+  const refineSuggestion = () => {
+    if (!suggestion) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    promptText({
+      title: t('chat.refineSuggestionTitle'),
+      message: t('chat.refineSuggestionMessage'),
+      confirmLabel: t('chat.refineConfirm'),
+      scheme,
+      onSubmit: (wish) => {
+        if (wish.trim()) onSuggestionRefine?.(wish.trim())
+      },
+    })
+  }
   const drawer = useChatDrawer()
   // While the attach menu is up the composer's gestures are off, as the drawer's drag is
   // (see suspend in ChatDrawer): the touch on the plus that opened it never ends for them.
@@ -295,10 +312,16 @@ export function Composer({
     .runOnJS(true)
     .enabled(suggesting && !menuUp)
     .activeOffsetX([-18, 18])
-    .failOffsetY([-14, 14])
+    .activeOffsetY(-18)
+    .failOffsetY(14)
     .onEnd((e) => {
-      if (e.translationX > 48) takeSuggestion()
-      else if (e.translationX < -48) dismissSuggestion()
+      if (e.translationY < -36 && Math.abs(e.translationY) > Math.abs(e.translationX)) {
+        refineSuggestion()
+      } else if (e.translationX > 48) {
+        takeSuggestion()
+      } else if (e.translationX < -48) {
+        dismissSuggestion()
+      }
     })
   const mode = editing
     ? value
