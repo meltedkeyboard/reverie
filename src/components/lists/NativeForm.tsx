@@ -85,6 +85,7 @@ type Footer = string | { text: string; danger?: boolean }[]
 export function NativeSection({
   title,
   footer,
+  footerNode,
   inset,
   id: name,
   fill,
@@ -93,6 +94,7 @@ export function NativeSection({
 }: {
   title?: string
   footer?: Footer
+  footerNode?: ReactNode
   inset?: number
   id?: string
   // The rows' color where it is not the theme's surface, as the cards of a sheet.
@@ -113,21 +115,23 @@ export function NativeSection({
         {title ? <Text>{title}</Text> : null}
       </VStack>
     ) : undefined
+  const sectionFooter =
+    footerNode !== undefined ? (
+      footerNode
+    ) : lines.length ? (
+      <VStack alignment="leading" spacing={6}>
+        {lines.map((line, i) => (
+          <Text key={i} modifiers={line.danger ? [foregroundStyle(colors.danger)] : []}>
+            {line.text}
+          </Text>
+        ))}
+      </VStack>
+    ) : undefined
   return (
     <Section
       title={header ? undefined : title}
       header={header}
-      footer={
-        lines.length ? (
-          <VStack alignment="leading" spacing={6}>
-            {lines.map((line, i) => (
-              <Text key={i} modifiers={line.danger ? [foregroundStyle(colors.danger)] : []}>
-                {line.text}
-              </Text>
-            ))}
-          </VStack>
-        ) : undefined
-      }
+      footer={sectionFooter}
       modifiers={[
         listRowBackground(fill ?? colors.surface),
         ...(name ? [id(name)] : []),

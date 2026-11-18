@@ -15,6 +15,7 @@ import {
   NativeSliderRow,
   NativeTextRow,
 } from '@/components/lists/NativeForm'
+import { Icon } from '@/components/visuals/Icon'
 import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
@@ -452,7 +453,22 @@ export default function SettingsScreen() {
 
   const suggestFooter = (
     <>
-      <ListFooter>{t('settings.suggestButtonNote')}</ListFooter>
+      <ListFooter>{t('settings.suggestIntro')}</ListFooter>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 }}>
+        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipe')}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          <Icon name="arrow-forward-outline" size={13} color={colors.textMuted} />
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipeRight')}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          <Icon name="arrow-back-outline" size={13} color={colors.textMuted} />
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipeLeft')}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          <Icon name="arrow-up-outline" size={13} color={colors.textMuted} />
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipeUp')}</Text>
+        </View>
+      </View>
       {suggestions && suggestionContextMode === 'all' ? (
         <ListFooter danger>{t('settings.suggestContextAllWarning')}</ListFooter>
       ) : null}
@@ -692,7 +708,7 @@ export default function SettingsScreen() {
   // The same page as the system's own list (iOS with SwiftUI). The model's chips and the rows
   // of chips for the sync and the backup stay React Native views in rows of their own.
   const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
-    const { Picker, Text: SwiftText, LabeledContent, HStack, Spacer, Toggle, Button: SwiftButton, Image, ProgressView, SwipeActions } = ui
+    const { Picker, Text: SwiftText, LabeledContent, HStack, VStack, Spacer, Toggle, Button: SwiftButton, Image, ProgressView, SwipeActions } = ui
     const { pickerStyle, tag, labelsHidden, disabled, id, tint, foregroundStyle, lineLimit } = modifiers
     const toggle = (name: string | null, label: string, isOn: boolean, onChange: (on: boolean) => void, off = false) => (
       <Toggle label={label} isOn={isOn} onIsOnChange={onChange} modifiers={[disabled(off), ...(name ? [id(name)] : [])]} />
@@ -780,12 +796,29 @@ export default function SettingsScreen() {
 
         <NativeSection
           id="suggest"
-          footer={[
-            { text: t('settings.suggestButtonNote') },
-            ...(suggestions && suggestionContextMode === 'all'
-              ? [{ text: t('settings.suggestContextAllWarning'), danger: true }]
-              : []),
-          ]}
+          footerNode={
+            <VStack alignment="leading" spacing={6}>
+              <SwiftText>{t('settings.suggestIntro')}</SwiftText>
+              <HStack spacing={10}>
+                <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{t('settings.suggestSwipe')}</SwiftText>
+                <HStack spacing={3}>
+                  <Image systemName="arrow.right" size={11} color={colors.textMuted} />
+                  <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{t('settings.suggestSwipeRight')}</SwiftText>
+                </HStack>
+                <HStack spacing={3}>
+                  <Image systemName="arrow.left" size={11} color={colors.textMuted} />
+                  <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{t('settings.suggestSwipeLeft')}</SwiftText>
+                </HStack>
+                <HStack spacing={3}>
+                  <Image systemName="arrow.up" size={11} color={colors.textMuted} />
+                  <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{t('settings.suggestSwipeUp')}</SwiftText>
+                </HStack>
+              </HStack>
+              {suggestions && suggestionContextMode === 'all' ? (
+                <SwiftText modifiers={[foregroundStyle(colors.danger)]}>{t('settings.suggestContextAllWarning')}</SwiftText>
+              ) : null}
+            </VStack>
+          }
         >
           {toggle(null, t('settings.suggestButton'), suggestions, toggleSuggestions)}
           {suggestions ? (
