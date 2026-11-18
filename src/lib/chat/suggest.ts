@@ -13,6 +13,11 @@ const SYSTEM = [
   'Reply with the message text only: no quotes around it, no labels, no explanations, and do not write for the characters.',
 ].join('\n')
 
+export interface SuggestionRefine {
+  original: string
+  wish: string
+}
+
 // onText gets everything streamed so far, once per frame; the finished text is returned.
 // maxTokens is the limit set in Settings.
 export async function suggestReply(
@@ -24,7 +29,8 @@ export async function suggestReply(
   history: Message[],
   signal: AbortSignal,
   onText: (text: string) => void,
-  direction?: string | null
+  direction?: string | null,
+  refine?: SuggestionRefine | null
 ) {
   const lines = contextMode === 'all' ? history : history.slice(-Math.max(1, messageCount))
   const transcript = lines
@@ -33,12 +39,16 @@ export async function suggestReply(
   const steer = direction?.trim()
     ? `\n\n---\n\nUser's direction for their reply (steer the message according to this):\n${direction.trim()}`
     : ''
+  const wish = refine?.wish.trim()
+  const refineBlock = wish
+    ? `\n\n---\n\nPreviously suggested reply:\n${refine?.original.trim() || '(none)'}\n\nInstruction to rewrite this reply:\n${wish}\n\nRewrite the reply according to the instruction.`
+    : ''
   const req = {
     messages: [
       { role: 'system' as const, content: SYSTEM },
       {
         role: 'user' as const,
-        content: `Scene brief:\n${scene.brief}\n\n---\n\nTranscript of the latest lines:\n${transcript}${steer}\n\n---\n\nWrite the user's next message.`,
+        content: `Scene brief:\n${scene.brief}\n\n---\n\nTranscript of the latest lines:\n${transcript}${steer}${refineBlock}\n\n---\n\nWrite the user's next message.`,
       },
     ],
     temperature: 0.8,
