@@ -268,8 +268,8 @@ export function AttachMenu({
   // them are the app's own, in rows of the list with nothing drawn under them; the camera
   // without the row, files, the persona and the thinking switch are the system's rows.
   if (nativeForm) {
-    const { Button: SwiftButton, Toggle, HStack, Text: SwiftText, Image } = nativeForm.ui
-    const { badge, foregroundStyle, tint } = nativeForm.modifiers
+    const { Button: SwiftButton, Toggle, HStack, Spacer, Text: SwiftText, Image } = nativeForm.ui
+    const { foregroundStyle, lineLimit, tint } = nativeForm.modifiers
     return (
       <View style={[styles.menuContainer, scrollStyle]}>
         <NativeSheetForm>
@@ -294,32 +294,39 @@ export function AttachMenu({
               </HStack>
             </SwiftButton>
             {showGallery ? (
-              <SwiftButton onPress={openGallery} modifiers={[badge(String(galleryCount))]}>
+              <SwiftButton onPress={openGallery}>
                 <HStack spacing={10}>
                   <Image systemName="photo.on.rectangle.angled" size={18} color={effectiveAccent} />
                   <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('gallery.title')}</SwiftText>
+                  <Spacer />
+                  <SwiftText modifiers={[foregroundStyle(colors.textMuted), lineLimit(1)]}>{String(galleryCount)}</SwiftText>
+                  <Image systemName="chevron.right" size={13} color={colors.textFaint} />
                 </HStack>
               </SwiftButton>
             ) : null}
             {showPersona ? (
-              <SwiftButton
-                onPress={openPersonas}
-                modifiers={[badge(session.persona?.name ? session.persona.name : t('attach.personaNone'))]}
-              >
+              <SwiftButton onPress={openPersonas}>
                 <HStack spacing={10}>
                   <Image systemName="person" size={18} color={effectiveAccent} />
                   <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('attach.persona')}</SwiftText>
+                  <Spacer />
+                  <SwiftText modifiers={[foregroundStyle(colors.textMuted), lineLimit(1)]}>
+                    {session.persona?.name ? session.persona.name : t('attach.personaNone')}
+                  </SwiftText>
+                  <Image systemName="chevron.right" size={13} color={colors.textFaint} />
                 </HStack>
               </SwiftButton>
             ) : null}
             {showDirection ? (
-              <SwiftButton
-                onPress={openDirection}
-                modifiers={directionSummary ? [badge(directionSummary)] : []}
-              >
+              <SwiftButton onPress={openDirection}>
                 <HStack spacing={10}>
                   <Image systemName="signpost.right" size={18} color={effectiveAccent} />
                   <SwiftText modifiers={[foregroundStyle(colors.text)]}>{t('direction.title')}</SwiftText>
+                  <Spacer />
+                  {directionSummary ? (
+                    <SwiftText modifiers={[foregroundStyle(colors.textMuted), lineLimit(1)]}>{directionSummary}</SwiftText>
+                  ) : null}
+                  <Image systemName="chevron.right" size={13} color={colors.textFaint} />
                 </HStack>
               </SwiftButton>
             ) : null}
