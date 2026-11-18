@@ -188,10 +188,15 @@ export function databaseDirectory(): string | undefined {
 export async function keepCopy(db: SQLiteDatabase) {
   const backups = new Directory(storageRoot, 'backups')
   backups.create({ intermediates: true, idempotent: true })
+  const name = `before-sync-${DATABASE_NAME}`
   if (isWeb) {
-    new File(backups, DATABASE_NAME).writeSync(await db.serializeAsync('main'))
+    new File(backups, name).writeSync(await db.serializeAsync('main'))
     return
   }
-  const path = `${plainPath(backups)}/before-sync-${DATABASE_NAME}`
+  for (const suffix of ['', '-wal', '-shm', '-journal']) {
+    const f = new File(backups, `${name}${suffix}`)
+    if (f.exists) f.delete()
+  }
+  const path = `${plainPath(backups)}/${name}`
   await db.execAsync(`VACUUM INTO '${path.replace(/'/g, "''")}'`)
 }
