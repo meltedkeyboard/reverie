@@ -677,9 +677,19 @@ export function Composer({
               >
                 <Text
                   style={styles.ghostText}
+                  numberOfLines={GHOST_MAX_LINES}
+                  ellipsizeMode="tail"
+                  onLayout={(e) => setGhostHeight(e.nativeEvent.layout.height)}
+                >
+                  {suggestion}
+                </Text>
+                <Text
+                  style={[styles.ghostText, styles.ghostMeasure]}
+                  aria-hidden
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
                   onLayout={(e) => {
                     const h = e.nativeEvent.layout.height
-                    setGhostHeight(h)
                     if (h > GHOST_MAX_HEIGHT) {
                       Haptics.setSuggestionOverflowed(true)
                     }
@@ -890,6 +900,7 @@ const NO_FADES = { top: false, bottom: false }
 const ONE_LINE_INPUT = 38
 const DOCKED_INPUT = 42
 const GHOST_MAX_HEIGHT = 164
+const GHOST_MAX_LINES = Math.floor(GHOST_MAX_HEIGHT / 22)
 // The bar's padding around the field (the bottom one comes on top of the safe area).
 const BAR_PAD_TOP = 8
 const BAR_PAD_BOTTOM = 8
@@ -999,6 +1010,7 @@ const createStyles = (colors: Colors) =>
   },
   ghost: { position: 'absolute', maxHeight: GHOST_MAX_HEIGHT, overflow: 'hidden' },
   ghostText: { color: colors.textMuted, fontSize: 17, lineHeight: 22 },
+  ghostMeasure: { position: 'absolute', top: 0, left: 0, right: 0, opacity: 0 },
   inputDocked: { paddingTop: 12, paddingBottom: 8 },
   tools: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   dockGroup: {
