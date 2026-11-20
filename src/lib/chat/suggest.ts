@@ -1,8 +1,10 @@
-import type { Message } from '@/db/messages'
+import type { ContentPart } from '@/api/llm'
+import type { Message, MessageImage } from '@/db/messages'
 import type { ServerSettings } from '@/db/prefs/settings'
 import type { SuggestionContextMode } from '@/db/prefs/suggestions'
 import type { AsideScene } from '@/lib/chat/aside'
 import { runReplyStream } from '@/lib/chat/replyStream'
+import { attachmentUri } from '@/lib/images/attachments'
 
 const LINE_MAX = 800
 
@@ -10,12 +12,14 @@ const SYSTEM = [
   'You predict what the user will write next in a roleplay chat.',
   'You get a brief of the scene and a transcript of its latest lines. Write the next message the user would most plausibly send, in the first person, in their voice and in the language of the transcript.',
   'Match the format the user has used so far (actions in asterisks, speech, length). Keep it to one to three sentences.',
+  'If images are attached as reference, write a message that naturally accompanies, reacts to, or refers to them as the user sending them.',
   'Reply with the message text only: no quotes around it, no labels, no explanations, and do not write for the characters.',
 ].join('\n')
 
 export interface SuggestionRefine {
   original: string
   wish: string
+  images?: MessageImage[]
 }
 
 // onText gets everything streamed so far, once per frame; the finished text is returned.
@@ -30,7 +34,8 @@ export async function suggestReply(
   signal: AbortSignal,
   onText: (text: string) => void,
   direction?: string | null,
-  refine?: SuggestionRefine | null
+  refine?: SuggestionRefine | null,
+  images?: MessageImage[]
 ) {
   const lines = contextMode === 'all' ? history : history.slice(-Math.max(1, messageCount))
   const transcript = lines
@@ -39,16 +44,30 @@ export async function suggestReply(
   const steer = direction?.trim()
     ? `\n\n---\n\nUser's direction for their reply (steer the message according to this):\n${direction.trim()}`
     : ''
-  const wish = refine?.wish.trim()
-  const refineBlock = wish
-    ? `\n\n---\n\nPreviously suggested reply:\n${refine?.original.trim() || '(none)'}\n\nInstruction to rewrite this reply:\n${wish}\n\nRewrite the reply according to the instruction.`
+  const attachedImages = refine?.images ?? images ?? []
+  const pictures: ContentPart[] = attachedImages.map((image) => ({
+    type: 'image_url' as const,
+    image_url: { url: attachmentUri(image.file) },
+  }))
+  const imageNote = pictures.length
+    ? `\n\n---\n\nThe user has attached ${pictures.length === 1 ? 'this photo' : `${pictures.length} photos`} to their message as reference.`
     : ''
+  const wish = refine?.wish.trim()
+  const refineInstruction = wish || (pictures.length ? 'Incorporate and react to the attached photo(s) naturally in character.' : '')
+  const refineBlock = refineInstruction
+    ? `\n\n---\n\nPreviously suggested reply:\n${refine?.original.trim() || '(none)'}\n\nInstruction to rewrite this reply:\n${refineInstruction}\n\nRewrite the reply according to the instruction${pictures.length ? ' and the attached photo(s)' : ''}.`
+    : ''
+  const promptText = `Scene brief:\n${scene.brief}\n\n---\n\nTranscript of the latest lines:\n${transcript}${steer}${imageNote}${refineBlock}\n\n---\n\nWrite the user's next message.`
+  const userContent: string | ContentPart[] = pictures.length
+    ? [...pictures, { type: 'text' as const, text: promptText }]
+    : promptText
+
   const req = {
     messages: [
       { role: 'system' as const, content: SYSTEM },
       {
         role: 'user' as const,
-        content: `Scene brief:\n${scene.brief}\n\n---\n\nTranscript of the latest lines:\n${transcript}${steer}${refineBlock}\n\n---\n\nWrite the user's next message.`,
+        content: userContent,
       },
     ],
     temperature: 0.8,

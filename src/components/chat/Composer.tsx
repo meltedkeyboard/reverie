@@ -53,6 +53,7 @@ import { isAndroid, isDesktop, isIOS, isWeb } from '@/lib/core/platform'
 import { type Colors, ON_ACCENT, useColors, useStyles, useTheme } from '@/theme'
 import { useRouter } from 'expo-router'
 import type { Persona } from '@/db/personas'
+import { isSuggestionImagesReferenceEnabled } from '@/db/prefs/suggestions'
 import { finishAttachSession, setAttachAfter, setAttachSession, type AttachSession } from '@/lib/chat/attachSession'
 
 type Props = {
@@ -83,6 +84,7 @@ type Props = {
   // being swapped for another one.
   initialText?: string
   onTextChange?: (text: string) => void
+  onImagesChange?: (images: MessageImage[]) => void
   // Which chat the field writes to: a new one sets the field to `initialText` and drops
   // the pictures, the field itself staying as it is (a chat switched to in place).
   resetKey?: string | number
@@ -94,7 +96,7 @@ type Props = {
   // A swipe to the left turns the suggestion down.
   onSuggestionDismissed?: () => void
   // A swipe up opens the refine prompt to rewrite the suggestion.
-  onSuggestionRefine?: (wish: string) => void
+  onSuggestionRefine?: (wish: string, images?: MessageImage[]) => void
   // Whether reasoning / thinking is active for this chat.
   thinking?: boolean
   onToggleThinking?: (thinking: boolean) => void
@@ -133,6 +135,7 @@ export function Composer({
   placeholder,
   initialText = '',
   onTextChange,
+  onImagesChange,
   resetKey,
   autoFocus = false,
   onContinueLongPress,
@@ -208,6 +211,9 @@ export function Composer({
     setText(next)
   }
   const [images, setImages] = useState<MessageImage[]>([])
+  useEffect(() => {
+    onImagesChange?.(images)
+  }, [images, onImagesChange])
   picturedRef.current = images.length > 0 && !editing
   const [picking, setPicking] = useState(false)
   const imageUris = useMemo(() => images.map(pictureUri), [images])
@@ -257,7 +263,7 @@ export function Composer({
   }, [text])
 
   const value = text.trim()
-  const suggesting = !editing && !value && !images.length && !!suggestion
+  const suggesting = !editing && !value && !!suggestion
   suggestingRef.current = suggesting
   // The suggestion ending (taken, dismissed, a new message) lets the wrapped state go.
   useEffect(() => {
@@ -290,16 +296,21 @@ export function Composer({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onSuggestionDismissed?.()
   }
-  const refineSuggestion = () => {
+  const refineSuggestion = async () => {
     if (!suggestion) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    const imagesRefEnabled = await isSuggestionImagesReferenceEnabled(db)
+    const imagesNote = imagesRefEnabled && images.length
+      ? `\n\n${t('chat.refineSuggestionImagesNote', { count: images.length })}`
+      : ''
     promptText({
       title: t('chat.refineSuggestionTitle'),
-      message: t('chat.refineSuggestionMessage'),
+      message: `${t('chat.refineSuggestionMessage')}${imagesNote}`,
       confirmLabel: t('chat.refineConfirm'),
       scheme,
       onSubmit: (wish) => {
-        if (wish.trim()) onSuggestionRefine?.(wish.trim())
+        const trimmed = wish.trim()
+        if (trimmed || images.length) onSuggestionRefine?.(trimmed, images)
       },
     })
   }

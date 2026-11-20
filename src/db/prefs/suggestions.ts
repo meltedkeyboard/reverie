@@ -24,3 +24,9 @@ export const saveSuggestionContextMode = suggestionContextMode.save
 const suggestionMessages = defineNumber('reply_suggestion_messages', SUGGESTION_MESSAGES.min, SUGGESTION_MESSAGES.max, SUGGESTION_MESSAGES.default)
 export const loadSuggestionMessages = suggestionMessages.load
 export const saveSuggestionMessages = suggestionMessages.save
+
+// Whether images attached in the composer are considered reference inputs for reply suggestions.
+const suggestionImagesReference = defineFlag('reply_suggestion_images_reference', true)
+export const isSuggestionImagesReferenceEnabled = suggestionImagesReference.load
+export const setSuggestionImagesReferenceEnabled = suggestionImagesReference.save
+

@@ -43,6 +43,7 @@ import { useDatabase } from '@/db/provider'
 import { DEFAULT_SETTINGS, loadSettings, saveContextLimits, serverName, typedCount, updateServer, type ContextLimits } from '@/db/prefs/settings'
 import {
   isSuggestionsEnabled,
+  isSuggestionImagesReferenceEnabled,
   loadSuggestionContextMode,
   loadSuggestionMessages,
   loadSuggestionTokens,
@@ -50,6 +51,7 @@ import {
   saveSuggestionMessages,
   saveSuggestionTokens,
   setSuggestionsEnabled,
+  setSuggestionImagesReferenceEnabled,
   SUGGESTION_MESSAGES,
   SUGGESTION_TOKENS,
   type SuggestionContextMode,
@@ -183,6 +185,11 @@ export default function SettingsScreen() {
   const [continueByVisit, setContinueByVisitValue] = useStoredFlag(isContinueByVisit, setContinueByVisit, true)
   const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
   const [suggestions, toggleSuggestions] = useStoredFlag(isSuggestionsEnabled, setSuggestionsEnabled, false)
+  const [suggestionImagesReference, toggleSuggestionImagesReference] = useStoredFlag(
+    isSuggestionImagesReferenceEnabled,
+    setSuggestionImagesReferenceEnabled,
+    true
+  )
   const [suggestionTokens, setSuggestionTokens] = useState<number>(SUGGESTION_TOKENS.default)
   const [suggestionContextMode, setSuggestionContextMode] = useState<SuggestionContextMode>('limit')
   const [suggestionMessages, setSuggestionMessages] = useState<number>(SUGGESTION_MESSAGES.default)
@@ -512,6 +519,11 @@ export default function SettingsScreen() {
               onValueChange={toggleSuggestionHaptics}
             />
           ) : null}
+          <SwitchCell
+            label={t('settings.suggestImagesReference')}
+            value={suggestionImagesReference}
+            onValueChange={toggleSuggestionImagesReference}
+          />
         </>
       ) : null}
     </ListSection>
@@ -848,6 +860,7 @@ export default function SettingsScreen() {
                 }}
               />
               {haptics ? toggle(null, t('settings.suggestionHaptics'), suggestionHaptics, toggleSuggestionHaptics) : null}
+              {toggle(null, t('settings.suggestImagesReference'), suggestionImagesReference, toggleSuggestionImagesReference)}
             </>
           ) : null}
         </NativeSection>

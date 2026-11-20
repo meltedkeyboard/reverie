@@ -779,11 +779,13 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const idle = phase === 'idle'
   // The chat of a character in the archive is there to be read.
   const archived = character.archivedAt !== null
+  const composerImagesRef = useRef<MessageImage[]>([])
   const [suggestion, clearSuggestion, dismissSuggestion, refineSuggestion] = useSuggestion(
     scene,
     messages,
     suggestEnabled && idle && !asideOpen && !editingRow && !archived,
-    direction.suggestionText
+    direction.suggestionText,
+    () => composerImagesRef.current
   )
   // Changing the conversation while a reply streams or a message is edited would pull
   // the context out from under it, so only reading actions stay available then.
@@ -870,6 +872,11 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
           : (text) => {
               sceneDraft.current = text
               setDraft(db, chatId, text)
+            },
+        onImagesChange: asideOpen
+          ? undefined
+          : (images) => {
+              composerImagesRef.current = images
             },
         autoFocus: asideOpen,
         generating: asideOpen ? aside.phase !== 'idle' : !idle,

@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { Message } from '@/db/messages'
+import type { Message, MessageImage } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { loadSettings } from '@/db/prefs/settings'
-import { loadSuggestionContextMode, loadSuggestionMessages, loadSuggestionTokens } from '@/db/prefs/suggestions'
+import {
+  isSuggestionImagesReferenceEnabled,
+  loadSuggestionContextMode,
+  loadSuggestionMessages,
+  loadSuggestionTokens,
+} from '@/db/prefs/suggestions'
 import type { AsideScene } from '@/lib/chat/aside'
 import { suggestReply, type SuggestionRefine } from '@/lib/chat/suggest'
 import { isSuggestionOverflowed, setSuggestionOverflowed, suggestionFinishAsync } from '@/lib/ui/haptics'
@@ -11,7 +16,13 @@ import { isSuggestionOverflowed, setSuggestionOverflowed, suggestionFinishAsync 
 // A guess at the user's next message, asked for once the characters have finished their
 // turn and streamed into the field as it is written. A failed request just leaves the
 // field without a suggestion.
-export function useSuggestion(scene: AsideScene, messages: Message[], enabled: boolean, direction?: string | null) {
+export function useSuggestion(
+  scene: AsideScene,
+  messages: Message[],
+  enabled: boolean,
+  direction?: string | null,
+  getComposerImages?: () => MessageImage[]
+) {
   const db = useDatabase()
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const suggestionRef = useRef<string | null>(null)
@@ -21,6 +32,8 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
   messagesRef.current = messages
   const directionRef = useRef(direction)
   directionRef.current = direction
+  const getComposerImagesRef = useRef(getComposerImages)
+  getComposerImagesRef.current = getComposerImages
   const ctrlRef = useRef<AbortController | null>(null)
   const refineRef = useRef<SuggestionRefine | null>(null)
   const [refineCycle, setRefineCycle] = useState(0)
@@ -64,9 +77,13 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
       loadSuggestionTokens(db),
       loadSuggestionContextMode(db),
       loadSuggestionMessages(db),
+      isSuggestionImagesReferenceEnabled(db),
     ])
-      .then(([cfg, maxTokens, contextMode, messageCount]) =>
-        suggestReply(
+      .then(([cfg, maxTokens, contextMode, messageCount, imagesRefEnabled]) => {
+        const composerImages = imagesRefEnabled
+          ? (currentRefine?.images ?? getComposerImagesRef.current?.() ?? [])
+          : []
+        return suggestReply(
           cfg,
           maxTokens,
           contextMode,
@@ -76,9 +93,10 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
           ctrl.signal,
           show,
           directionRef.current,
-          currentRefine
+          currentRefine,
+          composerImages
         )
-      )
+      })
       .then((finalText) => {
         show(finalText)
         if (finalText && !ctrl.signal.aborted && isSuggestionOverflowed()) {
@@ -109,9 +127,9 @@ export function useSuggestion(scene: AsideScene, messages: Message[], enabled: b
   }, [clear])
 
   const refine = useCallback(
-    (wish: string) => {
-      if (!source || !wish.trim()) return
-      refineRef.current = { original: suggestionRef.current ?? '', wish: wish.trim() }
+    (wish: string, images?: MessageImage[]) => {
+      if (!source || (!wish.trim() && !images?.length)) return
+      refineRef.current = { original: suggestionRef.current ?? '', wish: wish.trim(), images }
       setDismissed(false)
       setRefineCycle((c) => c + 1)
     },

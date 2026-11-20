@@ -214,11 +214,13 @@ export function RoomController({
   }, [members])
 
   const idle = phase === 'idle'
+  const composerImagesRef = useRef<MessageImage[]>([])
   const [suggestion, clearSuggestion, dismissSuggestion, refineSuggestion] = useSuggestion(
     scene,
     messages,
     suggestEnabled && idle && !asideOpen && !editingRow,
-    direction.suggestionText
+    direction.suggestionText,
+    () => composerImagesRef.current
   )
   const locked = !idle || editingRow !== null
   const byId = useMemo(() => new Map(members.map((m) => [m.characterId, m])), [members])
@@ -463,6 +465,11 @@ export function RoomController({
           : (text) => {
               sceneDraft.current = text
               setDraft(db, chatId, text)
+            },
+        onImagesChange: asideOpen
+          ? undefined
+          : (images) => {
+              composerImagesRef.current = images
             },
         autoFocus: asideOpen,
         generating: asideOpen ? aside.phase !== 'idle' : !idle,
