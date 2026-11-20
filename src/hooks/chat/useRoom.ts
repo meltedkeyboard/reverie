@@ -174,7 +174,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   }, [chat.id, chat.thinking])
 
   const modes = new Set(members.map((m) => m.character.thinking))
-  const defaultMode: ThinkingMode = modes.size === 1 ? [...modes][0] : 'auto'
+  const defaultMode: ThinkingMode = modes.size === 1 ? [...modes][0] : 'off'
   const thinking = chatThinking !== null ? chatThinking === 'on' : defaultMode === 'on'
 
   const toggleThinking = useCallback(

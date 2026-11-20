@@ -24,13 +24,12 @@ export type ChatRequest = {
   // What thinking may take on top of maxTokens; none is added with thinking off.
   reasoningBudget?: number
   topP: number
-  // 'auto' omits the field entirely, leaving thinking mode to the server's own setting.
+  // 'on' enables thinking; 'off' disables it.
   thinking: ThinkingMode
 }
 
 // max_tokens covers the thought and the reply together, so the thinking budget is added
-// to the reply's own. With 'auto' the model may or may not think, so it is added too: it
-// is only a ceiling.
+// to the reply's own when thinking is not off.
 export function tokenLimit(req: Pick<ChatRequest, 'maxTokens' | 'reasoningBudget' | 'thinking'>) {
   return req.maxTokens + (req.thinking === 'off' ? 0 : (req.reasoningBudget ?? 0))
 }
@@ -397,10 +396,8 @@ export async function inspectLoadedModel(cfg: Server, fresh = false): Promise<Lo
 // and lets the model answer, so the budget holds there whatever the model's habits;
 // elsewhere it is only the share of max_tokens set aside for thinking.
 async function reasoningFields(cfg: Server, base: string, mode: ThinkingMode, budget?: number) {
-  if (mode === 'auto' && !budget) return {}
   const server = await detectServer(cfg, base)
   const capped = server.kind === 'lmstudio' && mode !== 'off' && budget ? { thinking_budget_tokens: budget } : {}
-  if (mode === 'auto') return capped
   const kwargs = { chat_template_kwargs: { enable_thinking: mode === 'on' } }
   // Ollama's reasoning models think by default, so only "off" needs its own field.
   if (server.kind === 'ollama') return mode === 'off' ? { ...kwargs, reasoning_effort: 'none' } : kwargs

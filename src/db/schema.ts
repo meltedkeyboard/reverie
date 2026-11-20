@@ -398,6 +398,11 @@ const MIGRATIONS = [
   `
     ALTER TABLE chats ADD COLUMN suggestion_direction TEXT;
   `,
+  // Migrate legacy 'auto' thinking mode to 'off'.
+  `
+    UPDATE characters SET thinking = 'off' WHERE thinking = 'auto';
+    UPDATE chats SET thinking = 'off' WHERE thinking = 'auto';
+  `,
 ]
 
 // The schema version this build writes, for telling a database from a newer app apart.

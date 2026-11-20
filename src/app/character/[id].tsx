@@ -69,9 +69,8 @@ export default function CharacterEditorScreen() {
   const { exportTargets } = useCardExport()
 
   const THINKING_OPTIONS: { value: ThinkingMode; label: string }[] = [
-    { value: 'auto', label: t('editor.thinkingAuto') },
-    { value: 'on', label: t('editor.thinkingOn') },
     { value: 'off', label: t('editor.thinkingOff') },
+    { value: 'on', label: t('editor.thinkingOn') },
   ]
 
   const [ready, setReady] = useState(isNew)
@@ -101,7 +100,7 @@ export default function CharacterEditorScreen() {
   const [reasoningBudget, setReasoningBudget] = useState<number>(DEFAULT_SAMPLING.reasoningBudget)
   const [topP, setTopP] = useState<number>(DEFAULT_SAMPLING.topP)
   const [replyLimit, setReplyLimit] = useState<number | null>(null)
-  const [thinking, setThinking] = useState<ThinkingMode>('auto')
+  const [thinking, setThinking] = useState<ThinkingMode>('off')
   const [background, setBackground] = useState<string | null>(null)
   const [backgroundOriginal, setBackgroundOriginal] = useState<string | null>(null)
   const [backgroundCrop, setBackgroundCrop] = useState<string | null>(null)

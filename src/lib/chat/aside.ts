@@ -77,7 +77,7 @@ export function roomScene(room: Room, members: RoomMember[]): AsideScene {
       if (m.audience) return targets.length ? `${who} (whispering to ${targets.join(', ')})` : `${who} (whispering)`
       return targets.length ? `${who} (to ${targets.join(', ')})` : who
     },
-    thinking: modes.size === 1 ? [...modes][0] : 'auto',
+    thinking: modes.size === 1 ? [...modes][0] : 'off',
     // The most any member is allowed, so no one's answer is cut shorter than their own.
     maxTokens: Math.max(DEFAULT_SAMPLING.maxTokens, ...members.map((m) => m.character.maxTokens)),
     reasoningBudget: Math.max(DEFAULT_SAMPLING.reasoningBudget, ...members.map((m) => m.character.reasoningBudget)),

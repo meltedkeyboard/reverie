@@ -24,7 +24,7 @@ export type CharacterFields = {
   topP: number
   // Paragraphs kept before the reply is cut off; null leaves it unbounded.
   replyLimit: number | null
-  // 'auto' leaves thinking mode to the server's own setting; 'on'/'off' override it.
+  // 'on' enables thinking; 'off' disables it.
   thinking: ThinkingMode
   // File name of the picture behind the character's chats, like an avatar's.
   background: string | null
@@ -39,7 +39,7 @@ export type CharacterFields = {
   backgroundTone: BackgroundTone
 }
 
-export type ThinkingMode = 'auto' | 'on' | 'off'
+export type ThinkingMode = 'on' | 'off'
 
 // 'dim' lays the theme's own background over the picture; 'dim-light' and 'dim-dark' lay
 // the light or the dark one whatever the theme. Stored as text, so older rows and
@@ -79,7 +79,7 @@ export function newCharacterFields(name: string, systemPrompt: string): Characte
     notes: '',
     ...DEFAULT_SAMPLING,
     replyLimit: null,
-    thinking: 'auto',
+    thinking: 'off',
     background: null,
     backgroundOriginal: null,
     backgroundCrop: null,
