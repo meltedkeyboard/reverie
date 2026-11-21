@@ -743,6 +743,95 @@ private struct StackMeasurementKey: Hashable {`,
   private var compactColumnBinding: Binding<NavigationSplitViewColumn> {`,
     'NavigationSplitViewView.swift (compactColumnBinding)'
   )
+
+  // UniversalLayout: MeasuredChild & MeasuredChildren
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private struct MeasuredChild {`,
+    `@available(iOS 16.0, *)
+private struct MeasuredChild {`,
+    'UniversalLayout.swift (MeasuredChild)'
+  )
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private struct MeasuredChildren {`,
+    `@available(iOS 16.0, *)
+private struct MeasuredChildren {`,
+    'UniversalLayout.swift (MeasuredChildren)'
+  )
+
+  // UniversalLayout: stackSpacings
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private func stackSpacings(subviews: LayoutSubviews, explicit: CGFloat?) -> [CGFloat] {`,
+    `@available(iOS 16.0, *)
+private func stackSpacings(subviews: LayoutSubviews, explicit: CGFloat?) -> [CGFloat] {`,
+    'UniversalLayout.swift (stackSpacings)'
+  )
+
+  // ViewModifierRegistry: TintModifier
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/ViewModifierRegistry.swift',
+    `internal struct TintModifier: ViewModifier, Record {
+  @Field var tint: ShapeStyleValue?
+
+  func body(content: Content) -> some View {
+    if let shapeStyle = tint?.toAnyShapeStyle() {
+      content.tint(shapeStyle)
+    } else {
+      content
+    }
+  }
+}`,
+    `internal struct TintModifier: ViewModifier, Record {
+  @Field var tint: ShapeStyleValue?
+
+  func body(content: Content) -> some View {
+    if #available(iOS 16.0, *), let shapeStyle = tint?.toAnyShapeStyle() {
+      content.tint(shapeStyle)
+    } else {
+      content
+    }
+  }
+}`,
+    'ViewModifierRegistry.swift (TintModifier)'
+  )
+
+  // ViewModifierRegistry: listRowSeparatorLeading & listRowSeparatorTrailing
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/ViewModifierRegistry.swift',
+    `    case .listRowSeparatorLeading:
+#if os(tvOS)
+      return nil
+#else
+      return .listRowSeparatorLeading
+#endif
+    case .listRowSeparatorTrailing:
+#if os(tvOS)
+      return nil
+#else
+      return .listRowSeparatorTrailing
+#endif`,
+    `    case .listRowSeparatorLeading:
+#if os(tvOS)
+      return nil
+#else
+      if #available(iOS 16.0, *) {
+        return .listRowSeparatorLeading
+      }
+      return nil
+#endif
+    case .listRowSeparatorTrailing:
+#if os(tvOS)
+      return nil
+#else
+      if #available(iOS 16.0, *) {
+        return .listRowSeparatorTrailing
+      }
+      return nil
+#endif`,
+    'ViewModifierRegistry.swift (listRowSeparatorLeading/Trailing)'
+  )
 }
 
 patchPodspecsIn(path.resolve('node_modules'))
