@@ -95,7 +95,12 @@ final class ConfirmButtonView: ExpoView {
     })
     sheet.addAction(UIAlertAction(title: cancel, style: .cancel))
     sheet.overrideUserInterfaceStyle = overrideUserInterfaceStyle
-    sheet.popoverPresentationController?.sourceItem = button
+    if #available(iOS 16.0, *) {
+      sheet.popoverPresentationController?.sourceItem = button
+    } else {
+      sheet.popoverPresentationController?.sourceView = button
+      sheet.popoverPresentationController?.sourceRect = button.bounds
+    }
     appContext?.utilities?.currentViewController()?.present(sheet, animated: true)
   }
 }
