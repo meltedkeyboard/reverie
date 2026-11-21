@@ -11,6 +11,7 @@
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#0F0F12",
     "ios": {
+      "deploymentTarget": "15.1",
       "supportsTablet": true,
       "bundleIdentifier": "reverie.app",
       "infoPlist": {
@@ -90,6 +91,7 @@
       "expo-font",
       "./tools/plugins/android-lint",
       "./tools/plugins/ios-settings",
+      "./tools/plugins/ios-deployment-target",
       ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }],
       [
         "expo-alternate-app-icons",

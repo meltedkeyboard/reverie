@@ -11,7 +11,7 @@
     "desktop:build": "expo export -p web && electron-builder",
     "typecheck": "tsc --noEmit",
     "icons": "node tools/build-icons.mjs",
-    "postinstall": "patch-package --patch-dir tools/patches && node tools/build-icons.mjs"
+    "postinstall": "patch-package --patch-dir tools/patches && node tools/build-icons.mjs && node tools/ios15-compat.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
