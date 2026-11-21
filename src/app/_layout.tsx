@@ -29,6 +29,8 @@ import { useStoredValue } from '@/hooks/util/useStoredFlag'
 import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
 import { finishGalleryPick } from '@/lib/images/galleryPick'
 import { castDetent, finishCastSession } from '@/lib/chat/castSession'
+import { finishThoughtSession, markThoughtClosing } from '@/lib/chat/thoughtSession'
+import { ThoughtSheetHost } from '@/components/chat/ThoughtSheet'
 import { cropSheetDetents, cropSheetDown } from '@/lib/images/avatarCropLook'
 import { lookSheetDetents, lookSheetDown } from '@/lib/images/backgroundLook'
 import { ChatTextProvider } from '@/lib/chat/chatText'
@@ -263,11 +265,41 @@ function AppShell() {
                   },
                 }}
               />
+              {/* A message's thought/reasoning sheet, the system sheet of iOS:
+                  pulled up to full height, down to close. Content scrolls freely without expanding. */}
+              <Stack.Screen
+                name="thought"
+                options={() => ({
+                  presentation: 'formSheet',
+                  title: '',
+                  sheetAllowedDetents: [0.7, 1],
+                  sheetExpandsWhenScrolledToEdge: false,
+                  sheetGrabberVisible: true,
+                  headerShown: true,
+                  headerBackVisible: false,
+                  headerTransparent: true,
+                  headerBlurEffect: 'regular',
+                  headerLargeStyle: { backgroundColor: 'transparent' },
+                  headerStyle: { backgroundColor: 'transparent' },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                  contentStyle: { backgroundColor: sheetTones.sheet },
+                })}
+                listeners={{
+                  transitionStart: (e) => {
+                    if (e.data.closing) markThoughtClosing()
+                  },
+                  transitionEnd: (e) => {
+                    if (e.data.closing) finishThoughtSession()
+                  },
+                }}
+              />
             </Stack>
           </View>
         </View>
         <DialogHost />
         <ToastHost />
+        <ThoughtSheetHost />
         <SyncProgressPill />
       </ThemeProvider>
     </>

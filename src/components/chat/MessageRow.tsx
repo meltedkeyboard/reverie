@@ -1,6 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import * as Clipboard from 'expo-clipboard'
 import { Image } from 'expo-image'
+import { useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -19,8 +20,10 @@ import * as Haptics from '@/lib/ui/haptics'
 import { pictureUri } from '@/lib/images/attachments'
 import type { Corners } from '@/lib/images/viewer'
 import { CHAT_METRICS, useChatText } from '@/lib/chat/chatText'
+import { openThought, thoughtFirstWords, thoughtSession } from '@/lib/chat/thoughtSession'
 import { menuItems, messageActions, type MessageAction } from '@/lib/chat/messageActions'
 import { useColors, useStyles, useTheme, type Colors } from '@/theme'
+import type { ChatLook } from '@/components/chrome/ChatChrome'
 
 import { Avatar } from '../visuals/Avatar'
 import { IconButton } from '../controls/IconButton'
@@ -276,6 +279,9 @@ function MessageRowView({ message, canRegenerate, locked, onAction, onSelectVari
           ms={thought.ms}
           memory={message.streaming ? liveThought(message.chatId) : `${message.id}:${message.variant}`}
           chatId={message.chatId}
+          speakerName={speaker?.name}
+          speakerAvatar={speaker?.avatar}
+          speakerColor={speaker?.color}
         />
       ) : null}
       {waiting && thought ? null : waiting ? (
@@ -495,45 +501,23 @@ function ActionBar({ message, actions, locked, onAction, onSelectVariant, rich }
 const SF_BOX = Math.round(15 * 1.3)
 const ICON_SYMBOL = 0.85
 
-// Roughly four lines on a phone: enough to see the model is working, not a wall of text.
-const THINKING_TAIL = 220
-// Longer than this a press on the thought's lines is the start of a selection, not a tap.
-const LINES_TAP_MS = 300
-// How long after a selection is cleared a tap is still the one that cleared it.
-const SELECTION_CLEAR_MS = 400
 // How long after the finger lifts from text being written it is still held, for the
 // selection of a long press to be told.
 const HOLD_RELEASE_MS = 150
 
-type ThoughtProps = {
+export type ThoughtProps = {
   text: string
   // Null while the model is still thinking.
   ms: number | null
-  // What it is remembered as unfolded by: the message and its version, or the chat whose
-  // reply is being written. Without it the block forgets once it is gone.
   memory?: string
   chatId?: number
+  speakerName?: string
+  speakerAvatar?: string | null
+  speakerColor?: string | null
+  look?: ChatLook | null
 }
 
-// The thoughts the reader unfolded, kept outside the rows: a cell of the list is handed
-// another message once its own scrolls away (sending a message scrolls to the new reply),
-// and a thought kept open in the cell folded up with it.
-const unfolded = new Set<string>()
-// The latest text of the thought of the reply being written in each chat. The saved reply
-// with the same thought opens as that one was left, and a new reply whose thought does not
-// go on from it starts folded.
-const liveTexts = new Map<string, string>()
 const liveThought = (chatId: number) => `live:${chatId}`
-
-// Whether a block comes up unfolded, and whether that is taken over from the reply written.
-function wasUnfolded(memory: string | undefined, chatId: number | undefined, text: string) {
-  if (!memory || chatId === undefined) return { open: false, carried: false }
-  const live = liveThought(chatId)
-  if (memory === live) return { open: unfolded.has(live) && text.startsWith(liveTexts.get(live) ?? ''), carried: false }
-  if (unfolded.has(memory)) return { open: true, carried: false }
-  const carried = unfolded.has(live) && liveTexts.get(live) === text
-  return { open: carried, carried }
-}
 
 // Text being written is replaced with every frame, and each replacement dropped a
 // selection under way. A finger on it holds the text as it was until the finger lets go
@@ -574,36 +558,67 @@ function useHeldText(active: boolean, text: string) {
   return { shown: held ?? text, selection, onSelect, touch }
 }
 
-// Folded by default like in ChatGPT. While the model thinks, the folded block
-// shows the latest lines so it is clear something is happening; afterwards only the
-// header stays, and a tap unfolds the whole reasoning either way.
-export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
+// While the model thinks, a compact shimmering row shows the first words and an arrow indicating
+// it is clickable; tapping it opens the native drawer sheet where the live thought text can be
+// viewed in real time. Afterwards, tapping the completed reasoning row opens the drawer as well.
+export function ThoughtBlock({ text, ms, memory, chatId, speakerName, speakerAvatar, speakerColor, look }: ThoughtProps) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const [initial] = useState(() => wasUnfolded(memory, chatId, text))
-  const [open, setOpen] = useState(initial.open)
+  const chatText = useChatText()
+  const router = useRouter()
   const live = ms === null
   const seconds = useElapsedSeconds(live)
-  const writing = memory !== undefined && chatId !== undefined && memory === liveThought(chatId)
 
-  useEffect(() => {
-    if (writing && memory) liveTexts.set(memory, text)
-  }, [writing, memory, text])
-  useEffect(() => {
-    if (!memory) return
-    if (open) unfolded.add(memory)
-    else unfolded.delete(memory)
-  }, [memory, open])
-  // The saved reply took the open thought over from the one written.
-  useEffect(() => {
-    if (initial.carried && chatId !== undefined) unfolded.delete(liveThought(chatId))
-  }, [initial, chatId])
+  const id = memory ?? (chatId !== undefined ? `chat:${chatId}` : 'thought')
 
-  // The tap is a gesture of the UI thread. A Pressable lost it while a reply streams: the
-  // list follows the reply, and a scroll event during the touch hands the touch to the
-  // scroll view, which cancels the press.
-  const toggle = useCallback(() => setOpen((prev) => !prev), [])
+  // While live streaming, update open thought session if it matches this thought
+  useEffect(() => {
+    if (!live) return
+    const current = thoughtSession.get()
+    if (current && current.id === id) {
+      thoughtSession.set({
+        ...current,
+        text,
+        ms,
+        live,
+      })
+    }
+  }, [id, text, ms, live])
+
+  // When thinking finishes, update the session as well
+  useEffect(() => {
+    if (live) return
+    const current = thoughtSession.get()
+    if (current && current.id === id && current.live) {
+      thoughtSession.set({
+        ...current,
+        text,
+        ms,
+        live: false,
+      })
+    }
+  }, [id, text, ms, live])
+
+  const openSheet = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    openThought(
+      {
+        id,
+        text,
+        ms,
+        live,
+        speakerName,
+        speakerAvatar,
+        speakerColor,
+        look,
+      },
+      () => {
+        router.push('/thought')
+      }
+    )
+  }, [id, text, ms, live, speakerName, speakerAvatar, speakerColor, look, router])
+
   const pressed = useSharedValue(false)
   const tap = useMemo(
     () =>
@@ -617,80 +632,72 @@ export function ThoughtBlock({ text, ms, memory, chatId }: ThoughtProps) {
           pressed.value = false
         })
         .onEnd((_e, success) => {
-          if (success) scheduleOnRN(toggle)
+          if (success) scheduleOnRN(openSheet)
         }),
-    [pressed, toggle]
+    [pressed, openSheet]
   )
   const headStyle = useAnimatedStyle(() => ({ opacity: pressed.value ? 0.6 : 1 }))
 
-  // The lines under the header fold and unfold it too. A press held longer is no tap and
-  // is left to the text, which selects; a tap that only clears a selection keeps the
-  // thought as it is. In a browser the unfolded text is selected with clicks, so it is
-  // left alone there.
-  const { shown: shownText, selection, onSelect, touch } = useHeldText(live && open, text)
-  const tapLines = useCallback(() => {
-    const { selected, clearedAt } = selection.current
-    if (selected || Date.now() - clearedAt < SELECTION_CLEAR_MS) return
-    setOpen((prev) => !prev)
-  }, [])
-  const linesTap = useMemo(
-    () =>
-      Gesture.Tap()
-        .maxDistance(10)
-        .maxDuration(LINES_TAP_MS)
-        .enabled(!(isWeb && open))
-        .onEnd((_e, success) => {
-          if (success) scheduleOnRN(tapLines)
-        }),
-    [tapLines, open]
+  const shown = live ? seconds : Math.max(1, Math.round((ms ?? 0) / 1000))
+  const firstWords = useMemo(() => thoughtFirstWords(text), [text])
+  const preview = firstWords || t('message.thinking')
+
+  const labelStyle = useMemo(
+    () => [
+      styles.thoughtLabel,
+      {
+        fontSize: chatText.scaled(15.5),
+        fontFamily: 'System',
+      },
+    ],
+    [styles.thoughtLabel, chatText.scaled]
+  )
+  const timeStyle = useMemo(
+    () => [
+      styles.thoughtTime,
+      {
+        fontSize: chatText.scaled(13.5),
+        fontFamily: 'System',
+      },
+    ],
+    [styles.thoughtTime, chatText.scaled]
   )
 
-  const shown = live ? seconds : Math.max(1, Math.round(ms / 1000))
-  const tail = text.length > THINKING_TAIL ? `...${text.slice(-THINKING_TAIL).trimStart()}` : text
-
   return (
-    <View style={[styles.thought, !live && !open && styles.thoughtFolded]}>
+    <View style={styles.thought}>
       <GestureDetector gesture={tap}>
         <Animated.View
           style={[styles.thoughtHead, headStyle]}
           accessible
           accessibilityRole="button"
-          accessibilityState={{ expanded: open }}
-          onAccessibilityTap={toggle}
+          accessibilityLabel={
+            live
+              ? `${t('message.thinking')}, ${shown} ${t('message.secondsShort')}`
+              : `${t('message.reasoning')}, ${shown} ${t('message.secondsShort')}`
+          }
+          onAccessibilityTap={openSheet}
         >
-          {/* The symbol breathes while the model thinks and settles once the reply starts. */}
-          <SFIcon
-            name="brain"
-            fallback="sparkles-outline"
-            size={13}
-            color={colors.textMuted}
-            effect={{ effect: 'breathe' }}
-            active={live}
-          />
-          {live ? (
-            <ShimmerText text={t('message.thinking')} style={styles.thoughtLabel} />
-          ) : (
-            <Text style={styles.thoughtLabel}>{t('message.reasoning')}</Text>
-          )}
-          {shown > 0 ? <Text style={styles.thoughtTime}>{shown} {t('message.secondsShort')}</Text> : null}
-          <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textFaint} />
+          <View style={styles.thoughtLeft}>
+            <View style={styles.thoughtPreview}>
+              {live ? (
+                <ShimmerText text={preview} style={labelStyle} />
+              ) : (
+                <Text style={labelStyle} numberOfLines={1}>
+                  {t('message.reasoning')}
+                </Text>
+              )}
+            </View>
+          </View>
+          <View style={styles.thoughtRight}>
+            {shown > 0 ? (
+              <Text style={timeStyle}>
+                {shown} {t('message.secondsShort')}
+              </Text>
+            ) : null}
+            <Icon name="chevron-forward" size={16} color={colors.textFaint} />
+          </View>
         </Animated.View>
       </GestureDetector>
-      {open || live ? (
-        <GestureDetector gesture={linesTap}>
-          <View {...touch}>
-            {open ? (
-              <SelectableText style={styles.thoughtText} onSelect={onSelect}>
-                {shownText}
-              </SelectableText>
-            ) : (
-              <Text style={styles.thoughtText} numberOfLines={4}>
-                {tail}
-              </Text>
-            )}
-          </View>
-        </GestureDetector>
-      ) : null}
     </View>
   )
 }
@@ -835,16 +842,44 @@ const createStyles = (colors: Colors) =>
   narrationText: { fontStyle: 'italic', color: colors.textMuted, textAlign: 'center' },
   thought: {
     alignSelf: 'stretch',
-    marginBottom: 10,
-    paddingLeft: 12,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.border,
+    marginBottom: 6,
   },
-  thoughtFolded: { alignSelf: 'flex-start', borderLeftWidth: 0, paddingLeft: 0 },
-  thoughtHead: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
-  thoughtLabel: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
-  thoughtTime: { color: colors.textFaint, fontSize: 13, fontVariant: ['tabular-nums'] },
-  thoughtText: { color: colors.textFaint, fontSize: 13.5, lineHeight: 19, marginTop: 6 },
+  thoughtHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 3,
+  },
+  thoughtLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    overflow: 'hidden',
+  },
+  thoughtPreview: {
+    flex: 1,
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  thoughtRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 0,
+  },
+  thoughtLabel: {
+    color: colors.textMuted,
+    fontSize: 15.5,
+    fontWeight: '600',
+    fontFamily: 'System',
+  },
+  thoughtTime: {
+    color: colors.textFaint,
+    fontSize: 13.5,
+    fontVariant: ['tabular-nums'],
+    fontFamily: 'System',
+  },
   refineTrigger: { alignSelf: 'flex-start', maxWidth: '100%', marginBottom: 8 },
   refine: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
   refineText: { color: colors.textFaint, fontSize: 13, lineHeight: 17, flexShrink: 1 },

@@ -31,6 +31,7 @@ type Props = {
   // Drawn under the content of a sheet without glass and clipped to its corners: the
   // background of the chat it opened over (ChatBackdrop).
   underlay?: React.ReactNode
+  dragHandleOnly?: boolean
   children: React.ReactNode
 }
 
@@ -94,6 +95,7 @@ export function BottomSheet({
   contentPaddingBottom,
   onBack,
   underlay,
+  dragHandleOnly = false,
   children,
 }: Props) {
   const styles = useStyles(createStyles)
@@ -222,81 +224,85 @@ export function BottomSheet({
   const dim = useAnimatedStyle(() => ({ opacity: interpolate(offset.value, [0, travel.value], [1, 0], 'clamp') }))
   const slide = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }))
 
-  const sheetBody = (
-    <>
-      <View style={[styles.header, compactHeader && styles.headerCompact, compactHeader && isGlassButtons && styles.headerCompactGlass]}>
-        <View style={[styles.grabber, compactHeader && styles.grabberCompact]} />
-        <View style={styles.titleRow}>
-          <View style={styles.titleCenterContainer} pointerEvents="none">
-            <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1}>
-              {title}
-            </Text>
-          </View>
-          {isGlassButtons ? (
-            // Liquid Glass does not render when it appears under a parent with opacity, so the
-            // glass buttons are not cross-faded: only the current one is mounted and it swaps
-            // by scale alone. The first one shows as is when the sheet opens.
-            <LayoutAnimationConfig skipEntering>
-              <View style={styles.buttonSlot}>
-                <Animated.View
-                  key={onBack ? 'back' : 'close'}
-                  entering={ZoomIn.springify().stiffness(280).damping(24).mass(0.85)}
-                  exiting={ZoomOut.duration(140)}
-                  style={styles.buttonOverlay}
-                >
-                  <GlassButton
-                    icon={onBack ? 'chevron-back' : 'close'}
-                    iconSize={compactHeader ? 22 : 26}
-                    onPress={onBack ?? dismiss}
-                    accessibilityLabel={onBack ? t('common.back') : t('common.close')}
-                  />
-                </Animated.View>
-              </View>
-            </LayoutAnimationConfig>
-          ) : (
-            // Both buttons stay mounted and cross-fade on a spring; the slot keeps the
-            // title centred throughout.
-            <View style={[styles.buttonSlot, compactHeader && styles.buttonSlotCompact]}>
-              <Animated.View style={[styles.buttonOverlay, closeButtonStyle]} pointerEvents={onBack ? 'none' : 'auto'}>
-                <Pressable
-                  onPress={dismiss}
-                  hitSlop={6}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('common.close')}
-                  style={({ pressed }) => [
-                    styles.close,
-                    compactHeader && styles.closeCompact,
-                    { backgroundColor: pressed ? tones.pressed : tones.card },
-                  ]}
-                >
-                  <Icon name="close" size={compactHeader ? 20 : 24} color={colors.text} />
-                </Pressable>
-              </Animated.View>
-              <Animated.View style={[styles.buttonOverlay, backButtonStyle]} pointerEvents={onBack ? 'auto' : 'none'}>
-                <Pressable
+  const headerContent = (
+    <View style={[styles.header, compactHeader && styles.headerCompact, compactHeader && isGlassButtons && styles.headerCompactGlass]}>
+      <View style={[styles.grabber, compactHeader && styles.grabberCompact]} />
+      <View style={styles.titleRow}>
+        <View style={styles.titleCenterContainer} pointerEvents="none">
+          <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+        {isGlassButtons ? (
+          // Liquid Glass does not render when it appears under a parent with opacity, so the
+          // glass buttons are not cross-faded: only the current one is mounted and it swaps
+          // by scale alone. The first one shows as is when the sheet opens.
+          <LayoutAnimationConfig skipEntering>
+            <View style={styles.buttonSlot}>
+              <Animated.View
+                key={onBack ? 'back' : 'close'}
+                entering={ZoomIn.springify().stiffness(280).damping(24).mass(0.85)}
+                exiting={ZoomOut.duration(140)}
+                style={styles.buttonOverlay}
+              >
+                <GlassButton
+                  icon={onBack ? 'chevron-back' : 'close'}
+                  iconSize={compactHeader ? 22 : 26}
                   onPress={onBack ?? dismiss}
-                  hitSlop={6}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('common.back')}
-                  style={({ pressed }) => [
-                    styles.close,
-                    compactHeader && styles.closeCompact,
-                    { backgroundColor: pressed ? tones.pressed : tones.card },
-                  ]}
-                >
-                  <Icon name="chevron-back" size={compactHeader ? 20 : 24} color={colors.text} />
-                </Pressable>
+                  accessibilityLabel={onBack ? t('common.back') : t('common.close')}
+                />
               </Animated.View>
             </View>
-          )}
-          <View style={styles.spacer} />
-          {rightItem ? (
-            <View style={[styles.rightItemContainer, compactHeader && styles.rightItemCompact]}>{rightItem}</View>
-          ) : (
-            <View style={[styles.balance, compactHeader && styles.balanceCompact]} />
-          )}
-        </View>
+          </LayoutAnimationConfig>
+        ) : (
+          // Both buttons stay mounted and cross-fade on a spring; the slot keeps the
+          // title centred throughout.
+          <View style={[styles.buttonSlot, compactHeader && styles.buttonSlotCompact]}>
+            <Animated.View style={[styles.buttonOverlay, closeButtonStyle]} pointerEvents={onBack ? 'none' : 'auto'}>
+              <Pressable
+                onPress={dismiss}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
+                style={({ pressed }) => [
+                  styles.close,
+                  compactHeader && styles.closeCompact,
+                  { backgroundColor: pressed ? tones.pressed : tones.card },
+                ]}
+              >
+                <Icon name="close" size={compactHeader ? 20 : 24} color={colors.text} />
+              </Pressable>
+            </Animated.View>
+            <Animated.View style={[styles.buttonOverlay, backButtonStyle]} pointerEvents={onBack ? 'auto' : 'none'}>
+              <Pressable
+                onPress={onBack ?? dismiss}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
+                style={({ pressed }) => [
+                  styles.close,
+                  compactHeader && styles.closeCompact,
+                  { backgroundColor: pressed ? tones.pressed : tones.card },
+                ]}
+              >
+                <Icon name="chevron-back" size={compactHeader ? 20 : 24} color={colors.text} />
+              </Pressable>
+            </Animated.View>
+          </View>
+        )}
+        <View style={styles.spacer} />
+        {rightItem ? (
+          <View style={[styles.rightItemContainer, compactHeader && styles.rightItemCompact]}>{rightItem}</View>
+        ) : (
+          <View style={[styles.balance, compactHeader && styles.balanceCompact]} />
+        )}
       </View>
+    </View>
+  )
+
+  const sheetBody = (
+    <>
+      {dragHandleOnly ? <GestureDetector gesture={drag}>{headerContent}</GestureDetector> : headerContent}
       {children}
     </>
   )
@@ -344,8 +350,8 @@ export function BottomSheet({
             open()
           }}
         >
-          <GestureDetector gesture={drag}>
-            {isGlass ? (
+          {dragHandleOnly ? (
+            isGlass ? (
               <GlassSurface
                 style={[
                   styles.sheet,
@@ -382,8 +388,49 @@ export function BottomSheet({
                 ) : null}
                 {sheetBody}
               </View>
-            )}
-          </GestureDetector>
+            )
+          ) : (
+            <GestureDetector gesture={drag}>
+              {isGlass ? (
+                <GlassSurface
+                  style={[
+                    styles.sheet,
+                    fixedHeight ? { height: '100%' } : null,
+                    customMinHeight ? { minHeight: customMinHeight } : null,
+                    { paddingBottom: contentPaddingBottom !== undefined ? contentPaddingBottom : Math.max(insets.bottom, 16) },
+                  ]}
+                  fallbackStyle={[styles.solid, { backgroundColor: tones.sheet }]}
+                >
+                  {sheetBody}
+                </GlassSurface>
+              ) : (
+                <View
+                  style={[
+                    styles.sheet,
+                    // overflow:'hidden' clips GlassSurface children (UIKit paints glass layers
+                    // outside view bounds). When glass buttons are used, skip the clip and let
+                    // borderRadius handle the visual rounding of the sheet background.
+                    !glassButtons && styles.solid,
+                    glassButtons && styles.solidNoClip,
+                    fixedHeight ? { height: '100%' } : null,
+                    customMinHeight ? { minHeight: customMinHeight } : null,
+                    {
+                      backgroundColor: tones.sheet,
+                      paddingBottom: contentPaddingBottom !== undefined ? contentPaddingBottom : Math.max(insets.bottom, 16),
+                    },
+                  ]}
+                >
+                  {/* Clipped on its own: with glass buttons the sheet is not. */}
+                  {underlay ? (
+                    <View pointerEvents="none" style={styles.underlay}>
+                      {underlay}
+                    </View>
+                  ) : null}
+                  {sheetBody}
+                </View>
+              )}
+            </GestureDetector>
+          )}
         </Animated.View>
       </GestureHandlerRootView>
     </Modal>

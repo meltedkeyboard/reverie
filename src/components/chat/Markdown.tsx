@@ -18,6 +18,8 @@ type Props = {
   selectable?: boolean
   // Told whether some of the text is selected now.
   onSelect?: (selected: boolean) => void
+  // In reasoning/thought streams, models often indent bullet lists with 4 spaces.
+  unwrapIndentedCode?: boolean
 }
 
 const HEADING_SCALE = [1.35, 1.2, 1.1, 1, 1, 1]
@@ -35,6 +37,8 @@ export function SelectableText({
   children: ReactNode
   // Told whether some of the text is selected now.
   onSelect?: (selected: boolean) => void
+  // In reasoning/thought streams, models often indent bullet lists with 4 spaces.
+  unwrapIndentedCode?: boolean
 }) {
   const colors = useColors()
   // A browser selects ordinary text by itself, and a <textarea> cannot hold nested Text.
@@ -119,7 +123,7 @@ type Piece = { flow: true; node: ReactNode; tight: boolean; over?: ReactNode } |
 // Pieces that flow are joined into one UITextView, so a selection runs through the
 // whole reply and only stops at a code block or a table, as in ChatGPT. Lists and
 // quotes are drawn with characters for the same reason: a view would split the text.
-function MarkdownView({ text, style, emStyle, streaming = false, selectable = true, onSelect }: Props) {
+function MarkdownView({ text, style, emStyle, streaming = false, selectable = true, onSelect, unwrapIndentedCode = false }: Props) {
   const Block = selectable ? SelectableText : PlainText
   const styles = useStyles(createStyles)
   const tokens = useMemo(() => lex(text, streaming), [text, streaming])
@@ -214,7 +218,13 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
             )
           })
         }
-        case 'code':
+        case 'code': {
+          const codeToken = token as Tokens.Code
+          // Indented blocks (e.g. 4-space indented lists or reasoning notes from models)
+          // should parse as normal Markdown rather than being wrapped in horizontal code blocks.
+          if (unwrapIndentedCode && codeToken.codeBlockStyle === 'indented') {
+            return collect(lex(codeToken.text, streaming), indent, quote, bullet)
+          }
           return [{
             flow: false,
             node: (
@@ -223,6 +233,7 @@ function MarkdownView({ text, style, emStyle, streaming = false, selectable = tr
               </ScrollView>
             ),
           }]
+        }
         case 'mathBlock': {
           // A browser selects across views by itself, so there the formula stands apart.
           if (isWeb) return [{ flow: false, node: <MathBlock tex={token.text} style={style} /> }]

@@ -1,6 +1,7 @@
 import { Icon } from '@/components/visuals/Icon'
 import { useEffect, useRef, type ComponentProps } from 'react'
 import { View, type ColorValue } from 'react-native'
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 
 import { swiftUI } from '@/lib/ui/nativeUI'
 import { useTheme } from '@/theme'
@@ -32,8 +33,30 @@ type Props = {
 // look and time exactly like in Apple's apps. Without @expo/ui the plain icon stays.
 export const SFIcon = swiftUI ? NativeIcon : FallbackIcon
 
-function FallbackIcon({ fallback, size, color }: Props) {
-  return <Icon name={fallback} size={size} color={color as string} />
+function FallbackIcon({ fallback, size, color, animateChange }: Props) {
+  const opacity = useSharedValue(1)
+  const prev = useRef(fallback)
+
+  useEffect(() => {
+    if (!animateChange || prev.current === fallback) return
+    prev.current = fallback
+    opacity.value = 0.2
+    opacity.value = withTiming(1, { duration: 180 })
+  }, [fallback, animateChange, opacity])
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }))
+
+  if (!animateChange) {
+    return <Icon name={fallback} size={size} color={color as string} />
+  }
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Icon name={fallback} size={size} color={color as string} />
+    </Animated.View>
+  )
 }
 
 function NativeIcon({ name, size, color, effect, trigger, active, animateChange, changeResponse = 0.35, onAccent = false }: Props) {

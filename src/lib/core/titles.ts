@@ -41,7 +41,7 @@ export async function suggestTitle(cfg: ServerSettings, nameOf: (m: Message) => 
     if (isServerError(err)) return ''
     throw err
   })
-  return cleanTitle(quick) ?? cleanTitle(await ask('auto', 2048))
+  return cleanTitle(quick) ?? cleanTitle(await ask('on', 2048))
 }
 
 function cleanTitle(raw: string) {

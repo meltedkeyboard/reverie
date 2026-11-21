@@ -51,7 +51,7 @@ import { getCharacter, restoreCharacters, type Character } from '@/db/characters
 import { createChat, getChat, getLatestChatId, type Chat } from '@/db/chats'
 import { getDraft, setDraft } from '@/db/drafts'
 import { setContinueHidden, setLastOpened } from '@/db/prefs/continue'
-import { newMessage, type Message } from '@/db/messages'
+import { newMessage, type Message, type MessageImage } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { createRoomChat, getLatestRoomChatId, getRoom, listRoomMembers } from '@/db/rooms'
 import { useAside } from '@/hooks/chat/useAside'
