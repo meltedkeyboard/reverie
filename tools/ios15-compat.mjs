@@ -568,6 +568,181 @@ private extension ProposedViewSize {`,
 private func placementProposal(bounds: CGRect, proposal: ProposedViewSize) -> ProposedViewSize {`,
     'UniversalLayout.swift (placementProposal)'
   )
+
+  // UniversalLayout: StackLayoutCache & StackMeasurementKey
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `internal struct StackLayoutCache {`,
+    `@available(iOS 16.0, *)
+internal struct StackLayoutCache {`,
+    'UniversalLayout.swift (StackLayoutCache)'
+  )
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private struct StackMeasurementKey: Hashable {`,
+    `@available(iOS 16.0, *)
+private struct StackMeasurementKey: Hashable {`,
+    'UniversalLayout.swift (StackMeasurementKey)'
+  )
+
+  // ToolbarItemPlacementOptions: secondaryAction
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Convertibles/ToolbarItemPlacementOptions.swift',
+    `    case .secondaryAction:
+#if os(tvOS)
+      return .automatic
+#else
+      return .secondaryAction
+#endif`,
+    `    case .secondaryAction:
+#if os(tvOS)
+      return .automatic
+#else
+      if #available(iOS 16.0, *) {
+        return .secondaryAction
+      }
+      return .automatic
+#endif`,
+    'ToolbarItemPlacementOptions.swift'
+  )
+
+  // ScrollIndicatorVisibilityOptions: toVisibility
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Convertibles/ScrollIndicatorVisibilityOptions.swift',
+    `  func toVisibility() -> ScrollIndicatorVisibility {`,
+    `  @available(iOS 16.0, *)
+  func toVisibility() -> ScrollIndicatorVisibility {`,
+    'ScrollIndicatorVisibilityOptions.swift'
+  )
+
+  // ScrollIndicatorsModifier
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/ScrollIndicatorsModifier.swift',
+    `  func body(content: Content) -> some View {
+    content.scrollIndicators(visibility.toVisibility(), axes: axes.toAxis())
+  }`,
+    `  func body(content: Content) -> some View {
+    if #available(iOS 16.0, *) {
+      content.scrollIndicators(visibility.toVisibility(), axes: axes.toAxis())
+    } else {
+      content
+    }
+  }`,
+    'ScrollIndicatorsModifier.swift'
+  )
+
+  // RNHostView: onGeometryChange
+  replaceInFile(
+    'node_modules/@expo/ui/ios/RNHostView.swift',
+    `  func body(content: Content) -> some View {
+    if isEnabled {
+      content
+        .onGeometryChange(for: CGPoint?.self) { proxy in
+          originInHost(proxy)
+        } action: { origin in
+          if let origin {
+            shadowNodeProxy.setContentOrigin?(origin)
+          }
+        }
+        .onDisappear {
+          shadowNodeProxy.clearContentOrigin?()
+        }
+    } else {
+      content
+    }
+  }`,
+    `  func body(content: Content) -> some View {
+    if isEnabled {
+      if #available(iOS 16.0, *) {
+        content
+          .onGeometryChange(for: CGPoint?.self) { proxy in
+            originInHost(proxy)
+          } action: { origin in
+            if let origin {
+              shadowNodeProxy.setContentOrigin?(origin)
+            }
+          }
+          .onDisappear {
+            shadowNodeProxy.clearContentOrigin?()
+          }
+      } else {
+        content
+      }
+    } else {
+      content
+    }
+  }`,
+    'RNHostView.swift (PublishContentOriginModifier)'
+  )
+
+  // PresentationModifiers: presentationCornerRadius
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/PresentationModifiers.swift',
+    `  func body(content: Content) -> some View {
+    content.presentationCornerRadius(cornerRadius.map { CGFloat($0) })
+  }`,
+    `  func body(content: Content) -> some View {
+    if #available(iOS 16.4, tvOS 16.4, *) {
+      content.presentationCornerRadius(cornerRadius.map { CGFloat($0) })
+    } else {
+      content
+    }
+  }`,
+    'PresentationModifiers.swift (presentationCornerRadius)'
+  )
+
+  // PresentationModifiers: presentationBackground
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/PresentationModifiers.swift',
+    `  func body(content: Content) -> some View {
+    if let shapeStyle = style?.toAnyShapeStyle() {
+      content.presentationBackground(shapeStyle)
+    } else {
+      content
+    }
+  }`,
+    `  func body(content: Content) -> some View {
+    if #available(iOS 16.4, tvOS 16.4, *), let shapeStyle = style?.toAnyShapeStyle() {
+      content.presentationBackground(shapeStyle)
+    } else {
+      content
+    }
+  }`,
+    'PresentationModifiers.swift (presentationBackground)'
+  )
+
+  // NavigationSplitViewView: NavigationSplitViewVisibility methods and properties
+  replaceInFile(
+    'node_modules/@expo/ui/ios/NavigationSplitViewView.swift',
+    `  func toVisibility() -> NavigationSplitViewVisibility {`,
+    `  @available(iOS 16.0, *)
+  func toVisibility() -> NavigationSplitViewVisibility {`,
+    'NavigationSplitViewView.swift (toVisibility)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/NavigationSplitViewView.swift',
+    `  static func from(_ visibility: NavigationSplitViewVisibility) -> NavigationSplitViewVisibilityOptions {`,
+    `  @available(iOS 16.0, *)
+  static func from(_ visibility: NavigationSplitViewVisibility) -> NavigationSplitViewVisibilityOptions {`,
+    'NavigationSplitViewView.swift (from visibility)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/NavigationSplitViewView.swift',
+    `  private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {`,
+    `  @available(iOS 16.0, *)
+  private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {`,
+    'NavigationSplitViewView.swift (columnVisibilityBinding)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/NavigationSplitViewView.swift',
+    `  private var compactColumnBinding: Binding<NavigationSplitViewColumn> {`,
+    `  @available(iOS 16.0, *)
+  private var compactColumnBinding: Binding<NavigationSplitViewColumn> {`,
+    'NavigationSplitViewView.swift (compactColumnBinding)'
+  )
 }
 
 patchPodspecsIn(path.resolve('node_modules'))
