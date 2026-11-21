@@ -25,5 +25,9 @@ export async function dismissNativeSplash(): Promise<void> {
 
 // 0 where the module is missing (Expo Go, Android, the web) or the screen has square corners.
 export function displayCornerRadius(): number {
-  return ReverieSplash?.displayCornerRadius?.() ?? 0
+  try {
+    return ReverieSplash?.displayCornerRadius?.() ?? 0
+  } catch {
+    return 0
+  }
 }

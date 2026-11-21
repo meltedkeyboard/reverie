@@ -85,7 +85,13 @@ const FLICK = 500
 // Critically damped, as UIKit moves its own sheets; short, so the drawer keeps up with the hand.
 const SPRING = { duration: 320, dampingRatio: 1 }
 // The chat rounds off like the screen itself, so it looks like the whole screen moved.
-const CORNER = displayCornerRadius() || 24
+let cornerRadius = 24
+try {
+  cornerRadius = displayCornerRadius() || 24
+} catch {
+  cornerRadius = 24
+}
+const CORNER = cornerRadius
 const ROW_RADIUS = 12
 // How dark the chat gets once fully aside; the dark scheme needs more to show at all.
 const VEIL = { light: 0.12, dark: 0.35 }

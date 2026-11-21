@@ -16,6 +16,10 @@ public class ReverieSplashModule: Module {
     // The radius of the screen's own corners, so a screen pushed aside can round off exactly
     // like the glass. UIKit keeps it private; a device with square corners gives 0.
     Function("displayCornerRadius") { () -> Double in
+      let selector = NSSelectorFromString("_displayCornerRadius")
+      guard UIScreen.main.responds(to: selector) else {
+        return 0
+      }
       let radius = UIScreen.main.value(forKey: "_displayCornerRadius") as? CGFloat
       return Double(radius ?? 0)
     }
