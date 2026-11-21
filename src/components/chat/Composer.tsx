@@ -955,7 +955,13 @@ function AttachedThumb({ image, uri, index, group, onRemove }: AttachedThumbProp
       >
         <Image source={{ uri }} style={styles.thumb} contentFit="cover" transition={200} />
       </ImageLink>
-      <Pressable onPress={onRemove} hitSlop={8} style={styles.thumbRemove}>
+      <Pressable
+        onPress={onRemove}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.delete')}
+        style={styles.thumbRemove}
+      >
         <Icon name="close" size={13} color={ON_ACCENT} />
       </Pressable>
     </View>
@@ -995,9 +1001,12 @@ const createStyles = (colors: Colors) =>
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: isDesktop ? 0 : 1,
-    borderColor: colors.border,
+    backgroundColor: colors.accent,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   plusAt: { position: 'absolute', left: EDGE, bottom: EDGE },
   sendAt: { position: 'absolute', right: EDGE, bottom: EDGE },
