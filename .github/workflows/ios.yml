@@ -6,8 +6,6 @@ name: iOS build
 on:
   workflow_dispatch:
   push:
-    branches:
-      - support/ios15
     tags: ['v*']
 
 jobs:
