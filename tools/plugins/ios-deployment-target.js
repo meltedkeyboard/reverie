@@ -23,8 +23,8 @@ const withIosDeploymentTargetPlugin = (config) => {
     let contents = mod.modResults.contents
 
     // Set platform :ios, '15.1'
-    if (/platform\s+:ios\s*,\s*['"][^'"]+['"]/.test(contents)) {
-      contents = contents.replace(/platform\s+:ios\s*,\s*['"][^'"]+['"]/, "platform :ios, '15.1'")
+    if (/platform\s+:ios.*/.test(contents)) {
+      contents = contents.replace(/platform\s+:ios.*/, "platform :ios, '15.1'")
     } else {
       contents = `platform :ios, '15.1'\n` + contents
     }
