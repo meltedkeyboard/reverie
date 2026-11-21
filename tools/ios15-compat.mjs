@@ -20,14 +20,23 @@ function patchPodspecsIn(dir) {
   }
 }
 
-// Patch expo-screen-orientation: guard requestGeometryUpdate and setNeedsUpdateOfSupportedInterfaceOrientations with if #available(iOS 16.0, *)
-function patchScreenOrientation() {
-  const file = path.resolve('node_modules/expo-screen-orientation/ios/ScreenOrientationRegistry.swift')
+function replaceInFile(relPath, target, replacement, label) {
+  const file = path.resolve(relPath)
   if (!fs.existsSync(file)) return
   let content = fs.readFileSync(file, 'utf8')
-  if (content.includes('if #available(iOS 16.0, *)') && content.includes('windowScene?.requestGeometryUpdate')) return
+  if (content.includes(replacement)) return
+  if (content.includes(target)) {
+    content = content.replace(target, replacement)
+    fs.writeFileSync(file, content, 'utf8')
+    console.log(`[ios15-compat] Patched ${label || path.basename(file)}`)
+  }
+}
 
-  const target = `      let windowScene = SceneGeometry.windowScene(for: self.rootViewController?.view)
+// Patch expo-screen-orientation: guard requestGeometryUpdate and setNeedsUpdateOfSupportedInterfaceOrientations
+function patchScreenOrientation() {
+  replaceInFile(
+    'node_modules/expo-screen-orientation/ios/ScreenOrientationRegistry.swift',
+    `      let windowScene = SceneGeometry.windowScene(for: self.rootViewController?.view)
       windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: orientationMask)) { error in
         #if DEBUG
         log.warn(
@@ -40,9 +49,8 @@ function patchScreenOrientation() {
         )
         #endif
       }
-      self.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()`
-
-  const replacement = `      if #available(iOS 16.0, *) {
+      self.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()`,
+    `      if #available(iOS 16.0, *) {
         let windowScene = SceneGeometry.windowScene(for: self.rootViewController?.view)
         windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: orientationMask)) { error in
           #if DEBUG
@@ -57,65 +65,509 @@ function patchScreenOrientation() {
           #endif
         }
         self.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-      }`
-
-  if (content.includes(target)) {
-    content = content.replace(target, replacement)
-    fs.writeFileSync(file, content, 'utf8')
-    console.log('[ios15-compat] Patched ScreenOrientationRegistry.swift')
-  }
+      }`,
+    'ScreenOrientationRegistry.swift'
+  )
 }
 
-// Patch expo-video: guard requestGeometryUpdate with if #available(iOS 16.0, *)
+// Patch expo-video: guard requestGeometryUpdate
 function patchExpoVideo() {
-  const file = path.resolve('node_modules/expo-video/ios/OrientationAVPlayerViewController.swift')
-  if (!fs.existsSync(file)) return
-  let content = fs.readFileSync(file, 'utf8')
-  if (content.includes('if #available(iOS 16.0, *)') && content.includes('windowScene?.requestGeometryUpdate')) return
-
-  const target = `  private func forceRotationUpdate() {
+  replaceInFile(
+    'node_modules/expo-video/ios/OrientationAVPlayerViewController.swift',
+    `  private func forceRotationUpdate() {
     let windowScene = SceneGeometry.windowScene(for: view)
     windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: fullscreenOrientation))
-  }`
-
-  const replacement = `  private func forceRotationUpdate() {
+  }`,
+    `  private func forceRotationUpdate() {
     if #available(iOS 16.0, *) {
       let windowScene = SceneGeometry.windowScene(for: view)
       windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: fullscreenOrientation))
     }
-  }`
-
-  if (content.includes(target)) {
-    content = content.replace(target, replacement)
-    fs.writeFileSync(file, content, 'utf8')
-    console.log('[ios15-compat] Patched OrientationAVPlayerViewController.swift')
-  }
+  }`,
+    'OrientationAVPlayerViewController.swift'
+  )
 }
 
-// Patch expo-modules-core: guard SceneGeometry.effectiveGeometry with if #available(iOS 16.0, *)
+// Patch expo-modules-core: guard SceneGeometry.effectiveGeometry
 function patchSceneGeometry() {
-  const file = path.resolve('node_modules/expo-modules-core/ios/Utilities/SceneGeometry.swift')
-  if (!fs.existsSync(file)) return
-  let content = fs.readFileSync(file, 'utf8')
-  if (content.includes('if #available(iOS 16.0, *)') && content.includes('effectiveGeometry')) return
-
-  const target = `  static func interfaceOrientation(for view: UIView? = nil) -> UIInterfaceOrientation {
+  replaceInFile(
+    'node_modules/expo-modules-core/ios/Utilities/SceneGeometry.swift',
+    `  static func interfaceOrientation(for view: UIView? = nil) -> UIInterfaceOrientation {
     return windowScene(for: view)?.effectiveGeometry.interfaceOrientation ?? .unknown
-  }`
-
-  const replacement = `  static func interfaceOrientation(for view: UIView? = nil) -> UIInterfaceOrientation {
+  }`,
+    `  static func interfaceOrientation(for view: UIView? = nil) -> UIInterfaceOrientation {
     if #available(iOS 16.0, *) {
       return windowScene(for: view)?.effectiveGeometry.interfaceOrientation ?? .unknown
     } else {
       return windowScene(for: view)?.interfaceOrientation ?? .unknown
     }
-  }`
+  }`,
+    'SceneGeometry.swift'
+  )
+}
 
-  if (content.includes(target)) {
-    content = content.replace(target, replacement)
-    fs.writeFileSync(file, content, 'utf8')
-    console.log('[ios15-compat] Patched SceneGeometry.swift')
+// Patch @expo/ui for iOS 15 compatibility
+function patchExpoUI() {
+  // NavigationLinkView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/NavigationLinkView.swift',
+    `  var body: some View {
+    NavigationLink(value: props.value) {
+      Children()
+    }
+  }`,
+    `  var body: some View {
+    if #available(iOS 16.0, *) {
+      NavigationLink(value: props.value) {
+        Children()
+      }
+    } else {
+      NavigationLink(destination: Children()) {
+        EmptyView()
+      }
+    }
+  }`,
+    'NavigationLinkView.swift'
+  )
+
+  // MenuOrderModifier
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/MenuOrderModifier.swift',
+    `  func toNativeMenuOrder() -> SwiftUI.MenuOrder {`,
+    `  @available(iOS 16.0, *)
+  func toNativeMenuOrder() -> SwiftUI.MenuOrder {`,
+    'MenuOrderModifier.swift (enum)'
+  )
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/MenuOrderModifier.swift',
+    `  func body(content: Content) -> some View {
+    content.menuOrder(order.toNativeMenuOrder())
+  }`,
+    `  func body(content: Content) -> some View {
+    if #available(iOS 16.0, *) {
+      content.menuOrder(order.toNativeMenuOrder())
+    } else {
+      content
+    }
+  }`,
+    'MenuOrderModifier.swift (body)'
+  )
+
+  // ListView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/ListView.swift',
+    `  var body: some View {
+    list
+      .onGeometryChange(for: CGFloat.self, of: { $0.size.width }, action: { crossAxisSize = $0 })
+      .environment(\\.containerCrossAxisSize, crossAxisSize)
+  }`,
+    `  var body: some View {
+    if #available(iOS 16.0, *) {
+      list
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }, action: { crossAxisSize = $0 })
+        .environment(\\.containerCrossAxisSize, crossAxisSize)
+    } else {
+      list
+    }
+  }`,
+    'ListView.swift'
+  )
+
+  // LazyVStackView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/LazyVStackView.swift',
+    `  public var body: some View {
+    LazyVStack(
+      alignment: props.alignment?.toHorizontalAlignment() ?? .center,
+      spacing: props.spacing.map { CGFloat($0) }) {
+        Children()
+    }
+    .onGeometryChange(for: CGFloat.self, of: { $0.size.width }, action: { crossAxisSize = $0 })
+    .environment(\\.containerCrossAxisSize, crossAxisSize)
+  }`,
+    `  public var body: some View {
+    let stack = LazyVStack(
+      alignment: props.alignment?.toHorizontalAlignment() ?? .center,
+      spacing: props.spacing.map { CGFloat($0) }) {
+        Children()
+    }
+    if #available(iOS 16.0, *) {
+      stack
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }, action: { crossAxisSize = $0 })
+        .environment(\\.containerCrossAxisSize, crossAxisSize)
+    } else {
+      stack
+    }
+  }`,
+    'LazyVStackView.swift'
+  )
+
+  // LazyHStackView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/LazyHStackView.swift',
+    `  public var body: some View {
+    LazyHStack(
+      alignment: props.alignment?.toVerticalAlignment() ?? .center,
+      spacing: props.spacing.map { CGFloat($0) }) {
+        Children()
+    }
+    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { crossAxisSize = $0 })
+    .environment(\\.containerCrossAxisSize, crossAxisSize)
+  }`,
+    `  public var body: some View {
+    let stack = LazyHStack(
+      alignment: props.alignment?.toVerticalAlignment() ?? .center,
+      spacing: props.spacing.map { CGFloat($0) }) {
+        Children()
+    }
+    if #available(iOS 16.0, *) {
+      stack
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { crossAxisSize = $0 })
+        .environment(\\.containerCrossAxisSize, crossAxisSize)
+    } else {
+      stack
+    }
+  }`,
+    'LazyHStackView.swift'
+  )
+
+  // HStackView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/HStackView.swift',
+    `  public var body: some View {
+    if props.resolvesChildPercentages {`,
+    `  public var body: some View {
+    if #available(iOS 16.0, *), props.resolvesChildPercentages {`,
+    'HStackView.swift'
+  )
+
+  // VStackView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/VStackView.swift',
+    `  public var body: some View {
+    if props.resolvesChildPercentages {`,
+    `  public var body: some View {
+    if #available(iOS 16.0, *), props.resolvesChildPercentages {`,
+    'VStackView.swift'
+  )
+
+  // DatePickerView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/DatePickerView.swift',
+    `  func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIDatePicker, context: Context) -> CGSize? {`,
+    `  @available(iOS 16.0, *)
+  func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIDatePicker, context: Context) -> CGSize? {`,
+    'DatePickerView.swift'
+  )
+
+  // DataListForEachView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/DataListForEachView.swift',
+    `      if showsContent {
+        // Measured in the background: \`onGeometryChange\` on the item hides its row traits from \`List\`.
+        DataListForEachItemView(props: props)
+          .id(itemKey)
+          .background(
+            Color.clear.onGeometryChange(
+              for: CGFloat.self,
+              of: { axis == .horizontal ? $0.size.width : $0.size.height },
+              action: { size in window.measure(size, for: itemKey, revision: revision) }
+            )
+          )
+      } else {`,
+    `      if showsContent {
+        if #available(iOS 16.0, *) {
+          DataListForEachItemView(props: props)
+            .id(itemKey)
+            .background(
+              Color.clear.onGeometryChange(
+                for: CGFloat.self,
+                of: { axis == .horizontal ? $0.size.width : $0.size.height },
+                action: { size in window.measure(size, for: itemKey, revision: revision) }
+              )
+            )
+        } else {
+          DataListForEachItemView(props: props)
+            .id(itemKey)
+        }
+      } else {`,
+    'DataListForEachView.swift'
+  )
+
+  // BottomSheetView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/BottomSheetView.swift',
+    `  @ViewBuilder
+  private var presentedContent: some View {
+    if let background = props.children?.slot("presentationBackground") {
+      sheetContent.presentationBackground { background }
+    } else {
+      sheetContent
+    }
+  }`,
+    `  @ViewBuilder
+  private var presentedContent: some View {
+    if #available(iOS 16.4, *), let background = props.children?.slot("presentationBackground") {
+      sheetContent.presentationBackground { background }
+    } else {
+      sheetContent
+    }
+  }`,
+    'BottomSheetView.swift'
+  )
+
+  // OnGeometryChangeModifier
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/OnGeometryChangeModifier.swift',
+    `  func body(content: Content) -> some View {
+    content.onGeometryChange(for: CGRect.self, of: { proxy in proxy.frame(in: .global) }, action: {
+      dispatch($0)
+    })
+  }`,
+    `  func body(content: Content) -> some View {
+    if #available(iOS 16.0, *) {
+      content.onGeometryChange(for: CGRect.self, of: { proxy in proxy.frame(in: .global) }, action: {
+        dispatch($0)
+      })
+    } else {
+      content
+    }
+  }`,
+    'OnGeometryChangeModifier.swift'
+  )
+
+  // NavigationStackView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/NavigationStackView.swift',
+    `  var body: some View {
+    NavigationStack(path: pathBinding) {
+      rootContent
+        .navigationDestination(for: String.self) { value in
+          NavigationDestinationContent(props: props, value: value)
+        }
+    }
+  }`,
+    `  var body: some View {
+    if #available(iOS 16.0, *) {
+      NavigationStack(path: pathBinding) {
+        rootContent
+          .navigationDestination(for: String.self) { value in
+            NavigationDestinationContent(props: props, value: value)
+          }
+      }
+    } else {
+      NavigationView {
+        rootContent
+      }
+    }
+  }`,
+    'NavigationStackView.swift'
+  )
+
+  // NavigationSplitViewView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/NavigationSplitViewView.swift',
+    `  @ViewBuilder
+  var body: some View {
+    if #available(iOS 17.0, tvOS 17.0, *) {`,
+    `  @ViewBuilder
+  var body: some View {
+    if #available(iOS 16.0, *) {
+      splitBody
+    } else {
+      EmptyView()
+    }
   }
+
+  @available(iOS 16.0, *)
+  @ViewBuilder
+  private var splitBody: some View {
+    if #available(iOS 17.0, tvOS 17.0, *) {`,
+    'NavigationSplitViewView.swift'
+  )
+
+  // NavigationModifiers
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/NavigationModifiers.swift',
+    `  @ViewBuilder
+  func body(content: Content) -> some View {
+    switch style {
+    case .automatic:
+      content.navigationSplitViewStyle(.automatic)
+    case .balanced:
+      content.navigationSplitViewStyle(.balanced)
+    case .prominentDetail:
+      content.navigationSplitViewStyle(.prominentDetail)
+    }
+  }`,
+    `  @ViewBuilder
+  func body(content: Content) -> some View {
+    if #available(iOS 16.0, *) {
+      switch style {
+      case .automatic:
+        content.navigationSplitViewStyle(.automatic)
+      case .balanced:
+        content.navigationSplitViewStyle(.balanced)
+      case .prominentDetail:
+        content.navigationSplitViewStyle(.prominentDetail)
+      }
+    } else {
+      content
+    }
+  }`,
+    'NavigationModifiers.swift (style)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/Modifiers/NavigationModifiers.swift',
+    `  @ViewBuilder
+  func body(content: Content) -> some View {
+    if let width {
+      content.navigationSplitViewColumnWidth(width)
+    } else if let ideal {
+      content.navigationSplitViewColumnWidth(min: min, ideal: ideal, max: max)
+    } else {
+      content
+    }
+  }`,
+    `  @ViewBuilder
+  func body(content: Content) -> some View {
+    if #available(iOS 16.0, *) {
+      if let width {
+        content.navigationSplitViewColumnWidth(width)
+      } else if let ideal {
+        content.navigationSplitViewColumnWidth(min: min, ideal: ideal, max: max)
+      } else {
+        content
+      }
+    } else {
+      content
+    }
+  }`,
+    'NavigationModifiers.swift (column width)'
+  )
+
+  // UIBaseView
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UIBaseView.swift',
+    `  public var body: some View {
+    UniversalPercentageParentBoundary(content: innerView)
+      .applyAccessibilityIdentifier(props.testID)
+      .applyModifiers(props.modifiers, appContext: props.appContext, globalEventDispatcher: props.globalEventDispatcher)
+      // A user modifier such as \`onGeometryChange\` hides the layout value a universal stack reads.
+      // Set it again outside every modifier.
+      .layoutValue(key: UniversalLayoutDimensionsKey.self, value: universalLayoutDimensions(from: props.modifiers))
+      .publishZeroContentOrigin(props.shadowNodeProxy)
+  }`,
+    `  public var body: some View {
+    let base = UniversalPercentageParentBoundary(content: innerView)
+      .applyAccessibilityIdentifier(props.testID)
+      .applyModifiers(props.modifiers, appContext: props.appContext, globalEventDispatcher: props.globalEventDispatcher)
+    if #available(iOS 16.0, *) {
+      base
+        .layoutValue(key: UniversalLayoutDimensionsKey.self, value: universalLayoutDimensions(from: props.modifiers))
+        .publishZeroContentOrigin(props.shadowNodeProxy)
+    } else {
+      base
+        .publishZeroContentOrigin(props.shadowNodeProxy)
+    }
+  }`,
+    'UIBaseView.swift'
+  )
+
+  // UniversalLayout
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `internal struct UniversalLayoutDimensionsKey: LayoutValueKey {`,
+    `@available(iOS 16.0, *)
+internal struct UniversalLayoutDimensionsKey: LayoutValueKey {`,
+    'UniversalLayout.swift (UniversalLayoutDimensionsKey)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `  var body: some View {
+    UniversalPercentageLayout(dimensions: dimensions, resolvesPercentages: resolvesPercentages) {
+      content
+    }
+    .layoutValue(key: UniversalLayoutDimensionsKey.self, value: dimensions)
+  }`,
+    `  var body: some View {
+    if #available(iOS 16.0, *) {
+      UniversalPercentageLayout(dimensions: dimensions, resolvesPercentages: resolvesPercentages) {
+        content
+      }
+      .layoutValue(key: UniversalLayoutDimensionsKey.self, value: dimensions)
+    } else {
+      content
+    }
+  }`,
+    'UniversalLayout.swift (ResolvedUniversalLayout)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `internal struct UniversalPercentageLayout: Layout {`,
+    `@available(iOS 16.0, *)
+internal struct UniversalPercentageLayout: Layout {`,
+    'UniversalLayout.swift (UniversalPercentageLayout)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `internal struct ParentAwareHStackLayout: Layout {`,
+    `@available(iOS 16.0, *)
+internal struct ParentAwareHStackLayout: Layout {`,
+    'UniversalLayout.swift (ParentAwareHStackLayout)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `internal struct ParentAwareVStackLayout: Layout {`,
+    `@available(iOS 16.0, *)
+internal struct ParentAwareVStackLayout: Layout {`,
+    'UniversalLayout.swift (ParentAwareVStackLayout)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private struct StackConfiguration {`,
+    `@available(iOS 16.0, *)
+private struct StackConfiguration {`,
+    'UniversalLayout.swift (StackConfiguration)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private struct StackMeasurement {`,
+    `@available(iOS 16.0, *)
+private struct StackMeasurement {`,
+    'UniversalLayout.swift (StackMeasurement)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private func proposedSize(main: CGFloat?, cross: CGFloat?, axis: Axis) -> ProposedViewSize {`,
+    `@available(iOS 16.0, *)
+private func proposedSize(main: CGFloat?, cross: CGFloat?, axis: Axis) -> ProposedViewSize {`,
+    'UniversalLayout.swift (proposedSize)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private extension ProposedViewSize {`,
+    `@available(iOS 16.0, *)
+private extension ProposedViewSize {`,
+    'UniversalLayout.swift (ProposedViewSize extension)'
+  )
+
+  replaceInFile(
+    'node_modules/@expo/ui/ios/UniversalLayout.swift',
+    `private func placementProposal(bounds: CGRect, proposal: ProposedViewSize) -> ProposedViewSize {`,
+    `@available(iOS 16.0, *)
+private func placementProposal(bounds: CGRect, proposal: ProposedViewSize) -> ProposedViewSize {`,
+    'UniversalLayout.swift (placementProposal)'
+  )
 }
 
 patchPodspecsIn(path.resolve('node_modules'))
@@ -123,3 +575,4 @@ patchPodspecsIn(path.resolve('modules'))
 patchScreenOrientation()
 patchExpoVideo()
 patchSceneGeometry()
+patchExpoUI()
