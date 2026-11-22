@@ -22,9 +22,10 @@ export default function SmbBrowserLayout() {
         <Stack
           screenOptions={{
             headerShown: true,
+            headerTransparent: true,
+            headerBlurEffect: 'regular',
             headerShadowVisible: false,
             headerBackButtonDisplayMode: 'generic',
-            headerStyle: { backgroundColor: colors.bg },
             headerTintColor: colors.accent,
             headerTitleStyle: { color: colors.text },
             contentStyle: { backgroundColor: colors.bg },
