@@ -101,17 +101,18 @@ export default function SettingsScreen() {
   // first visit the one asked for may not have been measured yet. The parameter is
   // cleared afterwards, so asking for the same section again scrolls once more.
   const jump = useCallback(() => {
+    const target = section === 'folderSync' ? 'appearance' : section
     if (jumpTo) {
-      if (!section) return
+      if (!target) return
       jumpTo.set(null)
-      jumpTo.set(section)
+      jumpTo.set(target)
       router.setParams({ section: undefined })
       return
     }
-    const y = section && offsets.current[section]
-    if (!section || y === undefined) return
+    const y = target && offsets.current[target]
+    if (!target || y === undefined) return
     scrollRef.current?.scrollTo({ y: Math.max(0, y - headerHeight - 16), animated: true })
-    setFlashed((prev) => ({ section, n: (prev?.n ?? 0) + 1 }))
+    setFlashed((prev) => ({ section: target, n: (prev?.n ?? 0) + 1 }))
     router.setParams({ section: undefined })
   }, [section, headerHeight, router, jumpTo])
 
@@ -283,15 +284,7 @@ export default function SettingsScreen() {
   // Expo Go has no sync module. In development the section is still shown there, with
   // its buttons out and pretending to work, so the layout and animations can be looked at.
   const cloudPreview = __DEV__ && !cloudSync.available
-
-  const toggleCloudSync = async (on: boolean) => {
-    try {
-      if (on) await cloudSync.enable()
-      else await cloudSync.disable()
-    } catch (err) {
-      reportError(t('sync.failedTitle'), err)
-    }
-  }
+  const showCloud = cloudSync.available || cloudPreview
 
   const destinationLabel =
     cloudSync.provider === 'smb'
@@ -379,6 +372,9 @@ export default function SettingsScreen() {
         <LinkCell label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
       ) : null}
       <LinkCell label={t('servers.title')} value={activeServerLabel} onPress={() => router.push('/servers')} />
+      {showCloud ? (
+        <LinkCell label={t('sync.title')} value={destinationLabel} onPress={() => router.push('/sync')} />
+      ) : null}
     </ListSection>
   )
 
@@ -630,27 +626,7 @@ export default function SettingsScreen() {
     </>
   )
 
-  const showCloud = cloudSync.available || cloudPreview
   const cloudBusy = cloudSync.syncing || backingUp
-
-  const folderSync = (
-    <ListSection
-      header={t('sync.title')}
-      footer={t('settings.folderSyncSyncNote')}
-    >
-      <SwitchCell
-        label={t('sync.enabled')}
-        value={cloudSync.enabled}
-        onValueChange={toggleCloudSync}
-        disabled={cloudBusy}
-      />
-      <LinkCell
-        label={t('sync.title')}
-        value={destinationLabel}
-        onPress={() => router.push('/sync')}
-      />
-    </ListSection>
-  )
 
   const backupChips = (
     <ChipRowCell
@@ -740,6 +716,13 @@ export default function SettingsScreen() {
             <NativeLinkRow label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
           ) : null}
           <NativeLinkRow label={t('servers.title')} value={activeServerLabel} onPress={() => router.push('/servers')} />
+          {showCloud ? (
+            <NativeLinkRow
+              label={t('sync.title')}
+              value={destinationLabel}
+              onPress={() => router.push('/sync')}
+            />
+          ) : null}
         </NativeSection>
 
         <NativeSection id="language" title={t('settings.language')}>
@@ -914,21 +897,6 @@ export default function SettingsScreen() {
           {numberRow(t('settings.contextRoomMessages'), messageDrafts.roomMessages ?? String(cfg.roomMessages), (text) => setMessages('roomMessages', text), !cfg.limitMessages)}
         </NativeSection>
 
-        {showCloud ? (
-          <NativeSection
-            id="folderSync"
-            title={t('sync.title')}
-            footer={t('settings.folderSyncSyncNote')}
-          >
-            {toggle(null, t('sync.enabled'), cloudSync.enabled, toggleCloudSync, cloudBusy)}
-            <NativeLinkRow
-              label={t('sync.title')}
-              value={destinationLabel}
-              onPress={() => router.push('/sync')}
-            />
-          </NativeSection>
-        ) : null}
-
         <NativeSection id="backup" title={t('settings.backupTitle')} footer={t('settings.backupNote')}>
           <NativeHostedRow>{backupChips}</NativeHostedRow>
         </NativeSection>
@@ -980,7 +948,6 @@ export default function SettingsScreen() {
           {block('confirmDelete', confirmDeleteRow)}
           {block('haptics', hapticsRow)}
           {block('server', server)}
-          {showCloud ? block('folderSync', folderSync) : null}
           {block('backup', backup)}
           {block('about', about)}
           {block('wipe', wipe)}
