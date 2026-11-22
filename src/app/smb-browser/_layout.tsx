@@ -1,7 +1,7 @@
-import { Stack, useTheme as useNavigationTheme } from 'expo-router'
+import { Stack, ThemeProvider, useTheme as useNavigationTheme } from 'expo-router'
 import { useMemo } from 'react'
+import { StyleSheet, View } from 'react-native'
 
-import { useSheetTones } from '@/components/overlays/BottomSheet'
 import { useColors, useTheme } from '@/theme'
 
 export const unstable_settings = {
@@ -13,24 +13,31 @@ export const unstable_settings = {
 export default function SmbBrowserLayout() {
   const colors = useColors()
   const { scheme } = useTheme()
-  const tones = useSheetTones({ noGlass: true })
   const outer = useNavigationTheme()
   const navigationTheme = useMemo(() => ({ ...outer, dark: scheme === 'dark' }), [outer, scheme])
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: true,
-        headerShadowVisible: false,
-        headerBackButtonDisplayMode: 'generic',
-        headerStyle: { backgroundColor: tones.sheet },
-        headerTintColor: colors.accent,
-        headerTitleStyle: { color: colors.text },
-        contentStyle: { backgroundColor: tones.sheet },
-      }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="[...subpath]" />
-    </Stack>
+    <View style={styles.root}>
+      <ThemeProvider value={navigationTheme}>
+        <Stack
+          screenOptions={{
+            headerShown: true,
+            headerShadowVisible: false,
+            headerBackButtonDisplayMode: 'generic',
+            headerStyle: { backgroundColor: colors.bg },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { color: colors.text },
+            contentStyle: { backgroundColor: colors.bg },
+          }}
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="[...subpath]" />
+        </Stack>
+      </ThemeProvider>
+    </View>
   )
 }
+
+const styles = StyleSheet.create({
+  root: { ...StyleSheet.absoluteFill },
+})

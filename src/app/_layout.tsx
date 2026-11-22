@@ -240,7 +240,7 @@ function AppShell() {
                   sheetGrabberVisible: true,
                   sheetExpandsWhenScrolledToEdge: false,
                   headerShown: false,
-                  contentStyle: { backgroundColor: sheetTones.sheet },
+                  contentStyle: { backgroundColor: colors.bg },
                 })}
                 listeners={{
                   transitionEnd: (e) => {

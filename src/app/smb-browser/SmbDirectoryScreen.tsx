@@ -3,8 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { NativeHostedRow, NativeLinkRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
-import { useSheetTones } from '@/components/overlays/BottomSheet'
+import { NativeLinkRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { useTranslation } from '@/i18n'
 import { isIOS } from '@/lib/core/platform'
@@ -26,7 +25,6 @@ export function SmbDirectoryScreen({ segments, isRoot = false }: Props) {
   const { t } = useTranslation()
   const colors = useColors()
   const { scheme } = useTheme()
-  const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
 
   const session = smbBrowserSession()
@@ -222,14 +220,14 @@ export function SmbDirectoryScreen({ segments, isRoot = false }: Props) {
         />
       )}
 
-      {/* Floating Action Footer: matching sheet background like in AttachMenu */}
+      {/* Floating Action Footer: matching card surface like in AttachMenu */}
       {showAction ? (
         <View
           style={[
             styles.actionFooter,
             {
               paddingBottom: Math.max(16, insets.bottom + 4),
-              backgroundColor: tones.sheet,
+              backgroundColor: colors.surface,
               borderTopColor: colors.border,
             },
           ]}
@@ -261,12 +259,22 @@ function NativeDirectoryList({
   onGoInto: (name: string) => void
 }) {
   const colors = useColors()
-  const { Text: SwiftText, HStack, Spacer, Image } = nativeForm!.ui
-  const { foregroundStyle, lineLimit } = nativeForm!.modifiers
+  const { Text: SwiftText, HStack, Spacer, Image, VStack } = nativeForm!.ui
+  const { foregroundStyle, lineLimit, frame } = nativeForm!.modifiers
 
   return (
     <NativeSheetForm>
-      <NativeSection>
+      <NativeSection
+        fill={colors.surface}
+        top
+        footerNode={
+          footerSpace > 0 ? (
+            <VStack modifiers={[frame({ height: footerSpace })]}>
+              <SwiftText> </SwiftText>
+            </VStack>
+          ) : undefined
+        }
+      >
         {items.length === 0 ? (
           <HStack spacing={10}>
             <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{emptyText}</SwiftText>
@@ -295,11 +303,6 @@ function NativeDirectoryList({
           )
         )}
       </NativeSection>
-      <NativeSection fill="transparent">
-        <NativeHostedRow clear height={footerSpace}>
-          <View />
-        </NativeHostedRow>
-      </NativeSection>
     </NativeSheetForm>
   )
 }
@@ -307,7 +310,12 @@ function NativeDirectoryList({
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: {
-      flex: 1,
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 0,
+      width: '100%',
+      height: '100%',
+      backgroundColor: colors.bg,
     },
     headerButton: {
       fontSize: 16,
