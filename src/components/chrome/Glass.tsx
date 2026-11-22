@@ -108,12 +108,27 @@ type ButtonProps = {
   // Replaces the Ionicons glyph, e.g. with an animated SF Symbol.
   children?: React.ReactNode
   interactive?: boolean
+  translucent?: boolean
+  style?: StyleProp<ViewStyle>
 }
 
 // A round Liquid Glass button of the same 44 pt as the other glass controls; outside
 // iOS 26 it is the plain icon button. The glass is interactive and springs under the
 // finger by itself, so a glass control adds no press scale of its own: the two fight.
-export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOut, disabled = false, accessibilityLabel, tint, interactive = true, children }: ButtonProps) {
+export function GlassButton({
+  icon,
+  iconSize = 22,
+  onPress,
+  onPressIn,
+  onPressOut,
+  disabled = false,
+  accessibilityLabel,
+  tint,
+  interactive = true,
+  translucent = false,
+  style,
+  children,
+}: ButtonProps) {
   const { colors } = useTheme()
   const inHeader = useInHeader()
   const styles = useStyles(createStyles)
@@ -122,6 +137,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOu
   const iconColor = isAndroidHeader && tint ? colors.accent : fill ? ON_ACCENT : undefined
   if (!liquidGlass) {
     const hasCircle = floatingBars && !isDesktop && !isAndroidHeader
+    const circleStyle = isAndroid && translucent ? styles.circleTranslucent : styles.circleSolid
     return (
       <IconButton
         name={icon}
@@ -132,7 +148,7 @@ export function GlassButton({ icon, iconSize = 22, onPress, onPressIn, onPressOu
         onPressOut={onPressOut}
         disabled={disabled}
         accessibilityLabel={accessibilityLabel}
-        style={[hasCircle && styles.circleSolid, fill ? { backgroundColor: fill } : undefined]}
+        style={[hasCircle && circleStyle, fill ? { backgroundColor: fill } : undefined, style]}
       >
         {children}
       </IconButton>
@@ -184,7 +200,16 @@ const createStyles = (colors: Colors) =>
     group: { height: 44, borderRadius: 22, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center' },
     circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
     circleSolid: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    circleTranslucent: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: `rgba(${colors.bgRgb}, 0.65)`,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
     solid: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    translucent: { backgroundColor: `rgba(${colors.bgRgb}, 0.65)`, borderWidth: 1, borderColor: colors.border },
     disabled: { opacity: 0.35 },
     desktopGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     // What stands in for glass on the desktop: a flat grey fill, no outline.

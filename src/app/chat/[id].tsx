@@ -663,13 +663,13 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
         fade={!hasCustomBackground}
         left={
           drawer ? (
-            <GlassButton icon="menu" iconSize={22} onPress={drawer.open} accessibilityLabel={t('chatDrawer.open')} />
+            <GlassButton icon="menu" iconSize={22} translucent onPress={drawer.open} accessibilityLabel={t('chatDrawer.open')} />
           ) : undefined
         }
         right={
           // The photo is a button of its own at the right end, as in Telegram: it opens full
           // screen, and the pill keeps the menu. A room's is its cast, swiped through.
-          <GlassSurface interactive style={[styles.photo, isAndroid && glass.solid]}>
+          <GlassSurface interactive style={[styles.photo, isAndroid && glass.translucent]}>
             {owner.kind === 'character' ? (
               <Avatar name={owner.character.name} file={owner.character.avatar} size={38} />
             ) : (
@@ -681,7 +681,7 @@ function ChatChrome({ store, away, owner, composerHeight, composerTop, onJump, o
         {/* When the menu can, it draws the pill's glass itself, so the menu morphs out of the
             pill. The chat's title heads the menu, as on a row of the drawer. */}
         <NativeMenu items={menu} title={data?.title ?? undefined} style={styles.whoPress} glassRadius={22}>
-          <PillSurface style={[styles.who, pilled && styles.whoPill, isAndroid && glass.solid]}>
+          <PillSurface style={[styles.who, pilled && styles.whoPill, isAndroid && glass.translucent]}>
             <WhoText name={owner.kind === 'character' ? owner.character.name : owner.room.name} data={data} />
           </PillSurface>
         </NativeMenu>

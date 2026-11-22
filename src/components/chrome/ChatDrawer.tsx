@@ -22,6 +22,7 @@ import { confirmDeleteChat } from '@/lib/chat/chatDialogs'
 import { plainPreview } from '@/lib/chat/roleplay'
 import { countLabel, formatWhen } from '@/lib/core/format'
 import { showSheet } from '@/lib/ui/dialogs'
+import { isAndroid } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
 import { swiftUI } from '@/lib/ui/nativeUI'
 import { FILL, fonts, HEADER_FONT_SCALE, useColors, useStyles, useTheme, type Colors } from '@/theme'
@@ -470,7 +471,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
               importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
             >
               <View style={styles.head}>
-                <GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />
+                <GlassButton icon="chevron-back" iconSize={26} translucent onPress={() => router.back()} accessibilityLabel={t('common.back')} />
                 {/* A tap on the owner opens the profile, a character's or a room's. A room of
                     several stands as in iMessage, the faces over a small pill with its name,
                     in the middle; one of one or none is a pill on the left, as a character's. */}
@@ -488,7 +489,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
                         <View style={styles.avatarRow}>
                           <AvatarStack cast={cast} size={34} max={3} viewable={false} />
                         </View>
-                        <GlassSurface interactive style={styles.namePill} fallbackStyle={glass.solid}>
+                        <GlassSurface interactive style={[styles.namePill, isAndroid && glass.translucent]} fallbackStyle={isAndroid ? glass.translucent : glass.solid}>
                           <Text maxFontSizeMultiplier={HEADER_FONT_SCALE} style={styles.imessageName} numberOfLines={1}>
                             {ownerName}
                           </Text>
@@ -496,7 +497,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
                         </GlassSurface>
                       </View>
                     ) : (
-                      <GlassSurface interactive style={[styles.whoPill, owner.kind === 'room' && !cast.length && styles.whoPillNoAvatar]} fallbackStyle={glass.solid}>
+                      <GlassSurface interactive style={[styles.whoPill, owner.kind === 'room' && !cast.length && styles.whoPillNoAvatar, isAndroid && glass.translucent]} fallbackStyle={isAndroid ? glass.translucent : glass.solid}>
                         {owner.kind === 'character' ? (
                           <Avatar name={owner.character.name} file={owner.character.avatar} size={32} viewable={false} />
                         ) : cast.length ? (
@@ -511,7 +512,7 @@ export function ChatDrawer({ owner, chatId, enabled, onStage, flipTo, onSelect, 
                 </View>
                 {/* A character in the archive starts no chats; its own stay to be read. */}
                 {owner.kind === 'character' && owner.character.archivedAt !== null ? null : (
-                  <GlassButton icon="create-outline" onPress={startNew} accessibilityLabel={t('chatDrawer.newChat')} />
+                  <GlassButton icon="create-outline" translucent onPress={startNew} accessibilityLabel={t('chatDrawer.newChat')} />
                 )}
               </View>
               <ReorderableList
