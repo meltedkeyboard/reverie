@@ -76,7 +76,7 @@ import type { SettingsSection } from '@/lib/core/searchScope'
 import { reportError } from '@/lib/transfer/report'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
 import { APP_COPYRIGHT, APP_VERSION_BUILD, ISSUES_URL, REPO_URL } from '@/lib/core/version'
-import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles } from '@/theme'
+import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles, useTheme } from '@/theme'
 
 
 export default function SettingsScreen() {
@@ -360,14 +360,20 @@ export default function SettingsScreen() {
   const [appIcon, setAppIconName] = useState(currentAppIcon)
   useFocusEffect(useCallback(() => setAppIconName(currentAppIcon()), []))
 
+  const { theme, mode } = useTheme()
   const chatText = useChatTextSettings()
+  const themeValue = `${t(`theme.${theme}`)}, ${t(`theme.${mode}`)}`
+  const fontValue = `${chatText.font === 'System' ? t('chatFont.system') : chatText.font}, ${Math.round(chatText.scale * 100)}%`
+  const backgroundValue =
+    chatText.pattern === 'custom' && chatText.wallpaper?.file
+      ? t('chatPattern.custom')
+      : t(`chatPattern.${chatText.pattern}`)
+
   const appearance = (
     <ListSection>
-      <LinkCell
-        label={t('settings.appearance')}
-        value={`${chatText.font === 'System' ? t('chatFont.system') : chatText.font}, ${Math.round(chatText.scale * 100)}%`}
-        onPress={() => router.push('/chat-text')}
-      />
+      <LinkCell label={t('settings.themeScreen')} value={themeValue} onPress={() => router.push('/theme')} />
+      <LinkCell label={t('settings.fontScreen')} value={fontValue} onPress={() => router.push('/chat-text')} />
+      <LinkCell label={t('settings.backgroundScreen')} value={backgroundValue} onPress={() => router.push('/chat-background')} />
       {alternateIconsAvailable ? (
         <LinkCell label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
       ) : null}
@@ -707,11 +713,9 @@ export default function SettingsScreen() {
     return (
       <NativeForm jumpTo={jumpTo}>
         <NativeSection id="appearance" inset={HEADER_ROW_HEIGHT}>
-          <NativeLinkRow
-            label={t('settings.appearance')}
-            value={`${chatText.font === 'System' ? t('chatFont.system') : chatText.font}, ${Math.round(chatText.scale * 100)}%`}
-            onPress={() => router.push('/chat-text')}
-          />
+          <NativeLinkRow label={t('settings.themeScreen')} value={themeValue} onPress={() => router.push('/theme')} />
+          <NativeLinkRow label={t('settings.fontScreen')} value={fontValue} onPress={() => router.push('/chat-text')} />
+          <NativeLinkRow label={t('settings.backgroundScreen')} value={backgroundValue} onPress={() => router.push('/chat-background')} />
           {alternateIconsAvailable ? (
             <NativeLinkRow label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
           ) : null}
