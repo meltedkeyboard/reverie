@@ -367,18 +367,6 @@ export default function SmbScreen() {
         {/* Connection Test */}
         <ListSection header={t('sync.sectionTest')}>
           <ButtonCell
-            label={t('common.save')}
-            onPress={async () => {
-              await persist()
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-              showToast({
-                tone: 'success',
-                title: t('common.save'),
-              })
-            }}
-            icon={{ symbol: 'checkmark', fallback: 'checkmark' }}
-          />
-          <ButtonCell
             label={t('sync.testConnectionButton')}
             onPress={onTest}
             loading={testing}
