@@ -1,9 +1,10 @@
 import { useNavigation, useRouter } from 'expo-router'
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { NativeHostedRow, NativeLinkRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
+import { useSheetTones } from '@/components/overlays/BottomSheet'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { useTranslation } from '@/i18n'
 import { isIOS } from '@/lib/core/platform'
@@ -11,7 +12,7 @@ import { finishSmbBrowserSession, smbBrowserSession } from '@/lib/transfer/smbBr
 import { createSmbDirectory, listSmbDirectory, type SmbFileItem } from '@/lib/transfer/smbClient'
 import { promptText, showMessage } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
-import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
+import { type Colors, ON_ACCENT, useColors, useStyles, useTheme } from '@/theme'
 
 type Props = {
   segments: string[]
@@ -24,6 +25,8 @@ export function SmbDirectoryScreen({ segments, isRoot = false }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const colors = useColors()
+  const { scheme } = useTheme()
+  const tones = useSheetTones({ noGlass: true })
   const styles = useStyles(createStyles)
 
   const session = smbBrowserSession()
@@ -42,24 +45,6 @@ export function SmbDirectoryScreen({ segments, isRoot = false }: Props) {
   const currentClean = currentPath.replace(/\/$/, '').trim()
   const isCurrentSaved = currentClean === initialClean
   const showAction = !isCurrentSaved
-
-  const footerProgress = useSharedValue(0)
-  useEffect(() => {
-    footerProgress.value = withSpring(showAction ? 1 : 0, {
-      stiffness: 300,
-      damping: 28,
-      mass: 0.8,
-    })
-  }, [showAction, footerProgress])
-
-  const [footerHeight, setFooterHeight] = useState(0)
-  const animatedFooterStyle = useAnimatedStyle(() => {
-    const travel = footerHeight || 120
-    return {
-      transform: [{ translateY: (1 - footerProgress.value) * travel }],
-      opacity: footerProgress.value > 0.01 ? 1 : 0,
-    }
-  })
 
   useEffect(() => {
     if (!session) {
@@ -174,6 +159,8 @@ export function SmbDirectoryScreen({ segments, isRoot = false }: Props) {
 
   if (!session) return null
 
+  const footerSpace = showAction ? Math.max(88, insets.bottom + 80) : Math.max(24, insets.bottom + 16)
+
   return (
     <View style={styles.screen}>
       {loading ? (
@@ -187,12 +174,19 @@ export function SmbDirectoryScreen({ segments, isRoot = false }: Props) {
             <Text style={styles.retryText}>{t('sync.browserRetry')}</Text>
           </Pressable>
         </View>
+      ) : nativeForm ? (
+        <NativeDirectoryList
+          items={items}
+          emptyText={t('sync.folderEmpty')}
+          footerSpace={footerSpace}
+          onGoInto={goInto}
+        />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(item) => item.name}
           style={styles.list}
-          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(88, insets.bottom + 80) }]}
+          contentContainerStyle={[styles.listContent, { paddingBottom: footerSpace }]}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>{t('sync.folderEmpty')}</Text>
@@ -228,31 +222,85 @@ export function SmbDirectoryScreen({ segments, isRoot = false }: Props) {
         />
       )}
 
-      {/* Floating Action Footer: slides in and out like in AttachMenu */}
-      <Animated.View
-        onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
-        pointerEvents={showAction ? 'auto' : 'none'}
-        style={[
-          styles.actionFooter,
-          {
-            paddingBottom: Math.max(16, insets.bottom + 4),
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-          },
-          animatedFooterStyle,
-        ]}
-      >
-        <Pressable
-          onPress={handleApply}
-          accessibilityRole="button"
-          accessibilityLabel={t('sync.useThisFolder')}
-          style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.85 }]}
+      {/* Floating Action Footer: matching sheet background like in AttachMenu */}
+      {showAction ? (
+        <View
+          style={[
+            styles.actionFooter,
+            {
+              paddingBottom: Math.max(16, insets.bottom + 4),
+              backgroundColor: tones.sheet,
+              borderTopColor: colors.border,
+            },
+          ]}
         >
-          <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }]} />
-          <Text style={[styles.actionText, { color: ON_ACCENT }]}>{t('sync.useThisFolder')}</Text>
-        </Pressable>
-      </Animated.View>
+          <Pressable
+            onPress={handleApply}
+            accessibilityRole="button"
+            accessibilityLabel={t('sync.useThisFolder')}
+            style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.85 }]}
+          >
+            <View style={[StyleSheet.absoluteFill, styles.actionBg, { backgroundColor: colors.accent }]} />
+            <Text style={[styles.actionText, { color: ON_ACCENT }]}>{t('sync.useThisFolder')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
+  )
+}
+
+function NativeDirectoryList({
+  items,
+  emptyText,
+  footerSpace,
+  onGoInto,
+}: {
+  items: SmbFileItem[]
+  emptyText: string
+  footerSpace: number
+  onGoInto: (name: string) => void
+}) {
+  const colors = useColors()
+  const { Text: SwiftText, HStack, Spacer, Image } = nativeForm!.ui
+  const { foregroundStyle, lineLimit } = nativeForm!.modifiers
+
+  return (
+    <NativeSheetForm>
+      <NativeSection>
+        {items.length === 0 ? (
+          <HStack spacing={10}>
+            <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{emptyText}</SwiftText>
+          </HStack>
+        ) : (
+          items.map((item) =>
+            item.isDirectory ? (
+              <NativeLinkRow
+                key={item.name}
+                label={item.name}
+                symbol="folder.fill"
+                color={colors.accent}
+                chevron
+                onPress={() => onGoInto(item.name)}
+              />
+            ) : (
+              <HStack key={item.name} spacing={10}>
+                <Image systemName="doc.fill" size={18} color={colors.textMuted} />
+                <SwiftText modifiers={[foregroundStyle(colors.text), lineLimit(1)]}>{item.name}</SwiftText>
+                <Spacer />
+                <SwiftText modifiers={[foregroundStyle(colors.textMuted), lineLimit(1)]}>
+                  {`${Math.round(item.size / 1024)} KB`}
+                </SwiftText>
+              </HStack>
+            )
+          )
+        )}
+      </NativeSection>
+      <NativeSection fill="transparent">
+        <NativeHostedRow clear height={footerSpace}>
+          <View />
+        </NativeHostedRow>
+      </NativeSection>
+    </NativeSheetForm>
   )
 }
 
@@ -260,7 +308,6 @@ const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: colors.bg,
     },
     headerButton: {
       fontSize: 16,

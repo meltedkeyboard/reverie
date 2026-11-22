@@ -234,14 +234,14 @@ function AppShell() {
               {/* The SMB folder browser, the system sheet of iOS with a stack of its own inside for folder drill-down. */}
               <Stack.Screen
                 name="smb-browser"
-                options={{
+                options={() => ({
                   presentation: 'formSheet',
                   sheetAllowedDetents: [0.75, 1],
                   sheetGrabberVisible: true,
                   sheetExpandsWhenScrolledToEdge: false,
                   headerShown: false,
-                  contentStyle: { backgroundColor: colors.bg },
-                }}
+                  contentStyle: { backgroundColor: sheetTones.sheet },
+                })}
                 listeners={{
                   transitionEnd: (e) => {
                     if (e.data.closing) finishSmbBrowserSession()
