@@ -28,8 +28,15 @@ export default function SyncScreen() {
 
   const toggleSync = async (on: boolean) => {
     try {
-      if (on) await cloudSync.enable()
-      else await cloudSync.disable()
+      if (on) {
+        if (cloudSync.provider === 'smb' && (!cloudSync.smb.host.trim() || !cloudSync.smb.share.trim())) {
+          router.push('/sync/smb')
+          return
+        }
+        await cloudSync.enable()
+      } else {
+        await cloudSync.disable()
+      }
     } catch (err: unknown) {
       reportError(t('sync.failedTitle'), err)
     }
@@ -84,24 +91,22 @@ export default function SyncScreen() {
               disabled={cloudSync.syncing}
             />
           )}
-          {cloudSync.enabled && (
-            <SegmentCell<SyncProvider>
-              label={t('sync.storageType')}
-              value={cloudSync.provider}
-              onChange={(p) => {
-                Haptics.selectionAsync()
-                cloudSync.switchProvider(p)
-              }}
-              options={[
-                { value: 'folder', label: t('sync.providerFolder') },
-                { value: 'smb', label: t('sync.providerSmb') },
-              ]}
-            />
-          )}
+          <SegmentCell<SyncProvider>
+            label={t('sync.storageType')}
+            value={cloudSync.provider}
+            onChange={(p) => {
+              Haptics.selectionAsync()
+              cloudSync.switchProvider(p)
+            }}
+            options={[
+              { value: 'folder', label: t('sync.providerFolder') },
+              { value: 'smb', label: t('sync.providerSmb') },
+            ]}
+          />
         </ListSection>
 
         {/* Folder Details */}
-        {cloudSync.enabled && cloudSync.provider === 'folder' && (
+        {cloudSync.provider === 'folder' && (
           <ListSection header={t('sync.sectionStorage')} footer={t('sync.folderNote')}>
             <ValueCell
               label={t('sync.currentFolder')}
@@ -116,7 +121,7 @@ export default function SyncScreen() {
         )}
 
         {/* SMB Details */}
-        {cloudSync.enabled && cloudSync.provider === 'smb' && (
+        {cloudSync.provider === 'smb' && (
           <ListSection header={t('sync.sectionSmb')} footer={t('sync.smbNote')}>
             <ValueCell
               label={t('sync.serverHost')}

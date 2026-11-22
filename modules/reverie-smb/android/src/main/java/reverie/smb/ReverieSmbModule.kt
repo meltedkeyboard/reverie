@@ -26,6 +26,8 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.net.Inet4Address
+import java.net.InetAddress
 import java.security.KeyStore
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
@@ -99,7 +101,7 @@ class ReverieSmbModule : Module() {
     return try {
       val parsed = parseConfig(config)
       if (parsed.share.isEmpty()) {
-        withClient(config, connectTimeoutMs = 3000) { _, _, session ->
+        withClient(config, connectTimeoutMs = 5000) { _, _, session ->
           try {
             val transport: RPCTransport = SMBTransportFactories.SRVSVC.getTransport(session)
             val srv = ServerService(transport)
@@ -110,8 +112,10 @@ class ReverieSmbModule : Module() {
           mapOf("ok" to true, "protocol" to "SMB 2/3")
         }
       } else {
-        withShare(config) { share ->
-          share.list("")
+        withShare(config, connectTimeoutMs = 5000) { share ->
+          if (!share.folderExists("")) {
+            share.list("")
+          }
           mapOf("ok" to true, "protocol" to "SMB 2/3")
         }
       }
@@ -190,7 +194,7 @@ class ReverieSmbModule : Module() {
         remotePath,
         setOf(AccessMask.GENERIC_READ),
         null,
-        setOf(SMB2ShareAccess.FILE_SHARE_READ, SMB2ShareAccess.FILE_SHARE_WRITE),
+        SMB2ShareAccess.ALL,
         SMB2CreateDisposition.FILE_OPEN,
         null
       )
@@ -198,20 +202,28 @@ class ReverieSmbModule : Module() {
       try {
         remoteFile.use { rf ->
           tempFile.outputStream().use { out ->
-            rf.inputStream.use { inp ->
-              inp.copyTo(out)
-            }
+            rf.read(out)
             out.flush()
           }
         }
-        if (tempFile.length() == 0L) {
-          throw IOException("Downloaded file is empty: $path")
+        val remoteSize = try {
+          remoteFile.fileInformation.standardInformation.endOfFile
+        } catch (_: Exception) {
+          -1L
+        }
+        if (remoteSize > 0L && tempFile.length() == 0L) {
+          throw IOException("Downloaded file is incomplete: $path")
         }
         if (localFile.exists()) {
           localFile.delete()
         }
         if (!tempFile.renameTo(localFile)) {
-          tempFile.copyTo(localFile, overwrite = true)
+          tempFile.inputStream().use { inp ->
+            localFile.outputStream().use { out ->
+              inp.copyTo(out)
+              out.flush()
+            }
+          }
           tempFile.delete()
         }
       } catch (e: Exception) {
@@ -344,10 +356,17 @@ class ReverieSmbModule : Module() {
     val smbConfig = SmbConfig.builder()
       .withTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
       .withSoTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
+      .withSigningEnabled(false)
       .build()
     val client = SMBClient(smbConfig)
     return try {
-      val connection = client.connect(parsed.host, parsed.port)
+      val resolvedHost = try {
+        val addrs = InetAddress.getAllByName(parsed.host)
+        addrs.firstOrNull { it is Inet4Address }?.hostAddress ?: parsed.host
+      } catch (_: Exception) {
+        parsed.host
+      }
+      val connection = client.connect(resolvedHost, parsed.port)
       connection.use { conn ->
         val auth = if (!parsed.username.isNullOrEmpty()) {
           AuthenticationContext(parsed.username, parsed.password.toCharArray(), parsed.domain)
@@ -366,13 +385,14 @@ class ReverieSmbModule : Module() {
 
   private inline fun <T> withShare(
     config: Map<String, Any?>,
+    connectTimeoutMs: Long = 15000,
     block: (share: DiskShare) -> T
   ): T {
     val parsed = parseConfig(config)
     if (parsed.share.isEmpty()) {
       throw IllegalArgumentException("Share name is required")
     }
-    return withClient(config) { _, _, session ->
+    return withClient(config, connectTimeoutMs = connectTimeoutMs) { _, _, session ->
       val share = session.connectShare(parsed.share) as? DiskShare
         ?: throw IllegalStateException("Share '${parsed.share}' is not a disk share")
       share.use { disk ->

@@ -65,8 +65,10 @@ export default function SmbScreen() {
       setPassword(pass)
       setDomain(settings.domain || 'WORKGROUP')
       setWifiOnly(settings.wifiOnly)
-      setAuthMode(settings.username ? 'user' : 'guest')
-      loaded.current = true
+      setAuthMode('user')
+      setTimeout(() => {
+        loaded.current = true
+      }, 50)
     })
   }, [db])
 
@@ -101,7 +103,9 @@ export default function SmbScreen() {
       }
       await saveSmbSettings(db, s)
       const passToSave = overridePass !== undefined ? overridePass : (authMode === 'user' ? password : '')
-      await saveSmbPassword(db, passToSave)
+      if (passToSave || authMode === 'guest') {
+        await saveSmbPassword(db, passToSave)
+      }
       refreshSync.current().catch(() => {})
     },
     [db, host, port, share, path, authMode, username, password, domain, wifiOnly]
@@ -112,6 +116,14 @@ export default function SmbScreen() {
       persist()
     }
   }, [host, port, share, path, username, password, domain, wifiOnly, authMode, persist])
+
+  useEffect(() => {
+    return () => {
+      if (loaded.current) {
+        persist()
+      }
+    }
+  }, [persist])
 
   const currentConfig: SmbConfig = useMemo(
     () => ({
@@ -165,6 +177,7 @@ export default function SmbScreen() {
 
   const onTest = async () => {
     if (!host.trim()) return
+    await persist()
     setTesting(true)
     const start = Date.now()
     try {
@@ -337,6 +350,18 @@ export default function SmbScreen() {
         {/* Connection Test */}
         <ListSection header={t('sync.sectionTest')}>
           <ButtonCell
+            label={t('common.save')}
+            onPress={async () => {
+              await persist()
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+              showToast({
+                tone: 'success',
+                title: t('common.save'),
+              })
+            }}
+            icon={{ symbol: 'checkmark', fallback: 'checkmark' }}
+          />
+          <ButtonCell
             label={t('sync.testConnectionButton')}
             onPress={onTest}
             loading={testing}
@@ -379,7 +404,17 @@ export default function SmbScreen() {
         <GlassHeader
           floating
           centerTitle
-          left={<GlassButton icon="chevron-back" iconSize={26} onPress={() => router.back()} accessibilityLabel={t('common.back')} />}
+          left={
+            <GlassButton
+              icon="chevron-back"
+              iconSize={26}
+              onPress={() => {
+                persist()
+                router.back()
+              }}
+              accessibilityLabel={t('common.back')}
+            />
+          }
         >
           <TabTitle star={false}>{t('sync.smbSettingsTitle')}</TabTitle>
         </GlassHeader>

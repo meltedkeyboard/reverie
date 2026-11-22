@@ -182,6 +182,10 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       await forgetSyncRev(dbRef.current)
       await refresh()
       if (enabledRef.current && autoSyncRef.current) {
+        if (nextProvider === 'smb') {
+          const s = await getSmbSettings(dbRef.current)
+          if (!s.host.trim() || !s.share.trim()) return
+        }
         await sync('auto', true)
       }
     },
