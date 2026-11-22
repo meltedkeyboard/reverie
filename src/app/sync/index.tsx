@@ -10,10 +10,12 @@ import { ChipRowCell } from '@/components/lists/PictureCells'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useTranslation } from '@/i18n'
 import { formatWhen } from '@/lib/core/format'
-import { isAndroid } from '@/lib/core/platform'
+import { isAndroid, isIOS } from '@/lib/core/platform'
 import { simulateSyncProgress } from '@/lib/transfer/cloudSync'
+import { openSmbBrowserSession } from '@/lib/transfer/smbBrowserSession'
 import { reportError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
+import { showToast } from '@/lib/ui/toast'
 import { type Colors, useColors, useStyles } from '@/theme'
 import type { SyncProvider } from '@/db/prefs/cloudSync'
 
@@ -173,6 +175,24 @@ export default function SyncScreen() {
               label={t('sync.testProgressPill')}
               onPress={() => simulateSyncProgress()}
               icon={{ symbol: 'play.circle', fallback: 'play-circle-outline' }}
+            />
+            <ButtonCell
+              label={t('sync.browseFoldersButton')}
+              onPress={() => {
+                if (isIOS) {
+                  openSmbBrowserSession({
+                    config: { host: 'demo.local', share: 'ReverieShare' },
+                    initialPath: 'Reverie Sync',
+                    onSelectPath: (chosen) => {
+                      showToast({ tone: 'success', title: chosen || '/' })
+                    },
+                  })
+                  router.push('/smb-browser')
+                } else {
+                  router.push('/sync/smb')
+                }
+              }}
+              icon={{ symbol: 'folder', fallback: 'folder-outline' }}
             />
           </ListSection>
         )}

@@ -28,6 +28,7 @@ import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useStoredValue } from '@/hooks/util/useStoredFlag'
 import { attachDetent, finishAttachSession } from '@/lib/chat/attachSession'
 import { finishGalleryPick } from '@/lib/images/galleryPick'
+import { finishSmbBrowserSession } from '@/lib/transfer/smbBrowserSession'
 import { castDetent, finishCastSession } from '@/lib/chat/castSession'
 import { finishThoughtSession, markThoughtClosing } from '@/lib/chat/thoughtSession'
 import { ThoughtSheetHost } from '@/components/chat/ThoughtSheet'
@@ -227,6 +228,23 @@ function AppShell() {
                 listeners={{
                   transitionEnd: (e) => {
                     if (e.data.closing) finishGalleryPick()
+                  },
+                }}
+              />
+              {/* The SMB folder browser, the system sheet of iOS with a stack of its own inside for folder drill-down. */}
+              <Stack.Screen
+                name="smb-browser"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: [0.75, 1],
+                  sheetGrabberVisible: true,
+                  sheetExpandsWhenScrolledToEdge: false,
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.bg },
+                }}
+                listeners={{
+                  transitionEnd: (e) => {
+                    if (e.data.closing) finishSmbBrowserSession()
                   },
                 }}
               />

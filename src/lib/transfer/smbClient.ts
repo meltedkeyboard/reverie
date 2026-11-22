@@ -20,18 +20,72 @@ export async function testSmbConnection(config: SmbConfig): Promise<SmbTestResul
   }
 }
 
+const mockDirectories = new Map<string, SmbFileItem[]>([
+  [
+    '',
+    [
+      { name: 'Reverie Sync', isDirectory: true, size: 0, modifiedAt: Date.now() },
+      { name: 'Backups', isDirectory: true, size: 0, modifiedAt: Date.now() },
+      { name: 'Public', isDirectory: true, size: 0, modifiedAt: Date.now() },
+      { name: 'manifest.json', isDirectory: false, size: 1024, modifiedAt: Date.now() },
+    ],
+  ],
+  [
+    'Reverie Sync',
+    [
+      { name: 'Media', isDirectory: true, size: 0, modifiedAt: Date.now() },
+      { name: 'Snapshots', isDirectory: true, size: 0, modifiedAt: Date.now() },
+      { name: 'reverie.db', isDirectory: false, size: 524288, modifiedAt: Date.now() },
+      { name: 'manifest.json', isDirectory: false, size: 2048, modifiedAt: Date.now() },
+    ],
+  ],
+  [
+    'Backups',
+    [
+      { name: '2026-11-20', isDirectory: true, size: 0, modifiedAt: Date.now() },
+      { name: '2026-11-22', isDirectory: true, size: 0, modifiedAt: Date.now() },
+    ],
+  ],
+])
+
 export async function listSmbShares(config: SmbConfig): Promise<string[]> {
-  if (!reverieSmb) return []
+  if (!reverieSmb || config.host === 'demo.local' || !config.host?.trim()) {
+    if (__DEV__) return ['ReverieShare', 'Backups', 'Public']
+    return []
+  }
   return reverieSmb.listShares(config)
 }
 
 export async function listSmbDirectory(config: SmbConfig, path: string): Promise<SmbFileItem[]> {
-  if (!reverieSmb) return []
+  if (!reverieSmb || config.host === 'demo.local' || !config.host?.trim()) {
+    if (__DEV__) {
+      const cleanPath = path.replace(/^\/+|\/+$/g, '')
+      const list = mockDirectories.get(cleanPath) ?? []
+      return [...list]
+    }
+    return []
+  }
   return reverieSmb.listDirectory(config, path)
 }
 
 export async function createSmbDirectory(config: SmbConfig, path: string): Promise<void> {
-  if (!reverieSmb) return
+  if (!reverieSmb || config.host === 'demo.local' || !config.host?.trim()) {
+    if (__DEV__) {
+      const clean = path.replace(/^\/+|\/+$/g, '')
+      const lastSlash = clean.lastIndexOf('/')
+      const parent = lastSlash >= 0 ? clean.slice(0, lastSlash) : ''
+      const name = lastSlash >= 0 ? clean.slice(lastSlash + 1) : clean
+      const current = mockDirectories.get(parent) ?? []
+      if (!current.some((item) => item.name === name)) {
+        mockDirectories.set(parent, [
+          ...current,
+          { name, isDirectory: true, size: 0, modifiedAt: Date.now() },
+        ])
+      }
+      return
+    }
+    return
+  }
   return reverieSmb.createDirectory(config, path)
 }
 

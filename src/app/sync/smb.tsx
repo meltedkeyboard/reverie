@@ -13,7 +13,8 @@ import { useDatabase } from '@/db/provider'
 import { getSmbPassword, getSmbSettings, saveSmbPassword, saveSmbSettings, type SmbSettings } from '@/db/prefs/cloudSync'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useTranslation } from '@/i18n'
-import { isAndroid } from '@/lib/core/platform'
+import { isAndroid, isIOS } from '@/lib/core/platform'
+import { openSmbBrowserSession } from '@/lib/transfer/smbBrowserSession'
 import { discoverSmbServers, listSmbShares, testSmbConnection, type DiscoveredSmbServer, type SmbConfig } from '@/lib/transfer/smbClient'
 import { showMessage, showSheet } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
@@ -341,8 +342,24 @@ export default function SmbScreen() {
           />
           <ButtonCell
             label={t('sync.browseFoldersButton')}
-            onPress={() => setBrowserVisible(true)}
-            disabled={!host.trim() || !share.trim()}
+            onPress={() => {
+              const effectiveConfig: SmbConfig = {
+                ...currentConfig,
+                host: currentConfig.host || (__DEV__ ? 'demo.local' : ''),
+                share: currentConfig.share || (__DEV__ ? 'ReverieShare' : ''),
+              }
+              if (isIOS) {
+                openSmbBrowserSession({
+                  config: effectiveConfig,
+                  initialPath: path,
+                  onSelectPath: (chosen) => setPath(chosen),
+                })
+                router.push('/smb-browser')
+              } else {
+                setBrowserVisible(true)
+              }
+            }}
+            disabled={!__DEV__ && (!host.trim() || !share.trim())}
             icon={{ symbol: 'folder', fallback: 'folder-outline' }}
           />
         </ListSection>
@@ -390,8 +407,8 @@ export default function SmbScreen() {
         </ListSection>
       </KeyboardAwareScrollView>
 
-      {/* Modal Folder Browser */}
-      {browserVisible && (
+      {/* Modal Folder Browser (non-iOS) */}
+      {browserVisible && !isIOS && (
         <SmbFolderBrowser
           visible={browserVisible}
           config={currentConfig}

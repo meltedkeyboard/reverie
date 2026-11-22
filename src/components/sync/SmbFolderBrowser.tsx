@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
@@ -5,23 +6,47 @@ import { Button } from '@/components/controls/Button/Button'
 import { PageSheet } from '@/components/overlays/PageSheet'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { useTranslation } from '@/i18n'
+import { isIOS } from '@/lib/core/platform'
+import { openSmbBrowserSession } from '@/lib/transfer/smbBrowserSession'
 import { createSmbDirectory, listSmbDirectory, type SmbConfig, type SmbFileItem } from '@/lib/transfer/smbClient'
 import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, useColors, useStyles } from '@/theme'
 
-type Props = {
-  visible: boolean
+type BrowserOptions = {
   config: SmbConfig
   initialPath: string
   onSelectPath: (path: string) => void
-  onClose: () => void
+  onClose?: () => void
+  enabled?: boolean
 }
 
-export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, onClose }: Props) {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = useStyles(createStyles)
+export type SmbFolderBrowserState = {
+  currentPath: string
+  pathLabel: string
+  title: string
+  items: SmbFileItem[]
+  loading: boolean
+  error: string | null
+  creating: boolean
+  newDirName: string
+  submittingCreate: boolean
+  canGoUp: boolean
+  setNewDirName: (name: string) => void
+  toggleCreating: () => void
+  goUp: () => void
+  goInto: (dirName: string) => void
+  loadDirectory: (path: string) => void
+  handleCreateDirectory: () => Promise<void>
+  handleApply: () => void
+}
 
+export function useSmbFolderBrowser({
+  config,
+  initialPath,
+  onSelectPath,
+  onClose,
+  enabled = true,
+}: BrowserOptions): SmbFolderBrowserState {
   const [currentPath, setCurrentPath] = useState(initialPath.trim() || '')
   const [items, setItems] = useState<SmbFileItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -30,7 +55,6 @@ export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, o
   const configRef = useRef(config)
   configRef.current = config
 
-  // Creation of a new directory inside current folder
   const [creating, setCreating] = useState(false)
   const [newDirName, setNewDirName] = useState('')
   const [submittingCreate, setSubmittingCreate] = useState(false)
@@ -40,7 +64,6 @@ export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, o
     setError(null)
     try {
       const list = await listSmbDirectory(configRef.current, path)
-      // Folders first, sorted alphabetically
       list.sort((a, b) => {
         if (a.isDirectory && !b.isDirectory) return -1
         if (!a.isDirectory && b.isDirectory) return 1
@@ -48,7 +71,6 @@ export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, o
       })
       setItems(list)
     } catch (err: unknown) {
-      // If requested subfolder does not exist yet on the share, gracefully fall back to root
       if (path && !isFallback) {
         setCurrentPath('')
         loadDirectory('', true)
@@ -61,12 +83,12 @@ export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, o
   }, [])
 
   useEffect(() => {
-    if (visible) {
+    if (enabled) {
       const initial = initialPath.trim() || ''
       setCurrentPath(initial)
       loadDirectory(initial)
     }
-  }, [visible, initialPath, loadDirectory])
+  }, [enabled, initialPath, loadDirectory])
 
   const goInto = (dirName: string) => {
     Haptics.selectionAsync()
@@ -107,115 +129,188 @@ export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, o
   const handleApply = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     onSelectPath(currentPath)
-    onClose()
+    onClose?.()
   }
 
   const canGoUp = currentPath.length > 0
   const pathLabel = currentPath ? `/${currentPath}` : '/'
+  const title = config.share ? `${config.share}${pathLabel}` : pathLabel
+
+  return {
+    currentPath,
+    pathLabel,
+    title,
+    items,
+    loading,
+    error,
+    creating,
+    newDirName,
+    submittingCreate,
+    canGoUp,
+    setNewDirName,
+    toggleCreating: () => setCreating((c) => !c),
+    goUp,
+    goInto,
+    loadDirectory,
+    handleCreateDirectory,
+    handleApply,
+  }
+}
+
+type ContentProps = {
+  browser: SmbFolderBrowserState
+  insetsBottom?: number
+}
+
+export function SmbFolderBrowserContent({ browser, insetsBottom }: ContentProps) {
+  const { t } = useTranslation()
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+
+  return (
+    <View style={styles.content}>
+      {browser.creating && (
+        <View style={styles.createCard}>
+          <Text style={styles.createTitle}>{t('sync.newFolderTitle')}</Text>
+          <View style={styles.createRow}>
+            <TextInput
+              style={styles.createInput}
+              value={browser.newDirName}
+              onChangeText={browser.setNewDirName}
+              placeholder={t('sync.newFolderPlaceholder')}
+              placeholderTextColor={colors.textFaint}
+              autoFocus
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            <Button
+              label={t('sync.createFolder')}
+              onPress={browser.handleCreateDirectory}
+              disabled={!browser.newDirName.trim() || browser.submittingCreate}
+            />
+          </View>
+        </View>
+      )}
+
+      {browser.loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      ) : browser.error ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>{browser.error}</Text>
+          <Button label={t('sync.browserRetry')} onPress={() => browser.loadDirectory(browser.currentPath)} />
+        </View>
+      ) : (
+        <FlatList
+          data={browser.items}
+          keyExtractor={(item) => item.name}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>{t('sync.folderEmpty')}</Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              style={({ pressed }) => [styles.itemRow, pressed && item.isDirectory && styles.itemRowPressed]}
+              disabled={!item.isDirectory}
+              onPress={() => item.isDirectory && browser.goInto(item.name)}
+            >
+              <View style={styles.itemIcon}>
+                <SFIcon
+                  name={item.isDirectory ? 'folder.fill' : 'doc.fill'}
+                  fallback={item.isDirectory ? 'folder' : 'document-outline'}
+                  size={22}
+                  color={item.isDirectory ? colors.accent : colors.textMuted}
+                />
+              </View>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                {!item.isDirectory && (
+                  <Text style={styles.itemMeta}>{Math.round(item.size / 1024)} KB</Text>
+                )}
+              </View>
+              {item.isDirectory && (
+                <SFIcon name="chevron.right" fallback="chevron-forward" size={16} color={colors.textMuted} />
+              )}
+            </Pressable>
+          )}
+        />
+      )}
+
+      <View style={[styles.footer, insetsBottom !== undefined && insetsBottom > 0 && { paddingBottom: Math.max(insetsBottom, 16) }]}>
+        <Text style={styles.footerPath} numberOfLines={1}>
+          {t('sync.selectedFolder')}: {browser.pathLabel}
+        </Text>
+        <Button label={t('sync.useThisFolder')} onPress={browser.handleApply} />
+      </View>
+    </View>
+  )
+}
+
+type Props = {
+  visible: boolean
+  config: SmbConfig
+  initialPath: string
+  onSelectPath: (path: string) => void
+  onClose: () => void
+}
+
+export function SmbFolderBrowser({ visible, config, initialPath, onSelectPath, onClose }: Props) {
+  const router = useRouter()
+  const { t } = useTranslation()
+  const colors = useColors()
+  const styles = useStyles(createStyles)
+
+  useEffect(() => {
+    if (isIOS && visible) {
+      openSmbBrowserSession({
+        config,
+        initialPath,
+        onSelectPath,
+        onClose,
+      })
+      router.push('/smb-browser')
+    }
+  }, [visible, config, initialPath, onSelectPath, onClose, router])
+
+  const browser = useSmbFolderBrowser({
+    config,
+    initialPath,
+    onSelectPath,
+    onClose,
+    enabled: visible && !isIOS,
+  })
+
+  if (isIOS || !visible) return null
 
   return (
     <PageSheet
       visible={visible}
       onClose={onClose}
-      title={config.share ? `${config.share}${pathLabel}` : pathLabel}
+      title={browser.title}
       left={
-        <Pressable onPress={canGoUp ? goUp : onClose} hitSlop={12} style={styles.navButton}>
+        <Pressable onPress={browser.canGoUp ? browser.goUp : onClose} hitSlop={12} style={styles.navButton}>
           <SFIcon
-            name={canGoUp ? 'chevron.left' : 'xmark'}
-            fallback={canGoUp ? 'chevron-back' : 'close'}
+            name={browser.canGoUp ? 'chevron.left' : 'xmark'}
+            fallback={browser.canGoUp ? 'chevron-back' : 'close'}
             size={20}
             color={colors.accent}
           />
-          <Text style={styles.navButtonText}>{canGoUp ? t('sync.browserUp') : t('common.cancel')}</Text>
+          <Text style={styles.navButtonText}>{browser.canGoUp ? t('sync.browserUp') : t('common.cancel')}</Text>
         </Pressable>
       }
       right={
-        <Pressable onPress={() => setCreating((c) => !c)} hitSlop={12} style={styles.navButton}>
+        <Pressable onPress={browser.toggleCreating} hitSlop={12} style={styles.navButton}>
           <SFIcon name="folder.badge.plus" fallback="add" size={22} color={colors.accent} />
         </Pressable>
       }
     >
-      <View style={styles.content}>
-        {creating && (
-          <View style={styles.createCard}>
-            <Text style={styles.createTitle}>{t('sync.newFolderTitle')}</Text>
-            <View style={styles.createRow}>
-              <TextInput
-                style={styles.createInput}
-                value={newDirName}
-                onChangeText={setNewDirName}
-                placeholder={t('sync.newFolderPlaceholder')}
-                placeholderTextColor={colors.textFaint}
-                autoFocus
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              <Button
-                label={t('sync.createFolder')}
-                onPress={handleCreateDirectory}
-                disabled={!newDirName.trim() || submittingCreate}
-              />
-            </View>
-          </View>
-        )}
-
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
-        ) : error ? (
-          <View style={styles.centerContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Button label={t('sync.browserRetry')} onPress={() => loadDirectory(currentPath)} />
-          </View>
-        ) : (
-          <FlatList
-            data={items}
-            keyExtractor={(item) => item.name}
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>{t('sync.folderEmpty')}</Text>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <Pressable
-                style={({ pressed }) => [styles.itemRow, pressed && item.isDirectory && styles.itemRowPressed]}
-                disabled={!item.isDirectory}
-                onPress={() => item.isDirectory && goInto(item.name)}
-              >
-                <View style={styles.itemIcon}>
-                  <SFIcon
-                    name={item.isDirectory ? 'folder.fill' : 'doc.fill'}
-                    fallback={item.isDirectory ? 'folder' : 'document-outline'}
-                    size={22}
-                    color={item.isDirectory ? colors.accent : colors.textMuted}
-                  />
-                </View>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemName} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  {!item.isDirectory && (
-                    <Text style={styles.itemMeta}>{Math.round(item.size / 1024)} KB</Text>
-                  )}
-                </View>
-                {item.isDirectory && (
-                  <SFIcon name="chevron.right" fallback="chevron-forward" size={16} color={colors.textMuted} />
-                )}
-              </Pressable>
-            )}
-          />
-        )}
-
-        <View style={styles.footer}>
-          <Text style={styles.footerPath} numberOfLines={1}>
-            {t('sync.selectedFolder')}: {pathLabel}
-          </Text>
-          <Button label={t('sync.useThisFolder')} onPress={handleApply} />
-        </View>
-      </View>
+      <SmbFolderBrowserContent browser={browser} />
     </PageSheet>
   )
 }
