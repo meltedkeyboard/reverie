@@ -32,6 +32,7 @@ import { finishSmbBrowserSession } from '@/lib/transfer/smbBrowserSession'
 import { castDetent, finishCastSession } from '@/lib/chat/castSession'
 import { finishThoughtSession, markThoughtClosing } from '@/lib/chat/thoughtSession'
 import { ThoughtSheetHost } from '@/components/chat/ThoughtSheet'
+import { SmbBrowserSheetHost } from '@/components/sync/SmbFolderBrowser'
 import { cropSheetDetents, cropSheetDown } from '@/lib/images/avatarCropLook'
 import { lookSheetDetents, lookSheetDown } from '@/lib/images/backgroundLook'
 import { ChatTextProvider } from '@/lib/chat/chatText'
@@ -318,6 +319,7 @@ function AppShell() {
         <DialogHost />
         <ToastHost />
         <ThoughtSheetHost />
+        <SmbBrowserSheetHost />
         <SyncProgressPill />
       </ThemeProvider>
     </>

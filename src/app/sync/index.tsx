@@ -179,17 +179,15 @@ export default function SyncScreen() {
             <ButtonCell
               label={t('sync.browseFoldersButton')}
               onPress={() => {
+                openSmbBrowserSession({
+                  config: { host: 'demo.local', share: 'ReverieShare' },
+                  initialPath: 'Reverie Sync',
+                  onSelectPath: (chosen) => {
+                    showToast({ tone: 'success', title: chosen || '/' })
+                  },
+                })
                 if (isIOS) {
-                  openSmbBrowserSession({
-                    config: { host: 'demo.local', share: 'ReverieShare' },
-                    initialPath: 'Reverie Sync',
-                    onSelectPath: (chosen) => {
-                      showToast({ tone: 'success', title: chosen || '/' })
-                    },
-                  })
                   router.push('/smb-browser')
-                } else {
-                  router.push('/sync/smb')
                 }
               }}
               icon={{ symbol: 'folder', fallback: 'folder-outline' }}

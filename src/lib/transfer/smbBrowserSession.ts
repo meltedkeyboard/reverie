@@ -1,3 +1,4 @@
+import { createStore } from '@/components/chat/thread/store'
 import type { SmbConfig } from './smbClient'
 
 export type SmbBrowserSession = {
@@ -7,20 +8,20 @@ export type SmbBrowserSession = {
   onClose?: () => void
 }
 
-let activeSession: SmbBrowserSession | null = null
+export const smbBrowserSessionStore = createStore<SmbBrowserSession | null>(null)
 
 export function openSmbBrowserSession(session: SmbBrowserSession) {
-  activeSession = session
+  smbBrowserSessionStore.set(session)
 }
 
 export function smbBrowserSession(): SmbBrowserSession | null {
-  return activeSession
+  return smbBrowserSessionStore.get()
 }
 
 export function finishSmbBrowserSession() {
-  const session = activeSession
+  const session = smbBrowserSessionStore.get()
   if (session) {
-    activeSession = null
+    smbBrowserSessionStore.set(null)
     session.onClose?.()
   }
 }

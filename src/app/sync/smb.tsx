@@ -7,7 +7,6 @@ import { FormScreenHeader } from '@/components/chrome/FormScreenHeader'
 import { GlassButton } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { ButtonCell, InputCell, ListSection, SegmentCell, SwitchCell } from '@/components/lists/GroupedList'
-import { SmbFolderBrowser } from '@/components/sync/SmbFolderBrowser'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { useDatabase } from '@/db/provider'
 import { getSmbPassword, getSmbSettings, saveSmbPassword, saveSmbSettings, type SmbSettings } from '@/db/prefs/cloudSync'
@@ -48,7 +47,6 @@ export default function SmbScreen() {
   const [scanning, setScanning] = useState(false)
 
   // Modals & testing
-  const [browserVisible, setBrowserVisible] = useState(false)
   const [listingShares, setListingShares] = useState(false)
   const [testing, setTesting] = useState(false)
 
@@ -348,15 +346,13 @@ export default function SmbScreen() {
                 host: currentConfig.host || (__DEV__ ? 'demo.local' : ''),
                 share: currentConfig.share || (__DEV__ ? 'ReverieShare' : ''),
               }
+              openSmbBrowserSession({
+                config: effectiveConfig,
+                initialPath: path,
+                onSelectPath: (chosen) => setPath(chosen),
+              })
               if (isIOS) {
-                openSmbBrowserSession({
-                  config: effectiveConfig,
-                  initialPath: path,
-                  onSelectPath: (chosen) => setPath(chosen),
-                })
                 router.push('/smb-browser')
-              } else {
-                setBrowserVisible(true)
               }
             }}
             disabled={!__DEV__ && (!host.trim() || !share.trim())}
@@ -394,17 +390,6 @@ export default function SmbScreen() {
           )}
         </ListSection>
       </KeyboardAwareScrollView>
-
-      {/* Modal Folder Browser (non-iOS) */}
-      {browserVisible && !isIOS && (
-        <SmbFolderBrowser
-          visible={browserVisible}
-          config={currentConfig}
-          initialPath={path}
-          onSelectPath={(chosen) => setPath(chosen)}
-          onClose={() => setBrowserVisible(false)}
-        />
-      )}
       {isAndroid ? (
         <GlassHeader
           floating
