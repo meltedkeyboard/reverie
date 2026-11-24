@@ -63,6 +63,7 @@ if (existsSync(`${BRAND}/alt/icon-violet-dream.svg`)) {
   png(defaultSvg, 'assets/images/icon-dark.png')
   png(tintedSvg, 'assets/images/icon-tinted.png')
   png(adaptive(defaultSvg), 'assets/images/adaptive-icon.png')
+  png(glyphOnly(dark, '#FFFFFF'), 'assets/images/adaptive-icon-mono.png')
   png(splashLightSvg || defaultSvg, 'assets/images/splash-icon.png', 512)
   png(splashDarkSvg || defaultSvg, 'assets/images/splash-icon-dark.png', 512)
 

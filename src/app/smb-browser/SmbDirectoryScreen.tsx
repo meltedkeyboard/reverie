@@ -416,3 +416,6 @@ const createStyles = (colors: Colors) =>
       fontWeight: '600',
     },
   })
+
+export default SmbDirectoryScreen
+
