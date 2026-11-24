@@ -125,7 +125,7 @@ const PAGE_SPRING = { stiffness: 170, damping: 26, mass: 1 }
 // title as Title 1 and the line under it as Title 2. wordmark-welcome.svg's viewBox has
 // the spark sticking out up and to the left of the letters; the letters are as tall as the
 // capitals of the title and the spark hangs in the margin, so they line up with the text.
-const WORDMARK = { x: -499, width: 7673, height: 1448, letters: 1058 }
+const WORDMARK = { x: -551, width: 7725, height: 1681, letters: 1058 }
 const WORDMARK_SCALE = 20 / WORDMARK.letters
 const SIDE = 38
 

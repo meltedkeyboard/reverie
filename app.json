@@ -44,7 +44,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "monochromeImage": "./assets/images/adaptive-icon-mono.png",
-        "backgroundColor": "#0F0F12"
+        "backgroundColor": "#5046cf"
       },
       "predictiveBackGestureEnabled": true,
       "permissions": ["VIBRATE"],
@@ -94,6 +94,56 @@
       [
         "expo-alternate-app-icons",
         [
+          {
+            "name": "MidnightObsidian",
+            "ios": {
+              "light": "./assets/images/alt/icon-midnight-obsidian.png",
+              "dark": "./assets/images/alt/icon-midnight-obsidian.png",
+              "tinted": "./assets/images/icon-tinted.png"
+            },
+            "android": { "foregroundImage": "./assets/images/alt/icon-midnight-obsidian-foreground.png", "backgroundColor": "#0c0e19" }
+          },
+          {
+            "name": "CoralStar",
+            "ios": {
+              "light": "./assets/images/alt/icon-coral-star.png",
+              "dark": "./assets/images/alt/icon-coral-star.png",
+              "tinted": "./assets/images/icon-tinted.png"
+            },
+            "android": { "foregroundImage": "./assets/images/alt/icon-coral-star-foreground.png", "backgroundColor": "#df4958" }
+          },
+          {
+            "name": "WarmEspresso",
+            "ios": {
+              "light": "./assets/images/alt/icon-warm-espresso.png",
+              "dark": "./assets/images/alt/icon-warm-espresso.png",
+              "tinted": "./assets/images/icon-tinted.png"
+            },
+            "android": { "foregroundImage": "./assets/images/alt/icon-warm-espresso-foreground.png", "backgroundColor": "#191512" }
+          },
+          {
+            "name": "CyberCyan",
+            "ios": {
+              "light": "./assets/images/alt/icon-cyber-cyan.png",
+              "dark": "./assets/images/alt/icon-cyber-cyan.png",
+              "tinted": "./assets/images/icon-tinted.png"
+            },
+            "android": { "foregroundImage": "./assets/images/alt/icon-cyber-cyan-foreground.png", "backgroundColor": "#187590" }
+          },
+          {
+            "name": "SunriseOrange",
+            "ios": {
+              "light": "./assets/images/alt/icon-sunrise-orange.png",
+              "dark": "./assets/images/alt/icon-sunrise-orange.png",
+              "tinted": "./assets/images/icon-tinted.png"
+            },
+            "android": { "foregroundImage": "./assets/images/alt/icon-sunrise-orange-foreground.png", "backgroundColor": "#ed5734" }
+          },
+          {
+            "name": "ClassicDefault",
+            "ios": { "light": "./assets/images/alt/default-light.png", "dark": "./assets/images/alt/default-dark.png", "tinted": "./assets/images/alt/default-tinted.png" },
+            "android": { "foregroundImage": "./assets/images/alt/default-foreground.png", "backgroundColor": "#0F0F12" }
+          },
           {
             "name": "CoralSunrise",
             "ios": "./assets/images/alt/icon-03-sunrise.png",

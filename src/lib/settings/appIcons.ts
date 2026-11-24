@@ -28,14 +28,44 @@ export const alternateIconsAvailable = native?.supportsAlternateIcons ?? __DEV__
 let previewChoice: string | null = null
 
 // What the picker offers: the standard icon first (null, the app's own from app.json), then
-// the alternates under the names given to the plugin in app.json, drawn in assets/brand/alt
-// and rendered by tools/build-icons.mjs, previews included. An icon that is pale or dark all
-// over comes in both looks of the Home Screen, and so does its preview: { light, dark }. An
-// Android launcher has no dark icons and shows the one look named by android. glow is the
-// color the picker lights the page with behind the icon, the one the icon reads as.
-export const APP_ICONS: readonly AppIcon[] = [
+// the alternates under the names given to the plugin in app.json. The standard set features
+// the default color palettes, while the classic set preserves the original brand icons.
+export const STANDARD_ICONS: readonly AppIcon[] = [
   {
     name: null,
+    preview: require('../../../assets/images/alt/icon-violet-dream-preview.png'),
+    glow: '#5046CF',
+  },
+  {
+    name: 'MidnightObsidian',
+    preview: require('../../../assets/images/alt/icon-midnight-obsidian-preview.png'),
+    glow: '#0C0E19',
+  },
+  {
+    name: 'CoralStar',
+    preview: require('../../../assets/images/alt/icon-coral-star-preview.png'),
+    glow: '#DF4958',
+  },
+  {
+    name: 'WarmEspresso',
+    preview: require('../../../assets/images/alt/icon-warm-espresso-preview.png'),
+    glow: '#191512',
+  },
+  {
+    name: 'CyberCyan',
+    preview: require('../../../assets/images/alt/icon-cyber-cyan-preview.png'),
+    glow: '#187590',
+  },
+  {
+    name: 'SunriseOrange',
+    preview: require('../../../assets/images/alt/icon-sunrise-orange-preview.png'),
+    glow: '#ED5734',
+  },
+]
+
+export const CLASSIC_ICONS: readonly AppIcon[] = [
+  {
+    name: 'ClassicDefault',
     preview: { light: require('../../../assets/images/alt/default-light-preview.png'), dark: require('../../../assets/images/alt/default-dark-preview.png') },
     android: 'dark',
     glow: '#5F55E0',
@@ -49,6 +79,18 @@ export const APP_ICONS: readonly AppIcon[] = [
   },
   { name: 'VioletSun', preview: require('../../../assets/images/alt/icon-05-violet-sun-preview.png'), glow: '#5F55E0' },
   { name: 'Metal', preview: require('../../../assets/images/alt/icon-08-metal-preview.png'), glow: '#138CF8' },
+]
+
+export const APP_ICONS: readonly AppIcon[] = [...STANDARD_ICONS, ...CLASSIC_ICONS]
+
+export type AppIconSection = {
+  key: 'standard' | 'classic'
+  icons: readonly AppIcon[]
+}
+
+export const APP_ICON_SECTIONS: readonly AppIconSection[] = [
+  { key: 'standard', icons: STANDARD_ICONS },
+  { key: 'classic', icons: CLASSIC_ICONS },
 ]
 
 // The picture of an icon as the Home Screen shows it in the given look.

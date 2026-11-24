@@ -62,8 +62,8 @@ public class ReverieSplashManager: NSObject {
     wordmark.image = loadImage(named: "wordmark")
 
     // The spark in wordmark.svg sits to the left of the letters, so the optical center
-    // sits about 3 points to the left of the geometric midpoint.
-    let opticalShiftX: CGFloat = -2.99
+    // sits about 3.3 points to the left of the geometric midpoint.
+    let opticalShiftX: CGFloat = -3.28
 
     container.addSubview(icon)
     container.addSubview(wordmark)
@@ -79,7 +79,7 @@ public class ReverieSplashManager: NSObject {
       wordmark.centerXAnchor.constraint(equalTo: container.centerXAnchor, constant: opticalShiftX),
       wordmark.bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor, constant: -28),
       wordmark.widthAnchor.constraint(equalToConstant: 92),
-      wordmark.heightAnchor.constraint(equalToConstant: 17.36),
+      wordmark.heightAnchor.constraint(equalToConstant: 20.02),
     ])
 
     wordmark.alpha = 0.0

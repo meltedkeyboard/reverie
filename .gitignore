@@ -4,10 +4,13 @@ dist/
 /ios/
 *.log
 
+
 # Rendered from assets/brand by tools/build-icons.mjs
 assets/images/
 
-# Internal notes, never committed
+# Scratch scripts
+scratch/
+
 TODO.md
 /android/
 Reverie-android.apk

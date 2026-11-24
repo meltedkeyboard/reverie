@@ -2,7 +2,7 @@ import { Image } from 'expo-image'
 import type { ImageStyle, StyleProp } from 'react-native'
 
 // wordmark.svg's viewBox; the spark sticks out past the letters up and to the left.
-const VIEW = { x: -499, width: 7673, height: 1448 }
+const VIEW = { x: -551, width: 7725, height: 1681 }
 const LETTERS_MIDDLE = 7173.6 / 2
 
 // How far right of the image's middle the letters' middle sits, as a share of its width.

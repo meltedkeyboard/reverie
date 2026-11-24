@@ -12,7 +12,7 @@ import { GROUP_CORNERS } from '@/components/lists/GroupedList'
 import { Icon } from '@/components/visuals/Icon'
 import { useTranslation } from '@/i18n'
 import { isAndroid } from '@/lib/core/platform'
-import { APP_ICONS, currentAppIcon, followsLook, previewFor, setAppIcon, type AppIcon } from '@/lib/settings/appIcons'
+import { APP_ICON_SECTIONS, currentAppIcon, followsLook, previewFor, setAppIcon, type AppIcon } from '@/lib/settings/appIcons'
 import * as Haptics from '@/lib/ui/haptics'
 import { reportError } from '@/lib/transfer/report'
 import { useStyles, useTheme, type Colors } from '@/theme'
@@ -74,51 +74,53 @@ export default function AppIconScreen() {
           },
         ]}
       >
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>{t('appIcon.sectionClassic')}</Text>
-          <View style={styles.group}>
-            {APP_ICONS.map((option, index) => {
-              const key = option.name ?? 'default'
-              const inUse = option.name === current
-              const isApplying = applying === key
+        {APP_ICON_SECTIONS.map((section) => (
+          <View key={section.key} style={styles.section}>
+            {section.key === 'classic' ? <Text style={styles.sectionHeader}>{t('appIcon.sectionClassic')}</Text> : null}
+            <View style={styles.group}>
+              {section.icons.map((option, index) => {
+                const key = option.name ?? 'default'
+                const inUse = option.name === current
+                const isApplying = applying === key
 
-              return (
-                <View key={key}>
-                  {index > 0 ? <View style={styles.separator} /> : null}
-                  <Pressable
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: inUse }}
-                    accessibilityLabel={`${nameOf(option)}${inUse ? `, ${t('appIcon.inUse')}` : ''}`}
-                    onPress={() => apply(option)}
-                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-                  >
-                    <View style={styles.iconFrame}>
-                      <Image source={previewFor(option, scheme)} style={styles.iconArt} />
-                      <View style={styles.iconEdge} pointerEvents="none" />
-                    </View>
-                    <View style={styles.info}>
-                      <Text style={styles.name} numberOfLines={1}>
-                        {nameOf(option)}
-                      </Text>
-                      {followsLook(option) ? (
-                        <Text style={styles.caption} numberOfLines={1}>
-                          {t('appIcon.followsLook')}
+                return (
+                  <View key={key}>
+                    {index > 0 ? <View style={styles.separator} /> : null}
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: inUse }}
+                      accessibilityLabel={`${nameOf(option)}${inUse ? `, ${t('appIcon.inUse')}` : ''}`}
+                      onPress={() => apply(option)}
+                      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                    >
+                      <View style={styles.iconFrame}>
+                        <Image source={previewFor(option, scheme)} style={styles.iconArt} />
+                        <View style={styles.iconEdge} pointerEvents="none" />
+                      </View>
+                      <View style={styles.info}>
+                        <Text style={styles.name} numberOfLines={1}>
+                          {nameOf(option)}
                         </Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.trailing}>
-                      {isApplying ? (
-                        <ActivityIndicator size="small" color={colors.accent} />
-                      ) : inUse ? (
-                        <Icon name="checkmark" size={22} color={colors.accent} />
-                      ) : null}
-                    </View>
-                  </Pressable>
-                </View>
-              )
-            })}
+                        {followsLook(option) ? (
+                          <Text style={styles.caption} numberOfLines={1}>
+                            {t('appIcon.followsLook')}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.trailing}>
+                        {isApplying ? (
+                          <ActivityIndicator size="small" color={colors.accent} />
+                        ) : inUse ? (
+                          <Icon name="checkmark" size={22} color={colors.accent} />
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  </View>
+                )
+              })}
+            </View>
           </View>
-        </View>
+        ))}
       </ScrollView>
 
       {isAndroid ? (
