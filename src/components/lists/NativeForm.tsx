@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 // A type only: the package itself is loaded through nativeUI where it is present.
+import type { Alignment } from '@expo/ui/swift-ui'
 import type { ObservableState, ViewModifier } from '@expo/ui/swift-ui/modifiers'
 
 import { swiftUI } from '@/lib/ui/nativeUI'
@@ -27,18 +28,20 @@ export function NativeForm({
   jumpTo,
   clear = false,
   modifiers = [],
+  alignment = 'topLeading',
   children,
 }: {
   jumpTo?: ObservableState<string | null>
   clear?: boolean
   modifiers?: ViewModifier[]
+  alignment?: Alignment
   children: ReactNode
 }) {
   const { colors, scheme } = useTheme()
   const { Host, Form } = nativeForm!.ui
   const { scrollContentBackground, background, tint, scrollPosition, scrollDismissesKeyboard } = nativeForm!.modifiers
   return (
-    <Host style={styles.host} alignment="center" colorScheme={scheme} seedColor={colors.accent}>
+    <Host style={styles.host} alignment={alignment} colorScheme={scheme} seedColor={colors.accent}>
       <Form
         modifiers={[
           scrollContentBackground('hidden'),

@@ -184,7 +184,8 @@ export function SmbDirectoryScreen({ segments, isRoot = false }: Props) {
           data={items}
           keyExtractor={(item) => item.name}
           style={styles.list}
-          contentContainerStyle={[styles.listContent, { paddingTop: 52, paddingBottom: footerSpace }]}
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={[styles.listContent, { paddingTop: isIOS ? 12 : 8, paddingBottom: footerSpace }]}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>{t('sync.folderEmpty')}</Text>
@@ -266,7 +267,7 @@ function NativeDirectoryList({
     <NativeSheetForm>
       <NativeSection
         fill={colors.surface}
-        inset={52}
+        top
         footerNode={
           footerSpace > 0 ? (
             <VStack modifiers={[frame({ height: footerSpace })]}>

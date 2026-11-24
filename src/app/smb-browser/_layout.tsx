@@ -2,6 +2,7 @@ import { Stack, ThemeProvider, useTheme as useNavigationTheme } from 'expo-route
 import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 
+import { isIOS } from '@/lib/core/platform'
 import { useColors, useTheme } from '@/theme'
 
 export const unstable_settings = {
@@ -22,10 +23,11 @@ export default function SmbBrowserLayout() {
         <Stack
           screenOptions={{
             headerShown: true,
-            headerTransparent: true,
+            headerTransparent: isIOS,
             headerBlurEffect: 'regular',
             headerShadowVisible: false,
             headerBackButtonDisplayMode: 'generic',
+            headerStyle: isIOS ? undefined : { backgroundColor: colors.bg },
             headerTintColor: colors.accent,
             headerTitleStyle: { color: colors.text },
             contentStyle: { backgroundColor: colors.bg },
