@@ -378,7 +378,7 @@ export default function RoomEditorScreen() {
         centerX: sideLeft + (screenWidth - sideLeft - sideRight) / 2,
         centerY: castCenterY,
       }
-  // A short profile would stop scrolling before the cast reaches the star and leave it
+  // A short profile would stop scrolling before the cast reaches the header and leave it
   // halfway, so the page always has room for the whole way up.
   const scrollRoom = editing
     ? contentPadding

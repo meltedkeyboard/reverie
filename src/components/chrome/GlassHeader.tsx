@@ -60,8 +60,7 @@ export function HeaderTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-// The large title of a tab or header: the name in the prose face, with the red star
-// kept only on character and room profiles.
+// The large title of a tab or header: the name in the prose face.
 // With `fit` a long name shrinks to the room it has instead of being cut off. `color` and
 // `starStyle` are for a title that moves out of the header (see DrawnFormScreenHeader).
 export function TabTitle({
@@ -105,9 +104,7 @@ export function TabTitle({
   )
 }
 
-export const TAB_TITLE_STAR = isDesktop ? 18 : 22
-// How far the name of a TabTitle stands from its left edge: the star and the gap after it.
-export const TAB_TITLE_STAR_ROOM = TAB_TITLE_STAR + (isDesktop ? 8 : 10)
+const TAB_TITLE_STAR = isDesktop ? 18 : 22
 
 // Goes back; a screen presented modally closes with a cross instead.
 export function BackButton({ close }: { close?: boolean }) {

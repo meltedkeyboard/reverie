@@ -409,7 +409,7 @@ export default function CharacterEditorScreen() {
   const sideLeft = padding.paddingLeft ?? padding.paddingHorizontal
   const sideRight = padding.paddingRight ?? padding.paddingHorizontal
   const nameSpot = usePhotoNameSpot(sideLeft, sideRight)
-  // Scrolled past, the profile's avatar goes up into the header in place of the star.
+  // Scrolled past, the profile's avatar goes up into the header beside the title.
   const handOff = useAvatarHandOff(photoSpread, scrollY)
   const { width: screenWidth, height: screenHeight } = useWindowDimensions()
   const headerHeight = useHeaderHeight()
@@ -423,7 +423,7 @@ export default function CharacterEditorScreen() {
         centerY: avatarCenterY,
       }
   // A short profile (a small prompt, no greeting) would stop scrolling before the avatar
-  // reaches the star and leave it halfway, so the page always has room for the whole way up.
+  // reaches the header and leave it halfway, so the page always has room for the whole way up.
   const scrollRoom = editing
     ? contentPadding
     : { ...contentPadding, minHeight: screenHeight + avatarCenterY - (headerHeight - HEADER_ROW_HEIGHT / 2) }

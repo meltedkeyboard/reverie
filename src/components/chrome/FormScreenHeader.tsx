@@ -10,7 +10,7 @@ import { type Colors, HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles } from 
 
 import { EdgeFade } from './BarChrome'
 import { GlassButton, HeaderContext, useInHeader } from './Glass'
-import { TAB_TITLE_STAR, TAB_TITLE_STAR_ROOM, TabTitle, useHeaderHeight } from './GlassHeader'
+import { TabTitle, useHeaderHeight } from './GlassHeader'
 import { IconButton } from '../controls/IconButton'
 import { SFIcon } from '../visuals/SFIcon'
 
@@ -50,8 +50,9 @@ export function FormScreenHeader({ title }: { title: string }) {
 // editor's avatar): the fade gives way to it, while the glass buttons stay, since Liquid
 // Glass renders wrongly under a fading parent. The title gives way too, or, with nameSpot,
 // moves down onto the photo and turns white, as the name in a Telegram profile does. With
-// the page's scrollY and its avatar, the avatar comes up into the header in place of the
-// star as the page is scrolled past it, and goes back down with the page.
+// the page's scrollY and its avatar, the avatar rises into the header beside the title as
+// the page is scrolled past it, while the title shifts right to keep the pair centered,
+// and goes back down with the page.
 export function DrawnFormScreenHeader({
   title,
   right,
@@ -62,7 +63,6 @@ export function DrawnFormScreenHeader({
   clearAtTop = false,
   fadeRgb,
   profileHeader,
-  star,
 }: {
   title: string
   right?: React.ReactNode
@@ -77,7 +77,6 @@ export function DrawnFormScreenHeader({
   fadeRgb?: string
   // Restores floating header and circle buttons of release 7.0 on Android for profile screens.
   profileHeader?: boolean
-  star?: boolean
 }) {
   const insets = useSafeAreaInsets()
   const headerHeight = useHeaderHeight()
@@ -92,7 +91,6 @@ export function DrawnFormScreenHeader({
   const colors = useColors()
   const isProfile = profileHeader || Boolean(overPhoto)
   const isSolidBar = isAndroid && !isProfile
-  const showStar = star ?? Boolean(profileHeader)
   return (
     <HeaderContext.Provider value={isSolidBar}>
       {(!isAndroid || isProfile) && (
@@ -125,11 +123,11 @@ export function DrawnFormScreenHeader({
           <BarButton symbol="chevron.backward" fallback="chevron-back" onPress={() => router.back()} accessibilityLabel={t('common.back')} />
           {overPhoto && scrollY ? (
             <View style={styles.titleSlot} pointerEvents="none">
-              <MovingTitle title={title} progress={overPhoto} scrollY={scrollY} spot={nameSpot} avatar={avatar} showStar={showStar} />
+              <MovingTitle title={title} progress={overPhoto} scrollY={scrollY} spot={nameSpot} avatar={avatar} />
             </View>
           ) : (
             <Animated.View style={[styles.titleSlot, giveWay]} pointerEvents="none">
-              <FormTitle title={title} star={showStar} />
+              <FormTitle title={title} />
             </Animated.View>
           )}
           {right}
@@ -200,6 +198,9 @@ export type NameSpot = { left: number; bottom: number }
 export type PageAvatar = { node: React.ReactNode; size: number; centerX: number; centerY: number }
 
 const HEADER_AVATAR = isDesktop ? 24 : 30
+const AVATAR_TITLE_GAP = isDesktop ? 8 : 10
+// How far the centered title slides right so the mini-avatar and title remain centered as a pair.
+const TITLE_SHIFT = (HEADER_AVATAR + AVATAR_TITLE_GAP) / 2
 // With clearAtTop, the page scrolls this far before the fade under the bar is fully in.
 const FADE_IN = 40
 
@@ -217,70 +218,73 @@ export function useAvatarHandOff(progress: SharedValue<number>, scrollY: SharedV
 
 // The title, carried from the middle of the header to the bottom left of the photo as it
 // spreads (or only giving way to it, without a spot). A white copy over it comes in on the
-// way; the star goes out, the photo has none. Scrolled down, the avatar of the page rides
-// up with it, shrinking, onto the star's place and over it.
+// way. Scrolled down, the avatar of the page rides up with it, shrinking, to the left of
+// the title while the title shifts right to make room for it.
 function MovingTitle({
   title,
   progress,
   scrollY,
   spot,
   avatar,
-  showStar = true,
 }: {
   title: string
   progress: SharedValue<number>
   scrollY: SharedValue<number>
   spot?: NameSpot
   avatar?: PageAvatar
-  showStar?: boolean
 }) {
   const insets = useSafeAreaInsets()
-  const titleMaxWidth = useWindowDimensions().width - 160 - insets.left - insets.right
-  // Where the title stands in the header row, for the way down from there.
+  const { width } = useWindowDimensions()
+  const hasAvatar = avatar !== undefined
+  const titleMaxWidth =
+    width - (hasAvatar ? 152 + HEADER_AVATAR + AVATAR_TITLE_GAP : 160) - 2 * Math.max(insets.left, insets.right)
+  // Where the title stands in the header row, for the way down from there and the mini-avatar's target.
   const [from, setFrom] = useState<{ x: number; y: number; height: number } | null>(null)
-  // The middle of the star on the screen, where the avatar ends up.
-  const starX = from ? from.x + TAB_TITLE_STAR / 2 : 0
-  // The star sits 2 pt low in its row.
-  const starY = from ? insets.top + from.y + from.height / 2 + 1 : 0
+  // Center of the mini-avatar once settled beside the shifted title.
+  const targetX = from ? from.x - AVATAR_TITLE_GAP / 2 : 0
+  const targetY = from ? insets.top + from.y + from.height / 2 : 0
   // Only numbers go into the worklets below: the avatar's node is a React element, which
   // can't be copied to the UI thread.
-  const hasAvatar = avatar !== undefined
   const avatarSize = avatar?.size ?? 1
   const centerX = avatar?.centerX ?? 0
   const centerY = avatar?.centerY ?? 0
   const ready = from !== null
 
-  const move = useAnimatedStyle(() => {
-    const k = progress.value
-    if (!spot) return { opacity: 1 - k }
-    if (!from) return {}
-    // The open photo doesn't follow the page below the top (pinOpen of ExpandingAvatar).
-    const scrolled = scrollY.value - Math.min(0, scrollY.value) * k
-    const dx = spot.left - TAB_TITLE_STAR_ROOM - from.x
-    const dy = spot.bottom - scrolled - from.height - (insets.top + from.y)
-    return { transform: [{ translateX: dx * k }, { translateY: dy * k }] }
-  })
-
   // How far the avatar has come up: it moves with the page, shrinking and drawing aside to
-  // the star, and stops there once its middle reaches the star's.
+  // the title's left, and stops there once its middle reaches the header row's.
   const rise = () => {
     'worklet'
     if (!hasAvatar || !ready) return 0
-    return Math.min(1, Math.max(0, scrollY.value) / Math.max(1, centerY - starY))
+    return Math.min(1, Math.max(0, scrollY.value) / Math.max(1, centerY - targetY))
   }
+
+  const move = useAnimatedStyle(() => {
+    const k = progress.value
+    const shiftX = TITLE_SHIFT * rise() * (1 - k)
+    if (!spot) {
+      return {
+        opacity: 1 - k,
+        transform: [{ translateX: shiftX }],
+      }
+    }
+    if (!from) return {}
+    // The open photo doesn't follow the page below the top (pinOpen of ExpandingAvatar).
+    const scrolled = scrollY.value - Math.min(0, scrollY.value) * k
+    const dx = spot.left - from.x
+    const dy = spot.bottom - scrolled - from.height - (insets.top + from.y)
+    return { transform: [{ translateX: dx * k + shiftX }, { translateY: dy * k }] }
+  })
+
   const mini = useAnimatedStyle(() => {
     if (!hasAvatar || !ready || !avatarInHeader(progress.value, scrollY.value)) return { opacity: 0 }
     const t = rise()
-    const up = Math.min(scrollY.value, centerY - starY)
+    const up = Math.min(scrollY.value, centerY - targetY)
     return {
       opacity: 1,
-      transform: [{ translateX: (starX - centerX) * t }, { translateY: -up }, { scale: 1 + (HEADER_AVATAR / avatarSize - 1) * t }],
+      transform: [{ translateX: (targetX - centerX) * t }, { translateY: -up }, { scale: 1 + (HEADER_AVATAR / avatarSize - 1) * t }],
     }
   })
-  // The photo has no star: it goes out as the photo spreads. Under the avatar it stays.
-  const star = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [0, 0.4], [1, 0], 'clamp') }))
   const white = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [0.2, 0.9], [0, 1], 'clamp') }))
-  const hidden = { opacity: 0 }
 
   return (
     <>
@@ -288,15 +292,15 @@ function MovingTitle({
         style={move}
         onLayout={(e) => {
           const { x, y, height } = e.nativeEvent.layout
-          setFrom({ x, y, height })
+          setFrom((was) => (was && was.x === x && was.y === y && was.height === height ? was : { x, y, height }))
         }}
       >
-        <TabTitle maxWidth={titleMaxWidth} fit starStyle={star} star={showStar}>
+        <TabTitle maxWidth={titleMaxWidth} fit>
           {title}
         </TabTitle>
         {spot ? (
           <Animated.View style={[StyleSheet.absoluteFill, white]}>
-            <TabTitle maxWidth={titleMaxWidth} fit color={ON_ACCENT} starStyle={hidden} star={showStar}>
+            <TabTitle maxWidth={titleMaxWidth} fit color={ON_ACCENT}>
               {title}
             </TabTitle>
           </Animated.View>
@@ -322,11 +326,11 @@ function MovingTitle({
   )
 }
 
-function FormTitle({ title, star = false }: { title: string; star?: boolean }) {
+function FormTitle({ title }: { title: string }) {
   const insets = useSafeAreaInsets()
   const titleMaxWidth = useWindowDimensions().width - 160 - insets.left - insets.right
   return (
-    <TabTitle maxWidth={titleMaxWidth} fit star={star}>
+    <TabTitle maxWidth={titleMaxWidth} fit>
       {title}
     </TabTitle>
   )
