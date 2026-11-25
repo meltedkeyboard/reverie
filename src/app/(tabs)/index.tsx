@@ -409,7 +409,7 @@ export default function CharactersScreen() {
       anchor.onLayout()
       fill.onLayout(e)
     }}>
-      <HomeBackground pattern="stars" />
+      <HomeBackground />
       {native ? (
         <NativeCardList
           rows={nativeRows}

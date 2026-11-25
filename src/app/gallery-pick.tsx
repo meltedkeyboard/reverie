@@ -1,5 +1,5 @@
 import { useNavigation, useRouter } from 'expo-router'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -17,9 +17,14 @@ import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 const COLUMNS = 3
 const GAP = 2
 
-// A character's gallery as a sheet to take one picture or video from, a grid as in Photos:
-// a tap picks it and confirms immediately. A generator takes several (`multiple`): each
-// tap adds one under its number in order and the check in the bar takes them all.
+type Row =
+  | { key: string; kind: 'header'; name: string; first: boolean }
+  | { key: string; kind: 'items'; items: GalleryItem[] }
+
+// A character's gallery, or several characters grouped under their names, as a sheet to
+// take one picture or video from: a tap picks it and confirms immediately. A generator takes
+// several (`multiple`): each tap adds one under its number in order and the check in the bar
+// takes them all.
 export default function GalleryPickScreen() {
   const router = useRouter()
   const navigation = useNavigation()
@@ -32,7 +37,21 @@ export default function GalleryPickScreen() {
   const [pick] = useState(galleryPick)
   const [selected, setSelected] = useState<GalleryItem[]>(() => pick?.initial ?? [])
   const multiple = pick?.multiple ?? false
-  const side = (width - GAP * (COLUMNS - 1)) / COLUMNS
+  // Down to a half point, or the rounding of a fraction may push the third tile to the next line.
+  const side = Math.floor(((width - GAP * (COLUMNS - 1)) / COLUMNS) * 2) / 2
+
+  const rows = useMemo<Row[]>(() => {
+    const sections = pick?.sections ?? (pick?.items ? [{ name: '', items: pick.items }] : [])
+    const list: Row[] = []
+    for (const [si, section] of sections.entries()) {
+      if (section.name) list.push({ key: `h:${si}`, kind: 'header', name: section.name, first: si === 0 })
+      for (let i = 0; i < section.items.length; i += COLUMNS) {
+        const chunk = section.items.slice(i, i + COLUMNS)
+        list.push({ key: `r:${si}:${chunk[0].id}`, kind: 'items', items: chunk })
+      }
+    }
+    return list
+  }, [pick])
 
   useEffect(() => {
     if (!pick) router.back()
@@ -115,43 +134,51 @@ export default function GalleryPickScreen() {
 
   return (
     <FlatList
-      data={pick.items}
-      keyExtractor={(item) => String(item.id)}
-      numColumns={COLUMNS}
-      columnWrapperStyle={styles.row}
-      contentContainerStyle={{ gap: GAP, paddingBottom: insets.bottom + 16 }}
+      data={rows}
+      keyExtractor={(row) => row.key}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
       style={{ backgroundColor: colors.bg }}
       // The bar of the sheet lies over the grid, which starts under it and scrolls beneath.
       contentInsetAdjustmentBehavior="automatic"
       extraData={selected}
-      renderItem={({ item }) => {
-        const video = isGalleryVideo(item.file)
-        // Where it stands among the ticked ones: the pictures are attached in that order.
-        const order = selected.findIndex((other) => other.id === item.id) + 1
-        const ticked = order > 0
+      renderItem={({ item: row }) => {
+        if (row.kind === 'header') {
+          return <Text style={[styles.header, !row.first && styles.headerSpaced]}>{row.name}</Text>
+        }
         return (
-          <Pressable
-            onPress={() => onSelect(item)}
-            accessibilityRole={multiple ? 'checkbox' : 'radio'}
-            accessibilityState={multiple ? { checked: ticked } : { selected: ticked }}
-            accessibilityValue={multiple && ticked ? { text: String(order) } : undefined}
-            accessibilityLabel={t(video ? 'promptGen.galleryVideo' : 'promptGen.galleryPicture')}
-            style={({ pressed }) => [{ width: side, height: side }, styles.tile, pressed && styles.pressed]}
-          >
-            {/* A video stands still on its first frame, as in the profile's grid. */}
-            <Picture uri={galleryUri(item.file)} style={styles.fill} paused transition={150} />
-            {video ? (
-              <View style={styles.play} pointerEvents="none">
-                <Icon name="play" size={13} color={ON_ACCENT} />
-              </View>
-            ) : null}
-            {ticked ? (
-              <>
-                <View style={styles.dim} pointerEvents="none" />
-                <OrderBadge order={multiple ? order : undefined} />
-              </>
-            ) : null}
-          </Pressable>
+          <View style={styles.row}>
+            {row.items.map((item) => {
+              const video = isGalleryVideo(item.file)
+              // Where it stands among the ticked ones: the pictures are attached in that order.
+              const order = selected.findIndex((other) => other.id === item.id) + 1
+              const ticked = order > 0
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => onSelect(item)}
+                  accessibilityRole={multiple ? 'checkbox' : 'radio'}
+                  accessibilityState={multiple ? { checked: ticked } : { selected: ticked }}
+                  accessibilityValue={multiple && ticked ? { text: String(order) } : undefined}
+                  accessibilityLabel={t(video ? 'promptGen.galleryVideo' : 'promptGen.galleryPicture')}
+                  style={({ pressed }) => [{ width: side, height: side }, styles.tile, pressed && styles.pressed]}
+                >
+                  {/* A video stands still on its first frame, as in the profile's grid. */}
+                  <Picture uri={galleryUri(item.file)} style={styles.fill} paused transition={150} />
+                  {video ? (
+                    <View style={styles.play} pointerEvents="none">
+                      <Icon name="play" size={13} color={ON_ACCENT} />
+                    </View>
+                  ) : null}
+                  {ticked ? (
+                    <>
+                      <View style={styles.dim} pointerEvents="none" />
+                      <OrderBadge order={multiple ? order : undefined} />
+                    </>
+                  ) : null}
+                </Pressable>
+              )
+            })}
+          </View>
         )
       }}
     />
@@ -160,7 +187,9 @@ export default function GalleryPickScreen() {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    row: { gap: GAP },
+    header: { color: colors.textMuted, fontSize: 13, fontWeight: '600', paddingTop: 4, paddingBottom: 8, paddingHorizontal: 16 },
+    headerSpaced: { paddingTop: 14 },
+    row: { flexDirection: 'row', gap: GAP, marginBottom: GAP },
     tile: { overflow: 'hidden', backgroundColor: colors.surfaceRaised },
     pressed: { opacity: 0.7 },
     fill: { width: '100%', height: '100%' },

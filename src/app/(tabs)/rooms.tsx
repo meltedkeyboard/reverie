@@ -131,7 +131,7 @@ export default function RoomsScreen() {
         anchor.onLayout()
         fill.onLayout(e)
       }}>
-        <HomeBackground pattern="stars" />
+        <HomeBackground />
         {native ? (
           <NativeCardList
             rows={nativeRows}

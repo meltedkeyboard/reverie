@@ -1,12 +1,15 @@
 import type { GalleryItem } from '@/db/gallery'
 
+export type GallerySection = { name: string; items: GalleryItem[] }
+
 // What the gallery sheet (app/gallery-pick.tsx) offers and where the ones picked go. It is
 // passed around the router because the result is a callback. The pick is handed over only
 // once the sheet is gone, so what it opens next (the crop, the background's screen) is
 // pushed onto a stack that is still.
 export type GalleryPick = {
   title: string
-  items: GalleryItem[]
+  items?: GalleryItem[]
+  sections?: GallerySection[]
   // Several ticked in order, as the attach menu's gallery does, rather than one.
   multiple?: boolean
   // Those ticked as the sheet opens, the ones a generator already has attached.

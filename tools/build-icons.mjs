@@ -1,5 +1,5 @@
-// Renders every app icon, the splash and the home screen pattern from the SVGs in
-// assets/brand. The output is not committed: it is rebuilt on every npm install/ci, or
+// Renders every app icon and the splash from the SVGs in assets/brand/.
+// The output is not committed: it is rebuilt on every npm install/ci, or
 // by hand after changing the SVGs: npm run icons
 import { Resvg } from '@resvg/resvg-js'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -185,14 +185,5 @@ for (const file of readdirSync(`${BRAND}/alt`).filter((f) => f.endsWith('.svg') 
     png(other, `assets/images/alt/${slug}-${variant.other}.png`)
     png(other, `assets/images/alt/${slug}-${variant.other}-preview.png`, PREVIEW)
     png(tintedLook(svg, variant.tinted), `assets/images/alt/${slug}-tinted.png`)
-  }
-}
-
-// The home screen's background tile, at every density the app picks from.
-for (const theme of ['light', 'dark']) {
-  const tile = readFileSync(`${BRAND}/pattern-${theme}.svg`, 'utf8')
-  for (const scale of [1, 2, 3]) {
-    const suffix = scale === 1 ? '' : `@${scale}x`
-    png(tile, `assets/images/pattern-${theme}${suffix}.png`, 131 * scale)
   }
 }

@@ -12,7 +12,6 @@ import { GlassButton } from '@/components/chrome/Glass'
 import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { ListCard } from '@/components/lists/ListCard'
 import { NativeCardList, nativeCardList, type NativeCardRow } from '@/components/lists/NativeCardList'
-import { Pattern } from '@/components/visuals/Pattern'
 import { deleteCharacter, listCharacters, restoreCharacters, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import { useCharacterActions } from '@/hooks/features/useCharacterActions'
@@ -31,7 +30,7 @@ const EDIT_BAR_SPACE = 64
 
 // The characters put away, from Settings: the list of archived characters.
 // Look and behavior match the other settings screens (personas, lorebooks):
-// compact cards with 44px avatars, swipe to restore/delete, and two-stars pattern.
+// compact cards with 44px avatars and swipe to restore/delete.
 export default function ArchiveScreen() {
   const db = useDatabase()
   const router = useRouter()
@@ -106,7 +105,6 @@ export default function ArchiveScreen() {
 
   return (
     <View style={styles.screen}>
-      <Pattern id="two-stars" />
       {native ? (
         <NativeCardList
           rows={nativeRows}

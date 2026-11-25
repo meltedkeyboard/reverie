@@ -10,6 +10,8 @@ const DAY = 24 * 60 * 60 * 1000
 // duplicated character points at the same files, so a file goes only with its last row.
 export type GalleryItem = { id: number; file: string; width: number | null; height: number | null }
 
+export type CharacterGallery = { characterId: number; name: string; items: GalleryItem[] }
+
 export type NewGalleryItem = Omit<GalleryItem, 'id'>
 
 export function listGallery(db: SQLiteDatabase, characterId: number) {
@@ -17,6 +19,26 @@ export function listGallery(db: SQLiteDatabase, characterId: number) {
     'SELECT id, file, width, height FROM character_gallery WHERE character_id = ? ORDER BY position, id',
     characterId
   )
+}
+
+export async function listCharacterGalleries(db: SQLiteDatabase): Promise<CharacterGallery[]> {
+  const rows = await db.getAllAsync<GalleryItem & { characterId: number; name: string }>(
+    `SELECT g.id, g.file, g.width, g.height, g.character_id AS characterId, c.name
+     FROM character_gallery g
+     JOIN characters c ON c.id = g.character_id
+     WHERE c.archived_at IS NULL
+     ORDER BY c.sort_order DESC, c.id DESC, g.position, g.id`
+  )
+  const byCharacter = new Map<number, CharacterGallery>()
+  for (const { characterId, name, ...item } of rows) {
+    let group = byCharacter.get(characterId)
+    if (!group) {
+      group = { characterId, name, items: [] }
+      byCharacter.set(characterId, group)
+    }
+    group.items.push(item)
+  }
+  return [...byCharacter.values()]
 }
 
 // New items go at the end, in the order given. No transaction of its own, so a backup's

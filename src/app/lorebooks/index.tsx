@@ -9,7 +9,6 @@ import { EmptyState, ListSeparator, emptyButtonStyle } from '@/components/lists/
 import { ListCard } from '@/components/lists/ListCard'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { Icon } from '@/components/visuals/Icon'
-import { Pattern } from '@/components/visuals/Pattern'
 import { deleteLorebook, listLorebooks, type LorebookPreview } from '@/db/lorebooks'
 import { useDatabase } from '@/db/provider'
 import { useReloadOnFocus } from '@/hooks/chat/useChatListActions'
@@ -44,7 +43,6 @@ export default function LorebooksScreen() {
 
   return (
     <View style={styles.screen}>
-      <Pattern id="two-stars" />
       <FlatList
         data={books ?? []}
         keyExtractor={(book) => String(book.id)}

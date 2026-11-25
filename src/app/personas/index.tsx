@@ -14,7 +14,6 @@ import { GlassHeader, TabTitle, useScreenPadding } from '@/components/chrome/Gla
 import { ListCard } from '@/components/lists/ListCard'
 import { NativeCardList, nativeCardList, type NativeCardRow } from '@/components/lists/NativeCardList'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
-import { Pattern } from '@/components/visuals/Pattern'
 import { deletePersona, listPersonas, setDefaultPersona, setPersonaOrder, type Persona } from '@/db/personas'
 import { useDatabase } from '@/db/provider'
 import { useReloadOnFocus } from '@/hooks/chat/useChatListActions'
@@ -115,7 +114,6 @@ export default function PersonasScreen() {
 
   return (
     <View style={styles.screen}>
-      <Pattern id="two-stars" />
       {native ? (
         <NativeCardList
           rows={nativeRows}

@@ -367,7 +367,7 @@ export default function SettingsScreen() {
   const backgroundValue =
     chatText.pattern === 'custom' && chatText.wallpaper?.file
       ? t('chatPattern.custom')
-      : t(`chatPattern.${chatText.pattern}`)
+      : t('chatPattern.none')
 
   const appearance = (
     <ListSection>

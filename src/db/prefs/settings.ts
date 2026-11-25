@@ -475,12 +475,10 @@ const chatBubbleGlass = defineFlag('chat_bubble_glass', false)
 export const loadChatBubbleGlass = chatBubbleGlass.load
 export const saveChatBubbleGlass = chatBubbleGlass.save
 
-// The pattern behind a chat that has no picture of its own, from the Penpot page
-// "Background Pattern"; 'none' is the plain theme background.
-export const CHAT_PATTERNS = ['none', 'stars', 'two-stars', 'big-star', 'diagonal', 'scattered', 'rings', 'rings-centered', 'dots'] as const
-export type ChatPatternId = (typeof CHAT_PATTERNS)[number] | 'custom'
+// Global chat background choice: 'none' is the plain theme background, 'custom' uses the saved wallpaper.
+export type ChatPatternId = 'none' | 'custom'
 
-const chatPattern = defineChoice('chat_pattern', [...CHAT_PATTERNS, 'custom'] as const, 'none')
+const chatPattern = defineChoice<ChatPatternId>('chat_pattern', ['none', 'custom'], 'none')
 export const loadChatPattern = chatPattern.load
 export const saveChatPattern = chatPattern.save
 

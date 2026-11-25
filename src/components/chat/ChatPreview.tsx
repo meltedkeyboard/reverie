@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View, ScrollView } from 'react-native'
 
 import { ChatBackground } from '@/components/chat/ChatBackground'
-import { Pattern } from '@/components/visuals/Pattern'
 import { GlassBubble, GlassSurface, useGlassStyles } from '@/components/chrome/Glass'
 import { Icon } from '@/components/visuals/Icon'
 import { Markdown } from '@/components/chat/Markdown'
@@ -52,9 +51,7 @@ export function ChatPreview({ flush = false }: { flush?: boolean }) {
             effect={wallpaper?.effect ?? 'blur'}
             intensity={wallpaper?.intensity ?? 0.5}
           />
-        ) : (
-          <Pattern id={pattern} />
-        )}
+        ) : null}
       </View>
       <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
         {isGlass ? (

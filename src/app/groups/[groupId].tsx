@@ -226,7 +226,7 @@ export default function GroupScreen() {
 
   const screen = (
     <View style={styles.screen}>
-      <HomeBackground pattern="two-stars" />
+      <HomeBackground />
       {native ? (
         <NativeCardList
           rows={nativeRows}

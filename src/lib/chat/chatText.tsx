@@ -50,7 +50,7 @@ type ChatTextValue = {
   // Whether the user's own messages go through Markdown, as the replies do.
   userMarkdown: boolean
   setUserMarkdown: (on: boolean) => void
-  // The pattern behind chats that have no picture of their own.
+  // Global chat background choice ('none' or 'custom') for chats with no picture of their own.
   pattern: ChatPatternId
   setPattern: (pattern: ChatPatternId) => void
   // The custom wallpaper behind chats that have no picture of their own.

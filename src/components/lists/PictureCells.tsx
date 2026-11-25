@@ -52,12 +52,14 @@ export function SourceCell({
   label,
   onPick,
   onGallery,
+  galleryLabel,
   color,
   loading,
 }: {
   label: string
   onPick: (source: ImageSource) => void
   onGallery?: () => void
+  galleryLabel?: string
   color?: string
   loading?: boolean
 }) {
@@ -73,7 +75,7 @@ export function SourceCell({
     return (
       <>
         <ButtonCell label={label} onPress={() => onPick('files')} unlit color={color} loading={loading} />
-        {onGallery ? <ButtonCell label={t('gallery.pickFrom')} onPress={onGallery} unlit color={color} /> : null}
+        {onGallery ? <ButtonCell label={galleryLabel ?? t('gallery.pickFrom')} onPress={onGallery} unlit color={color} /> : null}
       </>
     )
   }

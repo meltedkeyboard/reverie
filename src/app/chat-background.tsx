@@ -1,4 +1,5 @@
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
+import { useCallback, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 
 import { ChatBackground } from '@/components/chat/ChatBackground'
@@ -10,15 +11,17 @@ import { ButtonCell, ListSection, SwitchCell } from '@/components/lists/GroupedL
 import { nativeForm, NativeForm, NativeHostedRow, NativeSection } from '@/components/lists/NativeForm'
 import { SourceCell } from '@/components/lists/PictureCells'
 import { Icon } from '@/components/visuals/Icon'
-import { Pattern } from '@/components/visuals/Pattern'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { NO_PICTURE, useChatScheme } from '@/components/chrome/ChatChrome'
-import { CHAT_PATTERNS } from '@/db/prefs/settings'
+import { ImageSourceMenu } from '@/components/overlays/ImageSourceMenu'
+import { listCharacterGalleries, type CharacterGallery, type GalleryItem } from '@/db/gallery'
+import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { useChatTextSettings } from '@/lib/chat/chatText'
-import { isAndroid, isWeb } from '@/lib/core/platform'
+import { isAndroid } from '@/lib/core/platform'
 import {
   avatarUri,
+  checkBackground,
   cropFromJson,
   cropToJson,
   persistAvatar,
@@ -28,13 +31,15 @@ import {
   type CropRect,
 } from '@/lib/images/avatars'
 import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
+import { galleryUri } from '@/lib/images/gallery'
+import { setGalleryPick } from '@/lib/images/galleryPick'
 import { movingKind } from '@/lib/images/media'
 import type { ImageSource } from '@/lib/images/images'
 import { alertError } from '@/lib/transfer/report'
 import * as Haptics from '@/lib/ui/haptics'
 import { type Colors, CONTROL_FONT_SCALE, FILL, ON_ACCENT, SchemeOverride, useColors, useStyles } from '@/theme'
 
-const TILE_WIDTH = 84
+const TILE_WIDTH = 96
 const TILE_HEIGHT = (TILE_WIDTH * 852) / 393
 const MARK_SIZE = 22
 const TILE_LABEL_LINE = 16
@@ -54,12 +59,21 @@ function ChoiceMark({ selected }: { selected: boolean }) {
 
 export default function ChatBackgroundScreen() {
   const router = useRouter()
+  const db = useDatabase()
   const padding = useScreenPadding('form')
   const { fontScale } = useWindowDimensions()
   const tilesHeight = 32 + TILE_HEIGHT + 6 + Math.ceil(TILE_LABEL_LINE * Math.min(fontScale, CONTROL_FONT_SCALE)) + 6 + MARK_SIZE + 2
   const colors = useColors()
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
+  const [galleries, setGalleries] = useState<CharacterGallery[]>([])
+  useFocusEffect(
+    useCallback(() => {
+      listCharacterGalleries(db)
+        .then(setGalleries)
+        .catch((err) => console.warn('Gallery not loaded', err))
+    }, [db])
+  )
   const {
     pattern,
     setPattern,
@@ -129,6 +143,25 @@ export default function ChatBackgroundScreen() {
     }
   }
 
+  const onBackgroundFromGallery = (item: GalleryItem) => {
+    try {
+      const uri = galleryUri(item.file)
+      checkBackground(uri)
+      openBackground(uri, null, uri)
+    } catch (err) {
+      alertError(t('background.failedTitle'), err)
+    }
+  }
+
+  const openGallery = () => {
+    setGalleryPick({
+      title: t('gallery.title'),
+      sections: galleries.map((g) => ({ name: g.name.trim() || t('editor.characterTitle'), items: g.items })),
+      onPick: ([item]) => onBackgroundFromGallery(item),
+    })
+    router.push('/gallery-pick')
+  }
+
   const onAdjustBackground = () => {
     if (!wallpaper?.file) return
     const originalUri = wallpaper.original ? avatarUri(wallpaper.original, 'backgrounds') : null
@@ -145,77 +178,93 @@ export default function ChatBackgroundScreen() {
     if (pattern === 'custom') setPattern('none')
   }
 
+  const customTile = (
+    <View style={styles.tileButton}>
+      <View style={styles.tile}>
+        {wallpaperUri ? (
+          <ChatBackground
+            uri={wallpaperUri}
+            crop={cropFromJson(wallpaper?.crop ?? null)}
+            effect={wallpaper?.effect ?? 'blur'}
+            intensity={wallpaper?.intensity ?? 0.5}
+          />
+        ) : (
+          <View style={styles.customTileEmpty}>
+            <Icon name="add" size={24} color={colors.textFaint} />
+          </View>
+        )}
+        <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
+      </View>
+      <Text style={styles.tileLabel} numberOfLines={1}>
+        {t('chatPattern.custom')}
+      </Text>
+      <ChoiceMark selected={pattern === 'custom'} />
+    </View>
+  )
+
   const tiles = (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tiles}>
+    <View style={styles.tiles}>
       <Pressable
         onPress={() => {
-          if (wallpaper?.file) {
+          if (pattern !== 'none') {
+            Haptics.selectionAsync()
+            setPattern('none')
+          }
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ selected: pattern === 'none' }}
+        accessibilityLabel={t('chatPattern.none')}
+        style={styles.tileButton}
+      >
+        <View style={styles.tile}>
+          <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
+        </View>
+        <Text style={styles.tileLabel} numberOfLines={1}>
+          {t('chatPattern.none')}
+        </Text>
+        <ChoiceMark selected={pattern === 'none'} />
+      </Pressable>
+      {wallpaper?.file ? (
+        <Pressable
+          onPress={() => {
             if (pattern !== 'custom') {
               Haptics.selectionAsync()
               setPattern('custom')
             } else {
               onAdjustBackground()
             }
-          } else {
-            onPickBackground(isWeb ? 'files' : 'library')
-          }
-        }}
-        accessibilityRole="button"
-        accessibilityState={{ selected: pattern === 'custom' }}
-        accessibilityLabel={t('chatPattern.custom')}
-        style={styles.tileButton}
-      >
-        <View style={styles.tile}>
-          {wallpaperUri ? (
-            <ChatBackground
-              uri={wallpaperUri}
-              crop={cropFromJson(wallpaper?.crop ?? null)}
-              effect={wallpaper?.effect ?? 'blur'}
-              intensity={wallpaper?.intensity ?? 0.5}
-            />
-          ) : (
-            <View style={styles.customTileEmpty}>
-              <Icon name="add" size={24} color={colors.textFaint} />
-            </View>
-          )}
-          <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
-        </View>
-        <Text style={styles.tileLabel} numberOfLines={1}>
-          {t('chatPattern.custom')}
-        </Text>
-        <ChoiceMark selected={pattern === 'custom'} />
-      </Pressable>
-      {CHAT_PATTERNS.map((id) => {
-        const selected = id === pattern
-        return (
-          <Pressable
-            key={id}
-            onPress={() => {
-              if (!selected) Haptics.selectionAsync()
-              setPattern(id)
-            }}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            accessibilityLabel={t(`chatPattern.${id}`)}
-            style={styles.tileButton}
-          >
-            <View style={styles.tile}>
-              <Pattern id={id} scale={TILE_WIDTH / 393} />
-              <View style={[styles.edge, styles.tileEdge]} pointerEvents="none" />
-            </View>
-            <Text style={styles.tileLabel} numberOfLines={1}>
-              {t(`chatPattern.${id}`)}
-            </Text>
-            <ChoiceMark selected={selected} />
-          </Pressable>
-        )
-      })}
-    </ScrollView>
+          }}
+          accessibilityRole="button"
+          accessibilityState={{ selected: pattern === 'custom' }}
+          accessibilityLabel={t('chatPattern.custom')}
+        >
+          {customTile}
+        </Pressable>
+      ) : (
+        <ImageSourceMenu
+          onPick={onPickBackground}
+          onGallery={galleries.length > 0 ? openGallery : undefined}
+          galleryLabel={t('gallery.pickFromCharacters')}
+        >
+          <View accessible accessibilityRole="button" accessibilityLabel={t('chatPattern.custom')}>
+            {customTile}
+          </View>
+        </ImageSourceMenu>
+      )}
+    </View>
   )
 
-  const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
+  const sourceCell = (
+    <SourceCell
+      label={wallpaper?.file ? t('background.change') : t('background.choose')}
+      onPick={onPickBackground}
+      onGallery={galleries.length > 0 ? openGallery : undefined}
+      galleryLabel={t('gallery.pickFromCharacters')}
+    />
+  )
+
+  const renderNative = ({ ui }: NonNullable<typeof nativeForm>) => {
     const { Toggle, Button: SwiftButton } = ui
-    const { disabled } = modifiers
     return (
       <NativeForm>
         <NativeSection>
@@ -226,16 +275,26 @@ export default function ChatBackgroundScreen() {
           </NativeHostedRow>
         </NativeSection>
 
-        <NativeSection title={t('settings.backgroundScreen')} footer={t('settings.chatBackdropHint')}>
+        {/* Keep the hosted tiles and source picker in a section whose rows and footer never change,
+            so switching None/Custom does not rebuild the Section and blank out its RNHostViews. */}
+        <NativeSection title={t('settings.backgroundScreen')}>
           <NativeHostedRow height={tilesHeight}>{tiles}</NativeHostedRow>
-          <NativeHostedRow>
-            <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
-          </NativeHostedRow>
-          {wallpaper?.file ? <SwiftButton label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
-          {wallpaper?.file ? <SwiftButton label={t('background.remove')} role="destructive" onPress={onRemoveBackground} /> : null}
-          <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} modifiers={[disabled(noPicture)]} />
-          <Toggle label={t('settings.homeBackground')} isOn={homeBackground} onIsOnChange={setHomeBackground} modifiers={[disabled(noPicture)]} />
+          <NativeHostedRow>{sourceCell}</NativeHostedRow>
         </NativeSection>
+
+        {wallpaper?.file ? (
+          <NativeSection>
+            <SwiftButton label={t('background.adjust')} onPress={onAdjustBackground} />
+            <SwiftButton label={t('background.remove')} role="destructive" onPress={onRemoveBackground} />
+          </NativeSection>
+        ) : null}
+
+        {!noPicture ? (
+          <NativeSection footer={t('settings.chatBackdropHint')}>
+            <Toggle label={t('settings.chatBackdrop')} isOn={backdrop} onIsOnChange={setBackdrop} />
+            <Toggle label={t('settings.homeBackground')} isOn={homeBackground} onIsOnChange={setHomeBackground} />
+          </NativeSection>
+        ) : null}
       </NativeForm>
     )
   }
@@ -250,14 +309,24 @@ export default function ChatBackgroundScreen() {
             <ChatPreview />
           </SchemeOverride>
 
-          <ListSection header={t('settings.backgroundScreen')} footer={t('settings.chatBackdropHint')}>
+          <ListSection header={t('settings.backgroundScreen')}>
             {tiles}
-            <SourceCell label={wallpaper?.file ? t('background.change') : t('background.choose')} onPick={onPickBackground} />
-            {wallpaper?.file ? <ButtonCell label={t('background.adjust')} onPress={onAdjustBackground} /> : null}
-            {wallpaper?.file ? <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} /> : null}
-            <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} disabled={noPicture} />
-            <SwitchCell label={t('settings.homeBackground')} value={homeBackground} onValueChange={setHomeBackground} disabled={noPicture} />
+            {sourceCell}
           </ListSection>
+
+          {wallpaper?.file ? (
+            <ListSection>
+              <ButtonCell label={t('background.adjust')} onPress={onAdjustBackground} />
+              <ButtonCell danger label={t('background.remove')} onPress={onRemoveBackground} />
+            </ListSection>
+          ) : null}
+
+          {!noPicture ? (
+            <ListSection footer={t('settings.chatBackdropHint')}>
+              <SwitchCell label={t('settings.chatBackdrop')} value={backdrop} onValueChange={setBackdrop} />
+              <SwitchCell label={t('settings.homeBackground')} value={homeBackground} onValueChange={setHomeBackground} />
+            </ListSection>
+          ) : null}
         </ScrollView>
       )}
       {isAndroid ? (
@@ -278,7 +347,7 @@ export default function ChatBackgroundScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    tiles: { gap: 12, padding: 16 },
+    tiles: { width: '100%', flexDirection: 'row', justifyContent: 'center', gap: 28, padding: 16 },
     tileButton: { width: TILE_WIDTH, alignItems: 'center', gap: 6 },
     tile: {
       width: TILE_WIDTH,

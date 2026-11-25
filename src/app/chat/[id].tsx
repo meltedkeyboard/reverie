@@ -413,7 +413,7 @@ function Chats({ start, owner: given, focusMessageId, onShown }: ChatsProps) {
   }, [lists, away])
 
   // The chat takes the scheme its picture reads best in, and the drawer's list the one of
-  // the picture blurred under it; over a pattern both keep the app's.
+  // the picture blurred under it; without a picture both keep the app's.
   const scheme = useChatScheme(lookOf(owner))
   const backdrop = useChatBackdropTone(lookOf(owner))
   const chatAccent = useChatWallpaperAccent(lookOf(owner))

@@ -13,7 +13,7 @@ import { openInNewTab, useMiddleClick, wantsNewTab } from '@/components/chrome/T
 import { deleteChat, setChatTitle } from '@/db/chats'
 import { useDatabase } from '@/db/provider'
 import { listSearchChats, type SearchChat } from '@/db/search'
-import { RAIL_WIDTH, SIDEBAR_WIDTH, sidebarFold, sidebarWidthAt, useMarkSidebarShown } from '@/hooks/util/sidebarMotion'
+import { RAIL_WIDTH, SIDEBAR_WIDTH, sidebarFold, sidebarWidthAt } from '@/hooks/util/sidebarMotion'
 import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useWindowKey } from '@/hooks/util/useWindowKey'
 import { t, useTranslation } from '@/i18n'
@@ -133,7 +133,6 @@ export function Sidebar() {
   const collapsed = useSidebarCollapsed()
   // 0 = open, 1 = a rail of icons. The width and the fade of the text follow it.
   const progress = sidebarFold
-  useMarkSidebarShown()
   // On mounting it takes its state at once; after that each fold slides.
   const mounted = useRef(false)
   useEffect(() => {

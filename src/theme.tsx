@@ -33,8 +33,6 @@ export type Colors = {
   // A stronger hairline than `border`, for outlines that need to read as a shape's
   // edge (shard chips/buttons) rather than a faint divider.
   borderStrong: string
-  // Color for decorative background patterns (stars, dots, rings) against bg.
-  pattern: string
   // Name colors for the characters of a room, by their place in it; readable on bg.
   cast: string[]
 }
@@ -57,7 +55,6 @@ const darkColors: Colors = {
   dangerBorder: 'rgba(240, 97, 109, 0.3)',
   success: '#5FCB8B',
   borderStrong: 'rgba(255, 255, 255, 0.14)',
-  pattern: '#0A0A0D',
   cast: ['#F0A35E', '#6CC4E8', '#E779B2', '#7FD17F', '#B99BFF', '#F2D46B'],
 }
 
@@ -71,7 +68,6 @@ const blackColors: Colors = {
   bubble: '#222222',
   border: 'rgba(255, 255, 255, 0.10)',
   borderStrong: 'rgba(255, 255, 255, 0.18)',
-  pattern: '#040404',
   text: '#F5F5F5',
   textMuted: 'rgba(255, 255, 255, 0.65)',
   textFaint: 'rgba(255, 255, 255, 0.4)',
@@ -87,7 +83,6 @@ const greyColors: Colors = {
   bubble: '#303030',
   border: 'rgba(255, 255, 255, 0.08)',
   borderStrong: 'rgba(255, 255, 255, 0.14)',
-  pattern: '#0E0E0E',
   text: '#F0F0F0',
   textMuted: 'rgba(255, 255, 255, 0.65)',
   textFaint: 'rgba(255, 255, 255, 0.4)',
@@ -111,7 +106,6 @@ const lightColors: Colors = {
   dangerBorder: 'rgba(214, 57, 74, 0.3)',
   success: '#2F9A5C',
   borderStrong: 'rgba(0, 0, 0, 0.14)',
-  pattern: '#ECECEF',
   cast: ['#C26A12', '#1F86B5', '#C0407F', '#2F8F3A', '#6D4FD1', '#9A7A00'],
 }
 
@@ -125,7 +119,6 @@ const neutralLightColors: Colors = {
   bubble: '#E6E6E6',
   border: 'rgba(0, 0, 0, 0.08)',
   borderStrong: 'rgba(0, 0, 0, 0.14)',
-  pattern: '#EBEBEB',
   text: '#171717',
 }
 
@@ -139,7 +132,6 @@ const oledLightColors: Colors = {
   bubble: '#EDEDED',
   border: 'rgba(0, 0, 0, 0.10)',
   borderStrong: 'rgba(0, 0, 0, 0.18)',
-  pattern: '#F4F4F4',
   text: '#000000',
 }
 
@@ -152,7 +144,6 @@ const warmColors: Colors = {
   bubble: '#E4DBCB',
   border: 'rgba(60, 48, 36, 0.08)',
   borderStrong: 'rgba(60, 48, 36, 0.15)',
-  pattern: '#EAE2D5',
   text: '#28231D',
   textMuted: 'rgba(40, 35, 29, 0.62)',
   textFaint: 'rgba(40, 35, 29, 0.40)',
@@ -178,7 +169,6 @@ const desktopDarkColors: Colors = {
   bubble: '#303030',
   border: '#363636',
   borderStrong: '#424242',
-  pattern: '#191919',
   text: '#DADADA',
   textMuted: '#B3B3B3',
   textFaint: '#7A7A7A',
@@ -193,15 +183,9 @@ const desktopBlackColors: Colors = {
   bubble: '#181818',
   border: '#242424',
   borderStrong: '#303030',
-  pattern: '#040404',
   text: '#DADADA',
   textMuted: '#B3B3B3',
   textFaint: '#7A7A7A',
-}
-
-const desktopGreyColors: Colors = {
-  ...desktopDarkColors,
-  pattern: '#181818',
 }
 
 const desktopLightColors: Colors = {
@@ -213,7 +197,6 @@ const desktopLightColors: Colors = {
   bubble: '#EFEFEF',
   border: '#E0E0E0',
   borderStrong: '#D0D0D0',
-  pattern: '#F1F1F1',
   text: '#222222',
   textMuted: '#5C5C5C',
   textFaint: '#ABABAB',
@@ -228,7 +211,6 @@ const desktopWarmColors: Colors = {
   bubble: '#E8E0D4',
   border: '#DED5C7',
   borderStrong: '#CEC3B3',
-  pattern: '#E8E0D4',
   text: '#28231D',
   textMuted: '#685F54',
   textFaint: '#9E9487',
@@ -244,7 +226,6 @@ const warmDarkColors: Colors = {
   bubble: '#373029',
   border: 'rgba(255, 240, 220, 0.08)',
   borderStrong: 'rgba(255, 240, 220, 0.15)',
-  pattern: '#120F0D',
   text: '#F2EBE1',
   textMuted: 'rgba(242, 235, 225, 0.65)',
   textFaint: 'rgba(242, 235, 225, 0.40)',
@@ -267,7 +248,6 @@ const desktopWarmDarkColors: Colors = {
   bubble: '#362F2A',
   border: '#3D362F',
   borderStrong: '#4D443B',
-  pattern: '#14110E',
   text: '#EAE2D8',
   textMuted: '#ABA295',
   textFaint: '#7A7266',
@@ -283,7 +263,7 @@ const palettes: Record<ThemeName, Record<Scheme, Colors>> = isDesktop
   ? {
       default: { light: desktopLightColors, dark: desktopDarkColors },
       warm: { light: desktopWarmColors, dark: desktopWarmDarkColors },
-      neutral: { light: desktopLightColors, dark: desktopGreyColors },
+      neutral: { light: desktopLightColors, dark: desktopDarkColors },
       oled: { light: desktopOledLightColors, dark: desktopBlackColors },
     }
   : {
