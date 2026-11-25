@@ -215,6 +215,7 @@ export function Composer({
   suggestingRef.current = suggesting
 
   const [ghostHeight, setGhostHeight] = useState(0)
+  const [inputH, setInputH] = useState(30)
   useEffect(() => {
     if (!suggesting) {
       if (!textRef.current) setWraps(false)
@@ -485,9 +486,16 @@ export function Composer({
 
   useEffect(() => {
     if (pictured || editing || docked) return
-    const targetH = baseBarH.current + (expanded ? SIDE + 2 : 0)
+    const contentExtra = suggesting
+      ? ghostHeight > 0
+        ? Math.max(0, ghostHeight + 8 - 30)
+        : 0
+      : text
+        ? Math.max(0, inputH - 30)
+        : 0
+    const targetH = baseBarH.current + (expanded ? SIDE + 2 : 0) + contentExtra
     height.value = withTiming(targetH, { duration: 220, easing: Easing.out(Easing.cubic) })
-  }, [expanded, pictured, editing, docked, height])
+  }, [expanded, pictured, editing, docked, suggesting, ghostHeight, text, inputH, height])
 
   useEffect(() => {
     if (accessory) return
@@ -574,6 +582,10 @@ export function Composer({
                   }}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
+                  onLayout={(e) => {
+                    const h = e.nativeEvent.layout.height
+                    setInputH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev))
+                  }}
                   placeholder={suggesting ? '' : (placeholder ?? t('chat.messagePlaceholder'))}
                   {...inputColors}
                   placeholderTextColor="transparent"
