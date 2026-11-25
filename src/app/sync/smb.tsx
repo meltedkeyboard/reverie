@@ -64,7 +64,7 @@ export default function SmbScreen() {
       setPassword(pass)
       setDomain(settings.domain || 'WORKGROUP')
       setWifiOnly(settings.wifiOnly)
-      setAuthMode('user')
+      setAuthMode(settings.host && !settings.username ? 'guest' : 'user')
       setTimeout(() => {
         loaded.current = true
       }, 50)
@@ -102,9 +102,7 @@ export default function SmbScreen() {
       }
       await saveSmbSettings(db, s)
       const passToSave = overridePass !== undefined ? overridePass : (authMode === 'user' ? password : '')
-      if (passToSave || authMode === 'guest') {
-        await saveSmbPassword(db, passToSave)
-      }
+      await saveSmbPassword(db, passToSave)
       refreshSync.current().catch(() => {})
     },
     [db, host, port, share, path, authMode, username, password, domain, wifiOnly]

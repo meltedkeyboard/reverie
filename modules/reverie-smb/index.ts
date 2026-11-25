@@ -28,6 +28,8 @@ export type SmbNativeModule = {
   listShares(config: SmbConfig): Promise<string[]>
   listDirectory(config: SmbConfig, path: string): Promise<SmbFileItem[]>
   createDirectory(config: SmbConfig, path: string): Promise<void>
+  beginSession?(config: SmbConfig): Promise<void>
+  endSession?(): Promise<void>
   list(config: SmbConfig, path: string): Promise<string[]>
   copyIn(config: SmbConfig, path: string, localUri: string): Promise<void>
   copyOut(config: SmbConfig, localUri: string, path: string): Promise<void>

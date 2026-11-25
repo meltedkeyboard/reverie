@@ -80,6 +80,8 @@ export type SyncBackend = {
   copyIn(path: string, localUri: string): Promise<void>
   copyOut(localUri: string, path: string): Promise<void>
   remove(path: string): Promise<void>
+  beginSession?: () => Promise<void>
+  endSession?: () => Promise<void>
 }
 
 type Manifest = { app: 'reverie'; rev: string; schema: number; savedAt: number }
@@ -126,6 +128,8 @@ async function getBackend(db: SQLiteDatabase, mode: SyncMode): Promise<SyncBacke
       copyIn: (p, localUri) => smb.copyIn(config, p, localUri),
       copyOut: (localUri, p) => smb.copyOut(config, localUri, p),
       remove: (p) => smb.remove(config, p),
+      beginSession: smb.beginSession ? () => smb.beginSession!(config) : undefined,
+      endSession: smb.endSession ? () => smb.endSession!() : undefined,
     }
   }
 
@@ -431,69 +435,74 @@ async function run(mode: SyncMode): Promise<SyncOutcome> {
     const backend = await getBackend(db, mode)
     if (!backend) return 'unchanged'
 
-    const manifestRead = readManifest(backend).then(
-      (value) => ({ value }),
-      (error: unknown) => ({ error })
-    )
-    const state = await getSyncState(db)
-    const read = await manifestRead
-    if ('error' in read) throw read.error
-    const manifest = read.value
-    const changedHere = state.dirty || state.rev === null
-    const changedThere = manifest !== null && manifest.rev !== state.rev
+    await backend.beginSession?.()
+    try {
+      const manifestRead = readManifest(backend).then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error })
+      )
+      const state = await getSyncState(db)
+      const read = await manifestRead
+      if ('error' in read) throw read.error
+      const manifest = read.value
+      const changedHere = state.dirty || state.rev === null
+      const changedThere = manifest !== null && manifest.rev !== state.rev
 
-    const finish = (outcome: SyncOutcome, hadFiles = false) => {
-      if (hadFiles && (outcome === 'pushed' || outcome === 'pulled')) {
-        setSyncProgress({ active: true, stage: 'done' })
-        progressTimer = setTimeout(() => {
+      const finish = (outcome: SyncOutcome, hadFiles = false) => {
+        if (hadFiles && (outcome === 'pushed' || outcome === 'pulled')) {
+          setSyncProgress({ active: true, stage: 'done' })
+          progressTimer = setTimeout(() => {
+            setSyncProgress({ active: false, stage: 'idle' })
+          }, 1800)
+        } else {
           setSyncProgress({ active: false, stage: 'idle' })
-        }, 1800)
-      } else {
-        setSyncProgress({ active: false, stage: 'idle' })
+        }
+        return outcome
       }
-      return outcome
-    }
 
-    if (mode === 'push') {
-      if (changedThere) return finish('behind')
-      if (manifest && !changedHere) {
-        await markChecked(db)
-        return finish('unchanged')
+      if (mode === 'push') {
+        if (changedThere) return finish('behind')
+        if (manifest && !changedHere) {
+          await markChecked(db)
+          return finish('unchanged')
+        }
+        const hadFiles = await push(db, backend)
+        return finish('pushed', hadFiles)
       }
-      const hadFiles = await push(db, backend)
-      return finish('pushed', hadFiles)
-    }
-    if (mode === 'pull') {
-      if (!manifest) return finish('empty')
+      if (mode === 'pull') {
+        if (!manifest) return finish('empty')
+        if (!changedThere) {
+          await markChecked(db)
+          return finish('unchanged')
+        }
+        if (changedHere && !(state.rev === null && (await isEmpty(db)))) return finish('conflict')
+        const hadFiles = await pull(db, backend, manifest)
+        return finish('pulled', hadFiles)
+      }
+
       if (!changedThere) {
-        await markChecked(db)
-        return finish('unchanged')
+        if (manifest && !changedHere) {
+          await markChecked(db)
+          return finish('unchanged')
+        }
+        const hadFiles = await push(db, backend)
+        return finish('pushed', hadFiles)
       }
-      if (changedHere && !(state.rev === null && (await isEmpty(db)))) return finish('conflict')
+
+      let side: 'local' | 'cloud' | null = mode === 'local' || mode === 'cloud' ? mode : null
+      if (!side && (!changedHere || (state.rev === null && (await isEmpty(db))))) side = 'cloud'
+      if (!side) return finish('conflict')
+      if (side === 'local') {
+        const hadFiles = await push(db, backend)
+        return finish('pushed', hadFiles)
+      }
+      if (mode === 'push-only') return finish('unchanged')
+      if (changedHere) await keepCopy(db)
       const hadFiles = await pull(db, backend, manifest)
       return finish('pulled', hadFiles)
+    } finally {
+      await backend.endSession?.().catch(() => {})
     }
-
-    if (!changedThere) {
-      if (manifest && !changedHere) {
-        await markChecked(db)
-        return finish('unchanged')
-      }
-      const hadFiles = await push(db, backend)
-      return finish('pushed', hadFiles)
-    }
-
-    let side: 'local' | 'cloud' | null = mode === 'local' || mode === 'cloud' ? mode : null
-    if (!side && (!changedHere || (state.rev === null && (await isEmpty(db))))) side = 'cloud'
-    if (!side) return finish('conflict')
-    if (side === 'local') {
-      const hadFiles = await push(db, backend)
-      return finish('pushed', hadFiles)
-    }
-    if (mode === 'push-only') return finish('unchanged')
-    if (changedHere) await keepCopy(db)
-    const hadFiles = await pull(db, backend, manifest)
-    return finish('pulled', hadFiles)
   } catch (err) {
     setSyncProgress({ active: false, stage: 'idle' })
     throw err

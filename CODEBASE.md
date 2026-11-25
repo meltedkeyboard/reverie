@@ -198,7 +198,7 @@ Two native modules handle storage backends:
   - iOS (`ios/ReverieCloudFolderModule.swift`): document picker, bookmark in `UserDefaults`, `NSFileCoordinator`.
   - Android (`android/.../ReverieCloudFolderModule.kt`): `ACTION_OPEN_DOCUMENT_TREE`, persisted SAF tree uri.
 - `modules/reverie-smb`: direct in-app SMB2/3 client.
-  - iOS (`ios/ReverieSmbModule.swift`): uses `AMSMB2` (wrapping `libsmb2`) over direct TCP sockets to bypass the iOS Files app read-only quirks and session drops. Passwords are saved in iOS Keychain (`kSecClassGenericPassword`). Includes directory listing, folder creation, connection probing, and atomic snapshot transfers.
+  - iOS (`ios/ReverieSmbModule.swift`): uses `AMSMB2` (wrapping `libsmb2`) over direct TCP sockets to bypass the iOS Files app read-only quirks and session drops. Passwords are saved in iOS Keychain (`kSecClassGenericPassword`). Reuses one pooled share session per sync (`beginSession` / `endSession`) with graceful disconnect wait, stages uploads through temporary files with transient lock retries before replacing targets, and checks folder reachability.
   - Android (`android/.../ReverieSmbModule.kt`): uses `smbj` and `dcerpc` over direct TCP sockets. Passwords are saved in hardware-backed Android KeyStore encrypted preferences. Includes directory listing, folder creation, connection probing, and atomic snapshot transfers.
   - Web/Dev (`index.web.ts`): in-memory simulation for local development.
 

@@ -31,6 +31,8 @@ export const reverieSmb: SmbNativeModule = {
     ]
   },
   createDirectory: async (): Promise<void> => {},
+  beginSession: async (): Promise<void> => {},
+  endSession: async (): Promise<void> => {},
   list: async (): Promise<string[]> => ['manifest.json', 'reverie.db'],
   copyIn: async (): Promise<void> => {},
   copyOut: async (): Promise<void> => {},
