@@ -204,6 +204,8 @@ export type GalleryHandle = {
   close: () => void
   // Turns to the picture beside, -1 or 1.
   go: (step: number) => void
+  // Jumps directly to picture `index`.
+  goTo: (index: number) => void
   // Opens the original of the avatar shown out of it, or closes it back in.
   toggleOriginal: () => void
   // Takes the picture shown away (see `remove` in the motion).
@@ -230,6 +232,8 @@ type Props = {
   bottomTravel: number
   onIndexChange: (index: number) => void
   onChromeChange: (shown: boolean) => void
+  // Continuous fractional page position (`0..images.length - 1`) for driving the bottom bar.
+  scrollProgress?: SharedValue<number>
   // The original of picture `index` has loaded and can be swapped in, or has gone with its page.
   onOriginalLoad: (index: number, loaded: boolean) => void
   // The picture shown is the original of its avatar now, or the avatar again.
@@ -261,6 +265,7 @@ export function Gallery({
   bottom,
   topTravel,
   bottomTravel,
+  scrollProgress,
   onIndexChange,
   onChromeChange,
   onOriginalLoad,
@@ -765,6 +770,24 @@ export function Gallery({
       if (to !== page.value) turnTo(to, 0)
     }
 
+    // Jumps directly from the bottom filmstrip: slides for adjacent pages, snaps cleanly for
+    // distant ones because pages more than two apart aren't mounted.
+    const goTo = (to: number) => {
+      'worklet'
+      if (closing.value || mode.value !== NONE) return
+      const target = clamp(to, 0, lastPage)
+      if (target === page.value) return
+      if (Math.abs(target - page.value) <= 1) {
+        turnTo(target, 0)
+        return
+      }
+      cancelAnimation(pager)
+      page.value = target
+      pager.value = target * stride
+      claimZoom()
+      scheduleOnRN(turned, target, showsOriginal.value && zoomPage.value === target)
+    }
+
     // The button over an avatar: the whole original it was cut from opens out of it where it
     // is, or closes back into it, and any zoom is let go on the way. Not while a finger is
     // moving a picture.
@@ -874,6 +897,7 @@ export function Gallery({
       gesture: Gesture.Simultaneous(pinch, pan, Gesture.Exclusive(doubleTap, singleTap)),
       close,
       go,
+      goTo,
       wheel,
       relayout,
       toggleOriginal,
@@ -887,6 +911,7 @@ export function Gallery({
     () => ({
       close: () => scheduleOnUI(motion.close),
       go: (step: number) => scheduleOnUI(motion.go, step),
+      goTo: (index: number) => scheduleOnUI(motion.goTo, index),
       toggleOriginal: () => scheduleOnUI(motion.toggleOriginal),
       remove: () => scheduleOnUI(motion.remove),
     }),
@@ -937,6 +962,14 @@ export function Gallery({
       scheduleOnRN(onClosed)
     },
     [morphs, fits, wholes, onClosed]
+  )
+
+  useAnimatedReaction(
+    () => (stride > 0 ? pager.value / stride : page.value),
+    (pos) => {
+      if (scrollProgress) scrollProgress.value = pos
+    },
+    [stride, scrollProgress]
   )
 
   const laidOut = useRef({ width, height })

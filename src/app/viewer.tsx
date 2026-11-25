@@ -1,14 +1,15 @@
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BackHandler, StyleSheet, Text, View, type ViewStyle, type ViewInstance } from 'react-native'
-import Animated, { ZoomIn, ZoomOut } from 'react-native-reanimated'
+import { BackHandler, StyleSheet, View, type ViewStyle, type ViewInstance } from 'react-native'
+import Animated, { useSharedValue, ZoomIn, ZoomOut } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { GlassButton } from '@/components/chrome/Glass'
 import { TITLE_BAR_HEIGHT } from '@/components/chrome/TitleBar'
 import { Gallery, type GalleryHandle } from '@/components/viewer/Gallery'
 import { RemoveButton } from '@/components/viewer/RemoveButton'
+import { ViewerStrip } from '@/components/viewer/ViewerStrip'
 import { SFIcon } from '@/components/visuals/SFIcon'
 import { useDatabase } from '@/db/provider'
 import { isKey, useWindowKey } from '@/hooks/util/useWindowKey'
@@ -46,6 +47,7 @@ export default function ViewerScreen() {
   const [frame, setFrame] = useState<Frame | null>(null)
   const root = useRef<ViewInstance>(null)
   const gallery = useRef<GalleryHandle>(null)
+  const scrollProgress = useSharedValue(initialIndex)
 
   const leave = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/')), [router])
 
@@ -153,6 +155,8 @@ export default function ViewerScreen() {
 
   const current = images[index]
   const removable = pending?.remove !== undefined
+  const sideReserve = removable ? Math.max(insets.left, insets.right) + 66 : Math.max(insets.left, insets.right) + 12
+  const maxStripWidth = frame ? Math.max(160, frame.width - sideReserve * 2) : 260
   const video = current ? isVideo(current.uri) : false
   // The button turns into a checkmark for a moment, since Photos gives no sign of its own.
   const [saved, setSaved] = useState(false)
@@ -187,6 +191,7 @@ export default function ViewerScreen() {
           frame={frame}
           topTravel={insets.top + 64}
           bottomTravel={insets.bottom + 64}
+          scrollProgress={scrollProgress}
           onIndexChange={setIndex}
           onChromeChange={setChrome}
           onOriginalLoad={originalLoaded}
@@ -241,15 +246,17 @@ export default function ViewerScreen() {
           }
           bottom={
             images.length > 1 || removable ? (
-              // The counter in the middle and, for the pictures of a gallery, the bin at the
+              // The filmstrip pill in the middle and, for gallery pictures, the bin at the
               // trailing edge, as the bottom bar of Photos has it.
               <View style={[styles.bottomBar, { marginBottom: insets.bottom + 4 }]} pointerEvents="box-none">
                 {images.length > 1 ? (
-                  <View style={styles.counter} pointerEvents="none">
-                    <Text style={styles.counterText}>
-                      {index + 1} / {images.length}
-                    </Text>
-                  </View>
+                  <ViewerStrip
+                    count={images.length}
+                    index={index}
+                    maxWidth={maxStripWidth}
+                    progress={scrollProgress}
+                    onSelect={(to) => gallery.current?.goTo(to)}
+                  />
                 ) : null}
                 {removable && current ? (
                   <View style={[styles.trailing, { right: insets.right + 12 }]}>
@@ -276,19 +283,12 @@ const WINDOW = isWeb
   ? ({ position: 'fixed', top: isElectron ? TITLE_BAR_HEIGHT : 0, left: 0, right: 0, bottom: 0, zIndex: 100 } as unknown as ViewStyle)
   : FILL
 
-const createStyles = (colors: Colors) =>
+const createStyles = (_colors: Colors) =>
   StyleSheet.create({
     root: { ...WINDOW, overflow: 'hidden' },
     bar: { flexDirection: 'row', justifyContent: 'space-between' },
     actions: { flexDirection: 'row', gap: 8 },
-    // As tall as the glass buttons, the counter in its middle.
+    // As tall as the glass buttons, the filmstrip capsule centered in its middle.
     bottomBar: { height: 44, alignItems: 'center', justifyContent: 'center' },
     trailing: { position: 'absolute', top: 0 },
-    counter: {
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
-    },
-    counterText: { color: colors.textMuted, fontSize: 13, fontVariant: ['tabular-nums'] },
   })
