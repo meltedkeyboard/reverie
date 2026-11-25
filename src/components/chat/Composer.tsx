@@ -416,19 +416,9 @@ export function Composer({
   const expanded = docked || opened || pictured || wraps || text.includes('\n') || (suggesting && !!suggestion?.includes('\n'))
 
   const expandAnim = useSharedValue(expanded ? 1 : 0)
-  const shiftX = useSharedValue(0)
-  const prevExpanded = useRef(expanded)
-  if (prevExpanded.current !== expanded) {
-    if (!editing) {
-      // Set synchronously before commit so TextInput never flashes at the new padding for one frame.
-      shiftX.value = expanded ? SIDE_PAD - 14 : 14 - SIDE_PAD
-    }
-    prevExpanded.current = expanded
-  }
   useEffect(() => {
     expandAnim.value = withTiming(expanded ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) })
-    shiftX.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) })
-  }, [expanded, expandAnim, shiftX])
+  }, [expanded, expandAnim])
 
   const narrow = useSharedValue(0)
   const resting = !focused && !expanded
@@ -437,9 +427,8 @@ export function Composer({
   }, [resting, narrow])
   const narrowStyle = useAnimatedStyle(() => ({ paddingHorizontal: narrow.value * NARROW_INSET }))
 
-  const inputWrapStyle = useAnimatedStyle(() => ({
-    paddingTop: docked ? 12 : 8,
-    transform: [{ translateX: shiftX.value }],
+  const placeholderStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: editing ? 0 : expandAnim.value * (14 - SIDE_PAD) }],
   }))
   const spacerStyle = useAnimatedStyle(() => ({
     height: expandAnim.value * (SIDE + 2),
@@ -492,6 +481,13 @@ export function Composer({
   const accessoryH = useSharedValue(0)
   const expandedRef = useRef(expanded)
   expandedRef.current = expanded
+  const baseBarH = useRef(BAR_PAD_TOP + BAR_PAD_BOTTOM + insets.bottom + 2 * FIELD_PAD + SIDE)
+
+  useEffect(() => {
+    if (pictured || editing || docked) return
+    const targetH = baseBarH.current + (expanded ? SIDE + 2 : 0)
+    height.value = withTiming(targetH, { duration: 220, easing: Easing.out(Easing.cubic) })
+  }, [expanded, pictured, editing, docked, height])
 
   useEffect(() => {
     if (accessory) return
@@ -503,8 +499,10 @@ export function Composer({
     const h = e.nativeEvent.layout.height
     barH.value = h
     if (top) top.value = h + accessoryH.value
-    // Keep list padding stable while typing/wrapping so ChatThread does not re-layout every frame.
-    if (!expandedRef.current || pictured || editing || docked) {
+    if (pictured || editing || docked) {
+      height.value = h
+    } else if (!expandedRef.current && expandAnim.value === 0) {
+      baseBarH.current = h
       height.value = h
     }
   }
@@ -553,11 +551,12 @@ export function Composer({
 
         <GestureDetector gesture={swipe}>
           <View style={styles.inputClip}>
-            <Animated.View
-              style={[
-                { paddingLeft: expanded || editing ? 14 : SIDE_PAD, paddingRight: expanded ? 14 : SIDE_PAD },
-                inputWrapStyle,
-              ]}
+            <View
+              style={{
+                paddingLeft: expanded || editing ? 14 : SIDE_PAD,
+                paddingRight: expanded ? 14 : SIDE_PAD,
+                paddingTop: docked ? 12 : 8,
+              }}
             >
               <View>
                 <TextInput
@@ -577,12 +576,17 @@ export function Composer({
                   onBlur={() => setFocused(false)}
                   placeholder={suggesting ? '' : (placeholder ?? t('chat.messagePlaceholder'))}
                   {...inputColors}
+                  placeholderTextColor="transparent"
                   selectionColor={effectiveAccent}
                   multiline
                   numberOfLines={isWeb ? 1 : undefined}
                   autoFocus={autoFocus && !isWeb}
                   accessibilityHint={suggesting ? t('chat.suggestionHint') : undefined}
-                  style={[styles.input, suggesting && { minHeight: ghostHeight + 8 }]}
+                  style={[
+                    styles.input,
+                    !text && !suggesting && styles.inputEmpty,
+                    suggesting && { minHeight: ghostHeight + 8 },
+                  ]}
                 />
                 {suggesting ? (
                   <View style={styles.ghost} pointerEvents="none">
@@ -598,7 +602,20 @@ export function Composer({
                   </View>
                 ) : null}
               </View>
-            </Animated.View>
+            </View>
+            {!text && !suggesting ? (
+              <Animated.Text
+                style={[
+                  styles.placeholder,
+                  { left: editing ? 14 : SIDE_PAD, top: docked ? 12 : 8, color: inputColors.placeholderTextColor },
+                  placeholderStyle,
+                ]}
+                numberOfLines={1}
+                pointerEvents="none"
+              >
+                {placeholder ?? t('chat.messagePlaceholder')}
+              </Animated.Text>
+            ) : null}
           </View>
         </GestureDetector>
 
@@ -804,7 +821,9 @@ const createStyles = (colors: Colors) =>
     plusAt: { position: 'absolute', left: EDGE, bottom: EDGE },
     sendAt: { position: 'absolute', right: EDGE, bottom: EDGE },
     measure: { position: 'absolute', top: 0, opacity: 0, fontSize: 17, lineHeight: 22 },
+    placeholder: { position: 'absolute', right: 14, fontSize: 17, lineHeight: 22 },
     inputClip: { overflow: 'hidden' },
+    inputEmpty: { height: 30 },
     input: {
       maxHeight: 180,
       color: colors.text,
