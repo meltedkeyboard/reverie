@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
@@ -27,6 +27,7 @@ import {
   type ThinkingMode,
 } from '@/db/characters'
 import type { GalleryItem } from '@/db/gallery'
+import { clearGenSession } from '@/db/genSessions'
 import { useDatabase } from '@/db/provider'
 import { useCardExport } from '@/hooks/features/useCardExport'
 import { useGalleryPicks } from '@/hooks/features/useGalleryPicks'
@@ -44,6 +45,7 @@ import { usePictureColor } from '@/lib/images/pictureColor'
 import { setBackgroundDraft } from '@/lib/images/backgroundDraft'
 import type { ImageSource } from '@/lib/images/images'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
+import { confirm } from '@/lib/ui/dialogs'
 import { countLabel } from '@/lib/core/format'
 import { alertError } from '@/lib/transfer/report'
 import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles, useTheme } from '@/theme'
@@ -77,6 +79,8 @@ export default function CharacterEditorScreen() {
   // While a tile of the gallery is in the air, the page holds still under the finger.
   const [galleryDrag, setGalleryDrag] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const confirmingLeave = useRef(false)
   const [name, setName] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [greeting, setGreeting] = useState('')
@@ -148,6 +152,58 @@ export default function CharacterEditorScreen() {
   }, [db, id, isNew, router])
 
   const canSave = ready && !saving && name.trim().length > 0
+
+  const hasDraft = isNew && (
+    name.length > 0 ||
+    systemPrompt.length > 0 ||
+    greeting.length > 0 ||
+    notes.length > 0 ||
+    avatarSlot.uri !== null ||
+    avatar !== null ||
+    avatarOriginal !== null ||
+    avatarCrop !== null ||
+    bgSlot.uri !== null ||
+    background !== null ||
+    backgroundOriginal !== null ||
+    backgroundCrop !== null ||
+    temperature !== DEFAULT_SAMPLING.temperature ||
+    maxTokens !== DEFAULT_SAMPLING.maxTokens ||
+    reasoningBudget !== DEFAULT_SAMPLING.reasoningBudget ||
+    topP !== DEFAULT_SAMPLING.topP ||
+    replyLimit !== null ||
+    thinking !== 'off' ||
+    bgEffect !== 'blur' ||
+    bgIntensity !== 0.5 ||
+    bgBubbleTransparency !== 0.3 ||
+    bgBubbleGlass !== false ||
+    bgTone !== 'auto'
+  )
+
+  // Always uses confirm() directly instead of confirmDeletion() so the user's "confirm
+  // before deleting" setting cannot bypass unsaved-draft protection on character creation.
+  const disableLeaveGuard = usePreventRemove(hasDraft && !leaving, ({ repeat }) => {
+    if (confirmingLeave.current) return
+    confirmingLeave.current = true
+    confirm({
+      title: t('editor.discardConfirmTitle'),
+      message: t('editor.discardConfirmMessage'),
+      confirmLabel: t('editor.discardLeave'),
+      cancelLabel: t('editor.discardKeep'),
+      destructive: true,
+      onConfirm: () => {
+        confirmingLeave.current = false
+        avatarSlot.clearPicked()
+        bgSlot.clearPicked()
+        clearGenSession(db, `prompt:character:${id}`)
+        clearGenSession(db, `greeting:character:${id}`)
+        setLeaving(true)
+        repeat()
+      },
+      onCancel: () => {
+        confirmingLeave.current = false
+      },
+    })
+  })
 
   // The gallery the photo and the background can be taken from, asked for again each time
   // the editor opens, so what was just added in the profile is there.
@@ -319,7 +375,12 @@ export default function CharacterEditorScreen() {
       avatarSlot.settle(nextAvatarValue)
       setRemovedAvatar(null)
       bgSlot.settle(nextBackgroundValue)
-      if (!asProfile) return router.back()
+      if (!asProfile) {
+        // Lift the unsaved-character guard before navigating back after a successful save.
+        setLeaving(true)
+        disableLeaveGuard()
+        return router.back()
+      }
       // Back to the profile, now showing what was saved.
       setAvatar(nextAvatar)
       setAvatarOriginal(nextAvatarOriginal)
