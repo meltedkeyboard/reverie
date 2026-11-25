@@ -958,7 +958,7 @@ export default function SettingsScreen() {
         </KeyboardAwareScrollView>
       ) : null}
 
-      <GlassHeader floating tabHeader>
+      <GlassHeader floating centerTitle tabHeader>
         <TabTitle>{t('settings.title')}</TabTitle>
       </GlassHeader>
     </View>
