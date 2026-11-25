@@ -6,7 +6,7 @@ import { createRequiredContext } from '@/lib/core/requiredContext'
 
 export type Scheme = 'light' | 'dark'
 // A theme is a pair of palettes, a light and a dark one; the mode picks which is shown.
-export const THEMES = ['default', 'warm', 'neutral', 'oled'] as const
+export const THEMES = ['default', 'violet', 'warm', 'neutral', 'oled'] as const
 export type ThemeName = (typeof THEMES)[number]
 export type ThemeMode = Scheme | 'system'
 
@@ -47,9 +47,9 @@ const darkColors: Colors = {
   text: '#F2F2F5',
   textMuted: 'rgba(255, 255, 255, 0.65)',
   textFaint: 'rgba(255, 255, 255, 0.4)',
-  accent: '#756DE9',
-  accentSoft: 'rgba(117, 109, 233, 0.16)',
-  accentBorder: 'rgba(117, 109, 233, 0.35)',
+  accent: '#1472E6',
+  accentSoft: 'rgba(20, 114, 230, 0.16)',
+  accentBorder: 'rgba(20, 114, 230, 0.35)',
   danger: '#F0616D',
   dangerSoft: 'rgba(240, 97, 109, 0.1)',
   dangerBorder: 'rgba(240, 97, 109, 0.3)',
@@ -98,9 +98,9 @@ const lightColors: Colors = {
   text: '#17171B',
   textMuted: 'rgba(0, 0, 0, 0.6)',
   textFaint: 'rgba(0, 0, 0, 0.38)',
-  accent: '#5F55E0',
-  accentSoft: 'rgba(95, 85, 224, 0.12)',
-  accentBorder: 'rgba(95, 85, 224, 0.3)',
+  accent: '#1472E6',
+  accentSoft: 'rgba(20, 114, 230, 0.12)',
+  accentBorder: 'rgba(20, 114, 230, 0.3)',
   danger: '#D6394A',
   dangerSoft: 'rgba(214, 57, 74, 0.08)',
   dangerBorder: 'rgba(214, 57, 74, 0.3)',
@@ -259,15 +259,45 @@ const desktopOledLightColors: Colors = {
   textMuted: '#4A4A4A',
 }
 
+const violetDarkColors: Colors = {
+  ...darkColors,
+  accent: '#756DE9',
+  accentSoft: 'rgba(117, 109, 233, 0.16)',
+  accentBorder: 'rgba(117, 109, 233, 0.35)',
+}
+
+const violetLightColors: Colors = {
+  ...lightColors,
+  accent: '#5F55E0',
+  accentSoft: 'rgba(95, 85, 224, 0.12)',
+  accentBorder: 'rgba(95, 85, 224, 0.3)',
+}
+
+const desktopVioletDarkColors: Colors = {
+  ...desktopDarkColors,
+  accent: '#756DE9',
+  accentSoft: 'rgba(117, 109, 233, 0.16)',
+  accentBorder: 'rgba(117, 109, 233, 0.35)',
+}
+
+const desktopVioletLightColors: Colors = {
+  ...desktopLightColors,
+  accent: '#5F55E0',
+  accentSoft: 'rgba(95, 85, 224, 0.12)',
+  accentBorder: 'rgba(95, 85, 224, 0.3)',
+}
+
 const palettes: Record<ThemeName, Record<Scheme, Colors>> = isDesktop
   ? {
       default: { light: desktopLightColors, dark: desktopDarkColors },
+      violet: { light: desktopVioletLightColors, dark: desktopVioletDarkColors },
       warm: { light: desktopWarmColors, dark: desktopWarmDarkColors },
       neutral: { light: desktopLightColors, dark: desktopDarkColors },
       oled: { light: desktopOledLightColors, dark: desktopBlackColors },
     }
   : {
       default: { light: lightColors, dark: darkColors },
+      violet: { light: violetLightColors, dark: violetDarkColors },
       warm: { light: warmColors, dark: warmDarkColors },
       neutral: { light: neutralLightColors, dark: greyColors },
       oled: { light: oledLightColors, dark: blackColors },
