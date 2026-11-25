@@ -356,7 +356,7 @@ class ReverieSmbModule : Module() {
     val smbConfig = SmbConfig.builder()
       .withTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
       .withSoTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
-      .withSigningEnabled(false)
+      .withSigningRequired(false)
       .build()
     val client = SMBClient(smbConfig)
     return try {
