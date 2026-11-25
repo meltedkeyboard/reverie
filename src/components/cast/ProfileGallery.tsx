@@ -1,14 +1,23 @@
 import { Image, useImage, type ImageRef } from 'expo-image'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react'
 import { ActivityIndicator, Dimensions, PixelRatio, Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
+import Animated, {
+  useAnimatedReaction,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  type SharedValue,
+} from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import type { GalleryItem } from '@/db/gallery'
+import { useGalleryLayout } from '@/db/prefs/galleryLook'
 import { reorderFeel } from '@/hooks/features/useReorder'
 import { useGallery } from '@/hooks/features/useGallery'
 import { useTranslation } from '@/i18n'
+import { isWeb } from '@/lib/core/platform'
 import { galleryUri, isGalleryStill, isGalleryVideo } from '@/lib/images/gallery'
 import { originOf, type Corners } from '@/lib/images/viewer'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
@@ -34,14 +43,16 @@ const LIFTED_SCALE = 1.08
 // Tiles move aside, and a dropped one lands, quickly and without a bounce.
 const SETTLE = spring(0.35, 0.9)
 
-// The pictures and videos of a character's profile, in a grid the user puts in order: a tap
-// opens one in the viewer and swipes through all of them from there, where the bin deletes it,
-// and a long press lifts one to move it. A single item spans the full grid width at its own
-// aspect ratio with the add button below; from two items onward a plus takes the place after
-// the last while its row has room, under full rows the add button stands below the grid instead,
-// and with nothing in the gallery a hint stands where the first row will. `onDragging` says
-// while a tile is in the air, for the page to hold its scroll still. `system` draws the header
-// as the system's list beside it does.
+// Carousel height stays within portrait-to-landscape bounds so mixed shapes don't jolt the page.
+const CAROUSEL_MIN_ASPECT = 0.65
+const CAROUSEL_MAX_ASPECT = 2.2
+
+// The pictures and videos of a character's profile, shown either as a reorderable grid or as a
+// full-width horizontally swipeable carousel (chosen in Settings): a tap opens one in the
+// viewer where the bin deletes it. A single item spans the full width at its own aspect ratio
+// with the add button below in both modes. `onDragging` says while a grid tile is in the air,
+// for the page to hold its scroll still. `system` draws the header as the system's list beside
+// it does.
 export function ProfileGallery({
   characterId,
   system = false,
@@ -56,9 +67,14 @@ export function ProfileGallery({
   const styles = useStyles(createStyles)
   const colors = useColors()
   const { t } = useTranslation()
+  const galleryLayout = useGalleryLayout()
   const { items, adding, add, remove, reorder, measured } = useGallery(characterId)
   const openViewer = useOpenViewer()
   const [width, setWidth] = useState(0)
+  const [page, setPage] = useState(0)
+  const [jump, setJump] = useState<{ index: number; animated: boolean; tick: number } | null>(null)
+  const carouselPage = useRef(0)
+  const addedFrom = useRef<number | null>(null)
   const cell = width ? (width - GAP * (COLUMNS - 1)) / COLUMNS : 0
   // The place of each item in the grid by its id, on the UI thread, where a lifted tile moves
   // the others as it passes over them; it is set again from the list whenever that changes.
@@ -81,20 +97,58 @@ export function ProfileGallery({
   // is up, so the tiles' places after one is deleted there are worked out from it.
   const gridAt = useRef<{ x: number; y: number } | null>(null)
 
+  const carousel = galleryLayout === 'carousel' && items.length > 1
+
+  const jumpTo = useCallback((index: number, animated: boolean) => {
+    carouselPage.current = index
+    setPage(index)
+    setJump((prev) => ({ index, animated, tick: (prev?.tick ?? 0) + 1 }))
+  }, [])
+
+  const onPageChange = useCallback((next: number) => {
+    carouselPage.current = next
+    setPage(next)
+  }, [])
+
+  const addItems = async (source: Parameters<typeof add>[0]) => {
+    addedFrom.current = items.length
+    await add(source)
+  }
+
+  useEffect(() => {
+    const start = addedFrom.current
+    if (start !== null) {
+      if (items.length > start) {
+        addedFrom.current = null
+        if (galleryLayout === 'carousel' && items.length > 1) jumpTo(start, true)
+      } else if (!adding) {
+        addedFrom.current = null
+      }
+    } else if (items.length > 0 && carouselPage.current >= items.length) {
+      jumpTo(items.length - 1, false)
+    } else if (items.length <= 1 && carouselPage.current !== 0) {
+      carouselPage.current = 0
+      setPage(0)
+    }
+  }, [items.length, adding, galleryLayout, jumpTo])
+
   // Read when the viewer or a drop comes back, by which time the list may have changed.
-  const latest = useRef({ items, width, cell, remove, reorder, onDragging })
-  latest.current = { items, width, cell, remove, reorder, onDragging }
+  const latest = useRef({ items, width, cell, galleryLayout, remove, reorder, onDragging, jumpTo })
+  latest.current = { items, width, cell, galleryLayout, remove, reorder, onDragging, jumpTo }
 
   // The viewer's bin: the item goes at once, the tiles after it close up under the viewer, and
   // the viewer is told where the ones left now sit, to land the one it shows in its own.
   const removeFromViewer = (index: number) => {
-    const { items, width, cell, remove } = latest.current
+    const { items, width, cell, galleryLayout, remove, jumpTo } = latest.current
     const item = items[index]
     if (!item) return []
     remove(item)
     const at = gridAt.current
     const left = items.filter((_, i) => i !== index)
-    return at && width && cell ? placesOf(left, at, width, cell) : []
+    if (!left.length) return []
+    const next = Math.min(index, left.length - 1)
+    if (galleryLayout === 'carousel') jumpTo(next, false)
+    return at && width && cell ? placesOf(left, at, width, cell, false, galleryLayout, next) : []
   }
 
   const open = (id: number) => {
@@ -104,7 +158,7 @@ export function ProfileGallery({
     if (!node || !width || !cell) return openViewer(images, index, [], [], removeFromViewer)
     node.measureInWindow((x, y) => {
       gridAt.current = { x, y }
-      const origins = placesOf(items, { x, y }, width, cell, adding)
+      const origins = placesOf(items, { x, y }, width, cell, adding, galleryLayout, index)
       openViewer(images, index, origins, items.map((item, i) => (origins[i] ? sourceOf(item) : null)), removeFromViewer)
     })
   }
@@ -123,30 +177,44 @@ export function ProfileGallery({
     if (from !== to) latest.current.reorder(from, to)
   }, [])
 
-  const { single, button, extra, cells } = layoutOf(items.length, adding)
+  const { single, button, extra, cells } = layoutOf(items.length, adding, carousel)
   const rows = Math.ceil(cells / COLUMNS)
   const height = !width
     ? 0
     : single
       ? width / aspectOf(items[0])
-      : rows * cell + (rows - 1) * GAP
+      : carousel
+        ? undefined
+        : rows * cell + (rows - 1) * GAP
   const next = placeAt(items.length, cell)
   const nextStyle = [styles.cell, { width: cell, height: cell, left: next.x, top: next.y }]
 
   return (
     <ListSection header={t('gallery.title')} plainHeader={system}>
       {cells ? (
-        <View ref={grid} style={{ height }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+        <View ref={grid} style={height !== undefined ? { height } : undefined} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
           {width ? (
             single ? (
               <SingleGalleryItem
                 item={items[0]}
                 width={width}
-                height={height}
+                height={height!}
                 onPreview={setPreview}
                 onOpen={() => open(items[0].id)}
                 onRemove={() => confirmRemove(items[0])}
                 onVideoSize={(size) => measured(items[0], size.width, size.height)}
+              />
+            ) : carousel ? (
+              <GalleryCarousel
+                items={items}
+                width={width}
+                page={page}
+                jump={jump}
+                onPageChange={onPageChange}
+                onPreview={setPreview}
+                onOpen={open}
+                onRemove={confirmRemove}
+                onVideoSize={(item, size) => measured(item, size.width, size.height)}
               />
             ) : (
               items.map((item) => (
@@ -173,7 +241,7 @@ export function ProfileGallery({
                 <ActivityIndicator color={colors.textMuted} />
               </View>
             ) : (
-              <ImageSourceMenu onPick={add} disabled={adding} style={nextStyle}>
+              <ImageSourceMenu onPick={addItems} disabled={adding} style={nextStyle}>
                 <View style={styles.plusInner} accessible accessibilityRole="button" accessibilityLabel={t('gallery.add')}>
                   {adding ? <ActivityIndicator color={color ?? colors.textMuted} /> : <Icon name="add" size={30} color={color ?? colors.textMuted} />}
                 </View>
@@ -193,7 +261,7 @@ export function ProfileGallery({
           <Text style={styles.emptyText}>{t('gallery.empty')}</Text>
         </View>
       )}
-      {button ? <SourceCell label={t('gallery.add')} onPick={add} color={color} loading={single && adding} /> : null}
+      {button ? <SourceCell label={t('gallery.add')} onPick={addItems} color={color} loading={(single || carousel) && adding} /> : null}
     </ListSection>
   )
 }
@@ -330,6 +398,163 @@ function GalleryTile({ item, cell, count, slots, onPreview, onOpen, onRemove, on
   )
 }
 
+function GalleryCarousel({
+  items,
+  width,
+  page,
+  jump,
+  onPageChange,
+  onPreview,
+  onOpen,
+  onRemove,
+  onVideoSize,
+}: {
+  items: GalleryItem[]
+  width: number
+  page: number
+  jump: { index: number; animated: boolean; tick: number } | null
+  onPageChange: (page: number) => void
+  onPreview: (id: number, preview: ImageRef | null) => void
+  onOpen: (id: number) => void
+  onRemove: (item: GalleryItem) => void
+  onVideoSize: (item: GalleryItem, size: { width: number; height: number }) => void
+}) {
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  const scrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null)
+  const lastWidth = useRef(width)
+  const pageRef = useRef(page)
+  pageRef.current = page
+
+  const heights = useMemo(() => items.map((item) => carouselHeightOf(item, width)), [items, width])
+  const heightsSV = useSharedValue(heights)
+  useEffect(() => {
+    heightsSV.value = heights
+  }, [heights, heightsSV])
+
+  const pageWidth = useSharedValue(width)
+  useEffect(() => {
+    pageWidth.value = width
+  }, [width, pageWidth])
+
+  const scrollX = useSharedValue(page * width)
+
+  // Keep the clip wrapper's height synced to the active slide on the UI thread without resizing
+  // slides inside ScrollView while scrolling.
+  const clipStyle = useAnimatedStyle(() => {
+    const hs = heightsSV.value
+    const w = pageWidth.value
+    if (!hs.length || w <= 0) return { height: 0 }
+    const pos = clamp(scrollX.value / w, 0, hs.length - 1)
+    const low = Math.floor(pos)
+    const high = Math.min(hs.length - 1, low + 1)
+    return { height: hs[low] + (hs[high] - hs[low]) * (pos - low) }
+  })
+
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollX.value = e.contentOffset.x
+    },
+  })
+
+  useAnimatedReaction(
+    () => {
+      const w = pageWidth.value
+      const count = heightsSV.value.length
+      if (w <= 0 || count <= 1) return 0
+      return clamp(Math.round(scrollX.value / w), 0, count - 1)
+    },
+    (next, prev) => {
+      if (next !== prev) scheduleOnRN(onPageChange, next)
+    }
+  )
+
+  useEffect(() => {
+    if (width <= 0) return
+    const widthChanged = lastWidth.current !== width
+    lastWidth.current = width
+    if (!jump && !widthChanged) return
+    const target = clamp(jump ? jump.index : pageRef.current, 0, items.length - 1)
+    const x = target * width
+    const animated = !widthChanged && Boolean(jump?.animated)
+    if (!animated) scrollX.value = x
+    const frame = requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ x, animated })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [jump, width, items.length, scrollX])
+
+  const safePage = clamp(page, 0, items.length - 1)
+  const activeLifted = useLifted(sourceOf(items[safePage]))
+
+  const stepTo = (next: number) => {
+    const clamped = clamp(next, 0, items.length - 1)
+    onPageChange(clamped)
+    scrollRef.current?.scrollTo({ x: clamped * width, animated: true })
+  }
+
+  return (
+    <Animated.View style={[styles.carouselWrap, clipStyle]}>
+      <Animated.ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        nestedScrollEnabled
+        directionalLockEnabled
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
+        style={styles.fill}
+      >
+        {items.map((item, i) => (
+          <SingleGalleryItem
+            key={item.id}
+            item={item}
+            width={width}
+            height={heights[i]}
+            onPreview={onPreview}
+            onOpen={() => onOpen(item.id)}
+            onRemove={() => onRemove(item)}
+            onVideoSize={(size) => onVideoSize(item, size)}
+          />
+        ))}
+      </Animated.ScrollView>
+      {!activeLifted ? (
+        <>
+          <View style={styles.counter} pointerEvents="none">
+            <Text style={styles.counterText}>
+              {safePage + 1} / {items.length}
+            </Text>
+          </View>
+          {isWeb && safePage > 0 ? (
+            <Pressable
+              onPress={() => stepTo(safePage - 1)}
+              hitSlop={8}
+              style={[styles.arrow, styles.arrowLeft]}
+              accessibilityRole="button"
+              accessibilityLabel={t('gallery.previous')}
+            >
+              <Icon name="chevron-back" size={18} color={ON_ACCENT} />
+            </Pressable>
+          ) : null}
+          {isWeb && safePage < items.length - 1 ? (
+            <Pressable
+              onPress={() => stepTo(safePage + 1)}
+              hitSlop={8}
+              style={[styles.arrow, styles.arrowRight]}
+              accessibilityRole="button"
+              accessibilityLabel={t('gallery.next')}
+            >
+              <Icon name="chevron-forward" size={18} color={ON_ACCENT} />
+            </Pressable>
+          ) : null}
+        </>
+      ) : null}
+    </Animated.View>
+  )
+}
+
 function SingleGalleryItem({
   item,
   width,
@@ -450,31 +675,50 @@ function placeAt(slot: number, cell: number) {
 
 const aspectOf = (item: GalleryItem) => (item.width && item.height ? item.width / item.height : 1)
 
+const carouselHeightOf = (item: GalleryItem, width: number) =>
+  Math.round(width / clamp(aspectOf(item), CAROUSEL_MIN_ASPECT, CAROUSEL_MAX_ASPECT))
+
 // What a tile is known by while its picture is up in the viewer.
 const sourceOf = (item: GalleryItem) => `gallery:${item.id}`
 
-// What the gallery holds for `count` items: one item spans the full width with the add
-// button below; otherwise a plus takes the place after the last while its row has room, or a
-// spinner while new ones come in under full rows, where the add button stands below (and alone
-// with no items at all).
-function layoutOf(count: number, adding: boolean) {
+// What the gallery holds for `count` items: one item (or carousel mode) spans the full width
+// with the add button below; otherwise a plus takes the place after the last while its row
+// has room, or a spinner while new ones come in under full rows, where the add button stands
+// below (and alone with no items at all).
+function layoutOf(count: number, adding: boolean, carousel: boolean) {
   const single = count === 1
-  const button = single || count % COLUMNS === 0
-  const extra = !single && (!button || adding)
+  const button = single || carousel || count % COLUMNS === 0
+  const extra = !single && !carousel && (!button || adding)
   return { single, button, extra, cells: count + (extra ? 1 : 0) }
 }
 
 // Where the items sit in the window, given the grid's corner there, each with the group's
 // rounding on the corners it fills; null for one off the screen.
-function placesOf(list: GalleryItem[], at: { x: number; y: number }, width: number, cell: number, adding = false) {
+function placesOf(
+  list: GalleryItem[],
+  at: { x: number; y: number },
+  width: number,
+  cell: number,
+  adding = false,
+  mode: 'grid' | 'carousel' = 'grid',
+  active = 0
+) {
   const window = Dimensions.get('window')
+  const { radius, continuous } = GROUP_CORNERS
   if (list.length === 1) {
     const box = { x: at.x, y: at.y, width, height: width / aspectOf(list[0]) }
     const shown = box.x + box.width > 0 && box.y + box.height > 0 && box.x < window.width && box.y < window.height
-    const { radius, continuous } = GROUP_CORNERS
     return [shown ? originOf(box, { topLeft: radius, topRight: radius, bottomRight: 0, bottomLeft: 0, continuous }) : null]
   }
-  const { button, cells } = layoutOf(list.length, adding)
+  if (mode === 'carousel') {
+    const shownItem = list[active]
+    if (!shownItem) return list.map(() => null)
+    const box = { x: at.x, y: at.y, width, height: carouselHeightOf(shownItem, width) }
+    const shown = box.x + box.width > 0 && box.y + box.height > 0 && box.x < window.width && box.y < window.height
+    const origin = shown ? originOf(box, { topLeft: radius, topRight: radius, bottomRight: 0, bottomLeft: 0, continuous }) : null
+    return list.map((_, slot) => (slot === active ? origin : null))
+  }
+  const { button, cells } = layoutOf(list.length, adding, false)
   return list.map((_, slot) => {
     const place = placeAt(slot, cell)
     const box = { x: at.x + place.x, y: at.y + place.y, width: cell, height: cell }
@@ -508,9 +752,38 @@ const createStyles = (colors: Colors) =>
     // Every place is laid out from the grid's corner, the tiles by a transform, so a lifted
     // one moves on the UI thread and the rest slide aside by springs.
     cell: { position: 'absolute', left: 0, top: 0, overflow: 'hidden', backgroundColor: colors.surfaceRaised },
+    carouselWrap: { width: '100%', overflow: 'hidden', backgroundColor: colors.surfaceRaised },
     single: { overflow: 'hidden', backgroundColor: colors.surfaceRaised },
     hidden: { opacity: 0 },
     fill: { width: '100%', height: '100%' },
+    counter: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 10,
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    },
+    counterText: {
+      color: ON_ACCENT,
+      fontSize: 12,
+      fontWeight: '600',
+      fontVariant: ['tabular-nums'],
+    },
+    arrow: {
+      position: 'absolute',
+      top: '50%',
+      marginTop: -16,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    },
+    arrowLeft: { left: 10 },
+    arrowRight: { right: 10 },
     plusInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     // As tall as a row of tiles once the width is known; about that before.
     empty: { minHeight: 112, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12 },

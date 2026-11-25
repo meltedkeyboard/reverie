@@ -21,6 +21,7 @@ export type SettingsSection =
   | 'language'
   | 'continue'
   | 'archive'
+  | 'gallery'
   | 'private'
   | 'memory'
   | 'personas'

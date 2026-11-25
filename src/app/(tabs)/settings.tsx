@@ -19,6 +19,7 @@ import { Icon } from '@/components/visuals/Icon'
 import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
+import { setGalleryLayout, useGalleryLayout, type GalleryLayout } from '@/db/prefs/galleryLook'
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/prefs/continue'
 import { isDirectionEnabled, isPersonasEnabled, setDirectionEnabled, setPersonasEnabled } from '@/db/prefs/features'
 import { isHapticsEnabled, isStreamHapticsEnabled, isSuggestionHapticsEnabled, setHapticsEnabled, setStreamHapticsEnabled, setSuggestionHapticsEnabled } from '@/db/prefs/haptics'
@@ -138,6 +139,15 @@ export default function SettingsScreen() {
     { value: 'visit', label: t('settings.continueByVisit') },
     { value: 'message', label: t('settings.continueByMessage') },
   ]
+  const GALLERY_LAYOUT_OPTIONS: { value: GalleryLayout; label: string }[] = [
+    { value: 'grid', label: t('settings.galleryGrid') },
+    { value: 'carousel', label: t('settings.galleryCarousel') },
+  ]
+  const galleryLayout = useGalleryLayout()
+  const pickGalleryLayout = (next: GalleryLayout) => {
+    selectionAsync()
+    setGalleryLayout(db, next)
+  }
   const LANGUAGE_OPTIONS: { value: LocalePreference; label: string }[] = [
     { value: 'system', label: t('language.system') },
     { value: 'ru', label: t('language.ru') },
@@ -401,6 +411,17 @@ export default function SettingsScreen() {
   const archiveRow = (
     <ListSection footer={t('archive.settingsNote')}>
       <LinkCell label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
+    </ListSection>
+  )
+
+  const galleryRow = (
+    <ListSection footer={t('settings.galleryLayoutNote')}>
+      <SegmentCell
+        label={t('settings.galleryLayout')}
+        options={GALLERY_LAYOUT_OPTIONS}
+        value={galleryLayout}
+        onChange={pickGalleryLayout}
+      />
     </ListSection>
   )
 
@@ -765,6 +786,15 @@ export default function SettingsScreen() {
           <NativeLinkRow label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
         </NativeSection>
 
+        <NativeSection id="gallery" footer={t('settings.galleryLayoutNote')}>
+          <NativeSegmentRow
+            label={t('settings.galleryLayout')}
+            options={GALLERY_LAYOUT_OPTIONS}
+            value={galleryLayout}
+            onChange={pickGalleryLayout}
+          />
+        </NativeSection>
+
         <NativeSection id="private" title={t('settings.chats')} footer={t('settings.privateButtonNote')}>
           {toggle(null, t('settings.privateButton'), privateButton, togglePrivateButton)}
         </NativeSection>
@@ -942,6 +972,7 @@ export default function SettingsScreen() {
           {block('language', language)}
           {block('continue', continueRows)}
           {block('archive', archiveRow)}
+          {block('gallery', galleryRow)}
           {block('private', privateRow)}
           {block('memory', memoryRows)}
           {block('personas', personasRow)}
