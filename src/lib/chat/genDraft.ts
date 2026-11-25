@@ -8,7 +8,7 @@ import type { GenCastMember } from '@/lib/chat/room/roomGen'
 // room when the description names them. A saved character's generators can also take
 // pictures from its gallery.
 export type GenDraft = { target: string } & (
-  | { kind: 'prompt'; name: string; characterId: number | null; currentPrompt: string; onApply: (prompt: string) => void }
+  | { kind: 'prompt'; name: string; characterId: number | null; currentPrompt: string; currentGreeting: string; onApply: (prompt: string) => void }
   | { kind: 'greeting'; name: string; characterId: number | null; systemPrompt: string; currentGreeting: string; onApply: (greeting: string) => void }
   | { kind: 'persona'; name: string; currentDescription: string; onApply: (description: string) => void }
   | { kind: 'scenario'; cast: GenCastMember[]; currentScenario: string; onApply: (scenario: string) => void }

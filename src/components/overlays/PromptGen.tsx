@@ -12,34 +12,43 @@ type Props = {
   name: string
   characterId: number | null
   currentPrompt: string
+  currentGreeting: string
   onApply: (prompt: string) => void
 }
+
+type PromptMode = 'free' | 'form' | 'greeting'
 
 const IDEA_KEYS = ['promptGen.idea1', 'promptGen.idea2', 'promptGen.idea3', 'promptGen.idea4']
 const TWEAK_KEYS = ['promptGen.tweakShorter', 'promptGen.tweakLonger', 'promptGen.tweakSpeech', 'promptGen.tweakVivid']
 
-// The system prompt written from a description, or the one there is rewritten.
-export function PromptGen({ name, characterId, currentPrompt, onApply }: Props) {
+// The system prompt written from a description, questionnaire or greeting, or the one
+// there is rewritten.
+export function PromptGen({ name, characterId, currentPrompt, currentGreeting, onApply }: Props) {
   const { t, locale } = useTranslation()
   const hasCurrent = currentPrompt.trim().length > 0
+  const hasGreeting = currentGreeting.trim().length > 0
   // A character that already has a prompt most likely wants that prompt improved, not
-  // replaced from scratch.
+  // replaced from scratch; one with only a greeting likely wants the prompt built around it.
   const [improve, setImprove] = useGenInput('improve', hasCurrent)
   const [description, setDescription] = useGenInput('description', '')
+  const [customGreeting, setCustomGreeting] = useGenInput('customGreeting', false)
+  const [greetingText, setGreetingText] = useGenInput('greetingText', '')
+  const [greetingNotes, setGreetingNotes] = useGenInput('greetingNotes', '')
   const [length, setLength] = useGenInput<PromptLength>('length', 'medium')
   const [images, setImages] = useGenInput<MessageImage[]>('images', [])
-  // The free description and the questionnaire keep what was typed in each while the user
-  // switches between them.
-  const [mode, setMode] = useGenInput<'free' | 'form'>('mode', 'free')
+  // Each mode keeps what was typed in it while the user switches between them.
+  const [mode, setMode] = useGenInput<PromptMode>('mode', !hasCurrent && hasGreeting ? 'greeting' : 'free')
   const [form, setForm] = useGenInput<PromptFormValues>('form', {})
 
   const improving = hasCurrent && improve
-  // An improvement edits the prompt there is, so the questionnaire is only for a new one.
+  // An improvement edits the prompt there is, so creation modes apply only to a new one.
   const fromForm = !improving && mode === 'form'
-  const request = fromForm ? formDescription(form, t) : description
+  const fromGreeting = !improving && mode === 'greeting'
+  const activeGreeting = customGreeting ? greetingText : currentGreeting
+  const request = fromForm ? formDescription(form, t) : fromGreeting ? greetingNotes : description
 
-  // Improve or write anew, the description or the questionnaire, then the settings of the
-  // request in one group.
+  // Improve or write anew, the description, questionnaire or greeting, then the settings
+  // of the request in one group.
   const compose = (thinkingCell: React.ReactNode) => (
     <>
       <GenSection>
@@ -50,6 +59,7 @@ export function PromptGen({ name, characterId, currentPrompt, onApply }: Props) 
             options={[
               { value: 'free', label: t('promptGen.modeFree') },
               { value: 'form', label: t('promptGen.modeForm') },
+              { value: 'greeting', label: t('promptGen.modeGreeting') },
             ]}
             value={mode}
             onChange={setMode}
@@ -59,6 +69,38 @@ export function PromptGen({ name, characterId, currentPrompt, onApply }: Props) 
 
       {fromForm ? (
         <PromptForm value={form} onChange={setForm} />
+      ) : fromGreeting ? (
+        <>
+          <GenSection
+            footer={
+              customGreeting
+                ? undefined
+                : hasGreeting
+                  ? t('promptGen.greetingFromEditorHint')
+                  : [{ text: t('promptGen.noGreetingHint'), danger: true }]
+            }
+          >
+            <GenSwitch label={t('promptGen.customGreeting')} value={customGreeting} onValueChange={setCustomGreeting} />
+          </GenSection>
+          {customGreeting ? (
+            <GenSection header={t('promptGen.greetingLabel')} footer={t('promptGen.greetingHint')}>
+              <GenArea
+                value={greetingText}
+                onChangeText={setGreetingText}
+                placeholder={t('editor.greetingPlaceholder')}
+                minHeight={110}
+              />
+            </GenSection>
+          ) : null}
+          <GenSection header={t('promptGen.greetingNotesLabel')} footer={t('promptGen.greetingNotesHint')}>
+            <GenArea
+              value={greetingNotes}
+              onChangeText={setGreetingNotes}
+              placeholder={t('promptGen.greetingNotesPlaceholder')}
+              minHeight={66}
+            />
+          </GenSection>
+        </>
       ) : (
         <GenSection
           header={improving ? t('promptGen.changesLabel') : t('promptGen.descriptionLabel')}
@@ -109,11 +151,19 @@ export function PromptGen({ name, characterId, currentPrompt, onApply }: Props) 
       resultLabel={t('editor.systemPromptLabel')}
       current={currentPrompt}
       compose={compose}
-      canGenerate={improving || request.trim().length > 0 || images.length > 0}
+      canGenerate={improving || (fromGreeting ? activeGreeting.trim().length > 0 : request.trim().length > 0 || images.length > 0)}
       generateLabel={improving ? t('promptGen.improve') : t('promptGen.generate')}
       build={(revision) =>
         buildPromptMessages(
-          { description: request, name, base: improving ? currentPrompt : null, length, locale, images },
+          {
+            description: request,
+            name,
+            base: improving ? currentPrompt : null,
+            greeting: fromGreeting ? activeGreeting : null,
+            length,
+            locale,
+            images,
+          },
           revision
         )
       }

@@ -40,7 +40,7 @@ export default function GenerateScreen() {
   return (
     <GenSessionContext.Provider value={session}>
       {draft.kind === 'prompt' ? (
-        <PromptGen key={round} name={draft.name} characterId={draft.characterId} currentPrompt={draft.currentPrompt} onApply={draft.onApply} />
+        <PromptGen key={round} name={draft.name} characterId={draft.characterId} currentPrompt={draft.currentPrompt} currentGreeting={draft.currentGreeting} onApply={draft.onApply} />
       ) : draft.kind === 'greeting' ? (
         <GreetingGen key={round} name={draft.name} characterId={draft.characterId} systemPrompt={draft.systemPrompt} currentGreeting={draft.currentGreeting} onApply={draft.onApply} />
       ) : draft.kind === 'persona' ? (

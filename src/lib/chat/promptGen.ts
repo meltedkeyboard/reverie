@@ -9,11 +9,13 @@ export type PromptLength = 'short' | 'medium' | 'long'
 
 export type PromptGenInput = {
   // In 'improve' mode this is the list of requested changes and may be empty. From the
-  // questionnaire it is lines of "Field: value".
+  // questionnaire it is lines of "Field: value", and from a greeting it is optional wishes.
   description: string
   name: string
   // The prompt already in the editor; set only in 'improve' mode.
   base: string | null
+  // Opening message to reverse-engineer the character dossier and writing style from.
+  greeting?: string | null
   length: PromptLength
   locale: Locale
   images?: MessageImage[]
@@ -29,7 +31,7 @@ const LENGTH_RULES: Record<PromptLength, string> = {
 // model given literary prose writes literary prose back, and an epithet gives it nothing
 // to act on. So the rules ask for a dossier of plain facts and behaviors, laid out as a
 // hand-written preset is.
-const DOSSIER_RULES = [
+const DOSSIER_CORE = [
   'Write it as a dossier the model can act on: short declarative sentences, one fact per line. No metaphors, no epithets, no atmosphere, no adjectives piled up, no narration about the character.',
   'State every trait as behavior. Not "a soul tempered by storms" but "You get angry fast and calm down just as fast. You never apologize first."',
   'Follow this order. The first four parts are plain lines without labels; the last three each get a plain label ending in a colon and a dash list under it. No Markdown headings.',
@@ -38,21 +40,44 @@ const DOSSIER_RULES = [
   '3. Personality: the main traits, each with how it shows; what excites them, what annoys them, their habits.',
   '4. The user: who the user is to the character, their shared history, how the character treats the user, what they do and never do with them. Call the user "the user".',
   '5. "Speech:" register, sentence length, slang, swearing or its absence, verbal habits, and sample lines in quotes, each on its own dash line.',
+]
+
+const DOSSIER_RULES = [
+  ...DOSSIER_CORE,
   '6. "Roleplay formatting:" actions, narration and thoughts in *asterisks*, spoken dialogue in plain text without asterisks; mix actions and dialogue instead of grouping them into blocks; show emotions through actions rather than naming them; no Markdown or lists in replies. End it with a short example reply that alternates *actions* and dialogue.',
   '7. "Rules:" short imperative lines on how to behave in the chat, fitting this character (for example: react before answering, vary sentence length, never speak or act for the user).',
 ].join('\n')
 
+// Greeting mode keeps the plain dossier layout, except formatting and pacing follow how the
+// greeting itself is written instead of forcing a single default markup.
+const GREETING_DOSSIER_RULES = [
+  ...DOSSIER_CORE,
+  '6. "Roleplay formatting:" match the formatting, narrative POV (1st or 3rd person), tense, action vs dialogue markup (such as *asterisks*, plain prose with dialogue dashes/quotes, or pure chat messages without stage directions), paragraph density and pacing of the opening greeting. Only fall back to *actions* and plain dialogue if the greeting shows no distinct format. End it with a short example reply written in that exact style and formatting.',
+  '7. "Rules:" short imperative lines on how to behave in the chat so every reply preserves the greeting\'s voice, rhythm, relationship tension and style (for example: react before answering, keep sentence pacing, never speak or act for the user).',
+].join('\n')
+
 function systemRules(input: PromptGenInput) {
   const hasImages = (input.images?.length ?? 0) > 0
+  const hasGreeting = Boolean(input.greeting?.trim())
   return [
-    'You write system prompts for roleplay AI characters in a chat app.',
+    hasGreeting
+      ? 'You write system prompts for roleplay AI characters in a chat app, building a character dossier tailored to the character\'s opening greeting.'
+      : 'You write system prompts for roleplay AI characters in a chat app.',
     'The prompt is addressed to the model in the second person ("You are ...") and defines the character the model plays.',
-    DOSSIER_RULES,
+    hasGreeting ? GREETING_DOSSIER_RULES : DOSSIER_RULES,
     'Do not add rules about being an AI or safety disclaimers.',
     input.name.trim()
       ? `The character's name is ${input.name.trim()}.`
-      : 'If no name is given, invent one that fits the character.',
-    'Every fact the user gives is fixed: keep it exactly. Fill whatever is left out with plausible facts that fit.',
+      : 'If no name is given and none appears in the greeting, invent one that fits the character.',
+    hasGreeting
+      ? [
+          'Read the opening greeting closely and fit the whole dossier around it:',
+          '- Style and prose: analyze sentence rhythm, vocabulary register, formality, punctuation habits, expressiveness or restraint, POV, tense, and how actions and dialogue are formatted. Encode those into "Speech:", "Roleplay formatting:" and "Rules:" so later replies sound written by the exact same character and style.',
+          '- Character clues: extract explicit facts and subtle cues about identity, setting, occupation, appearance, habits, current situation, and how the character treats the user. Keep all fixed details from the greeting and any extra notes; invent cohesive dossier facts where details are unstated.',
+          '- Fresh examples: write new sample lines under "Speech:" and a fresh example reply under "Roleplay formatting:" in the same voice and style rather than copying the greeting verbatim.',
+          '- Keep the dossier lines themselves plain, concrete and declarative even if the greeting is lyrical, archaic or stylized; put the stylistic flavor into the speech/formatting rules, sample lines and example reply.',
+        ].join('\n')
+      : 'Every fact the user gives is fixed: keep it exactly. Fill whatever is left out with plausible facts that fit.',
     hasImages
       ? [
           'Reference images are attached to guide the character creation.',
@@ -148,7 +173,13 @@ const IMPROVE_DEFAULT =
 // resends the latest draft, not the whole chain of drafts, so a long back-and-forth doesn't
 // eat into the model's context.
 export function buildPromptMessages(input: PromptGenInput, revision?: { draft: string; note: string }): ChatTurn[] {
-  if (revision) return buildEditMessages('prompt', revision.draft, revision.note, input.images)
+  const greeting = input.greeting?.trim() ?? ''
+  if (revision) {
+    const context = greeting
+      ? { facts: `Reference opening greeting whose voice, characterization and formatting style should be kept:\n\n${greeting}` }
+      : undefined
+    return buildEditMessages('prompt', revision.draft, revision.note, input.images, context)
+  }
   if (input.base !== null)
     return buildEditMessages('prompt', input.base, input.description.trim() || IMPROVE_DEFAULT, input.images)
 
@@ -156,7 +187,11 @@ export function buildPromptMessages(input: PromptGenInput, revision?: { draft: s
   const fallback = input.images?.length
     ? 'Create a character system prompt based on the attached image(s).'
     : ''
-  const userText = text || fallback
+  const userText = greeting
+    ? text
+      ? `Opening greeting:\n\n${greeting}\n\nAdditional wishes and facts:\n${text}`
+      : `Opening greeting:\n\n${greeting}`
+    : text || fallback
 
   let content: string | ContentPart[] = userText
   if (input.images && input.images.length > 0) {

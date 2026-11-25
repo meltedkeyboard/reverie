@@ -412,7 +412,15 @@ export default function CharacterEditorScreen() {
 
   // The generators open as a form sheet of the stack, app/generate.tsx.
   const openPromptGen = () => {
-    setGenDraft({ kind: 'prompt', target: `character:${id}`, name, characterId: isNew ? null : Number(id), currentPrompt: systemPrompt, onApply: applyGenerated })
+    setGenDraft({
+      kind: 'prompt',
+      target: `character:${id}`,
+      name,
+      characterId: isNew ? null : Number(id),
+      currentPrompt: systemPrompt,
+      currentGreeting: greeting,
+      onApply: applyGenerated,
+    })
     router.push('/generate')
   }
 
