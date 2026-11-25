@@ -1,6 +1,6 @@
 import { Image, useImage, type ImageRef } from 'expo-image'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Dimensions, PixelRatio, StyleSheet, Text, View, type ViewInstance } from 'react-native'
+import { ActivityIndicator, Dimensions, PixelRatio, Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
@@ -36,11 +36,12 @@ const SETTLE = spring(0.35, 0.9)
 
 // The pictures and videos of a character's profile, in a grid the user puts in order: a tap
 // opens one in the viewer and swipes through all of them from there, where the bin deletes it,
-// and a long press lifts one to move it. A plus takes the place after the last one while its
-// row has room; under full rows the add button stands below the grid instead, so a plus never
-// opens a row of its own, and with nothing in the gallery a hint stands where the first row
-// will. `onDragging` says while a tile is in the air, for the page to hold its scroll still.
-// `system` draws the header as the system's list beside it does.
+// and a long press lifts one to move it. A single item spans the full grid width at its own
+// aspect ratio with the add button below; from two items onward a plus takes the place after
+// the last while its row has room, under full rows the add button stands below the grid instead,
+// and with nothing in the gallery a hint stands where the first row will. `onDragging` says
+// while a tile is in the air, for the page to hold its scroll still. `system` draws the header
+// as the system's list beside it does.
 export function ProfileGallery({
   characterId,
   system = false,
@@ -81,28 +82,29 @@ export function ProfileGallery({
   const gridAt = useRef<{ x: number; y: number } | null>(null)
 
   // Read when the viewer or a drop comes back, by which time the list may have changed.
-  const latest = useRef({ items, cell, remove, reorder, onDragging })
-  latest.current = { items, cell, remove, reorder, onDragging }
+  const latest = useRef({ items, width, cell, remove, reorder, onDragging })
+  latest.current = { items, width, cell, remove, reorder, onDragging }
 
   // The viewer's bin: the item goes at once, the tiles after it close up under the viewer, and
   // the viewer is told where the ones left now sit, to land the one it shows in its own.
   const removeFromViewer = (index: number) => {
-    const { items, cell, remove } = latest.current
+    const { items, width, cell, remove } = latest.current
     const item = items[index]
     if (!item) return []
     remove(item)
     const at = gridAt.current
-    return at && cell ? placesOf(items.length - 1, at, cell) : []
+    const left = items.filter((_, i) => i !== index)
+    return at && width && cell ? placesOf(left, at, width, cell) : []
   }
 
   const open = (id: number) => {
     const index = Math.max(0, items.findIndex((item) => item.id === id))
     const images = items.map((item) => ({ uri: galleryUri(item.file), aspect: aspectOf(item), preview: previews.current.get(item.id) ?? null }))
     const node = grid.current
-    if (!node || !cell) return openViewer(images, index, [], [], removeFromViewer)
+    if (!node || !width || !cell) return openViewer(images, index, [], [], removeFromViewer)
     node.measureInWindow((x, y) => {
       gridAt.current = { x, y }
-      const origins = placesOf(items.length, { x, y }, cell, adding)
+      const origins = placesOf(items, { x, y }, width, cell, adding)
       openViewer(images, index, origins, items.map((item, i) => (origins[i] ? sourceOf(item) : null)), removeFromViewer)
     })
   }
@@ -121,9 +123,13 @@ export function ProfileGallery({
     if (from !== to) latest.current.reorder(from, to)
   }, [])
 
-  const { button, extra, cells } = layoutOf(items.length, adding)
+  const { single, button, extra, cells } = layoutOf(items.length, adding)
   const rows = Math.ceil(cells / COLUMNS)
-  const height = cell ? rows * cell + (rows - 1) * GAP : 0
+  const height = !width
+    ? 0
+    : single
+      ? width / aspectOf(items[0])
+      : rows * cell + (rows - 1) * GAP
   const next = placeAt(items.length, cell)
   const nextStyle = [styles.cell, { width: cell, height: cell, left: next.x, top: next.y }]
 
@@ -131,8 +137,19 @@ export function ProfileGallery({
     <ListSection header={t('gallery.title')} plainHeader={system}>
       {cells ? (
         <View ref={grid} style={{ height }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-          {cell
-            ? items.map((item) => (
+          {width ? (
+            single ? (
+              <SingleGalleryItem
+                item={items[0]}
+                width={width}
+                height={height}
+                onPreview={setPreview}
+                onOpen={() => open(items[0].id)}
+                onRemove={() => confirmRemove(items[0])}
+                onVideoSize={(size) => measured(items[0], size.width, size.height)}
+              />
+            ) : (
+              items.map((item) => (
                 <GalleryTile
                   key={item.id}
                   item={item}
@@ -147,7 +164,8 @@ export function ProfileGallery({
                   onVideoSize={(size) => measured(item, size.width, size.height)}
                 />
               ))
-            : null}
+            )
+          ) : null}
           {cell && extra ? (
             button ? (
               // New ones coming in under full rows: a row of their own is starting anyway.
@@ -175,7 +193,7 @@ export function ProfileGallery({
           <Text style={styles.emptyText}>{t('gallery.empty')}</Text>
         </View>
       )}
-      {button ? <SourceCell label={t('gallery.add')} onPick={add} color={color} /> : null}
+      {button ? <SourceCell label={t('gallery.add')} onPick={add} color={color} loading={single && adding} /> : null}
     </ListSection>
   )
 }
@@ -196,7 +214,6 @@ type TileProps = {
 function GalleryTile({ item, cell, count, slots, onPreview, onOpen, onRemove, onDragging, onDrop, onVideoSize }: TileProps) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
-  const uri = galleryUri(item.file)
   const video = isGalleryVideo(item.file)
   const id = item.id
   // Away while its picture is up in the viewer, which puts it back here on closing.
@@ -302,44 +319,114 @@ function GalleryTile({ item, cell, count, slots, onPreview, onOpen, onRemove, on
         }}
         style={[styles.cell, { width: cell, height: cell }, style]}
       >
-        {isGalleryStill(item.file) ? (
-          <StillPicture item={item} uri={uri} side={Math.ceil(cell * PixelRatio.get() * LIFTED_SCALE)} onPreview={onPreview} />
-        ) : (
-          // A video stands still on its first frame here; it plays in the viewer.
-          <Picture
-            uri={uri}
-            style={styles.fill}
-            paused={video}
-            transition={150}
-            onVideoSize={video && !(item.width && item.height) ? onVideoSize : undefined}
-          />
-        )}
-        {video ? (
-          <View style={styles.play} pointerEvents="none">
-            <Icon name="play" size={13} color={ON_ACCENT} />
-          </View>
-        ) : null}
+        <GalleryMedia
+          item={item}
+          limits={previewSize(item, Math.ceil(cell * PixelRatio.get() * LIFTED_SCALE))}
+          onPreview={onPreview}
+          onVideoSize={onVideoSize}
+        />
       </Animated.View>
     </GestureDetector>
   )
 }
 
-// A still picture decoded once, off the main thread, at about the size of its tile, rather than
+function SingleGalleryItem({
+  item,
+  width,
+  height,
+  onPreview,
+  onOpen,
+  onRemove,
+  onVideoSize,
+}: {
+  item: GalleryItem
+  width: number
+  height: number
+  onPreview: (id: number, preview: ImageRef | null) => void
+  onOpen: () => void
+  onRemove: () => void
+  onVideoSize: (size: { width: number; height: number }) => void
+}) {
+  const styles = useStyles(createStyles)
+  const { t } = useTranslation()
+  const video = isGalleryVideo(item.file)
+  const lifted = useLifted(sourceOf(item))
+  const scale = PixelRatio.get()
+  const limits = {
+    maxWidth: Math.ceil(width * scale),
+    maxHeight: Math.ceil((item.width && item.height ? height : width * 2) * scale),
+  }
+
+  return (
+    <Pressable
+      onPress={onOpen}
+      accessible
+      accessibilityRole="imagebutton"
+      accessibilityLabel={t(video ? 'gallery.openVideo' : 'gallery.openPicture')}
+      accessibilityActions={[{ name: 'delete', label: t('common.delete') }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === 'delete') onRemove()
+      }}
+      style={[styles.single, { width, height }, lifted && styles.hidden]}
+    >
+      <GalleryMedia item={item} limits={limits} onPreview={onPreview} onVideoSize={onVideoSize} />
+    </Pressable>
+  )
+}
+
+function GalleryMedia({
+  item,
+  limits,
+  onPreview,
+  onVideoSize,
+}: {
+  item: GalleryItem
+  limits: { maxWidth: number; maxHeight: number }
+  onPreview: (id: number, preview: ImageRef | null) => void
+  onVideoSize: (size: { width: number; height: number }) => void
+}) {
+  const styles = useStyles(createStyles)
+  const uri = galleryUri(item.file)
+  const video = isGalleryVideo(item.file)
+  return (
+    <>
+      {isGalleryStill(item.file) ? (
+        <StillPicture item={item} uri={uri} limits={limits} onPreview={onPreview} />
+      ) : (
+        // A video stands still on its first frame here; it plays in the viewer.
+        <Picture
+          uri={uri}
+          style={styles.fill}
+          paused={video}
+          transition={150}
+          onVideoSize={video && !(item.width && item.height) ? onVideoSize : undefined}
+        />
+      )}
+      {video ? (
+        <View style={styles.play} pointerEvents="none">
+          <Icon name="play" size={13} color={ON_ACCENT} />
+        </View>
+      ) : null}
+    </>
+  )
+}
+
+// A still picture decoded once, off the main thread, at about its display size, rather than
 // read whole from its file and shrunk by every view that shows it. The decoded picture is handed
 // up for the viewer to open with.
 function StillPicture({
   item,
   uri,
-  side,
+  limits,
   onPreview,
 }: {
   item: GalleryItem
   uri: string
-  side: number
+  limits: { maxWidth: number; maxHeight: number }
   onPreview: (id: number, preview: ImageRef | null) => void
 }) {
   const styles = useStyles(createStyles)
-  const preview = useImage(uri, { ...previewSize(item, side), onError: (err) => console.warn('Gallery picture not loaded', err) })
+  const preview = useImage(uri, { ...limits, onError: (err) => console.warn('Gallery picture not loaded', err) })
   const id = item.id
   useEffect(() => {
     onPreview(id, preview)
@@ -366,21 +453,29 @@ const aspectOf = (item: GalleryItem) => (item.width && item.height ? item.width 
 // What a tile is known by while its picture is up in the viewer.
 const sourceOf = (item: GalleryItem) => `gallery:${item.id}`
 
-// What the grid holds for `count` items: a place after the last for the plus while its row has
-// room, or for a spinner while new ones come in under full rows, where the add button stands
-// below the grid (and alone with no items at all); and so how many places it has.
+// What the gallery holds for `count` items: one item spans the full width with the add
+// button below; otherwise a plus takes the place after the last while its row has room, or a
+// spinner while new ones come in under full rows, where the add button stands below (and alone
+// with no items at all).
 function layoutOf(count: number, adding: boolean) {
-  const button = count % COLUMNS === 0
-  const extra = !button || adding
-  return { button, extra, cells: count + (extra ? 1 : 0) }
+  const single = count === 1
+  const button = single || count % COLUMNS === 0
+  const extra = !single && (!button || adding)
+  return { single, button, extra, cells: count + (extra ? 1 : 0) }
 }
 
-// Where the first `count` tiles sit in the window, given the grid's corner there, each with
-// the group's rounding on the corners it fills; null for one off the screen.
-function placesOf(count: number, at: { x: number; y: number }, cell: number, adding = false) {
+// Where the items sit in the window, given the grid's corner there, each with the group's
+// rounding on the corners it fills; null for one off the screen.
+function placesOf(list: GalleryItem[], at: { x: number; y: number }, width: number, cell: number, adding = false) {
   const window = Dimensions.get('window')
-  const { button, cells } = layoutOf(count, adding)
-  return Array.from({ length: count }, (_, slot) => {
+  if (list.length === 1) {
+    const box = { x: at.x, y: at.y, width, height: width / aspectOf(list[0]) }
+    const shown = box.x + box.width > 0 && box.y + box.height > 0 && box.x < window.width && box.y < window.height
+    const { radius, continuous } = GROUP_CORNERS
+    return [shown ? originOf(box, { topLeft: radius, topRight: radius, bottomRight: 0, bottomLeft: 0, continuous }) : null]
+  }
+  const { button, cells } = layoutOf(list.length, adding)
+  return list.map((_, slot) => {
     const place = placeAt(slot, cell)
     const box = { x: at.x + place.x, y: at.y + place.y, width: cell, height: cell }
     const shown = box.x + cell > 0 && box.y + cell > 0 && box.x < window.width && box.y < window.height
@@ -413,6 +508,8 @@ const createStyles = (colors: Colors) =>
     // Every place is laid out from the grid's corner, the tiles by a transform, so a lifted
     // one moves on the UI thread and the rest slide aside by springs.
     cell: { position: 'absolute', left: 0, top: 0, overflow: 'hidden', backgroundColor: colors.surfaceRaised },
+    single: { overflow: 'hidden', backgroundColor: colors.surfaceRaised },
+    hidden: { opacity: 0 },
     fill: { width: '100%', height: '100%' },
     plusInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     // As tall as a row of tiles once the width is known; about that before.

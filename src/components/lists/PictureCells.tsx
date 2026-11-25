@@ -53,11 +53,13 @@ export function SourceCell({
   onPick,
   onGallery,
   color,
+  loading,
 }: {
   label: string
   onPick: (source: ImageSource) => void
   onGallery?: () => void
   color?: string
+  loading?: boolean
 }) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
@@ -70,7 +72,7 @@ export function SourceCell({
   if (isWeb) {
     return (
       <>
-        <ButtonCell label={label} onPress={() => onPick('files')} unlit color={color} />
+        <ButtonCell label={label} onPress={() => onPick('files')} unlit color={color} loading={loading} />
         {onGallery ? <ButtonCell label={t('gallery.pickFrom')} onPress={onGallery} unlit color={color} /> : null}
       </>
     )
@@ -107,7 +109,7 @@ export function SourceCell({
         />
       </View>
       <Animated.View style={[styles.cover, buttonStyle]} pointerEvents={open ? 'none' : 'auto'}>
-        <ButtonCell label={label} onPress={() => toggle(true)} unlit color={color} />
+        <ButtonCell label={label} onPress={() => toggle(true)} unlit color={color} loading={loading} />
       </Animated.View>
     </View>
   )
