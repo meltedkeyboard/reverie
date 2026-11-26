@@ -482,20 +482,26 @@ export function Composer({
   const accessoryH = useSharedValue(0)
   const expandedRef = useRef(expanded)
   expandedRef.current = expanded
-  const baseBarH = useRef(BAR_PAD_TOP + BAR_PAD_BOTTOM + insets.bottom + 2 * FIELD_PAD + SIDE)
+  const emptyBarH = BAR_PAD_TOP + BAR_PAD_BOTTOM + insets.bottom + 2 * EDGE + SIDE
+  const baseBarH = useRef(emptyBarH)
+  const prevBottomInset = useRef(insets.bottom)
+  if (prevBottomInset.current !== insets.bottom) {
+    baseBarH.current += insets.bottom - prevBottomInset.current
+    prevBottomInset.current = insets.bottom
+  }
 
   useEffect(() => {
     if (pictured || editing || docked) return
     const contentExtra = suggesting
       ? ghostHeight > 0
-        ? Math.max(0, ghostHeight + 8 - 30)
+        ? Math.max(0, Math.min(INPUT_MAX_HEIGHT, ghostHeight + 8) - EMPTY_INPUT_HEIGHT)
         : 0
       : text
-        ? Math.max(0, inputH - 30)
+        ? Math.max(0, Math.min(INPUT_MAX_HEIGHT, inputH) - EMPTY_INPUT_HEIGHT)
         : 0
     const targetH = baseBarH.current + (expanded ? SIDE + 2 : 0) + contentExtra
     height.value = withTiming(targetH, { duration: 220, easing: Easing.out(Easing.cubic) })
-  }, [expanded, pictured, editing, docked, suggesting, ghostHeight, text, inputH, height])
+  }, [expanded, pictured, editing, docked, suggesting, ghostHeight, text, inputH, insets.bottom, height])
 
   useEffect(() => {
     if (accessory) return
@@ -509,7 +515,8 @@ export function Composer({
     if (top) top.value = h + accessoryH.value
     if (pictured || editing || docked) {
       height.value = h
-    } else if (!expandedRef.current && expandAnim.value === 0) {
+    } else if (!expandedRef.current && expandAnim.value === 0 && !textRef.current && !suggestingRef.current) {
+      // Only sample baseline height while empty; wrapped text/suggestions lay out before onTextLayout flips `expanded`.
       baseBarH.current = h
       height.value = h
     }
@@ -745,6 +752,8 @@ export function ComposerSwap({ id, children }: { id: string; children: React.Rea
 const swapStyle = { zIndex: 1 }
 
 const SIDE = 40
+const EMPTY_INPUT_HEIGHT = 30
+const INPUT_MAX_HEIGHT = 180
 const GHOST_MAX_HEIGHT = 164
 const GHOST_MAX_LINES = Math.floor(GHOST_MAX_HEIGHT / 22)
 const BAR_PAD_TOP = 8
@@ -835,9 +844,9 @@ const createStyles = (colors: Colors) =>
     measure: { position: 'absolute', top: 0, opacity: 0, fontSize: 17, lineHeight: 22 },
     placeholder: { position: 'absolute', right: 14, fontSize: 17, lineHeight: 22 },
     inputClip: { overflow: 'hidden' },
-    inputEmpty: { height: 30 },
+    inputEmpty: { height: EMPTY_INPUT_HEIGHT },
     input: {
-      maxHeight: 180,
+      maxHeight: INPUT_MAX_HEIGHT,
       color: colors.text,
       fontSize: 17,
       lineHeight: 22,
