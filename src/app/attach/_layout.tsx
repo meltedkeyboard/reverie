@@ -58,10 +58,11 @@ function AttachStack({ session }: { session: AttachSession | null }) {
           <Stack
             screenOptions={{
               headerShown: true,
+              headerShadowVisible: false,
               headerBackButtonDisplayMode: 'minimal',
-              ...(liquidGlass
-                ? undefined
-                : { headerShadowVisible: false, headerStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet } }),
+              // Keep the sheet header filled by its background color or chat backdrop without scroll blur.
+              headerStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet },
+              ...(liquidGlass ? { scrollEdgeEffects: { top: 'hidden' } } : undefined),
               headerTintColor: wallpaperColors?.accent ?? colors.accent,
               headerTitleStyle: { color: colors.text },
               contentStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet },

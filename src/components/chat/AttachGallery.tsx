@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { GalleryItem } from '@/db/gallery'
 import { useTranslation } from '@/i18n'
 import type { AttachSession } from '@/lib/chat/attachSession'
-import { isIOS } from '@/lib/core/platform'
 import { galleryMessageImage } from '@/lib/images/attachments'
 import { galleryUri } from '@/lib/images/gallery'
 import { alertError } from '@/lib/transfer/report'
@@ -96,7 +95,6 @@ export function AttachGalleryPicker({
     <View style={[styles.container, scrollStyle]} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       <ScrollView
         style={[styles.scroll, scrollStyle]}
-        contentInsetAdjustmentBehavior={isIOS ? 'automatic' : undefined}
         contentContainerStyle={{ paddingBottom: Math.max(76, insets.bottom + 68) }}
         showsVerticalScrollIndicator={false}
       >

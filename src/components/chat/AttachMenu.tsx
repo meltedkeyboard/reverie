@@ -481,7 +481,6 @@ export function AttachMenu({
       {isFill ? (
         <ScrollView
           style={[styles.scroll, scrollStyle]}
-          contentInsetAdjustmentBehavior={isIOS ? 'automatic' : undefined}
           contentContainerStyle={[styles.content, contentPadding]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -634,7 +633,6 @@ export function PersonaPicker({
     return (
       <ScrollView
         style={[styles.scroll, scrollStyle]}
-        contentInsetAdjustmentBehavior={isIOS ? 'automatic' : undefined}
         contentContainerStyle={[styles.content, styles.personaContent]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -679,7 +677,6 @@ export function PersonaPicker({
   return (
     <ScrollView
       style={[styles.scroll, scrollStyle]}
-      contentInsetAdjustmentBehavior={isIOS ? 'automatic' : undefined}
       contentContainerStyle={[styles.content, styles.personaContent]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
@@ -814,7 +811,6 @@ export function DirectionEditor({
   return (
     <ScrollView
       style={[styles.scroll, scrollStyle]}
-      contentInsetAdjustmentBehavior={isIOS ? 'automatic' : undefined}
       contentContainerStyle={[styles.content, styles.personaContent]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
