@@ -73,6 +73,11 @@ export async function readAvatarBase64(name: string, kind: ImageKind = 'avatars'
   return file.exists ? await file.base64() : null
 }
 
+export function avatarByteSize(name: string, kind: ImageKind = 'avatars') {
+  const file = imageFile(name, kind)
+  return file.exists ? (file.size ?? 1) : 0
+}
+
 export async function readAvatarBytes(name: string, kind: ImageKind = 'avatars') {
   const file = imageFile(name, kind)
   return file.exists ? await file.bytes() : null

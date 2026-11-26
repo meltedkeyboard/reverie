@@ -6,7 +6,7 @@ import { DEFAULT_MEMBER, DEFAULT_ROOM, insertRoom, ROOM_COLUMNS, type FloorMode 
 import { addServer, DEFAULT_SERVER, loadServers, loadSettings } from '@/db/prefs/settings'
 import { t } from '@/i18n'
 import { pickBackupFile } from '@/lib/transfer/pickBackup'
-import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/images/avatars'
+import { avatarByteSize, readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/images/avatars'
 import { isArchive, packArchive, unpackArchive } from '@/lib/transfer/backupArchive'
 import { addToGallery, type NewGalleryItem } from '@/db/gallery'
 import { loadDrafts, saveDrafts } from '@/db/drafts'
@@ -24,6 +24,41 @@ import { extensionOf } from '@/lib/images/media'
 // each chat's long memory and direction, and lorebooks. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
 const BACKUP_VERSION = 18
+
+export type BackupProgressStage = 'idle' | 'packing' | 'done'
+
+export type BackupProgress = {
+  active: boolean
+  stage: BackupProgressStage
+  progress: number
+}
+
+const LONG_MEDIA_BYTES = 15 * 1024 * 1024
+const LONG_FILE_COUNT = 30
+const LONG_MESSAGE_COUNT = 2000
+const LONG_ENTITY_COUNT = 100
+
+let currentBackupProgress: BackupProgress = { active: false, stage: 'idle', progress: 0 }
+let backupProgressTimer: ReturnType<typeof setTimeout> | undefined
+let backupRunId = 0
+const backupProgressListeners = new Set<() => void>()
+
+export function getBackupProgress(): BackupProgress {
+  return currentBackupProgress
+}
+
+export function subscribeBackupProgress(fn: () => void): () => void {
+  backupProgressListeners.add(fn)
+  return () => {
+    backupProgressListeners.delete(fn)
+  }
+}
+
+function setBackupProgress(next: BackupProgress) {
+  clearTimeout(backupProgressTimer)
+  currentBackupProgress = next
+  backupProgressListeners.forEach((fn) => fn())
+}
 
 type BackupCharacter = {
   id: number
@@ -345,9 +380,13 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
   const { baseUrl, model } = await loadSettings(db)
 
   // Every picture a character or a room points at, the originals too, once each.
-  const wanted = new Map<string, { kind: ImageKind; name: string }>()
+  const wanted = new Map<string, { kind: ImageKind; name: string; size: number }>()
   const want = (name: string | null, kind: ImageKind) => {
-    if (name) wanted.set(`${kind}/${name}`, { kind, name })
+    if (!name) return
+    const key = `${kind}/${name}`
+    if (wanted.has(key)) return
+    const size = avatarByteSize(name, kind)
+    if (size > 0) wanted.set(key, { kind, name, size })
   }
   for (const character of characters) {
     want(character.avatar, 'avatars')
@@ -370,25 +409,68 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       want(picture.moving ?? null, 'attachments')
     }
   }
-  const files: { path: string; bytes: Uint8Array }[] = []
-  for (const { kind, name } of wanted.values()) {
-    const bytes = await readAvatarBytes(name, kind)
-    if (bytes) files.push({ path: `${kind}/${name}`, bytes })
+
+  let mediaBytes = 0
+  for (const item of wanted.values()) mediaBytes += item.size
+  const jsonEntries = 1 + characters.length + rooms.length + chats.length + personas.length + lorebooks.length
+  const showProgress =
+    mediaBytes >= LONG_MEDIA_BYTES ||
+    wanted.size >= LONG_FILE_COUNT ||
+    messages.length >= LONG_MESSAGE_COUNT ||
+    jsonEntries >= LONG_ENTITY_COUNT
+
+  const runId = ++backupRunId
+  let lastPct = -1
+  if (showProgress) {
+    setBackupProgress({ active: true, stage: 'packing', progress: 0 })
+    // Yield one tick so the top pill enters immediately before heavy packing starts.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
   }
+
+  const files = [...wanted.values()].map(({ kind, name, size }) => ({
+    path: `${kind}/${name}`,
+    size,
+    read: () => readAvatarBytes(name, kind),
+  }))
 
   // The API key is left out on purpose: the file usually ends up in a cloud drive.
   const manifest = { app: 'reverie', version: BACKUP_VERSION, exportedAt: new Date().toISOString(), settings: { baseUrl, model } }
-  return packArchive({
-    manifest,
-    characters: characters as (typeof characters[number] & { name: string })[],
-    rooms: rooms as (typeof rooms[number] & { id: number; name: string })[],
-    roomMembers: roomMembers as { roomId: number }[],
-    chats: chats as { id: number; title: string | null }[],
-    messages: messages as unknown as { chatId: number }[],
-    personas,
-    lorebooks,
-    files,
-  })
+  try {
+    const zip = await packArchive(
+      {
+        manifest,
+        characters: characters as (typeof characters[number] & { name: string })[],
+        rooms: rooms as (typeof rooms[number] & { id: number; name: string })[],
+        roomMembers: roomMembers as { roomId: number }[],
+        chats: chats as { id: number; title: string | null }[],
+        messages: messages as unknown as { chatId: number }[],
+        personas,
+        lorebooks,
+        files,
+      },
+      showProgress
+        ? (ratio) => {
+            const clamped = Math.min(0.99, Math.max(0, ratio))
+            const pct = Math.round(clamped * 100)
+            if (pct === lastPct) return
+            lastPct = pct
+            setBackupProgress({ active: true, stage: 'packing', progress: clamped })
+          }
+        : undefined
+    )
+    if (showProgress) {
+      setBackupProgress({ active: true, stage: 'done', progress: 1 })
+      backupProgressTimer = setTimeout(() => {
+        if (backupRunId === runId) setBackupProgress({ active: false, stage: 'idle', progress: 0 })
+      }, 1600)
+    }
+    return zip
+  } catch (err) {
+    if (showProgress && backupRunId === runId) {
+      setBackupProgress({ active: false, stage: 'idle', progress: 0 })
+    }
+    throw err
+  }
 }
 
 // The gallery of every character that has one, in its order.

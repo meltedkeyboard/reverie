@@ -8,7 +8,7 @@ import { readAvatarBase64, removeAvatar, writeAvatarBase64, type ImageKind } fro
 // Picking and resizing work the same everywhere; only storage differs per platform. Avatars
 // and chat backgrounds are kept in separate folders.
 export type { ImageKind } from './avatarStore'
-export { avatarUri, persistAvatar, persistOriginal, removeAvatar, readAvatarBase64, readAvatarBytes, writeAvatarBase64, writeAvatarBytes, removeAllAvatars } from './avatarStore'
+export { avatarByteSize, avatarUri, persistAvatar, persistOriginal, removeAvatar, readAvatarBase64, readAvatarBytes, writeAvatarBase64, writeAvatarBytes, removeAllAvatars } from './avatarStore'
 
 const SIDE = 512
 

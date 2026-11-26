@@ -673,6 +673,8 @@
   "backup.personaDefault": "default",
   "backup.personaExists": "already here",
   "backup.personaNote": "Chats whose persona isn't ticked come without one. A persona already on this device isn't duplicated",
+  "backup.progressPacking": "Packing: {{pct}}%",
+  "backup.progressDone": "Backup ready",
   "format.today": "Today",
   "format.yesterday": "Yesterday",
   "sidebar.collapse": "Collapse sidebar",

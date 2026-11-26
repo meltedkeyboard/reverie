@@ -672,6 +672,8 @@
   "backup.personaDefault": "по умолчанию",
   "backup.personaExists": "уже есть",
   "backup.personaNote": "Чаты, чья персона не отмечена, придут без неё. Персона, которая уже есть на устройстве, не задублируется",
+  "backup.progressPacking": "Упаковка: {{pct}}%",
+  "backup.progressDone": "Бэкап готов",
   "format.today": "Сегодня",
   "format.yesterday": "Вчера",
   "sidebar.collapse": "Свернуть панель",

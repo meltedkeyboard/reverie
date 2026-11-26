@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate'
+import { strFromU8, strToU8, unzipSync, Zip, ZipDeflate, ZipPassThrough } from 'fflate'
 
 // A backup is a zip you can open on a computer:
 //   manifest.json            what and when, the server address
@@ -14,6 +14,13 @@ import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate'
 
 type WithId = { id: number }
 
+export type ArchiveFile = {
+  path: string
+  size?: number
+  bytes?: Uint8Array
+  read?: () => Promise<Uint8Array | null>
+}
+
 export type ArchiveParts = {
   manifest: object
   characters: (WithId & { name: string })[]
@@ -24,7 +31,7 @@ export type ArchiveParts = {
   personas: (WithId & { name: string })[]
   lorebooks: (WithId & { name: string })[]
   // Every picture by its path in the zip ("avatars/1.jpg").
-  files: { path: string; bytes: Uint8Array }[]
+  files: ArchiveFile[]
 }
 
 export type OpenedArchive = Omit<ArchiveParts, 'files' | 'manifest'> & {
@@ -45,18 +52,111 @@ function groupBy<T>(items: T[], key: (item: T) => number) {
   return groups
 }
 
-export function packArchive(parts: ArchiveParts) {
-  const files: Zippable = { 'manifest.json': json(parts.manifest) }
-  for (const character of parts.characters) files[`characters/${fileName(character.id, character.name)}`] = json(character)
+const MEDIA_CHUNK_BYTES = 512 * 1024
+const YIELD_INTERVAL_MS = 16
+
+const yieldTick = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+function concatChunks(chunks: Uint8Array[]) {
+  let total = 0
+  for (const chunk of chunks) total += chunk.length
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.length
+  }
+  return out
+}
+
+export async function packArchive(parts: ArchiveParts, onProgress?: (ratio: number) => void): Promise<Uint8Array> {
   const members = groupBy(parts.roomMembers, (m) => m.roomId)
-  for (const room of parts.rooms) files[`rooms/${fileName(room.id, room.name)}`] = json({ ...room, members: members.get(room.id) ?? [] })
   const messages = groupBy(parts.messages, (m) => m.chatId)
-  for (const chat of parts.chats) files[`chats/${fileName(chat.id, chat.title)}`] = json({ ...chat, messages: messages.get(chat.id) ?? [] })
-  for (const persona of parts.personas) files[`personas/${fileName(persona.id, persona.name)}`] = json(persona)
-  for (const book of parts.lorebooks) files[`lorebooks/${fileName(book.id, book.name)}`] = json(book)
+  const jsonEntries: { path: string; data: unknown }[] = [
+    { path: 'manifest.json', data: parts.manifest },
+    ...parts.characters.map((c) => ({ path: `characters/${fileName(c.id, c.name)}`, data: c })),
+    ...parts.rooms.map((r) => ({ path: `rooms/${fileName(r.id, r.name)}`, data: { ...r, members: members.get(r.id) ?? [] } })),
+    ...parts.chats.map((ch) => ({ path: `chats/${fileName(ch.id, ch.title)}`, data: { ...ch, messages: messages.get(ch.id) ?? [] } })),
+    ...parts.personas.map((p) => ({ path: `personas/${fileName(p.id, p.name)}`, data: p })),
+    ...parts.lorebooks.map((b) => ({ path: `lorebooks/${fileName(b.id, b.name)}`, data: b })),
+  ]
+
+  let mediaTotal = 0
+  for (const file of parts.files) mediaTotal += file.size ?? file.bytes?.length ?? 0
+  const estJsonBytes = Math.max(16384, jsonEntries.length * 4096 + parts.messages.length * 500)
+  const totalWeight = estJsonBytes + mediaTotal
+  const jsonShare = totalWeight > 0 ? estJsonBytes / totalWeight : 1
+
+  const chunks: Uint8Array[] = []
+  let zipError: unknown = null
+  let finished = false
+  let doneResolve: (() => void) | null = null
+  const donePromise = new Promise<void>((resolve) => {
+    doneResolve = resolve
+  })
+
+  const zip = new Zip((err, chunk, final) => {
+    if (err) {
+      zipError = err
+      doneResolve?.()
+      return
+    }
+    if (chunk && chunk.length) chunks.push(chunk)
+    if (final) {
+      finished = true
+      doneResolve?.()
+    }
+  })
+
+  let lastYield = Date.now()
+  const maybeYield = async () => {
+    if (!onProgress && parts.files.length < 20 && parts.messages.length < 1000) return
+    if (Date.now() - lastYield >= YIELD_INTERVAL_MS) {
+      await yieldTick()
+      lastYield = Date.now()
+    }
+  }
+
+  for (let i = 0; i < jsonEntries.length; i++) {
+    const item = jsonEntries[i]
+    const entry = new ZipDeflate(item.path)
+    zip.add(entry)
+    entry.push(json(item.data), true)
+    if (zipError) throw zipError
+    onProgress?.(jsonShare * ((i + 1) / jsonEntries.length))
+    await maybeYield()
+  }
+
   // Pictures are compressed already; storing them is faster and no bigger.
-  for (const file of parts.files) files[file.path] = [file.bytes, { level: 0 }]
-  return zipSync(files)
+  let mediaDone = 0
+  for (const file of parts.files) {
+    const bytes = file.bytes ?? (file.read ? await file.read() : null)
+    if (!bytes) {
+      mediaDone += file.size ?? 0
+      onProgress?.(jsonShare + (1 - jsonShare) * (mediaTotal ? mediaDone / mediaTotal : 1))
+      continue
+    }
+    const entry = new ZipPassThrough(file.path)
+    zip.add(entry)
+    if (bytes.length === 0) {
+      entry.push(bytes, true)
+    } else {
+      for (let offset = 0; offset < bytes.length; offset += MEDIA_CHUNK_BYTES) {
+        const end = Math.min(bytes.length, offset + MEDIA_CHUNK_BYTES)
+        entry.push(bytes.subarray(offset, end), end === bytes.length)
+        if (zipError) throw zipError
+        mediaDone += end - offset
+        onProgress?.(jsonShare + (1 - jsonShare) * (mediaTotal ? Math.min(1, mediaDone / mediaTotal) : 1))
+        await maybeYield()
+      }
+    }
+    if (zipError) throw zipError
+  }
+
+  zip.end()
+  if (!finished && !zipError) await donePromise
+  if (zipError) throw zipError
+  return concatChunks(chunks)
 }
 
 export const isArchive = (bytes: Uint8Array) => bytes[0] === 0x50 && bytes[1] === 0x4b

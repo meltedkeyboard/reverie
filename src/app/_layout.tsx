@@ -13,7 +13,7 @@ import { StartupBoundary } from '@/components/startup/StartupBoundary'
 import { TabBar } from '@/components/chrome/TabBar'
 import { TitleBar } from '@/components/chrome/TitleBar'
 import { ToastHost } from '@/components/overlays/ToastHost'
-import { SyncProgressPill } from '@/components/sync/SyncProgressPill'
+import { TopProgressHost } from '@/components/overlays/TopProgressHost'
 import { isConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { loadGalleryLayout } from '@/db/prefs/galleryLook'
 import { loadListLook } from '@/db/prefs/listLook'
@@ -322,7 +322,7 @@ function AppShell() {
         <ToastHost />
         <ThoughtSheetHost />
         <SmbBrowserSheetHost />
-        <SyncProgressPill />
+        <TopProgressHost />
       </ThemeProvider>
     </>
   )
