@@ -56,8 +56,8 @@ const splashDarkSvg = existsSync(`${BRAND}/splash-icon-dark.svg`)
   ? readFileSync(`${BRAND}/splash-icon-dark.svg`, 'utf8')
   : null
 
-if (existsSync(`${BRAND}/alt/icon-azure-blue.svg`)) {
-  const defaultSvg = readFileSync(`${BRAND}/alt/icon-azure-blue.svg`, 'utf8')
+if (existsSync(`${BRAND}/alt/icon-violet-dream.svg`)) {
+  const defaultSvg = readFileSync(`${BRAND}/alt/icon-violet-dream.svg`, 'utf8')
   const tintedSvg = readFileSync(`${BRAND}/icon-tinted.svg`, 'utf8')
   png(defaultSvg, 'assets/images/icon.png')
   png(defaultSvg, 'assets/images/icon-dark.png')

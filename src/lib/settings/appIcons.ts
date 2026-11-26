@@ -33,13 +33,13 @@ let previewChoice: string | null = null
 export const STANDARD_ICONS: readonly AppIcon[] = [
   {
     name: null,
-    preview: require('../../../assets/images/alt/icon-azure-blue-preview.png'),
-    glow: '#1472E6',
-  },
-  {
-    name: 'VioletDream',
     preview: require('../../../assets/images/alt/icon-violet-dream-preview.png'),
     glow: '#5046CF',
+  },
+  {
+    name: 'AzureBlue',
+    preview: require('../../../assets/images/alt/icon-azure-blue-preview.png'),
+    glow: '#1472E6',
   },
   {
     name: 'MidnightObsidian',

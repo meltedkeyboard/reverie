@@ -44,7 +44,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "monochromeImage": "./assets/images/adaptive-icon-mono.png",
-        "backgroundColor": "#1472e6"
+        "backgroundColor": "#5046cf"
       },
       "predictiveBackGestureEnabled": true,
       "permissions": ["VIBRATE"],
@@ -95,13 +95,13 @@
         "expo-alternate-app-icons",
         [
           {
-            "name": "VioletDream",
+            "name": "AzureBlue",
             "ios": {
-              "light": "./assets/images/alt/icon-violet-dream.png",
-              "dark": "./assets/images/alt/icon-violet-dream.png",
+              "light": "./assets/images/alt/icon-azure-blue.png",
+              "dark": "./assets/images/alt/icon-azure-blue.png",
               "tinted": "./assets/images/icon-tinted.png"
             },
-            "android": { "foregroundImage": "./assets/images/alt/icon-violet-dream-foreground.png", "backgroundColor": "#5046cf" }
+            "android": { "foregroundImage": "./assets/images/alt/icon-azure-blue-foreground.png", "backgroundColor": "#1472e6" }
           },
           {
             "name": "MidnightObsidian",
