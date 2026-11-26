@@ -152,6 +152,7 @@ export function CastSheetContent({
   return (
     <ScrollView
       style={scrollStyle}
+      contentInsetAdjustmentBehavior={isIOS ? 'automatic' : undefined}
       contentContainerStyle={[styles.sheetContent, { paddingBottom: Math.max(36, insets.bottom + 20) }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="always"

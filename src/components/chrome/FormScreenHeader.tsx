@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
+import { liquidGlass } from '@/lib/ui/nativeUI'
 import { type Colors, HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 import { EdgeFade } from './BarChrome'
@@ -23,12 +24,11 @@ export function FormScreenHeader({ title }: { title: string }) {
   const styles = useStyles(createStyles)
   return (
     <>
-      <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
+      {!liquidGlass ? <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} /> : null}
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTransparent: true,
-          headerShadowVisible: false,
+          ...(liquidGlass ? undefined : { headerTransparent: true, headerShadowVisible: false }),
           // Like the glass buttons everywhere else, not the accent the navigation theme tints with.
           headerTintColor: colors.text,
           headerBackButtonDisplayMode: 'minimal',

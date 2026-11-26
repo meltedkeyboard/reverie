@@ -38,6 +38,7 @@ import { cropSheetDetents, cropSheetDown } from '@/lib/images/avatarCropLook'
 import { lookSheetDetents, lookSheetDown } from '@/lib/images/backgroundLook'
 import { ChatTextProvider } from '@/lib/chat/chatText'
 import { isElectron, isWeb } from '@/lib/core/platform'
+import { liquidGlass } from '@/lib/ui/nativeUI'
 import { LocaleContextProvider, type LocalePreference } from '@/i18n'
 import { colors as darkColors, ThemeContextProvider, useTheme, type ThemeMode, type ThemeName } from '@/theme'
 import { AccentProvider, useAppDynamicAccent } from '@/components/chrome/ChatChrome'
@@ -204,9 +205,10 @@ function AppShell() {
                   sheetGrabberVisible: true,
                   sheetExpandsWhenScrolledToEdge: false,
                   headerShown: true,
-                  headerShadowVisible: false,
                   headerBackVisible: false,
-                  headerStyle: { backgroundColor: colors.bg },
+                  ...(liquidGlass
+                    ? { contentStyle: { backgroundColor: colors.bg } }
+                    : { headerShadowVisible: false, headerStyle: { backgroundColor: colors.bg } }),
                   headerTintColor: colors.accent,
                   headerTitleStyle: { color: colors.text },
                 }}
@@ -221,9 +223,10 @@ function AppShell() {
                   sheetAllowedDetents: [0.6, 1],
                   sheetGrabberVisible: true,
                   headerShown: true,
-                  headerShadowVisible: false,
                   headerBackVisible: false,
-                  headerStyle: { backgroundColor: colors.bg },
+                  ...(liquidGlass
+                    ? undefined
+                    : { headerShadowVisible: false, headerStyle: { backgroundColor: colors.bg } }),
                   headerTintColor: colors.accent,
                   headerTitleStyle: { color: colors.text },
                   contentStyle: { backgroundColor: colors.bg },
@@ -298,10 +301,15 @@ function AppShell() {
                   sheetGrabberVisible: true,
                   headerShown: true,
                   headerBackVisible: false,
-                  headerTransparent: true,
-                  headerBlurEffect: 'regular',
-                  headerLargeStyle: { backgroundColor: 'transparent' },
-                  headerStyle: { backgroundColor: 'transparent' },
+                  // Leaving transparency and blur unset on iOS 26 activates UIKit's native scroll-edge bar.
+                  ...(liquidGlass
+                    ? undefined
+                    : {
+                        headerTransparent: true,
+                        headerBlurEffect: 'regular' as const,
+                        headerLargeStyle: { backgroundColor: 'transparent' },
+                        headerStyle: { backgroundColor: 'transparent' },
+                      }),
                   headerTintColor: colors.text,
                   headerTitleStyle: { color: colors.text },
                   contentStyle: { backgroundColor: sheetTones.sheet },

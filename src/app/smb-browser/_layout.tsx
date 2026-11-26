@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { isIOS } from '@/lib/core/platform'
+import { liquidGlass } from '@/lib/ui/nativeUI'
 import { useColors, useTheme } from '@/theme'
 
 export const unstable_settings = {
@@ -23,11 +24,13 @@ export default function SmbBrowserLayout() {
         <Stack
           screenOptions={{
             headerShown: true,
-            headerTransparent: isIOS,
-            headerBlurEffect: 'regular',
-            headerShadowVisible: false,
+            // iOS 26 uses the native scroll-edge bar when transparency and blur are left unset.
+            ...(liquidGlass
+              ? undefined
+              : isIOS
+                ? { headerTransparent: true, headerBlurEffect: 'regular' as const, headerShadowVisible: false }
+                : { headerShadowVisible: false, headerStyle: { backgroundColor: colors.bg } }),
             headerBackButtonDisplayMode: 'generic',
-            headerStyle: isIOS ? undefined : { backgroundColor: colors.bg },
             headerTintColor: colors.accent,
             headerTitleStyle: { color: colors.text },
             contentStyle: { backgroundColor: colors.bg },

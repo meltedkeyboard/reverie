@@ -7,6 +7,7 @@ import { useStore } from '@/components/chat/thread/store'
 import { ChatBackdrop, useChatBackdrop, useChatBackdropTone } from '@/components/chrome/ChatChrome'
 import { SheetBackdropContext, useSheetTones } from '@/components/overlays/BottomSheet'
 import { castSession, finishCastSession } from '@/lib/chat/castSession'
+import { liquidGlass } from '@/lib/ui/nativeUI'
 import { SchemeOverride, useColors, useTheme } from '@/theme'
 
 // The cast sheet of a scene as the system sheet (iOS), with the system's bar as the attach
@@ -53,8 +54,9 @@ function CastStack() {
           <Stack
             screenOptions={{
               headerShown: true,
-              headerShadowVisible: false,
-              headerStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet },
+              ...(liquidGlass
+                ? undefined
+                : { headerShadowVisible: false, headerStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet } }),
               headerTintColor: colors.accent,
               headerTitleStyle: { color: colors.text },
               contentStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet },

@@ -6,6 +6,7 @@ import { AttachStackContext } from '@/components/chat/AttachMenu'
 import { AccentProvider, ChatBackdrop, useChatBackdrop, useChatBackdropTone, useChatWallpaperAccent } from '@/components/chrome/ChatChrome'
 import { SheetBackdropContext, useSheetTones } from '@/components/overlays/BottomSheet'
 import { attachSession, finishAttachSession, type AttachSession } from '@/lib/chat/attachSession'
+import { liquidGlass } from '@/lib/ui/nativeUI'
 import { SchemeOverride, useColors, useTheme } from '@/theme'
 
 // The attach menu of the composer as the system sheet (iOS): a stack of its own, so the
@@ -57,9 +58,10 @@ function AttachStack({ session }: { session: AttachSession | null }) {
           <Stack
             screenOptions={{
               headerShown: true,
-              headerShadowVisible: false,
               headerBackButtonDisplayMode: 'minimal',
-              headerStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet },
+              ...(liquidGlass
+                ? undefined
+                : { headerShadowVisible: false, headerStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet } }),
               headerTintColor: wallpaperColors?.accent ?? colors.accent,
               headerTitleStyle: { color: colors.text },
               contentStyle: { backgroundColor: backdrop ? 'transparent' : tones.sheet },

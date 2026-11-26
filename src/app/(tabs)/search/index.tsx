@@ -25,6 +25,7 @@ import { formatWhen } from '@/lib/core/format'
 import { characterPreview } from '@/lib/chat/roleplay'
 import { getSearchScope, type SearchScope, type SettingsSection } from '@/lib/core/searchScope'
 import { isAndroid, isIOS, isWeb } from '@/lib/core/platform'
+import { liquidGlass } from '@/lib/ui/nativeUI'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
 
 
@@ -282,11 +283,10 @@ export default function SearchScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTransparent: true,
+          ...(liquidGlass ? undefined : { headerTransparent: true, headerShadowVisible: false }),
           // Search is a place of the sidebar on the isWeb, not a step on the way from another screen.
           headerBackVisible: !isWeb,
           title: '',
-          headerShadowVisible: false,
           headerTitleAlign: 'left',
           headerTitle: isIOS ? '' : () => <TabTitle>{t('search.title')}</TabTitle>,
           headerLeft: isWeb
@@ -372,7 +372,7 @@ export default function SearchScreen() {
         )
       ) : null}
 
-      <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
+      {!liquidGlass ? <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} /> : null}
     </View>
   )
 }
