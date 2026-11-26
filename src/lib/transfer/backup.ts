@@ -9,6 +9,7 @@ import { pickBackupFile } from '@/lib/transfer/pickBackup'
 import { readAvatarBytes, removeAllAvatars, writeAvatarBase64, writeAvatarBytes, type ImageKind } from '@/lib/images/avatars'
 import { isArchive, packArchive, unpackArchive } from '@/lib/transfer/backupArchive'
 import { addToGallery, type NewGalleryItem } from '@/db/gallery'
+import { loadDrafts, saveDrafts } from '@/db/drafts'
 import { insertGroup } from '@/db/groups'
 import { insertPersona, notifyPersonasChanged } from '@/db/personas'
 import { dumpLorebooks, writeLorebook, type LoreEntryFields, type LoreLinks } from '@/db/lorebooks'
@@ -19,10 +20,10 @@ import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
 
-// 17: the user's notes on each persona. 16: the user's notes on each room. 15: whether a character is in the archive. 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
+// 18: each chat's unsent draft. 17: the user's notes on each persona. 16: the user's notes on each room. 15: whether a character is in the archive. 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
 // each chat's long memory and direction, and lorebooks. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
 // it was one JSON file with the pictures in base64.
-const BACKUP_VERSION = 17
+const BACKUP_VERSION = 18
 
 type BackupCharacter = {
   id: number
@@ -83,6 +84,8 @@ type BackupChat = {
   recapUpto?: number
   direction?: string | null
   suggestionDirection?: string | null
+  // Version 18: what was typed into the chat's field and not sent yet.
+  draft?: string | null
 }
 
 // Version 13.
@@ -272,6 +275,7 @@ function fileStamp(date: Date) {
 }
 
 export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selection) {
+  await saveDrafts()
   const all = {
     characters: await db.getAllAsync<{
       id: number
@@ -305,9 +309,12 @@ export async function buildBackupArchive(db: SQLiteDatabase, selection?: Selecti
       title: string | null
       thinking?: ThinkingMode | null
     }>(
-      `SELECT id, character_id AS characterId, room_id AS roomId, persona_id AS personaId, title, created_at AS createdAt, thinking,
-         scene_state AS sceneState, recap, recap_upto AS recapUpto, direction, suggestion_direction AS suggestionDirection
-       FROM chats ORDER BY sort_order, id`
+      `SELECT ch.id, ch.character_id AS characterId, ch.room_id AS roomId, ch.persona_id AS personaId, ch.title, ch.created_at AS createdAt, ch.thinking,
+         ch.scene_state AS sceneState, ch.recap, ch.recap_upto AS recapUpto, ch.direction, ch.suggestion_direction AS suggestionDirection,
+         d.text AS draft
+       FROM chats ch
+       LEFT JOIN chat_drafts d ON d.chat_id = ch.id
+       ORDER BY ch.sort_order, ch.id`
     ),
     messages: await db.getAllAsync<{ id: number; chatId: number; images: string | null }>(`SELECT ${MESSAGE_COLUMNS} FROM messages ORDER BY id`),
     personas: (await db.getAllAsync<BackupPersona>(PERSONA_ROWS)).map((p) => ({ ...p, isDefault: Boolean(p.isDefault) })),
@@ -507,6 +514,8 @@ export async function importBackup(
     return JSON.stringify(mapped)
   }
   const avatarNames = new Map<string, string>()
+  let hasDrafts = false
+  if (dump.chats?.some((chat) => chat.draft?.trim())) await saveDrafts()
 
   await db.withTransactionAsync(async () => {
     const importImage = async (name: string | null | undefined, kind: ImageKind = 'avatars') => {
@@ -662,6 +671,11 @@ export async function importBackup(
         ]
       )
       chatIds.set(chat.id, res.lastInsertRowId)
+      const draft = chat.draft?.trim() ? chat.draft : null
+      if (draft) {
+        await db.runAsync('INSERT INTO chat_drafts (chat_id, text) VALUES (?, ?)', [res.lastInsertRowId, draft])
+        hasDrafts = true
+      }
     }
 
     for (const book of dump.lorebooks ?? []) {
@@ -742,6 +756,7 @@ export async function importBackup(
     }
   })
 
+  if (hasDrafts) await loadDrafts(db)
   if (personaIds.size) notifyPersonasChanged()
 
   if (dump.settings?.baseUrl) {
@@ -761,6 +776,7 @@ export async function wipeAllData(db: SQLiteDatabase) {
   await db.withTransactionAsync(async () => {
     await db.execAsync('DELETE FROM rooms; DELETE FROM characters; DELETE FROM character_groups; DELETE FROM personas; DELETE FROM lorebooks; DELETE FROM app_settings;')
   })
+  await loadDrafts(db)
   removeAllAvatars()
   notifyPersonasChanged()
 }
