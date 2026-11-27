@@ -827,6 +827,7 @@ export default function RoomEditorScreen() {
                 {
                   label: t('card.saveToFiles'),
                   systemImage: 'folder',
+                  fallbackIcon: 'folder-outline',
                   onSelect: () => exportFile({ id: Number(id), name: title, background: fields.background, backgroundOriginal: fields.backgroundOriginal }),
                 },
               ]}

@@ -23,16 +23,16 @@ export function useCardExport() {
 
   // The web build (the desktop app too) has no Photos, so only the file is left there.
   const exportTargets = (load: () => Promise<CardCharacter | null | undefined>): MenuItem[] => [
-    { label: t('card.saveToFiles'), systemImage: 'folder', onSelect: () => run(load, 'files') },
-    ...(isWeb ? [] : [{ label: t('card.saveToPhotos'), systemImage: 'photo', onSelect: () => run(load, 'photos') }]),
+    { label: t('card.saveToFiles'), systemImage: 'folder', fallbackIcon: 'folder-outline', onSelect: () => run(load, 'files') },
+    ...(isWeb ? [] : [{ label: t('card.saveToPhotos'), systemImage: 'photo', fallbackIcon: 'image-outline' as const, onSelect: () => run(load, 'photos') }]),
   ]
 
   // The same choices as one item that unfolds, for a menu that has other items too; with
   // only the file to choose, the item saves it straight away.
   const exportItem = (load: () => Promise<CardCharacter | null | undefined>): MenuItem =>
     isWeb
-      ? { label: t('card.export'), systemImage: 'square.and.arrow.up', onSelect: () => run(load, 'files') }
-      : { label: t('card.export'), systemImage: 'square.and.arrow.up', children: exportTargets(load) }
+      ? { label: t('card.export'), systemImage: 'square.and.arrow.up', fallbackIcon: 'share-outline', onSelect: () => run(load, 'files') }
+      : { label: t('card.export'), systemImage: 'square.and.arrow.up', fallbackIcon: 'share-outline', children: exportTargets(load) }
 
   return { exportTargets, exportItem }
 }

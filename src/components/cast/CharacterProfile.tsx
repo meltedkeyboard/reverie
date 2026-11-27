@@ -223,7 +223,20 @@ export function ProfileActions({ header, items, color }: { header: string; items
   return (
     <ListSection header={header}>
       {items.map((item) => (
-        <ButtonCell key={item.label} label={item.label} color={color} onPress={() => item.onSelect?.()} />
+        <ButtonCell
+          key={item.label}
+          label={item.label}
+          color={color}
+          icon={
+            item.systemImage || item.fallbackIcon
+              ? {
+                  symbol: item.systemImage as NonNullable<React.ComponentProps<typeof ButtonCell>['icon']>['symbol'],
+                  fallback: item.fallbackIcon ?? 'share-outline',
+                }
+              : undefined
+          }
+          onPress={() => item.onSelect?.()}
+        />
       ))}
     </ListSection>
   )

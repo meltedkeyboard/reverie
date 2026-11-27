@@ -213,9 +213,9 @@ export function NativeLinkRow({
 
 type Effect = Parameters<NonNullable<typeof swiftUI>['modifiers']['symbolEffect']>[0]
 
-// A row that does something: its symbol and name in the accent, or in red when it destroys.
-// While it works it cannot be pressed again, and its symbol plays `effect` instead of a
-// spinner standing beside it.
+// A row that does something: its name at the left and its symbol at the right, in the accent
+// (or in red when it destroys). While it works it cannot be pressed again, and its symbol
+// plays `effect` instead of a spinner standing beside it.
 export function NativeActionRow({
   label,
   symbol,
@@ -236,31 +236,46 @@ export function NativeActionRow({
   onPress: () => void
 }) {
   const { colors } = useTheme()
-  const { Button, useNativeState } = nativeForm!.ui
+  const { Button, HStack, Spacer, Text, Image, useNativeState } = nativeForm!.ui
   const { disabled: off, symbolEffect, foregroundStyle } = nativeForm!.modifiers
   const running = useNativeState(busy)
   useEffect(() => {
     running.set(busy)
   }, [running, busy])
+  // The destructive role reddens only the name, and a tint does not reach the symbol, which
+  // keeps the form's accent: a foreground paints both. Left off while the row is disabled,
+  // so that it greys as the others do.
+  const activeColor = !disabled && !busy ? (destructive ? colors.danger : color) : undefined
+  const buttonModifiers = [
+    off(disabled || busy),
+    ...(activeColor ? [foregroundStyle(activeColor)] : []),
+  ]
+  if (!symbol) {
+    return (
+      <Button
+        label={label}
+        role={destructive ? 'destructive' : undefined}
+        onPress={onPress}
+        modifiers={buttonModifiers}
+      />
+    )
+  }
   return (
     <Button
-      label={label}
-      systemImage={symbol as never}
       role={destructive ? 'destructive' : undefined}
       onPress={onPress}
-      // The destructive role reddens only the name, and a tint does not reach the symbol, which
-      // keeps the form's accent: a foreground paints both. Left off while the row is disabled,
-      // so that it greys as the others do.
-      modifiers={[
-        off(disabled || busy),
-        ...(destructive && !disabled && !busy
-          ? [foregroundStyle(colors.danger)]
-          : color && !disabled && !busy
-          ? [foregroundStyle(color)]
-          : []),
-        ...(symbol ? [symbolEffect(effect, { isActive: running, options: { repeat: 'continuous' } })] : []),
-      ]}
-    />
+      modifiers={buttonModifiers}
+    >
+      <HStack spacing={10}>
+        <Text>{label}</Text>
+        <Spacer />
+        <Image
+          systemName={symbol as never}
+          size={18}
+          modifiers={[symbolEffect(effect, { isActive: running, options: { repeat: 'continuous' } })]}
+        />
+      </HStack>
+    </Button>
   )
 }
 

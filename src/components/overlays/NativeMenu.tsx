@@ -1,6 +1,7 @@
 import { Fragment, useState, type ComponentProps, type ReactNode } from 'react'
 import { Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native'
 
+import type { Icon } from '@/components/visuals/Icon'
 import { showSheet } from '@/lib/ui/dialogs'
 import { liquidGlass, swiftUI } from '@/lib/ui/nativeUI'
 import { PRESS_ANYWHERE } from '@/lib/ui/press'
@@ -10,6 +11,8 @@ export type MenuItem = {
   label: string
   // SF Symbol shown next to the label in the native menu.
   systemImage?: string
+  // Ionicons glyph used when the item is rendered as a GroupedList row without SwiftUI.
+  fallbackIcon?: ComponentProps<typeof Icon>['name']
   destructive?: boolean
   // A line above it in the native menu, setting it apart from the items before; the action
   // sheet has none.
