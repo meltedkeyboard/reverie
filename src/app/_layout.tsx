@@ -23,6 +23,7 @@ import { isHapticsEnabled, isStreamHapticsEnabled, isSuggestionHapticsEnabled } 
 import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemeMode, loadThemeName, saveLocalePreference, saveThemeMode, saveThemeName } from '@/db/prefs/settings'
 import { CloudSyncProvider } from '@/hooks/features/useCloudSync'
+import { NotificationsProvider } from '@/hooks/features/useNotifications'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
 import { useScreenOrientation } from '@/hooks/util/useScreenOrientation'
 import { useScreenPathname } from '@/hooks/util/useScreenPathname'
@@ -82,10 +83,12 @@ function ThemedApp() {
         <AccentProvider>
           <StoredTheme>
             <CloudSyncProvider>
-              {/* A new text size doesn't always reach the layout of screens already shown, so
-                  the screens are built anew for it. The database and sync stay. */}
-              <AppShell key={fontScale} />
-              <SplashOverlay />
+              <NotificationsProvider>
+                {/* A new text size doesn't always reach the layout of screens already shown, so
+                    the screens are built anew for it. The database and sync stay. */}
+                <AppShell key={fontScale} />
+                <SplashOverlay />
+              </NotificationsProvider>
             </CloudSyncProvider>
           </StoredTheme>
         </AccentProvider>
