@@ -1,5 +1,6 @@
 import { useGlobalSearchParams, useRouter, type Href } from 'expo-router'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { AppState } from 'react-native'
 
 import {
   loadNotificationSettings,
@@ -10,6 +11,7 @@ import { useDatabase } from '@/db/provider'
 import { useScreenPathname } from '@/hooks/util/useScreenPathname'
 import { useTranslation } from '@/i18n'
 import { createRequiredContext } from '@/lib/core/requiredContext'
+import { flushDueFollowUps } from '@/lib/notifications/followUp'
 import {
   consumePendingNotificationActions,
   dispatchChatNotificationAction,
@@ -58,6 +60,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadNotificationSettings(db)
     refreshPermission()
+    flushDueFollowUps(db).catch(() => {})
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        refreshPermission()
+        flushDueFollowUps(db).catch(() => {})
+      }
+    })
+    return () => sub.remove()
   }, [db, refreshPermission])
 
   useEffect(() => {
@@ -76,6 +86,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     (event: NotificationActionEvent) => {
       const chatIdRaw = event.meta?.chatId
       const chatId = typeof chatIdRaw === 'number' ? chatIdRaw : Number(chatIdRaw)
+      if (event.kind === 'delayedCharacterMessage') {
+        flushDueFollowUps(db, Number.isFinite(chatId) ? chatId : undefined).catch(() => {})
+      }
 
       if (event.actionId === 'REPLY' && event.replyText?.trim() && Number.isFinite(chatId) && chatId > 0) {
         const handled = dispatchChatNotificationAction({ chatId, actionId: 'REPLY', replyText: event.replyText.trim() })
@@ -96,7 +109,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         router.push(event.route as Href)
       }
     },
-    [router]
+    [db, router]
   )
 
   useEffect(() => {

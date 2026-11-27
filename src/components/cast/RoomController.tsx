@@ -26,7 +26,7 @@ import { newMessage, type Message, type MessageImage } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { importChatToRoom, setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
 import { useAside } from '@/hooks/chat/useAside'
-import { useBranch, useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
+import { useBranch, useChatMenuActions, useDelayedFollowUpMenu, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useRoom, type RoomPhase } from '@/hooks/chat/useRoom'
 import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
@@ -275,6 +275,16 @@ export function RoomController({
   const branch = useBranch(chatId, title, onShow)
   const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow, branch })
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
+  const leadMember = members.find((m) => m.present) ?? members[0]
+  const delayedMenu = useDelayedFollowUpMenu({
+    chatId,
+    characterId: leadMember?.characterId ?? null,
+    senderName: leadMember?.character.name ?? room.name,
+    systemPrompt: [room.scenario, leadMember?.character.systemPrompt ?? ''].filter(Boolean).join('\n\n'),
+    avatarFile: leadMember?.character.avatar ?? null,
+    roomTitle: room.name,
+    disabled: !leadMember,
+  })
 
   const { pattern, wallpaper, bubbleGlass: globalBubbleGlass } = useChatTextSettings()
   const bubbleGlass = bubbleGlassOf(room, wallpaper, pattern, globalBubbleGlass)
@@ -436,6 +446,7 @@ export function RoomController({
     { label: t('room.menuImportScene'), systemImage: 'square.and.arrow.down', onSelect: importScene },
     { label: t('chat.menuShowProfile'), systemImage: 'person.2.circle', onSelect: () => router.push(`/room/${room.id}?profile=1`) },
     ...memoryMenu,
+    ...delayedMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 

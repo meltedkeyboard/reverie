@@ -36,6 +36,7 @@ import {
 } from '@/lib/chat/room/floor'
 import { buildRoomRequest, cleanLine, userNameOf } from '@/lib/chat/room/prompt'
 import { notifyReplyReady, notifyRoomAutoplayDone, notifyStreamInterrupted } from '@/lib/notifications/events'
+import { flushDueFollowUps, subscribeFollowUps } from '@/lib/notifications/followUp'
 import { withBackgroundTask } from '@/lib/notifications/service'
 
 // 'directing' is the short wait while the director decides who speaks, 'staging' while
@@ -190,15 +191,24 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
 
   useEffect(() => {
     let alive = true
-    listMessages(db, chatId).then((rows) => {
+    const load = async () => {
+      await flushDueFollowUps(db, chatId).catch(() => {})
+      const rows = await listMessages(db, chatId)
       if (!alive) return
       chronicledAt.current = rows.length
       eventAt.current = rows.length
       setMessages(rows)
       setLoaded(true)
+    }
+    load()
+    const unsub = subscribeFollowUps(chatId, () => {
+      listMessages(db, chatId).then((rows) => {
+        if (alive) setMessages(rows)
+      })
     })
     return () => {
       alive = false
+      unsub()
     }
   }, [db, chatId, setMessages, setLoaded])
 

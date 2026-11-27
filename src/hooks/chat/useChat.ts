@@ -20,6 +20,7 @@ import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/d
 import { useFeature } from '@/lib/settings/features'
 import { formatPersonaPrompt } from '@/lib/chat/persona'
 import { notifyReplyReady, notifyStreamInterrupted } from '@/lib/notifications/events'
+import { flushDueFollowUps, subscribeFollowUps } from '@/lib/notifications/followUp'
 import { withBackgroundTask } from '@/lib/notifications/service'
 
 export type ChatPhase = 'idle' | 'waiting' | 'streaming'
@@ -147,17 +148,28 @@ export function useChat(chat: Chat, character: Character) {
 
   useEffect(() => {
     let alive = true
+    const load = async () => {
+      await flushDueFollowUps(db, chat.id).catch(() => {})
+      const rows = await store.list()
+      if (!alive) return
+      setMessages(rows)
+      setLoaded(true)
+    }
     // Already there from the first render, read just before the chat opened.
-    if (primed.current) primed.current = false
-    else
-      (async () => {
-        const rows = await store.list()
-        if (!alive) return
-        setMessages(rows)
-        setLoaded(true)
-      })()
+    if (primed.current) {
+      primed.current = false
+      flushDueFollowUps(db, chat.id).catch(() => {})
+    } else {
+      load()
+    }
+    const unsub = subscribeFollowUps(chat.id, () => {
+      store.list().then((rows) => {
+        if (alive) setMessages(rows)
+      })
+    })
     return () => {
       alive = false
+      unsub()
       // A reply still streaming finishes into the store it was started for, but the
       // screen already belongs to the other one.
       task.reset()
@@ -172,7 +184,7 @@ export function useChat(chat: Chat, character: Character) {
       setReplacingId(null)
       setError(null)
     }
-  }, [store, setMessages, setLoaded, setError])
+  }, [db, chat.id, store, setMessages, setLoaded, setError])
 
   const generate = useCallback(
     async (history: Message[], replacing: Message | null = null, guidance?: string) => {

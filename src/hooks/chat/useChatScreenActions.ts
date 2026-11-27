@@ -8,8 +8,12 @@ import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { useTheme } from '@/theme'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chat/chatDialogs'
-import { promptText, showMessage } from '@/lib/ui/dialogs'
+import { promptText, showMessage, showSheet } from '@/lib/ui/dialogs'
 import type { MessageAction } from '@/lib/chat/messageActions'
+import type { MenuItem } from '@/components/overlays/NativeMenu'
+import { useNotifications } from '@/hooks/features/useNotifications'
+import { formatDelayLabel, scheduleDelayedFollowUp } from '@/lib/notifications/followUp'
+import { showToast } from '@/lib/ui/toast'
 import { alertError, reportError } from '@/lib/transfer/report'
 
 type MessageActionHandlers = {
@@ -110,4 +114,69 @@ export function useChatMenuActions({ chatId, title, rename, autoName, discard, o
   }
 
   return { confirmDelete, promptRename, suggestName }
+}
+
+const DELAY_CHOICES = [15, 60, 180, 480] as const
+
+export function useDelayedFollowUpMenu(opts: {
+  chatId: number
+  characterId: number | null
+  senderName: string
+  systemPrompt: string
+  avatarFile: string | null
+  roomTitle?: string
+  disabled?: boolean
+}): MenuItem[] {
+  const db = useDatabase()
+  const { t } = useTranslation()
+  const { scheme } = useTheme()
+  const { available, settings } = useNotifications()
+
+  if (opts.disabled || !available || !settings.enabled || !settings.delayedCharacterMessage.enabled) {
+    return []
+  }
+
+  const pick = (delayMinutes: number) => {
+    scheduleDelayedFollowUp(db, {
+      chatId: opts.chatId,
+      characterId: opts.characterId,
+      senderName: opts.senderName,
+      systemPrompt: opts.systemPrompt,
+      avatarFile: opts.avatarFile,
+      roomTitle: opts.roomTitle,
+      delayMinutes,
+    })
+      .then((ok) => {
+        if (ok) {
+          showToast({
+            tone: 'success',
+            title: t('notifications.delayedScheduled', {
+              name: opts.senderName,
+              delay: formatDelayLabel(delayMinutes),
+            }),
+          })
+        }
+      })
+      .catch((err) => reportError(t('notifications.delayedTitle'), err))
+  }
+
+  const defaultDelay = settings.delayedCharacterMessage.delayMinutes
+  const ordered = [defaultDelay, ...DELAY_CHOICES.filter((m) => m !== defaultDelay)]
+
+  return [
+    {
+      label: t('notifications.delayedMenu'),
+      systemImage: 'clock.badge',
+      onSelect: () => {
+        showSheet(
+          t('notifications.delayedMenu'),
+          ordered.map((mins) => ({
+            label: formatDelayLabel(mins),
+            onSelect: () => pick(mins),
+          })),
+          { scheme }
+        )
+      },
+    },
+  ]
 }

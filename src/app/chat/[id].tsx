@@ -58,7 +58,7 @@ import { useAside } from '@/hooks/chat/useAside'
 import { useChat } from '@/hooks/chat/useChat'
 import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
-import { useBranch, useChatMenuActions, useMessageActions } from '@/hooks/chat/useChatScreenActions'
+import { useBranch, useChatMenuActions, useDelayedFollowUpMenu, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useChatSwitches } from '@/hooks/util/useStoredFlag'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
 import { useTranslation } from '@/i18n'
@@ -832,6 +832,14 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const branch = useBranch(chatId, title, onShow)
   const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow, branch })
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
+  const delayedMenu = useDelayedFollowUpMenu({
+    chatId,
+    characterId: character.id,
+    senderName: character.name,
+    systemPrompt: character.systemPrompt,
+    avatarFile: character.avatar,
+    disabled: archived,
+  })
 
   // Over a chat background the user's bubbles can be made see-through.
   const { pattern, wallpaper, bubbleGlass: globalBubbleGlass } = useChatTextSettings()
@@ -855,6 +863,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     profileItem,
     ...memoryMenu,
+    ...delayedMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 
