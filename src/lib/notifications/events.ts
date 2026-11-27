@@ -46,3 +46,44 @@ export function notifyReplyReady({
     meta: { chatId },
   })
 }
+
+export function notifyRoomAutoplayDone({
+  chatId,
+  roomTitle,
+  spokenCount,
+  isAutoplay,
+  lastSpeakerName,
+}: {
+  chatId: number
+  roomTitle: string
+  spokenCount: number
+  isAutoplay: boolean
+  lastSpeakerName?: string
+}) {
+  if (!isAppBackgrounded() || spokenCount <= 0) return
+  const cfg = notificationSettingsNow()
+  if (!cfg.enabled || !cfg.roomAutoplayDone.enabled) return
+  if (cfg.roomAutoplayDone.onlyAutoplay && !isAutoplay) return
+
+  const body =
+    spokenCount > 1
+      ? t('notifications.roomAutoplayCountBody', { count: spokenCount })
+      : t('notifications.roomAutoplayDoneBody')
+
+  void notifyLocal({
+    id: `reply:${chatId}`,
+    tag: `chat:${chatId}`,
+    feature: 'roomAutoplayDone',
+    title: roomTitle,
+    body,
+    channel: 'rooms',
+    category: 'room_reply',
+    route: `/chat/${chatId}`,
+    kind: 'roomAutoplayDone',
+    threadId: `chat:${chatId}`,
+    senderName: lastSpeakerName ?? roomTitle,
+    isGroup: true,
+    presentInForeground: true,
+    meta: { chatId },
+  })
+}

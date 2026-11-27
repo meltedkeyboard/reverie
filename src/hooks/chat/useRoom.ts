@@ -35,7 +35,7 @@ import {
   type TurnPlan,
 } from '@/lib/chat/room/floor'
 import { buildRoomRequest, cleanLine, userNameOf } from '@/lib/chat/room/prompt'
-import { notifyReplyReady } from '@/lib/notifications/events'
+import { notifyReplyReady, notifyRoomAutoplayDone } from '@/lib/notifications/events'
 import { withBackgroundTask } from '@/lib/notifications/service'
 
 // 'directing' is the short wait while the director decides who speaks, 'staging' while
@@ -271,7 +271,14 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
 
   // Writes one character's line: a new message, or with `replacing` a new variant of it.
   const speak = useCallback(
-    async (ctrl: AbortController, planned: Planned, history: Message[], replacing?: Message, guidance?: string): Promise<Spoken> => {
+    async (
+      ctrl: AbortController,
+      planned: Planned,
+      history: Message[],
+      replacing?: Message,
+      guidance?: string,
+      suppressNotify = false
+    ): Promise<Spoken> => {
       const speaker = membersRef.current.find((m) => m.characterId === planned.characterId)
       if (!speaker) return { line: null, ok: false }
       const name = speaker.character.name
@@ -367,7 +374,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
         absent: absentIds(membersRef.current),
       })
       setMessages([...messagesRef.current, added])
-      if (ok) {
+      if (ok && !suppressNotify) {
         notifyReplyReady({
           chatId,
           senderName: name,
@@ -410,20 +417,23 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
   // Says the planned lines one after another. In open floor every line may pull in
   // whoever it calls by name. A failed line stops the rest, kept for a retry.
   const runQueue = useCallback(
-    async (ctrl: AbortController, planned: Planned[]) => {
+    async (ctrl: AbortController, planned: Planned[], options?: { suppressNotify?: boolean }) => {
       const pending = [...planned]
       let said = 0
+      let lastSpeakerName: string | undefined
       while (pending.length && !ctrl.signal.aborted) {
         const next = pending.shift()!
         setQueue([...pending])
         // Someone who walked out mid-turn has nothing more to say here.
-        if (!membersRef.current.some((m) => m.characterId === next.characterId && m.present)) continue
-        const { line, ok } = await speak(ctrl, next, messagesRef.current)
+        const speaker = membersRef.current.find((m) => m.characterId === next.characterId && m.present)
+        if (!speaker) continue
+        const { line, ok } = await speak(ctrl, next, messagesRef.current, undefined, undefined, options?.suppressNotify)
         if (!ok) {
           if (!ctrl.signal.aborted) failure.current = { kind: 'queue', queue: line ? pending : [next, ...pending] }
           return false
         }
         said++
+        lastSpeakerName = speaker.character.name
         if (!line) continue
         const entered = await stage(ctrl, line)
         if (roomRef.current.floor === 'open') {
@@ -431,9 +441,18 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           pending.push(...arrivals(entered, pending, said))
         }
       }
+      if (!options?.suppressNotify && said > 1 && !ctrl.signal.aborted) {
+        notifyRoomAutoplayDone({
+          chatId,
+          roomTitle: roomRef.current.name,
+          spokenCount: said,
+          isAutoplay: false,
+          lastSpeakerName,
+        })
+      }
       return true
     },
-    [speak, stage, arrivals]
+    [chatId, speak, stage, arrivals]
   )
 
   // Every few lines, with the director on, where the scene stands and whose feelings changed
@@ -650,21 +669,37 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
       const ctrl = begin()
       setAuto({ done: 0, total })
+      let spoken = 0
+      let lastSpeakerName: string | undefined
       try {
-        for (let done = 0; done < total && !ctrl.signal.aborted; done++) {
-          const history = messagesRef.current
-          const planned = await resolve(ctrl, nextSpeaker(history, membersRef.current), history[history.length - 1])
-          if (!planned.length || !(await runQueue(ctrl, planned.slice(0, 1)))) break
-          // A stalled dialogue is where an event helps most.
-          await plot(ctrl)
-          setAuto({ done: done + 1, total })
+        await withBackgroundTask('reverie.autoplay', async () => {
+          for (let done = 0; done < total && !ctrl.signal.aborted; done++) {
+            const history = messagesRef.current
+            const planned = await resolve(ctrl, nextSpeaker(history, membersRef.current), history[history.length - 1])
+            const first = planned[0]
+            if (!first || !(await runQueue(ctrl, [first], { suppressNotify: true }))) break
+            spoken++
+            lastSpeakerName = membersRef.current.find((m) => m.characterId === first.characterId)?.character.name
+            // A stalled dialogue is where an event helps most.
+            await plot(ctrl)
+            setAuto({ done: done + 1, total })
+          }
+        })
+        if (spoken > 0 && !ctrl.signal.aborted) {
+          notifyRoomAutoplayDone({
+            chatId,
+            roomTitle: roomRef.current.name,
+            spokenCount: spoken,
+            isAutoplay: true,
+            lastSpeakerName,
+          })
         }
         maybeName()
       } finally {
         settle(ctrl)
       }
     },
-    [task, begin, resolve, runQueue, plot, settle, maybeName]
+    [chatId, task, begin, resolve, runQueue, plot, settle, maybeName]
   )
 
   const regenerate = useCallback(
