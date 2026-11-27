@@ -19,7 +19,7 @@ import { CONTINUE_NOTE, directionNote, emptyReplyReason, replyLimitNote, runRepl
 import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
 import { useFeature } from '@/lib/settings/features'
 import { formatPersonaPrompt } from '@/lib/chat/persona'
-import { notifyReplyReady } from '@/lib/notifications/events'
+import { notifyReplyReady, notifyStreamInterrupted } from '@/lib/notifications/events'
 import { withBackgroundTask } from '@/lib/notifications/service'
 
 export type ChatPhase = 'idle' | 'waiting' | 'streaming'
@@ -192,6 +192,8 @@ export function useChat(chat: Chat, character: Character) {
       let reply = ''
       let keptThought: Thought | null = null
       let cutoff = false
+      let failedReason: string | undefined
+      let interruptedNotified = false
       // How many of the latest messages the request carried, for the long memory.
       let keptCount: number | null = null
 
@@ -228,22 +230,34 @@ export function useChat(chat: Chat, character: Character) {
           turns = pick(system)
         }
         keptCount = turns.length
-        const streamed = await withBackgroundTask('reverie.reply', () =>
-          runReplyStream(
-            cfg,
-            { messages: requestTurns(system, turns, guidance, target.replyLimit, direction.current()), ...sampling },
-            ctrl.signal,
-            {
-              onStart: () => setPhase('streaming'),
-              onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
-              onFrame: ({ text, thought, thinkingMs }) => {
-                if (storeRef.current !== store) return
-                setDraft(text.trimStart())
-                if (thought) setReasoning(thought.trim())
-                setReasoningMs(thinkingMs)
-              },
+        const streamed = await withBackgroundTask(
+          'reverie.reply',
+          () =>
+            runReplyStream(
+              cfg,
+              { messages: requestTurns(system, turns, guidance, target.replyLimit, direction.current()), ...sampling },
+              ctrl.signal,
+              {
+                onStart: () => setPhase('streaming'),
+                onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
+                onFrame: ({ text, thought, thinkingMs }) => {
+                  if (storeRef.current !== store) return
+                  setDraft(text.trimStart())
+                  if (thought) setReasoning(thought.trim())
+                  setReasoningMs(thinkingMs)
+                },
+              }
+            ),
+          () => {
+            if (!ctrl.signal.aborted && !interruptedNotified) {
+              interruptedNotified = true
+              notifyStreamInterrupted({
+                chatId: chat.id,
+                senderName: target.name,
+                avatarFile: target.avatar,
+              })
             }
-          )
+          }
         )
         // A stopped or broken stream still keeps what it had written.
         reply = streamed.text
@@ -251,11 +265,16 @@ export function useChat(chat: Chat, character: Character) {
         cutoff = streamed.cutoff
         if (streamed.error) throw streamed.error
       } catch (err) {
-        if (!ctrl.signal.aborted) setError(errorMessage(err))
+        if (!ctrl.signal.aborted) {
+          failedReason = errorMessage(err)
+          setError(failedReason)
+        }
       } finally {
         // An empty reply otherwise vanishes silently, as if the tap did nothing.
         if (!reply && !ctrl.signal.aborted) {
-          setError((prev) => prev ?? t(emptyReplyReason({ thought: keptThought, cutoff })))
+          const emptyReason = t(emptyReplyReason({ thought: keptThought, cutoff }))
+          failedReason = failedReason ?? emptyReason
+          setError((prev) => prev ?? emptyReason)
         }
         if (discarded.current.has(ctrl)) reply = ''
         const current = () => storeRef.current === store
@@ -281,6 +300,14 @@ export function useChat(chat: Chat, character: Character) {
             senderName: target.name,
             replyText: reply,
             elapsedMs: Date.now() - startedAt,
+            avatarFile: target.avatar,
+          })
+        } else if (!reply && !ctrl.signal.aborted && !interruptedNotified) {
+          interruptedNotified = true
+          notifyStreamInterrupted({
+            chatId: chat.id,
+            senderName: target.name,
+            reason: failedReason,
             avatarFile: target.avatar,
           })
         }

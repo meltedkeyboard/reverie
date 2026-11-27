@@ -100,3 +100,44 @@ export function notifyRoomAutoplayDone({
     meta: { chatId },
   })
 }
+
+export function notifyStreamInterrupted({
+  chatId,
+  senderName,
+  reason,
+  roomTitle,
+  avatarFile,
+}: {
+  chatId: number
+  senderName: string
+  reason?: string
+  roomTitle?: string
+  avatarFile?: string | null
+}) {
+  if (!isAppBackgrounded()) return
+  const cfg = notificationSettingsNow()
+  if (!cfg.enabled || !cfg.streamInterrupted.enabled) return
+
+  const body =
+    cfg.streamInterrupted.includeReason && reason?.trim()
+      ? replyPreview(reason)
+      : t('notifications.errorNotificationBody')
+
+  void notifyLocal({
+    id: `reply:${chatId}`,
+    tag: `chat:${chatId}`,
+    feature: 'streamInterrupted',
+    title: t('notifications.errorNotificationTitle', { name: roomTitle ?? senderName }),
+    body,
+    channel: roomTitle ? 'rooms' : 'replies',
+    category: 'stream_error',
+    route: `/chat/${chatId}`,
+    kind: 'streamInterrupted',
+    threadId: `chat:${chatId}`,
+    senderName,
+    isGroup: Boolean(roomTitle),
+    avatarPath: resolveNotificationAvatar(avatarFile),
+    presentInForeground: true,
+    meta: { chatId },
+  })
+}

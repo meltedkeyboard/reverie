@@ -35,7 +35,7 @@ import {
   type TurnPlan,
 } from '@/lib/chat/room/floor'
 import { buildRoomRequest, cleanLine, userNameOf } from '@/lib/chat/room/prompt'
-import { notifyReplyReady, notifyRoomAutoplayDone } from '@/lib/notifications/events'
+import { notifyReplyReady, notifyRoomAutoplayDone, notifyStreamInterrupted } from '@/lib/notifications/events'
 import { withBackgroundTask } from '@/lib/notifications/service'
 
 // 'directing' is the short wait while the director decides who speaks, 'staging' while
@@ -296,6 +296,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       let failed: unknown = null
       let thought: Thought | null = null
       let cutoff = false
+      let interruptedNotified = false
       try {
         const cfg = await loadSettings(db)
         // The speaker's own lorebooks and the room's, by what they heard of the latest lines.
@@ -321,20 +322,33 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           memory: memory.block(history),
           direction: direction.current(),
         })
-        const streamed = await withBackgroundTask('reverie.roomReply', () =>
-          runReplyStream(cfg, req, ctrl.signal, {
-            onStart: () => setPhase('streaming'),
-            onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
-            onFrame: (frame) =>
-              setDraft((prev) =>
-                prev && {
-                  ...prev,
-                  text: cleanLine(frame.text.trimStart(), name, others),
-                  reasoning: frame.thought ? frame.thought.trim() : null,
-                  reasoningMs: frame.thinkingMs,
-                }
-              ),
-          })
+        const streamed = await withBackgroundTask(
+          'reverie.roomReply',
+          () =>
+            runReplyStream(cfg, req, ctrl.signal, {
+              onStart: () => setPhase('streaming'),
+              onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
+              onFrame: (frame) =>
+                setDraft((prev) =>
+                  prev && {
+                    ...prev,
+                    text: cleanLine(frame.text.trimStart(), name, others),
+                    reasoning: frame.thought ? frame.thought.trim() : null,
+                    reasoningMs: frame.thinkingMs,
+                  }
+                ),
+            }),
+          () => {
+            if (!ctrl.signal.aborted && !interruptedNotified) {
+              interruptedNotified = true
+              notifyStreamInterrupted({
+                chatId,
+                senderName: name,
+                roomTitle: roomRef.current.name,
+                avatarFile: speaker.character.avatar,
+              })
+            }
+          }
         )
         reply = cleanLine(streamed.text, name, others).trim()
         thought = streamed.thought
@@ -344,10 +358,26 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
         failed = err
       }
       const aborted = ctrl.signal.aborted
-      if (failed && !aborted) setError(errorMessage(failed))
-      else if (!reply && !aborted) setError(t(emptyReplyReason({ thought, cutoff })))
+      let failureReason: string | undefined
+      if (failed && !aborted) {
+        failureReason = errorMessage(failed)
+        setError(failureReason)
+      } else if (!reply && !aborted) {
+        failureReason = t(emptyReplyReason({ thought, cutoff }))
+        setError(failureReason)
+      }
       if (discarded.current.has(ctrl)) return { line: null, ok: false }
       const ok = Boolean(reply) && !failed && !aborted
+      if (!ok && !aborted && !interruptedNotified) {
+        interruptedNotified = true
+        notifyStreamInterrupted({
+          chatId,
+          senderName: name,
+          reason: failureReason,
+          roomTitle: roomRef.current.name,
+          avatarFile: speaker.character.avatar,
+        })
+      }
 
       if (reply && replacing) {
         const updated = await addVariant(db, replacing, reply, thought, refine)
