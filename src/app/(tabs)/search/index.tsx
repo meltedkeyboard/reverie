@@ -20,6 +20,7 @@ import { listRooms, type RoomPreview } from '@/db/rooms'
 import { listSearchChats, searchMessages, type SearchChat, type SearchMessage } from '@/db/search'
 import { useTranslation } from '@/i18n'
 import { alternateIconsAvailable } from '@/lib/settings/appIcons'
+import { notificationsAvailable } from '@/lib/notifications/service'
 import { cloudSyncAvailable } from '@/lib/transfer/cloudSync'
 import { formatWhen } from '@/lib/core/format'
 import { characterPreview } from '@/lib/chat/roleplay'
@@ -141,7 +142,17 @@ export default function SearchScreen() {
         fallback: 'server-outline',
         href: '/servers',
       },
-      {
+      { label: t('settings.backupTitle'), keywords: [t('settings.exportJson'), t('settings.importJson')], symbol: 'externaldrive', fallback: 'archive-outline', href: settingsAt('backup') },
+      { label: t('settings.aboutTitle'), keywords: [t('settings.version'), t('settings.copyright'), 'GitHub'], symbol: 'info.circle', fallback: 'information-circle-outline', href: settingsAt('about') },
+      { label: t('settings.wipeAll'), keywords: [t('settings.dangerZone')], symbol: 'exclamationmark.triangle', fallback: 'warning-outline', href: settingsAt('wipe'), danger: true },
+    ]
+    if (alternateIconsAvailable) {
+      const language = entries.findIndex((entry) => entry.label === t('settings.language'))
+      entries.splice(language + 1, 0, { label: t('settings.appIcon'), keywords: [t('settings.appearance')], symbol: 'app', fallback: 'apps-outline', href: settingsAt('appearance') })
+    }
+    if (notificationsAvailable) {
+      const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
+      entries.splice(backup, 0, {
         label: t('notifications.title'),
         keywords: [
           t('notifications.replyReadyTitle'),
@@ -152,14 +163,7 @@ export default function SearchScreen() {
         symbol: 'bell.badge',
         fallback: 'notifications-outline',
         href: '/notifications',
-      },
-      { label: t('settings.backupTitle'), keywords: [t('settings.exportJson'), t('settings.importJson')], symbol: 'externaldrive', fallback: 'archive-outline', href: settingsAt('backup') },
-      { label: t('settings.aboutTitle'), keywords: [t('settings.version'), t('settings.copyright'), 'GitHub'], symbol: 'info.circle', fallback: 'information-circle-outline', href: settingsAt('about') },
-      { label: t('settings.wipeAll'), keywords: [t('settings.dangerZone')], symbol: 'exclamationmark.triangle', fallback: 'warning-outline', href: settingsAt('wipe'), danger: true },
-    ]
-    if (alternateIconsAvailable) {
-      const language = entries.findIndex((entry) => entry.label === t('settings.language'))
-      entries.splice(language + 1, 0, { label: t('settings.appIcon'), keywords: [t('settings.appearance')], symbol: 'app', fallback: 'apps-outline', href: settingsAt('appearance') })
+      })
     }
     if (cloudSyncAvailable) {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))

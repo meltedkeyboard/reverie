@@ -48,7 +48,10 @@ export type ChatNotificationAction = {
 
 type ChatActionHandler = (action: ChatNotificationAction) => void
 
-export const notificationsAvailable = reverieNotifications !== null
+export const notificationsAvailable = reverieNotifications !== null || __DEV__
+
+// Expo Go and dev web builds lack the native module; keep simulated state in memory for UI testing.
+let previewPermission: NotificationPermissionStatus = 'undetermined'
 
 let activeRouteNow: string | null = null
 const chatActionHandlers = new Map<number, ChatActionHandler>()
@@ -73,7 +76,7 @@ export function isNotificationFeatureEnabled(feature: NotificationFeatureKey, cf
 }
 
 export async function getNotificationPermissionStatus(): Promise<NotificationPermissionStatus> {
-  if (!reverieNotifications) return 'denied'
+  if (!reverieNotifications) return __DEV__ ? previewPermission : 'denied'
   try {
     return await reverieNotifications.getPermissionStatus()
   } catch {
@@ -82,7 +85,11 @@ export async function getNotificationPermissionStatus(): Promise<NotificationPer
 }
 
 export async function requestNotificationPermission(): Promise<NotificationPermissionStatus> {
-  if (!reverieNotifications) return 'denied'
+  if (!reverieNotifications) {
+    if (!__DEV__) return 'denied'
+    previewPermission = 'granted'
+    return previewPermission
+  }
   try {
     return await reverieNotifications.requestPermission()
   } catch {
@@ -154,7 +161,7 @@ function resolveCategory(opts: LocalNotificationOptions, cfg: NotificationSettin
 }
 
 export async function notifyLocal(opts: LocalNotificationOptions): Promise<boolean> {
-  if (!reverieNotifications) return false
+  if (!reverieNotifications && !__DEV__) return false
   const cfg = notificationSettingsNow()
   if (!cfg.enabled) return false
   if (opts.feature && !cfg[opts.feature].enabled) return false
@@ -166,6 +173,7 @@ export async function notifyLocal(opts: LocalNotificationOptions): Promise<boole
 
   const status = await getNotificationPermissionStatus()
   if (status !== 'granted') return false
+  if (!reverieNotifications) return true
 
   const text = applyPrivacy(opts, cfg)
   const avatar = resolveAvatar(opts, cfg)
