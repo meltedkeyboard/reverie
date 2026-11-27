@@ -18,6 +18,7 @@
           "NSAllowsArbitraryLoads": true
         },
         "NSLocalNetworkUsageDescription": "Reverie connects to your model server on your local network.",
+        "NSUserActivityTypes": ["INSendMessageIntent"],
         "UIFileSharingEnabled": true,
         "LSSupportsOpeningDocumentsInPlace": true,
         "UTExportedTypeDeclarations": [
@@ -47,7 +48,7 @@
         "backgroundColor": "#5046cf"
       },
       "predictiveBackGestureEnabled": true,
-      "permissions": ["VIBRATE"],
+      "permissions": ["VIBRATE", "POST_NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED"],
       "blockedPermissions": ["android.permission.RECORD_AUDIO", "android.permission.SYSTEM_ALERT_WINDOW"]
     },
     "plugins": [

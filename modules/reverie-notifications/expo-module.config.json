@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ReverieNotificationsModule"],
+    "appDelegateSubscribers": ["ReverieNotificationsAppDelegateSubscriber"]
+  },
+  "android": {
+    "modules": ["reverie.notifications.ReverieNotificationsModule"]
+  }
+}
