@@ -1,6 +1,13 @@
 import { notificationSettingsNow } from '@/db/prefs/notifications'
 import { t } from '@/i18n'
+import { avatarUri } from '@/lib/images/avatarStore'
+import { isVideo } from '@/lib/images/media'
 import { isAppBackgrounded, notifyLocal } from '@/lib/notifications/service'
+
+export function resolveNotificationAvatar(file: string | null | undefined): string | null {
+  if (!file || isVideo(file)) return null
+  return avatarUri(file)
+}
 
 export function replyPreview(text: string): string {
   const clean = text.replace(/\s+/g, ' ').trim()
@@ -14,12 +21,14 @@ export function notifyReplyReady({
   replyText,
   elapsedMs,
   roomTitle,
+  avatarFile,
 }: {
   chatId: number
   senderName: string
   replyText: string
   elapsedMs: number
   roomTitle?: string
+  avatarFile?: string | null
 }) {
   if (!isAppBackgrounded()) return
   const cfg = notificationSettingsNow()
@@ -42,6 +51,7 @@ export function notifyReplyReady({
     threadId: `chat:${chatId}`,
     senderName,
     isGroup: Boolean(roomTitle),
+    avatarPath: resolveNotificationAvatar(avatarFile),
     presentInForeground: true,
     meta: { chatId },
   })
@@ -53,12 +63,14 @@ export function notifyRoomAutoplayDone({
   spokenCount,
   isAutoplay,
   lastSpeakerName,
+  avatarFile,
 }: {
   chatId: number
   roomTitle: string
   spokenCount: number
   isAutoplay: boolean
   lastSpeakerName?: string
+  avatarFile?: string | null
 }) {
   if (!isAppBackgrounded() || spokenCount <= 0) return
   const cfg = notificationSettingsNow()
@@ -83,6 +95,7 @@ export function notifyRoomAutoplayDone({
     threadId: `chat:${chatId}`,
     senderName: lastSpeakerName ?? roomTitle,
     isGroup: true,
+    avatarPath: resolveNotificationAvatar(avatarFile),
     presentInForeground: true,
     meta: { chatId },
   })

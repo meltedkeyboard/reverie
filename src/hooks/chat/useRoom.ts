@@ -352,13 +352,14 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       if (reply && replacing) {
         const updated = await addVariant(db, replacing, reply, thought, refine)
         setMessages(messagesRef.current.map((m) => (m.id === updated.id ? updated : m)))
-        if (ok) {
+        if (ok && !suppressNotify) {
           notifyReplyReady({
             chatId,
             senderName: name,
             replyText: reply,
             elapsedMs: Date.now() - startedAt,
             roomTitle: roomRef.current.name,
+            avatarFile: speaker.character.avatar,
           })
         }
         return { line: updated, ok }
@@ -381,6 +382,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           replyText: reply,
           elapsedMs: Date.now() - startedAt,
           roomTitle: roomRef.current.name,
+          avatarFile: speaker.character.avatar,
         })
       }
       return { line: added, ok }
@@ -421,6 +423,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       const pending = [...planned]
       let said = 0
       let lastSpeakerName: string | undefined
+      let lastAvatarFile: string | null | undefined
       while (pending.length && !ctrl.signal.aborted) {
         const next = pending.shift()!
         setQueue([...pending])
@@ -434,6 +437,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
         }
         said++
         lastSpeakerName = speaker.character.name
+        lastAvatarFile = speaker.character.avatar ?? lastAvatarFile
         if (!line) continue
         const entered = await stage(ctrl, line)
         if (roomRef.current.floor === 'open') {
@@ -448,6 +452,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           spokenCount: said,
           isAutoplay: false,
           lastSpeakerName,
+          avatarFile: lastAvatarFile,
         })
       }
       return true
@@ -671,6 +676,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       setAuto({ done: 0, total })
       let spoken = 0
       let lastSpeakerName: string | undefined
+      let lastAvatarFile: string | null | undefined
       try {
         await withBackgroundTask('reverie.autoplay', async () => {
           for (let done = 0; done < total && !ctrl.signal.aborted; done++) {
@@ -679,7 +685,9 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
             const first = planned[0]
             if (!first || !(await runQueue(ctrl, [first], { suppressNotify: true }))) break
             spoken++
-            lastSpeakerName = membersRef.current.find((m) => m.characterId === first.characterId)?.character.name
+            const speaker = membersRef.current.find((m) => m.characterId === first.characterId)
+            lastSpeakerName = speaker?.character.name
+            lastAvatarFile = speaker?.character.avatar ?? lastAvatarFile
             // A stalled dialogue is where an event helps most.
             await plot(ctrl)
             setAuto({ done: done + 1, total })
@@ -692,6 +700,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
             spokenCount: spoken,
             isAutoplay: true,
             lastSpeakerName,
+            avatarFile: lastAvatarFile,
           })
         }
         maybeName()

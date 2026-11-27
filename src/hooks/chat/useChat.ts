@@ -281,6 +281,7 @@ export function useChat(chat: Chat, character: Character) {
             senderName: target.name,
             replyText: reply,
             elapsedMs: Date.now() - startedAt,
+            avatarFile: target.avatar,
           })
         }
         if (reply && keptCount !== null) {
