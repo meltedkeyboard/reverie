@@ -6,10 +6,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslation } from '@/i18n'
 import { isAndroid, isDesktop } from '@/lib/core/platform'
-import { liquidGlass } from '@/lib/ui/nativeUI'
+import { floatingBars } from '@/lib/ui/nativeUI'
 import { type Colors, HEADER_ROW_HEIGHT, ON_ACCENT, useColors, useStyles } from '@/theme'
 
-import { EdgeFade } from './BarChrome'
+import { BlurBar, EdgeFade } from './BarChrome'
 import { GlassButton, HeaderContext, useInHeader } from './Glass'
 import { TabTitle, useHeaderHeight } from './GlassHeader'
 import { IconButton } from '../controls/IconButton'
@@ -17,18 +17,25 @@ import { SFIcon } from '../visuals/SFIcon'
 
 
 // The transparent native header of a form-style screen: a title on the
-// left, with the content fading out underneath. Rendered inside the screen it belongs to.
+// left, with the content fading out or blurring underneath like tab headers.
 export function FormScreenHeader({ title }: { title: string }) {
   const headerHeight = useHeaderHeight()
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
     <>
-      {!liquidGlass ? <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} /> : null}
+      {floatingBars ? (
+        <EdgeFade edge="top" style={[styles.fade, { height: headerHeight + 28 }]} />
+      ) : (
+        <View pointerEvents="none" style={[styles.blur, { height: headerHeight }]}>
+          <BlurBar edge="top" style={StyleSheet.absoluteFill} />
+        </View>
+      )}
       <Stack.Screen
         options={{
           headerShown: true,
-          ...(liquidGlass ? undefined : { headerTransparent: true, headerShadowVisible: false }),
+          headerTransparent: true,
+          headerShadowVisible: false,
           // Like the glass buttons everywhere else, not the accent the navigation theme tints with.
           headerTintColor: colors.text,
           headerBackButtonDisplayMode: 'minimal',
@@ -338,7 +345,8 @@ function FormTitle({ title }: { title: string }) {
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
-    fade: { pointerEvents: 'none', position: 'absolute', top: 0, left: 0, right: 0 },
+    fade: { pointerEvents: 'none', position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
+    blur: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
     bar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
     row: {
       height: HEADER_ROW_HEIGHT,

@@ -18,7 +18,7 @@ export function BlurBar({
   edge: Edge
   style?: StyleProp<ViewStyle>
   onLayout?: (e: LayoutChangeEvent) => void
-  children: React.ReactNode
+  children?: React.ReactNode
 }) {
   const { scheme } = useTheme()
   const styles = useStyles(createStyles)
