@@ -188,3 +188,43 @@ export async function scheduleSceneReminder({
     meta: { chatId },
   })
 }
+
+export function notifyGeneratorDone(title: string) {
+  if (!isAppBackgrounded()) return
+  const cfg = notificationSettingsNow()
+  if (!cfg.enabled || !cfg.aiGeneratorsDone.enabled) return
+
+  void notifyLocal({
+    id: `gen:${Date.now()}`,
+    tag: 'generator',
+    feature: 'aiGeneratorsDone',
+    title: t('notifications.genDoneTitle', { title }),
+    body: t('notifications.genDoneBody'),
+    channel: 'background',
+    category: 'default',
+    route: '/generate',
+    kind: 'aiGeneratorsDone',
+    presentInForeground: true,
+  })
+}
+
+export function notifyLongMemoryDone(chatId: number, label: string) {
+  if (!isAppBackgrounded()) return
+  const cfg = notificationSettingsNow()
+  if (!cfg.enabled || !cfg.aiGeneratorsDone.enabled || !cfg.aiGeneratorsDone.includeMemory) return
+
+  void notifyLocal({
+    id: `memory:${chatId}`,
+    tag: `memory:${chatId}`,
+    feature: 'aiGeneratorsDone',
+    title: t('notifications.memoryDoneTitle', { name: label }),
+    body: t('notifications.memoryDoneBody'),
+    channel: 'background',
+    category: 'default',
+    route: `/chat/${chatId}`,
+    kind: 'aiGeneratorsDone',
+    threadId: `chat:${chatId}`,
+    presentInForeground: true,
+    meta: { chatId },
+  })
+}

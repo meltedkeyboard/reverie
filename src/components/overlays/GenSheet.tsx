@@ -27,6 +27,8 @@ import { countLabel } from '@/lib/core/format'
 import { confirmAsync } from '@/lib/ui/dialogs'
 import * as Haptics from '@/lib/ui/haptics'
 import { isIOS } from '@/lib/core/platform'
+import { notifyGeneratorDone } from '@/lib/notifications/events'
+import { withBackgroundTask } from '@/lib/notifications/service'
 import { computeDiff } from '@/lib/chat/diff'
 import { cleanGenerated, countWords, streamGeneration } from '@/lib/chat/promptGen'
 import { type Colors, ON_ACCENT, useColors, useStyles } from '@/theme'
@@ -180,30 +182,32 @@ export function GenSheet({
       let hadCutoff = false
       let hadReasoning = false
       let thoughts = ''
-      for await (const part of streamGeneration(cfg, build(revision), ctrl.signal, {
-        thinking,
-        edit: edits || !!revision,
-        maxTokens,
-        reasoningBudget,
-      })) {
-        if (part.kind === 'reasoning') {
-          hadReasoning = true
-          setActivity((prev) => (prev?.thinking ? prev : { thinking: true, since: Date.now() }))
-          thoughts += part.text
-          setLiveThought(thoughts)
-          continue
+      await withBackgroundTask('reverie.generator', async () => {
+        for await (const part of streamGeneration(cfg, build(revision), ctrl.signal, {
+          thinking,
+          edit: edits || !!revision,
+          maxTokens,
+          reasoningBudget,
+        })) {
+          if (part.kind === 'reasoning') {
+            hadReasoning = true
+            setActivity((prev) => (prev?.thinking ? prev : { thinking: true, since: Date.now() }))
+            thoughts += part.text
+            setLiveThought(thoughts)
+            continue
+          }
+          if (part.kind === 'cutoff') {
+            hadCutoff = true
+            continue
+          }
+          if (!text) {
+            setActivity({ thinking: false, since: Date.now() })
+            setLiveThought(null)
+          }
+          text += part.text
+          setLive(text)
         }
-        if (part.kind === 'cutoff') {
-          hadCutoff = true
-          continue
-        }
-        if (!text) {
-          setActivity({ thinking: false, since: Date.now() })
-          setLiveThought(null)
-        }
-        text += part.text
-        setLive(text)
-      }
+      })
       const done = cleanGenerated(text)
       if (!done) {
         if (hadCutoff && (hadReasoning || thinking)) {
@@ -212,6 +216,7 @@ export function GenSheet({
         throw new Error(t('promptGen.empty'))
       }
       pushVersion(done)
+      notifyGeneratorDone(title)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     } catch (err) {
       // A stopped generation keeps what it wrote so far.

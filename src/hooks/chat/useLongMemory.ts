@@ -8,9 +8,11 @@ import type { Message } from '@/db/messages'
 import { longMemoryEnabled } from '@/db/prefs/memory'
 import { loadSettings } from '@/db/prefs/settings'
 import { useDatabase } from '@/db/provider'
-import { useTranslation } from '@/i18n'
+import { t, useTranslation } from '@/i18n'
 import { setTextDraft } from '@/lib/chat/textDraft'
 import { RECAP_BATCH, RECAP_CHUNK, recapBlock, summarize } from '@/lib/chat/memory'
+import { notifyLongMemoryDone } from '@/lib/notifications/events'
+import { withBackgroundTask } from '@/lib/notifications/service'
 
 // The long memory of one chat or scene: the summary of what fell out of its context window
 // (src/lib/chat/memory.ts), kept with the chat. `block` is what a request puts into its
@@ -18,6 +20,7 @@ import { RECAP_BATCH, RECAP_CHUNK, recapBlock, summarize } from '@/lib/chat/memo
 export function useLongMemory(chat: Chat) {
   const db = useDatabase()
   const chatId = chat.id
+  const chatTitle = chat.title
   const memory = useRef({ recap: chat.recap ?? '', upto: chat.recapUpto ?? 0 })
   const running = useRef<AbortController | null>(null)
 
@@ -43,21 +46,28 @@ export function useLongMemory(chat: Chat) {
       const ctrl = new AbortController()
       running.current = ctrl
       ;(async () => {
+        let updated = false
         try {
-          const cfg = await loadSettings(db)
-          for (;;) {
-            const fresh = dropped.filter((m) => m.id > memory.current.upto)
-            if (fresh.length < RECAP_BATCH || ctrl.signal.aborted) break
-            const chunk = fresh.slice(0, RECAP_CHUNK)
-            const lines = chunk.flatMap((m) => {
-              const text = line(m)
-              return text ? [text] : []
-            })
-            const upto = chunk[chunk.length - 1].id
-            const recap = lines.length ? await summarize(cfg, memory.current.recap, lines, ctrl.signal) : memory.current.recap
-            if (recap === null || ctrl.signal.aborted) break
-            memory.current = { recap, upto }
-            await setChatRecap(db, chatId, recap, upto)
+          await withBackgroundTask('reverie.memory', async () => {
+            const cfg = await loadSettings(db)
+            for (;;) {
+              const fresh = dropped.filter((m) => m.id > memory.current.upto)
+              if (fresh.length < RECAP_BATCH || ctrl.signal.aborted) break
+              const chunk = fresh.slice(0, RECAP_CHUNK)
+              const lines = chunk.flatMap((m) => {
+                const text = line(m)
+                return text ? [text] : []
+              })
+              const upto = chunk[chunk.length - 1].id
+              const recap = lines.length ? await summarize(cfg, memory.current.recap, lines, ctrl.signal) : memory.current.recap
+              if (recap === null || ctrl.signal.aborted) break
+              memory.current = { recap, upto }
+              await setChatRecap(db, chatId, recap, upto)
+              updated = true
+            }
+          })
+          if (updated && !ctrl.signal.aborted) {
+            notifyLongMemoryDone(chatId, chatTitle?.trim() || t('memory.title'))
           }
         } catch {
           // The summary is an extra; a failed one is tried again after the next reply.
@@ -66,7 +76,7 @@ export function useLongMemory(chat: Chat) {
         }
       })()
     },
-    [db, chatId]
+    [db, chatId, chatTitle]
   )
 
   // The summary as the user reads and corrects it from the chat's menu.
