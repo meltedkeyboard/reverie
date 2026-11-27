@@ -66,6 +66,7 @@ import { characterScene } from '@/lib/chat/aside'
 import { useChatTextSettings } from '@/lib/chat/chatText'
 import { prefetchMessages } from '@/lib/chat/messageCache'
 import { measurePictureColor } from '@/lib/images/pictureColor'
+import { registerChatNotificationHandler } from '@/lib/notifications/service'
 import { formatWhen } from '@/lib/core/format'
 import { isAndroid } from '@/lib/core/platform'
 import * as Haptics from '@/lib/ui/haptics'
@@ -779,6 +780,19 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const idle = phase === 'idle'
   // The chat of a character in the archive is there to be read.
   const archived = character.archivedAt !== null
+
+  useEffect(() => {
+    if (!loaded || archived) return
+    return registerChatNotificationHandler(chatId, (action) => {
+      if (action.actionId === 'REPLY' && action.replyText) {
+        send(action.replyText, [])
+      } else if (action.actionId === 'CONTINUE') {
+        proceed()
+      } else if (action.actionId === 'RETRY') {
+        retry()
+      }
+    })
+  }, [loaded, archived, chatId, send, proceed, retry])
   const composerImagesRef = useRef<MessageImage[]>([])
   const [suggestion, clearSuggestion, dismissSuggestion, refineSuggestion] = useSuggestion(
     scene,

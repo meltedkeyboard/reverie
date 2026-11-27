@@ -36,6 +36,7 @@ import { roomScene } from '@/lib/chat/aside'
 import { USER } from '@/lib/chat/room/audience'
 import { castSession, closeCastSession, openCastSession } from '@/lib/chat/castSession'
 import { isDesktop, isIOS } from '@/lib/core/platform'
+import { registerChatNotificationHandler } from '@/lib/notifications/service'
 import { countLabel, formatWhen } from '@/lib/core/format'
 import { showMessage, showSheet } from '@/lib/ui/dialogs'
 import { reportError } from '@/lib/transfer/report'
@@ -214,6 +215,19 @@ export function RoomController({
   }, [members])
 
   const idle = phase === 'idle'
+
+  useEffect(() => {
+    if (!loaded) return
+    return registerChatNotificationHandler(chatId, (action) => {
+      if (action.actionId === 'REPLY' && action.replyText) {
+        send(action.replyText, [], { addressees: [], whisper: false, narration: false })
+      } else if (action.actionId === 'CONTINUE') {
+        proceed()
+      } else if (action.actionId === 'RETRY') {
+        retry()
+      }
+    })
+  }, [loaded, chatId, send, proceed, retry])
   const composerImagesRef = useRef<MessageImage[]>([])
   const [suggestion, clearSuggestion, dismissSuggestion, refineSuggestion] = useSuggestion(
     scene,

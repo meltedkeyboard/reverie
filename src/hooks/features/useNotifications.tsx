@@ -62,7 +62,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     syncNotificationLabels()
-  }, [locale])
+  }, [locale, settings.inlineReply.allowContinue])
 
   useEffect(() => {
     if (pathname.startsWith('/chat/') && params.id) {
@@ -78,11 +78,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       const chatId = typeof chatIdRaw === 'number' ? chatIdRaw : Number(chatIdRaw)
 
       if (event.actionId === 'REPLY' && event.replyText?.trim() && Number.isFinite(chatId) && chatId > 0) {
-        dispatchChatNotificationAction({ chatId, actionId: 'REPLY', replyText: event.replyText.trim() })
+        const handled = dispatchChatNotificationAction({ chatId, actionId: 'REPLY', replyText: event.replyText.trim() })
+        if (!handled && event.route) router.push(event.route as Href)
         return
       }
       if (event.actionId === 'CONTINUE' && Number.isFinite(chatId) && chatId > 0) {
-        dispatchChatNotificationAction({ chatId, actionId: 'CONTINUE' })
+        const handled = dispatchChatNotificationAction({ chatId, actionId: 'CONTINUE' })
+        if (!handled && event.route) router.push(event.route as Href)
         return
       }
       if (event.actionId === 'RETRY' && Number.isFinite(chatId) && chatId > 0) {
