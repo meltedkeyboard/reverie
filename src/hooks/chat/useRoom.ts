@@ -35,6 +35,8 @@ import {
   type TurnPlan,
 } from '@/lib/chat/room/floor'
 import { buildRoomRequest, cleanLine, userNameOf } from '@/lib/chat/room/prompt'
+import { notifyReplyReady } from '@/lib/notifications/events'
+import { withBackgroundTask } from '@/lib/notifications/service'
 
 // 'directing' is the short wait while the director decides who speaks, 'staging' while
 // it checks whether a line walked someone out of the scene or in, 'plotting' while the
@@ -282,6 +284,7 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       const refine = guidance?.trim() || null
       setDraft({ ...planned, speakerId: planned.characterId, text: '', reasoning: null, reasoningMs: null, refine })
 
+      const startedAt = Date.now()
       let reply = ''
       let failed: unknown = null
       let thought: Thought | null = null
@@ -311,19 +314,21 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
           memory: memory.block(history),
           direction: direction.current(),
         })
-        const streamed = await runReplyStream(cfg, req, ctrl.signal, {
-          onStart: () => setPhase('streaming'),
-          onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
-          onFrame: (frame) =>
-            setDraft((prev) =>
-              prev && {
-                ...prev,
-                text: cleanLine(frame.text.trimStart(), name, others),
-                reasoning: frame.thought ? frame.thought.trim() : null,
-                reasoningMs: frame.thinkingMs,
-              }
-            ),
-        })
+        const streamed = await withBackgroundTask('reverie.roomReply', () =>
+          runReplyStream(cfg, req, ctrl.signal, {
+            onStart: () => setPhase('streaming'),
+            onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
+            onFrame: (frame) =>
+              setDraft((prev) =>
+                prev && {
+                  ...prev,
+                  text: cleanLine(frame.text.trimStart(), name, others),
+                  reasoning: frame.thought ? frame.thought.trim() : null,
+                  reasoningMs: frame.thinkingMs,
+                }
+              ),
+          })
+        )
         reply = cleanLine(streamed.text, name, others).trim()
         thought = streamed.thought
         cutoff = streamed.cutoff
@@ -340,6 +345,15 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
       if (reply && replacing) {
         const updated = await addVariant(db, replacing, reply, thought, refine)
         setMessages(messagesRef.current.map((m) => (m.id === updated.id ? updated : m)))
+        if (ok) {
+          notifyReplyReady({
+            chatId,
+            senderName: name,
+            replyText: reply,
+            elapsedMs: Date.now() - startedAt,
+            roomTitle: roomRef.current.name,
+          })
+        }
         return { line: updated, ok }
       }
       if (!reply) return { line: null, ok }
@@ -353,6 +367,15 @@ export function useRoom(chat: Chat, room: Room, members: RoomMember[], onMembers
         absent: absentIds(membersRef.current),
       })
       setMessages([...messagesRef.current, added])
+      if (ok) {
+        notifyReplyReady({
+          chatId,
+          senderName: name,
+          replyText: reply,
+          elapsedMs: Date.now() - startedAt,
+          roomTitle: roomRef.current.name,
+        })
+      }
       return { line: added, ok }
     },
     [db, chatId, setMessages, memory, direction]

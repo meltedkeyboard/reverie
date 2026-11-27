@@ -19,6 +19,8 @@ import { CONTINUE_NOTE, directionNote, emptyReplyReason, replyLimitNote, runRepl
 import { getPersona, setChatPersona, onPersonasChanged, type Persona } from '@/db/personas'
 import { useFeature } from '@/lib/settings/features'
 import { formatPersonaPrompt } from '@/lib/chat/persona'
+import { notifyReplyReady } from '@/lib/notifications/events'
+import { withBackgroundTask } from '@/lib/notifications/service'
 
 export type ChatPhase = 'idle' | 'waiting' | 'streaming'
 
@@ -186,6 +188,7 @@ export function useChat(chat: Chat, character: Character) {
       setReasoningMs(null)
 
       const target = characterRef.current
+      const startedAt = Date.now()
       let reply = ''
       let keptThought: Thought | null = null
       let cutoff = false
@@ -225,20 +228,22 @@ export function useChat(chat: Chat, character: Character) {
           turns = pick(system)
         }
         keptCount = turns.length
-        const streamed = await runReplyStream(
-          cfg,
-          { messages: requestTurns(system, turns, guidance, target.replyLimit, direction.current()), ...sampling },
-          ctrl.signal,
-          {
-            onStart: () => setPhase('streaming'),
-            onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
-            onFrame: ({ text, thought, thinkingMs }) => {
-              if (storeRef.current !== store) return
-              setDraft(text.trimStart())
-              if (thought) setReasoning(thought.trim())
-              setReasoningMs(thinkingMs)
-            },
-          }
+        const streamed = await withBackgroundTask('reverie.reply', () =>
+          runReplyStream(
+            cfg,
+            { messages: requestTurns(system, turns, guidance, target.replyLimit, direction.current()), ...sampling },
+            ctrl.signal,
+            {
+              onStart: () => setPhase('streaming'),
+              onFirstWords: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
+              onFrame: ({ text, thought, thinkingMs }) => {
+                if (storeRef.current !== store) return
+                setDraft(text.trimStart())
+                if (thought) setReasoning(thought.trim())
+                setReasoningMs(thinkingMs)
+              },
+            }
+          )
         )
         // A stopped or broken stream still keeps what it had written.
         reply = streamed.text
@@ -259,15 +264,24 @@ export function useChat(chat: Chat, character: Character) {
           if (current()) setMessages(messagesRef.current.map((m) => (m.id === updated.id ? updated : m)))
         } else if (reply) {
           const added = await store.add('assistant', reply, { thought: keptThought, refine: wish })
-          if (!current()) return
-          const next = [...messagesRef.current, added]
-          setMessages(next)
-          // The first answer is where a chat gets its name. A failure here is not worth
-          // an error card: the user can always ask for a title from the menu.
-          const initialCount = characterRef.current.greeting.trim() ? 1 : 0
-          if (!titleRef.current && (next.filter((m) => m.role === 'user').length === 1 || next.length > initialCount)) {
-            autoName().catch(() => {})
+          if (current()) {
+            const next = [...messagesRef.current, added]
+            setMessages(next)
+            // The first answer is where a chat gets its name. A failure here is not worth
+            // an error card: the user can always ask for a title from the menu.
+            const initialCount = characterRef.current.greeting.trim() ? 1 : 0
+            if (!titleRef.current && (next.filter((m) => m.role === 'user').length === 1 || next.length > initialCount)) {
+              autoName().catch(() => {})
+            }
           }
+        }
+        if (reply && !ctrl.signal.aborted) {
+          notifyReplyReady({
+            chatId: chat.id,
+            senderName: target.name,
+            replyText: reply,
+            elapsedMs: Date.now() - startedAt,
+          })
         }
         if (reply && keptCount !== null) {
           const name = characterRef.current.name
@@ -284,7 +298,7 @@ export function useChat(chat: Chat, character: Character) {
         }
       }
     },
-    [db, store, setMessages, autoName, memory, direction]
+    [db, chat.id, store, setMessages, autoName, memory, direction]
   )
 
   const send = useCallback(
