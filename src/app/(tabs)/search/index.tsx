@@ -141,6 +141,18 @@ export default function SearchScreen() {
         fallback: 'server-outline',
         href: '/servers',
       },
+      {
+        label: t('notifications.title'),
+        keywords: [
+          t('notifications.replyReadyTitle'),
+          t('notifications.roomAutoplayTitle'),
+          t('notifications.delayedTitle'),
+          t('notifications.reminderTitle'),
+        ],
+        symbol: 'bell.badge',
+        fallback: 'notifications-outline',
+        href: '/notifications',
+      },
       { label: t('settings.backupTitle'), keywords: [t('settings.exportJson'), t('settings.importJson')], symbol: 'externaldrive', fallback: 'archive-outline', href: settingsAt('backup') },
       { label: t('settings.aboutTitle'), keywords: [t('settings.version'), t('settings.copyright'), 'GitHub'], symbol: 'info.circle', fallback: 'information-circle-outline', href: settingsAt('about') },
       { label: t('settings.wipeAll'), keywords: [t('settings.dangerZone')], symbol: 'exclamationmark.triangle', fallback: 'warning-outline', href: settingsAt('wipe'), danger: true },

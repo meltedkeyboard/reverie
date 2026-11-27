@@ -58,7 +58,9 @@ import {
   type SuggestionContextMode,
 } from '@/db/prefs/suggestions'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
+import { useNotifications } from '@/hooks/features/useNotifications'
 import { useServers } from '@/hooks/features/useServers'
+import { enabledNotificationCount, NOTIFICATION_FEATURE_KEYS } from '@/db/prefs/notifications'
 import { useStoredFlag } from '@/hooks/util/useStoredFlag'
 import { useTranslation, type LocalePreference } from '@/i18n'
 import { CONTEXT_STEP_TOKENS, MAX_CONTEXT_TOKENS, MIN_CONTEXT_TOKENS, formatTokensLabel } from '@/lib/core/context'
@@ -291,6 +293,16 @@ export default function SettingsScreen() {
 
 
   const cloudSync = useCloudSync()
+  const notifications = useNotifications()
+  const notificationsValue =
+    notifications.permission === 'denied'
+      ? t('notifications.summaryDenied')
+      : !notifications.settings.enabled
+        ? t('notifications.summaryOff')
+        : t('notifications.summaryOn', {
+            count: enabledNotificationCount(notifications.settings),
+            total: NOTIFICATION_FEATURE_KEYS.length,
+          })
   // Expo Go has no sync module. In development the section is still shown there, with
   // its buttons out and pretending to work, so the layout and animations can be looked at.
   const cloudPreview = __DEV__ && !cloudSync.available
@@ -388,6 +400,9 @@ export default function SettingsScreen() {
         <LinkCell label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
       ) : null}
       <LinkCell label={t('servers.title')} value={activeServerLabel} onPress={() => router.push('/servers')} />
+      {notifications.available ? (
+        <LinkCell label={t('notifications.title')} value={notificationsValue} onPress={() => router.push('/notifications')} />
+      ) : null}
       {showCloud ? (
         <LinkCell label={t('sync.title')} value={destinationLabel} onPress={() => router.push('/sync')} />
       ) : null}
@@ -741,6 +756,9 @@ export default function SettingsScreen() {
             <NativeLinkRow label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
           ) : null}
           <NativeLinkRow label={t('servers.title')} value={activeServerLabel} onPress={() => router.push('/servers')} />
+          {notifications.available ? (
+            <NativeLinkRow label={t('notifications.title')} value={notificationsValue} onPress={() => router.push('/notifications')} />
+          ) : null}
           {showCloud ? (
             <NativeLinkRow
               label={t('sync.title')}
