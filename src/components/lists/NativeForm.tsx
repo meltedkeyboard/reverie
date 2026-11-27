@@ -465,6 +465,45 @@ export function NativeSegmentRow<T extends string>({ label, options, value, onCh
   )
 }
 
+// An inline wheel picker embedded in the row, with the label and current choice above it.
+export function NativeWheelRow<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (value: T) => void
+}) {
+  const { colors } = useTheme()
+  const { VStack, HStack, Spacer, Text, Picker } = nativeForm!.ui
+  const { pickerStyle, labelsHidden, tag, frame, foregroundStyle } = nativeForm!.modifiers
+  const current = options.find((o) => o.value === value)?.label ?? value
+  return (
+    <VStack alignment="leading" spacing={4}>
+      <HStack>
+        <Text>{label}</Text>
+        <Spacer />
+        <Text modifiers={[foregroundStyle(colors.textMuted)]}>{current}</Text>
+      </HStack>
+      <Picker
+        label={label}
+        selection={value}
+        onSelectionChange={(next: T) => onChange(next)}
+        modifiers={[pickerStyle('wheel'), labelsHidden(), frame({ height: 132 })]}
+      >
+        {options.map((option) => (
+          <Text key={option.value} modifiers={[tag(option.value)]}>
+            {option.label}
+          </Text>
+        ))}
+      </Picker>
+    </VStack>
+  )
+}
+
 // A picker in a row: the label at the left and the choice popped from the system's menu at the right.
 export function NativePickerRow<T extends string>({
   label,

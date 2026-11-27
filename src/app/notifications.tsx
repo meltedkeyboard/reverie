@@ -13,6 +13,7 @@ import {
   NativePickerRow,
   NativeSection,
   NativeSegmentRow,
+  NativeWheelRow,
 } from '@/components/lists/NativeForm'
 import {
   type AvatarNotificationStyle,
@@ -32,6 +33,7 @@ import { type Colors, useStyles } from '@/theme'
 const MIN_SEC_OPTIONS: (0 | 5 | 15 | 30)[] = [0, 5, 15, 30]
 const DELAY_MIN_OPTIONS: (15 | 60 | 180 | 480)[] = [15, 60, 180, 480]
 const REMINDER_HOUR_OPTIONS: (9 | 12 | 18 | 21)[] = [9, 12, 18, 21]
+const WHEEL_HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => hour)
 
 export default function NotificationsScreen() {
   const router = useRouter()
@@ -90,6 +92,11 @@ export default function NotificationsScreen() {
   }))
 
   const hourOptions = REMINDER_HOUR_OPTIONS.map((v) => ({
+    value: String(v),
+    label: `${String(v).padStart(2, '0')}:00`,
+  }))
+
+  const wheelHourOptions = WHEEL_HOUR_OPTIONS.map((v) => ({
     value: String(v),
     label: `${String(v).padStart(2, '0')}:00`,
   }))
@@ -273,14 +280,13 @@ export default function NotificationsScreen() {
                 updateSettings({ sceneReminder: { ...settings.sceneReminder, enabled } })
               )}
               {settings.sceneReminder.enabled ? (
-                <NativeSegmentRow
+                <NativeWheelRow
                   label={t('notifications.reminderHour')}
-                  options={hourOptions}
+                  options={wheelHourOptions}
                   value={String(settings.sceneReminder.defaultHour)}
-                  onChange={(v) => {
-                    Haptics.selectionAsync()
-                    updateSettings({ sceneReminder: { ...settings.sceneReminder, defaultHour: Number(v) as 9 | 12 | 18 | 21 } })
-                  }}
+                  onChange={(v) =>
+                    updateSettings({ sceneReminder: { ...settings.sceneReminder, defaultHour: Number(v) } })
+                  }
                 />
               ) : null}
             </NativeSection>

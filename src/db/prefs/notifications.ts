@@ -40,7 +40,7 @@ export type NotificationSettings = {
   }
   sceneReminder: {
     enabled: boolean
-    defaultHour: 9 | 12 | 18 | 21
+    defaultHour: number
   }
   aiGeneratorsDone: {
     enabled: boolean
@@ -149,7 +149,17 @@ function mergeSettings(raw: Partial<NotificationSettings> | null | undefined): N
     inlineReply: { ...DEFAULT_NOTIFICATION_SETTINGS.inlineReply, ...raw.inlineReply },
     streamInterrupted: { ...DEFAULT_NOTIFICATION_SETTINGS.streamInterrupted, ...raw.streamInterrupted },
     delayedCharacterMessage: { ...DEFAULT_NOTIFICATION_SETTINGS.delayedCharacterMessage, ...raw.delayedCharacterMessage },
-    sceneReminder: { ...DEFAULT_NOTIFICATION_SETTINGS.sceneReminder, ...raw.sceneReminder },
+    sceneReminder: {
+      ...DEFAULT_NOTIFICATION_SETTINGS.sceneReminder,
+      ...raw.sceneReminder,
+      defaultHour:
+        typeof raw.sceneReminder?.defaultHour === 'number' &&
+        Number.isInteger(raw.sceneReminder.defaultHour) &&
+        raw.sceneReminder.defaultHour >= 0 &&
+        raw.sceneReminder.defaultHour <= 23
+          ? raw.sceneReminder.defaultHour
+          : DEFAULT_NOTIFICATION_SETTINGS.sceneReminder.defaultHour,
+    },
     aiGeneratorsDone: { ...DEFAULT_NOTIFICATION_SETTINGS.aiGeneratorsDone, ...raw.aiGeneratorsDone },
     transferDone: { ...DEFAULT_NOTIFICATION_SETTINGS.transferDone, ...raw.transferDone },
   }
