@@ -23,6 +23,9 @@ import { confirm } from '@/lib/ui/dialogs'
 import { showToast } from '@/lib/ui/toast'
 import { reportError } from '@/lib/transfer/report'
 import { createRequiredContext } from '@/lib/core/requiredContext'
+import { errorMessage } from '@/lib/core/errors'
+import { notifyTransferDone } from '@/lib/notifications/events'
+import { withBackgroundTask } from '@/lib/notifications/service'
 
 type CloudSync = {
   available: boolean
@@ -89,11 +92,32 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       if (!enabledRef.current) return null
       setSyncing(true)
       try {
-        const outcome = await syncWithCloud(mode)
+        const outcome = await withBackgroundTask('reverie.cloudSync', () => syncWithCloud(mode))
         if (outcome === 'pulled') await reloadRef.current()
         if (outcome === 'conflict' && mode === 'auto' && (loud || !conflictDismissed.current)) askConflict()
+        if (outcome === 'pushed' || outcome === 'pulled' || outcome === 'conflict') {
+          notifyTransferDone({
+            tag: 'sync',
+            ok: true,
+            title: t('notifications.syncDoneTitle'),
+            body:
+              outcome === 'pushed'
+                ? t('notifications.syncPushedBody')
+                : outcome === 'pulled'
+                  ? t('notifications.syncPulledBody')
+                  : t('notifications.syncConflictBody'),
+            route: '/sync',
+          })
+        }
         return outcome
       } catch (err) {
+        notifyTransferDone({
+          tag: 'sync',
+          ok: false,
+          title: t('notifications.syncFailedTitle'),
+          body: errorMessage(err),
+          route: '/sync',
+        })
         if (loud) reportError(t('sync.failedTitle'), err)
         else console.warn('Sync failed', err)
         return null

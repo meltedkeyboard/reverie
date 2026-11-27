@@ -228,3 +228,36 @@ export function notifyLongMemoryDone(chatId: number, label: string) {
     meta: { chatId },
   })
 }
+
+export function notifyTransferDone({
+  tag,
+  ok,
+  title,
+  body,
+  route,
+}: {
+  tag: string
+  ok: boolean
+  title: string
+  body: string
+  route: string
+}) {
+  if (!isAppBackgrounded()) return
+  const cfg = notificationSettingsNow()
+  if (!cfg.enabled || !cfg.transferDone.enabled) return
+  if (ok && !cfg.transferDone.notifySuccess) return
+  if (!ok && !cfg.transferDone.notifyFailure) return
+
+  void notifyLocal({
+    id: `transfer:${tag}`,
+    tag: `transfer:${tag}`,
+    feature: 'transferDone',
+    title,
+    body: replyPreview(body),
+    channel: 'background',
+    category: 'default',
+    route,
+    kind: 'transferDone',
+    presentInForeground: true,
+  })
+}

@@ -19,6 +19,9 @@ import { fromByteArray } from 'base64-js'
 import { strFromU8 } from 'fflate'
 
 import { extensionOf } from '@/lib/images/media'
+import { errorMessage } from '@/lib/core/errors'
+import { notifyTransferDone } from '@/lib/notifications/events'
+import { withBackgroundTask } from '@/lib/notifications/service'
 
 // 18: each chat's unsent draft. 17: the user's notes on each persona. 16: the user's notes on each room. 15: whether a character is in the archive. 14: each character's gallery. 13: a room member's secret and feelings, a room's plot twists, where each scene stands,
 // each chat's long memory and direction, and lorebooks. 12: the wishes replies were refined with. 11: the user's notes on each character. 10: personas, and the chats point at theirs. 9: a zip of JSON files and pictures. Up to 8
@@ -297,8 +300,31 @@ export async function exportRoom(db: SQLiteDatabase, room: { id: number; name: s
 
 // Everything when `selection` is left out.
 export async function exportBackup(db: SQLiteDatabase, selection?: Selection) {
-  const zip = await buildBackupArchive(db, selection)
-  return saveFile(`reverie-backup-${fileStamp(new Date())}.zip`, zip, 'application/zip')
+  return withBackgroundTask('reverie.backupExport', async () => {
+    try {
+      const zip = await buildBackupArchive(db, selection)
+      const saved = await saveFile(`reverie-backup-${fileStamp(new Date())}.zip`, zip, 'application/zip')
+      if (saved) {
+        notifyTransferDone({
+          tag: 'backup',
+          ok: true,
+          title: t('notifications.backupExportDoneTitle'),
+          body: t('notifications.backupExportDoneBody', { name: saved.name }),
+          route: '/settings',
+        })
+      }
+      return saved
+    } catch (err) {
+      notifyTransferDone({
+        tag: 'backup',
+        ok: false,
+        title: t('notifications.backupFailedTitle'),
+        body: errorMessage(err),
+        route: '/settings',
+      })
+      throw err
+    }
+  })
 }
 
 // The local date and time down to the second, so backups made the same day do not take
@@ -577,6 +603,35 @@ function avatarPreview(file: (path: string) => string | Uint8Array | undefined, 
 // (all of them without it) as new rows alongside whatever is already in the database —
 // nothing existing is touched or replaced.
 export async function importBackup(
+  db: SQLiteDatabase,
+  opened: OpenedBackup,
+  selection?: Selection
+): Promise<{ characters: number; rooms: number; chats: number; personas: number }> {
+  return withBackgroundTask('reverie.backupImport', async () => {
+    try {
+      const result = await runImportBackup(db, opened, selection)
+      notifyTransferDone({
+        tag: 'backup',
+        ok: true,
+        title: t('notifications.backupImportDoneTitle'),
+        body: t('notifications.backupImportDoneBody'),
+        route: '/',
+      })
+      return result
+    } catch (err) {
+      notifyTransferDone({
+        tag: 'backup',
+        ok: false,
+        title: t('notifications.backupFailedTitle'),
+        body: errorMessage(err),
+        route: '/settings',
+      })
+      throw err
+    }
+  })
+}
+
+async function runImportBackup(
   db: SQLiteDatabase,
   opened: OpenedBackup,
   selection?: Selection
