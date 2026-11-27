@@ -26,7 +26,7 @@ import { newMessage, type Message, type MessageImage } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { importChatToRoom, setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
 import { useAside } from '@/hooks/chat/useAside'
-import { useBranch, useChatMenuActions, useDelayedFollowUpMenu, useMessageActions } from '@/hooks/chat/useChatScreenActions'
+import { useBranch, useChatMenuActions, useDelayedFollowUpMenu, useMessageActions, useSceneReminderMenu } from '@/hooks/chat/useChatScreenActions'
 import { useRoom, type RoomPhase } from '@/hooks/chat/useRoom'
 import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
@@ -285,6 +285,12 @@ export function RoomController({
     roomTitle: room.name,
     disabled: !leadMember,
   })
+  const reminderMenu = useSceneReminderMenu({
+    chatId,
+    name: title?.trim() ? `${room.name} · ${title}` : room.name,
+    avatarFile: leadMember?.character.avatar ?? null,
+    isGroup: true,
+  })
 
   const { pattern, wallpaper, bubbleGlass: globalBubbleGlass } = useChatTextSettings()
   const bubbleGlass = bubbleGlassOf(room, wallpaper, pattern, globalBubbleGlass)
@@ -447,6 +453,7 @@ export function RoomController({
     { label: t('chat.menuShowProfile'), systemImage: 'person.2.circle', onSelect: () => router.push(`/room/${room.id}?profile=1`) },
     ...memoryMenu,
     ...delayedMenu,
+    ...reminderMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 

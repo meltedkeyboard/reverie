@@ -12,6 +12,8 @@ import { promptText, showMessage, showSheet } from '@/lib/ui/dialogs'
 import type { MessageAction } from '@/lib/chat/messageActions'
 import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { useNotifications } from '@/hooks/features/useNotifications'
+import { formatWhen } from '@/lib/core/format'
+import { scheduleSceneReminder } from '@/lib/notifications/events'
 import { formatDelayLabel, scheduleDelayedFollowUp } from '@/lib/notifications/followUp'
 import { showToast } from '@/lib/ui/toast'
 import { alertError, reportError } from '@/lib/transfer/report'
@@ -177,6 +179,88 @@ export function useDelayedFollowUpMenu(opts: {
           { scheme }
         )
       },
+    },
+  ]
+}
+
+export function useSceneReminderMenu(opts: {
+  chatId: number
+  name: string
+  avatarFile?: string | null
+  isGroup?: boolean
+  disabled?: boolean
+}): MenuItem[] {
+  const { t, locale } = useTranslation()
+  const { scheme } = useTheme()
+  const { available, settings } = useNotifications()
+
+  if (opts.disabled || !available || !settings.enabled || !settings.sceneReminder.enabled) {
+    return []
+  }
+
+  const scheduleAt = (fireAtMs: number) => {
+    scheduleSceneReminder({
+      chatId: opts.chatId,
+      name: opts.name,
+      avatarFile: opts.avatarFile,
+      isGroup: opts.isGroup,
+      fireAtMs,
+    })
+      .then((ok) => {
+        if (ok) {
+          showToast({
+            tone: 'success',
+            title: t('notifications.reminderScheduled', { when: formatWhen(fireAtMs, locale) }),
+          })
+        }
+      })
+      .catch((err) => reportError(t('notifications.reminderTitle'), err))
+  }
+
+  const openChoices = () => {
+    const now = new Date()
+    const hour = settings.sceneReminder.defaultHour
+    const tonight = new Date(now)
+    tonight.setHours(hour, 0, 0, 0)
+    if (tonight.getTime() <= now.getTime() + 15 * 60 * 1000) {
+      tonight.setDate(tonight.getDate() + 1)
+    }
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(9, 0, 0, 0)
+
+    const items: MenuItem[] = [
+      { label: t('notifications.reminderIn1h'), onSelect: () => scheduleAt(Date.now() + 60 * 60 * 1000) },
+      { label: t('notifications.reminderTonight', { hour }), onSelect: () => scheduleAt(tonight.getTime()) },
+      { label: t('notifications.reminderTomorrow'), onSelect: () => scheduleAt(tomorrow.getTime()) },
+      {
+        label: t('notifications.reminderCustom'),
+        onSelect: () => {
+          promptText({
+            title: t('notifications.reminderCustomTitle'),
+            message: t('notifications.reminderCustomPlaceholder'),
+            initial: '2',
+            confirmLabel: t('common.ok'),
+            scheme,
+            onSubmit: (raw) => {
+              const hours = Number(raw.replace(',', '.').trim())
+              if (Number.isFinite(hours) && hours > 0 && hours <= 168) {
+                scheduleAt(Date.now() + hours * 60 * 60 * 1000)
+              }
+            },
+          })
+        },
+      },
+    ]
+
+    showSheet(t('notifications.reminderMenu'), items, { scheme })
+  }
+
+  return [
+    {
+      label: t('notifications.reminderMenu'),
+      systemImage: 'bell.badge',
+      onSelect: openChoices,
     },
   ]
 }

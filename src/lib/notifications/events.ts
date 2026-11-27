@@ -2,7 +2,12 @@ import { notificationSettingsNow } from '@/db/prefs/notifications'
 import { t } from '@/i18n'
 import { avatarUri } from '@/lib/images/avatarStore'
 import { isVideo } from '@/lib/images/media'
-import { isAppBackgrounded, notifyLocal } from '@/lib/notifications/service'
+import {
+  getNotificationPermissionStatus,
+  isAppBackgrounded,
+  notifyLocal,
+  requestNotificationPermission,
+} from '@/lib/notifications/service'
 
 export function resolveNotificationAvatar(file: string | null | undefined): string | null {
   if (!file || isVideo(file)) return null
@@ -138,6 +143,48 @@ export function notifyStreamInterrupted({
     isGroup: Boolean(roomTitle),
     avatarPath: resolveNotificationAvatar(avatarFile),
     presentInForeground: true,
+    meta: { chatId },
+  })
+}
+
+export async function scheduleSceneReminder({
+  chatId,
+  name,
+  avatarFile,
+  isGroup,
+  fireAtMs,
+}: {
+  chatId: number
+  name: string
+  avatarFile?: string | null
+  isGroup?: boolean
+  fireAtMs: number
+}): Promise<boolean> {
+  const cfg = notificationSettingsNow()
+  if (!cfg.enabled || !cfg.sceneReminder.enabled) return false
+
+  let permission = await getNotificationPermissionStatus()
+  if (permission === 'undetermined') {
+    permission = await requestNotificationPermission()
+  }
+  if (permission !== 'granted') return false
+
+  return notifyLocal({
+    id: `reminder:${chatId}`,
+    tag: `reminder:${chatId}`,
+    feature: 'sceneReminder',
+    title: t('notifications.reminderNotifTitle', { name }),
+    body: t('notifications.reminderNotifBody'),
+    channel: 'reminders',
+    category: 'default',
+    route: `/chat/${chatId}`,
+    kind: 'sceneReminder',
+    threadId: `chat:${chatId}`,
+    senderName: name,
+    isGroup,
+    avatarPath: resolveNotificationAvatar(avatarFile),
+    presentInForeground: true,
+    fireAtMs,
     meta: { chatId },
   })
 }

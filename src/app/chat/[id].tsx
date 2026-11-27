@@ -58,7 +58,7 @@ import { useAside } from '@/hooks/chat/useAside'
 import { useChat } from '@/hooks/chat/useChat'
 import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
-import { useBranch, useChatMenuActions, useDelayedFollowUpMenu, useMessageActions } from '@/hooks/chat/useChatScreenActions'
+import { useBranch, useChatMenuActions, useDelayedFollowUpMenu, useMessageActions, useSceneReminderMenu } from '@/hooks/chat/useChatScreenActions'
 import { useChatSwitches } from '@/hooks/util/useStoredFlag'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
 import { useTranslation } from '@/i18n'
@@ -840,6 +840,12 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     avatarFile: character.avatar,
     disabled: archived,
   })
+  const reminderMenu = useSceneReminderMenu({
+    chatId,
+    name: title?.trim() ? `${character.name} · ${title}` : character.name,
+    avatarFile: character.avatar,
+    disabled: archived,
+  })
 
   // Over a chat background the user's bubbles can be made see-through.
   const { pattern, wallpaper, bubbleGlass: globalBubbleGlass } = useChatTextSettings()
@@ -864,6 +870,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     profileItem,
     ...memoryMenu,
     ...delayedMenu,
+    ...reminderMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 
