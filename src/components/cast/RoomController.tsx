@@ -26,7 +26,7 @@ import { newMessage, type Message, type MessageImage } from '@/db/messages'
 import { useDatabase } from '@/db/provider'
 import { importChatToRoom, setMemberMuted, setRoomFloor, type FloorMode, type Room, type RoomMember } from '@/db/rooms'
 import { useAside } from '@/hooks/chat/useAside'
-import { useBranch, useChatMenuActions, useDelayedFollowUpMenu, useMessageActions, useSceneReminderMenu } from '@/hooks/chat/useChatScreenActions'
+import { useBranch, useChatMenuActions, useChatTimer, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useRoom, type RoomPhase } from '@/hooks/chat/useRoom'
 import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
@@ -276,20 +276,16 @@ export function RoomController({
   const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow, branch })
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
   const leadMember = members.find((m) => m.present) ?? members[0]
-  const delayedMenu = useDelayedFollowUpMenu({
+  const timer = useChatTimer({
     chatId,
     characterId: leadMember?.characterId ?? null,
     senderName: leadMember?.character.name ?? room.name,
     systemPrompt: [room.scenario, leadMember?.character.systemPrompt ?? ''].filter(Boolean).join('\n\n'),
     avatarFile: leadMember?.character.avatar ?? null,
     roomTitle: room.name,
-    disabled: !leadMember,
-  })
-  const reminderMenu = useSceneReminderMenu({
-    chatId,
-    name: title?.trim() ? `${room.name} · ${title}` : room.name,
-    avatarFile: leadMember?.character.avatar ?? null,
+    reminderName: title?.trim() ? `${room.name} · ${title}` : room.name,
     isGroup: true,
+    disabled: !leadMember,
   })
 
   const { pattern, wallpaper, bubbleGlass: globalBubbleGlass } = useChatTextSettings()
@@ -452,8 +448,6 @@ export function RoomController({
     { label: t('room.menuImportScene'), systemImage: 'square.and.arrow.down', onSelect: importScene },
     { label: t('chat.menuShowProfile'), systemImage: 'person.2.circle', onSelect: () => router.push(`/room/${room.id}?profile=1`) },
     ...memoryMenu,
-    ...delayedMenu,
-    ...reminderMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 
@@ -520,6 +514,7 @@ export function RoomController({
         onSetDirection: asideOpen ? undefined : direction.set,
         suggestionDirection: asideOpen ? undefined : direction.suggestionText,
         onSetSuggestionDirection: asideOpen ? undefined : direction.setSuggestionDirection,
+        timer: asideOpen ? undefined : timer,
         hushed: asideOpen || (whisper && addressees.length > 0 && !narration),
         toolbar:
           members.length && !asideOpen ? (

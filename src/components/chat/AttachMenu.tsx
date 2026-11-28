@@ -10,6 +10,8 @@ import Animated, { ZoomIn, ZoomOut, useAnimatedStyle, useSharedValue, withSpring
 
 import { ChatBackdrop, useChatBackdrop, useChatBackdropTone, useChatWallpaperAccent, type ChatLook } from '@/components/chrome/ChatChrome'
 import { Button } from '@/components/controls/Button'
+import { Chip } from '@/components/controls/Chip'
+import { Segmented } from '@/components/controls/Segmented'
 import { Switch } from '@/components/controls/Switch'
 import { EmptyState, emptyButtonStyle } from '@/components/lists/EmptyState'
 import { NativeActionRow, NativeAreaRow, NativeHostedRow, NativeSection, NativeSheetForm, nativeForm } from '@/components/lists/NativeForm'
@@ -23,10 +25,11 @@ import { deletePersona, listPersonas, onPersonasChanged, type Persona } from '@/
 import { useDatabase } from '@/db/provider'
 import { isAttachGalleryEnabled, isRecentAttachmentsEnabled, loadRecentSettings } from '@/db/recentAttachments'
 import { useTranslation } from '@/i18n'
-import { choosePersona, type AttachGallery, type AttachSession } from '@/lib/chat/attachSession'
+import { choosePersona, type AttachGallery, type AttachSession, type AttachTimerMode } from '@/lib/chat/attachSession'
 import { isAndroid, isDesktop, isIOS, isWeb } from '@/lib/core/platform'
 import { pictureUri } from '@/lib/images/attachments'
 import { isGalleryVideo } from '@/lib/images/gallery'
+import { formatDelayLabel } from '@/lib/notifications/followUp'
 import { confirmDeletion } from '@/lib/settings/confirmDelete'
 import * as Haptics from '@/lib/ui/haptics'
 import { liquidGlass } from '@/lib/ui/nativeUI'
@@ -70,6 +73,9 @@ export async function loadAttachGalleries(db: SQLiteDatabase, cast: { id: number
 
 // What a row of the system's list draws under it where the app's own view stands alone.
 const CLEAR = '#00000000'
+const TIMER_HOURS = Array.from({ length: 24 }, (_, hour) => hour)
+const TIMER_MINUTES = Array.from({ length: 60 }, (_, minute) => minute)
+const TIMER_PRESETS = [5, 15, 30, 60, 180, 480] as const
 
 // Closes the menu; `then` runs once it is fully off the screen (see attachSession.ts).
 type Close = (then?: () => void) => void
@@ -262,14 +268,31 @@ export function AttachMenu({
   // Either can be switched off in Settings, rows and all.
   const showPersona = useFeature('personas')
   const showDirection = useFeature('direction') && !!onOpenDirection
+  const timer = session.timer
+  const initialMode: AttachTimerMode = timer?.allowReminder ? 'reminder' : 'message'
+  const initialMinutes = Math.max(1, timer?.defaultMinutes ?? 60)
+  const [timerMode, setTimerMode] = useState<AttachTimerMode>(initialMode)
+  const [timerHours, setTimerHours] = useState(Math.floor(initialMinutes / 60))
+  const [timerMinutes, setTimerMinutes] = useState(initialMinutes % 60)
+  const [fallbackMinutes, setFallbackMinutes] = useState(initialMinutes)
+  const [timerOpen, setTimerOpen] = useState(false)
+  const nativeTimerTotal = timerHours * 60 + timerMinutes
+
+  const scheduleTimer = (delayMinutes: number) => {
+    if (!timer || delayMinutes <= 0) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    onClose(() => {
+      void timer.onSchedule({ mode: timerMode, delayMinutes })
+    })
+  }
 
   // The same menu as the system's own list (iOS with SwiftUI), over the chat's picture as the
   // app's cards are. The row of the camera and the latest pictures and the button that attaches
   // them are the app's own, in rows of the list with nothing drawn under them; the camera
   // without the row, files, the persona and the thinking switch are the system's rows.
   if (nativeForm) {
-    const { Button: SwiftButton, Toggle, HStack, Spacer, Text: SwiftText, Image } = nativeForm.ui
-    const { foregroundStyle, lineLimit, tint } = nativeForm.modifiers
+    const { Button: SwiftButton, Toggle, Picker, HStack, Spacer, Text: SwiftText, Image } = nativeForm.ui
+    const { foregroundStyle, lineLimit, tint, pickerStyle, labelsHidden, tag, frame, clipped } = nativeForm.modifiers
     return (
       <View style={[styles.menuContainer, scrollStyle]}>
         <NativeSheetForm>
@@ -341,6 +364,57 @@ export function AttachMenu({
               </Toggle>
             </NativeSection>
           ) : null}
+          {timer ? (
+            <NativeSection fill={tones.card} title={t('attach.timerTitle')}>
+              {timer.allowReminder && timer.allowMessage ? (
+                  <Picker
+                    label={t('attach.timerTitle')}
+                    selection={timerMode}
+                    onSelectionChange={(next: AttachTimerMode) => {
+                      Haptics.selectionAsync()
+                      setTimerMode(next)
+                    }}
+                    modifiers={[pickerStyle('segmented'), labelsHidden()]}
+                  >
+                    <SwiftText modifiers={[tag('reminder')]}>{t('attach.timerModeReminder')}</SwiftText>
+                    <SwiftText modifiers={[tag('message')]}>{t('attach.timerModeMessage')}</SwiftText>
+                  </Picker>
+                ) : null}
+                <HStack spacing={0}>
+                  <Picker
+                    label={t('attach.timerHours')}
+                    selection={String(timerHours)}
+                    onSelectionChange={(next: string) => setTimerHours(Number(next))}
+                    modifiers={[pickerStyle('wheel'), labelsHidden(), frame({ height: 140 }), clipped()]}
+                  >
+                    {TIMER_HOURS.map((h) => (
+                      <SwiftText key={h} modifiers={[tag(String(h))]}>
+                        {t('attach.timerHourUnit', { count: h })}
+                      </SwiftText>
+                    ))}
+                  </Picker>
+                  <Picker
+                    label={t('attach.timerMinutes')}
+                    selection={String(timerMinutes)}
+                    onSelectionChange={(next: string) => setTimerMinutes(Number(next))}
+                    modifiers={[pickerStyle('wheel'), labelsHidden(), frame({ height: 140 }), clipped()]}
+                  >
+                    {TIMER_MINUTES.map((m) => (
+                      <SwiftText key={m} modifiers={[tag(String(m))]}>
+                        {t('attach.timerMinUnit', { count: m })}
+                      </SwiftText>
+                    ))}
+                  </Picker>
+                </HStack>
+              <NativeActionRow
+                label={t('attach.timerStart')}
+                symbol="timer"
+                color={effectiveAccent}
+                disabled={nativeTimerTotal <= 0}
+                onPress={() => scheduleTimer(nativeTimerTotal)}
+              />
+            </NativeSection>
+          ) : null}
           {showRow ? (
             <NativeSection fill={CLEAR}>
               <NativeHostedRow clear height={Math.max(76, insets.bottom + 68)}>
@@ -355,6 +429,11 @@ export function AttachMenu({
   }
 
   const isFill = scrollStyle === fillScreen
+  const timerModeOptions: { value: AttachTimerMode; label: string }[] = [
+    ...(timer?.allowReminder ? [{ value: 'reminder' as const, label: t('attach.timerModeReminder') }] : []),
+    ...(timer?.allowMessage ? [{ value: 'message' as const, label: t('attach.timerModeMessage') }] : []),
+  ]
+  const showTimerBody = isFill || timerOpen
   const menuContent = (
     <>
       {tiles}
@@ -469,6 +548,65 @@ export function AttachMenu({
                 trackColor={{ true: effectiveAccent }}
                 style={styles.nativeSwitch}
               />
+            </View>
+          </View>
+        ) : null}
+
+        {timer ? (
+          <View style={isFill ? styles.timerRevealSpacer : styles.cardSecondary}>
+            {isFill ? <Text style={styles.timerSectionHeader}>{t('attach.timerTitle')}</Text> : null}
+            <View style={[styles.card, { backgroundColor: tones.card }]}>
+              {!isFill ? (
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync()
+                    setTimerOpen((open) => !open)
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: timerOpen }}
+                  style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+                >
+                  <SFIcon name="timer" fallback="timer-outline" size={22} color={iconColor} />
+                  <Text style={styles.cardLabel}>{t('attach.timerTitle')}</Text>
+                  <Icon name={timerOpen ? 'chevron-up' : 'chevron-down'} size={17} color={colors.textFaint} />
+                </Pressable>
+              ) : null}
+
+              {showTimerBody ? (
+                <>
+                  {!isFill ? <View style={[styles.separator, { backgroundColor: colors.borderStrong }]} /> : null}
+                  {timerModeOptions.length > 1 ? (
+                    <View style={styles.timerBlock}>
+                      <Segmented options={timerModeOptions} value={timerMode} onChange={setTimerMode} />
+                    </View>
+                  ) : null}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="always"
+                    contentContainerStyle={styles.timerPresets}
+                  >
+                    {TIMER_PRESETS.map((mins) => (
+                      <Chip
+                        key={mins}
+                        label={formatDelayLabel(mins)}
+                        active={fallbackMinutes === mins}
+                        ink={effectiveAccent}
+                        onPress={() => setFallbackMinutes(mins)}
+                      />
+                    ))}
+                  </ScrollView>
+                  <View style={[styles.separator, { backgroundColor: colors.borderStrong, marginLeft: 16 }]} />
+                  <Pressable
+                    onPress={() => scheduleTimer(fallbackMinutes)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.cardRow, { backgroundColor: pressed ? tones.pressed : tones.row }]}
+                  >
+                    <Text style={[styles.cardLabel, { color: effectiveAccent }]}>{t('attach.timerStart')}</Text>
+                    <SFIcon name="timer" fallback="timer-outline" size={20} color={effectiveAccent} />
+                  </Pressable>
+                </>
+              ) : null}
             </View>
           </View>
         ) : null}
@@ -1189,6 +1327,16 @@ const createStyles = (colors: Colors) =>
     actionText: { fontSize: 17, fontWeight: '600' },
     card: { borderRadius: 24, overflow: 'hidden' },
     cardSecondary: { marginTop: 14 },
+    timerRevealSpacer: { marginTop: 14 },
+    timerSectionHeader: {
+      color: colors.textMuted,
+      fontSize: 13,
+      textTransform: 'uppercase',
+      paddingHorizontal: 16,
+      marginBottom: 5,
+    },
+    timerBlock: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
+    timerPresets: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
     directionInput: {
       paddingHorizontal: 16,

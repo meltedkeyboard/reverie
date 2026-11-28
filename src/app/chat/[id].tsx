@@ -58,7 +58,7 @@ import { useAside } from '@/hooks/chat/useAside'
 import { useChat } from '@/hooks/chat/useChat'
 import { useMemoryMenu } from '@/hooks/chat/useLongMemory'
 import { useLayoutMode } from '@/hooks/util/useLayoutMode'
-import { useBranch, useChatMenuActions, useDelayedFollowUpMenu, useMessageActions, useSceneReminderMenu } from '@/hooks/chat/useChatScreenActions'
+import { useBranch, useChatMenuActions, useChatTimer, useMessageActions } from '@/hooks/chat/useChatScreenActions'
 import { useChatSwitches } from '@/hooks/util/useStoredFlag'
 import { useSuggestion } from '@/hooks/chat/useSuggestion'
 import { useTranslation } from '@/i18n'
@@ -832,18 +832,13 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
   const branch = useBranch(chatId, title, onShow)
   const onAction = useMessageActions({ regenerate, removeRefine, removeVariant, removeMessage, edit: setEditingRow, branch })
   const { confirmDelete, promptRename, suggestName } = useChatMenuActions({ chatId, title, rename, autoName, discard, onDeleted })
-  const delayedMenu = useDelayedFollowUpMenu({
+  const timer = useChatTimer({
     chatId,
     characterId: character.id,
     senderName: character.name,
     systemPrompt: character.systemPrompt,
     avatarFile: character.avatar,
-    disabled: archived,
-  })
-  const reminderMenu = useSceneReminderMenu({
-    chatId,
-    name: title?.trim() ? `${character.name} · ${title}` : character.name,
-    avatarFile: character.avatar,
+    reminderName: title?.trim() ? `${character.name} · ${title}` : character.name,
     disabled: archived,
   })
 
@@ -869,8 +864,6 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
     { label: t('chat.menuSuggestTitle'), systemImage: 'sparkles', onSelect: suggestName },
     profileItem,
     ...memoryMenu,
-    ...delayedMenu,
-    ...reminderMenu,
     { label: t('chat.menuDeleteChat'), systemImage: 'trash', destructive: true, separated: true, onSelect: confirmDelete },
   ]
 
@@ -927,6 +920,7 @@ function ChatController({ chat, character, thread, chrome, focusMessageId, compo
         onSetDirection: asideOpen ? undefined : direction.set,
         suggestionDirection: asideOpen ? undefined : direction.suggestionText,
         onSetSuggestionDirection: asideOpen ? undefined : direction.setSuggestionDirection,
+        timer: asideOpen ? undefined : timer,
         onSend: (text, image) => {
           if (asideOpen) return void aside.ask(text, image)
           send(text, image)

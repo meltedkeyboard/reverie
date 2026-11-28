@@ -8,10 +8,10 @@ import { useDatabase } from '@/db/provider'
 import { useTranslation } from '@/i18n'
 import { useTheme } from '@/theme'
 import { confirmDeleteChat, promptRenameChat } from '@/lib/chat/chatDialogs'
-import { promptText, showMessage, showSheet } from '@/lib/ui/dialogs'
+import { promptText, showMessage } from '@/lib/ui/dialogs'
 import type { MessageAction } from '@/lib/chat/messageActions'
-import type { MenuItem } from '@/components/overlays/NativeMenu'
 import { useNotifications } from '@/hooks/features/useNotifications'
+import type { AttachTimerSession } from '@/lib/chat/attachSession'
 import { formatWhen } from '@/lib/core/format'
 import { scheduleSceneReminder } from '@/lib/notifications/events'
 import { formatDelayLabel, scheduleDelayedFollowUp } from '@/lib/notifications/followUp'
@@ -118,149 +118,77 @@ export function useChatMenuActions({ chatId, title, rename, autoName, discard, o
   return { confirmDelete, promptRename, suggestName }
 }
 
-const DELAY_CHOICES = [15, 60, 180, 480] as const
-
-export function useDelayedFollowUpMenu(opts: {
+export function useChatTimer(opts: {
   chatId: number
   characterId: number | null
   senderName: string
   systemPrompt: string
   avatarFile: string | null
   roomTitle?: string
-  disabled?: boolean
-}): MenuItem[] {
-  const db = useDatabase()
-  const { t } = useTranslation()
-  const { scheme } = useTheme()
-  const { available, settings } = useNotifications()
-
-  if (opts.disabled || !available || !settings.enabled || !settings.delayedCharacterMessage.enabled) {
-    return []
-  }
-
-  const pick = (delayMinutes: number) => {
-    scheduleDelayedFollowUp(db, {
-      chatId: opts.chatId,
-      characterId: opts.characterId,
-      senderName: opts.senderName,
-      systemPrompt: opts.systemPrompt,
-      avatarFile: opts.avatarFile,
-      roomTitle: opts.roomTitle,
-      delayMinutes,
-    })
-      .then((ok) => {
-        if (ok) {
-          showToast({
-            tone: 'success',
-            title: t('notifications.delayedScheduled', {
-              name: opts.senderName,
-              delay: formatDelayLabel(delayMinutes),
-            }),
-          })
-        }
-      })
-      .catch((err) => reportError(t('notifications.delayedTitle'), err))
-  }
-
-  const defaultDelay = settings.delayedCharacterMessage.delayMinutes
-  const ordered = [defaultDelay, ...DELAY_CHOICES.filter((m) => m !== defaultDelay)]
-
-  return [
-    {
-      label: t('notifications.delayedMenu'),
-      systemImage: 'clock.badge',
-      onSelect: () => {
-        showSheet(
-          t('notifications.delayedMenu'),
-          ordered.map((mins) => ({
-            label: formatDelayLabel(mins),
-            onSelect: () => pick(mins),
-          })),
-          { scheme }
-        )
-      },
-    },
-  ]
-}
-
-export function useSceneReminderMenu(opts: {
-  chatId: number
-  name: string
-  avatarFile?: string | null
+  reminderName: string
   isGroup?: boolean
   disabled?: boolean
-}): MenuItem[] {
+}): AttachTimerSession | undefined {
+  const db = useDatabase()
   const { t, locale } = useTranslation()
-  const { scheme } = useTheme()
   const { available, settings } = useNotifications()
 
-  if (opts.disabled || !available || !settings.enabled || !settings.sceneReminder.enabled) {
-    return []
-  }
+  const allowReminder = !opts.disabled && available && settings.enabled && settings.sceneReminder.enabled
+  const allowMessage = !opts.disabled && available && settings.enabled && settings.delayedCharacterMessage.enabled
+  if (!allowReminder && !allowMessage) return undefined
 
-  const scheduleAt = (fireAtMs: number) => {
-    scheduleSceneReminder({
-      chatId: opts.chatId,
-      name: opts.name,
-      avatarFile: opts.avatarFile,
-      isGroup: opts.isGroup,
-      fireAtMs,
-    })
-      .then((ok) => {
+  return {
+    allowReminder,
+    allowMessage,
+    defaultMinutes: settings.delayedCharacterMessage.delayMinutes,
+    onSchedule: async ({ mode, delayMinutes }) => {
+      if (delayMinutes <= 0) return false
+      if (mode === 'message') {
+        try {
+          const ok = await scheduleDelayedFollowUp(db, {
+            chatId: opts.chatId,
+            characterId: opts.characterId,
+            senderName: opts.senderName,
+            systemPrompt: opts.systemPrompt,
+            avatarFile: opts.avatarFile,
+            roomTitle: opts.roomTitle,
+            delayMinutes,
+          })
+          if (ok) {
+            showToast({
+              tone: 'success',
+              title: t('notifications.delayedScheduled', {
+                name: opts.senderName,
+                delay: formatDelayLabel(delayMinutes),
+              }),
+            })
+          }
+          return ok
+        } catch (err) {
+          reportError(t('notifications.delayedTitle'), err)
+          return false
+        }
+      }
+      try {
+        const fireAtMs = Date.now() + delayMinutes * 60 * 1000
+        const ok = await scheduleSceneReminder({
+          chatId: opts.chatId,
+          name: opts.reminderName,
+          avatarFile: opts.avatarFile,
+          isGroup: opts.isGroup,
+          fireAtMs,
+        })
         if (ok) {
           showToast({
             tone: 'success',
             title: t('notifications.reminderScheduled', { when: formatWhen(fireAtMs, locale) }),
           })
         }
-      })
-      .catch((err) => reportError(t('notifications.reminderTitle'), err))
-  }
-
-  const openChoices = () => {
-    const now = new Date()
-    const hour = settings.sceneReminder.defaultHour
-    const tonight = new Date(now)
-    tonight.setHours(hour, 0, 0, 0)
-    if (tonight.getTime() <= now.getTime() + 15 * 60 * 1000) {
-      tonight.setDate(tonight.getDate() + 1)
-    }
-    const tomorrow = new Date(now)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    tomorrow.setHours(9, 0, 0, 0)
-
-    const items: MenuItem[] = [
-      { label: t('notifications.reminderIn1h'), onSelect: () => scheduleAt(Date.now() + 60 * 60 * 1000) },
-      { label: t('notifications.reminderTonight', { hour }), onSelect: () => scheduleAt(tonight.getTime()) },
-      { label: t('notifications.reminderTomorrow'), onSelect: () => scheduleAt(tomorrow.getTime()) },
-      {
-        label: t('notifications.reminderCustom'),
-        onSelect: () => {
-          promptText({
-            title: t('notifications.reminderCustomTitle'),
-            message: t('notifications.reminderCustomPlaceholder'),
-            initial: '2',
-            confirmLabel: t('common.ok'),
-            scheme,
-            onSubmit: (raw) => {
-              const hours = Number(raw.replace(',', '.').trim())
-              if (Number.isFinite(hours) && hours > 0 && hours <= 168) {
-                scheduleAt(Date.now() + hours * 60 * 60 * 1000)
-              }
-            },
-          })
-        },
-      },
-    ]
-
-    showSheet(t('notifications.reminderMenu'), items, { scheme })
-  }
-
-  return [
-    {
-      label: t('notifications.reminderMenu'),
-      systemImage: 'bell.badge',
-      onSelect: openChoices,
+        return ok
+      } catch (err) {
+        reportError(t('notifications.reminderTitle'), err)
+        return false
+      }
     },
-  ]
+  }
 }

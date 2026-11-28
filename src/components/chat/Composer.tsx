@@ -43,7 +43,7 @@ import { useDatabase } from '@/db/provider'
 import { reorderFeel } from '@/hooks/features/useReorder'
 import { CHAT_COLUMN } from '@/hooks/util/useLayoutMode'
 import { useTranslation } from '@/i18n'
-import { finishAttachSession, setAttachAfter, setAttachSession, type AttachSession } from '@/lib/chat/attachSession'
+import { finishAttachSession, setAttachAfter, setAttachSession, type AttachSession, type AttachTimerSession } from '@/lib/chat/attachSession'
 import { isAndroid, isIOS, isWeb } from '@/lib/core/platform'
 import { pickMessageImages, pictureUri } from '@/lib/images/attachments'
 import type { ImageSource } from '@/lib/images/images'
@@ -87,6 +87,7 @@ type Props = {
   onSetDirection?: (direction: string) => void
   suggestionDirection?: string | null
   onSetSuggestionDirection?: (suggestionDirection: string) => void
+  timer?: AttachTimerSession
   fade?: boolean
   look?: ChatLook
   cast?: { id: number; name: string }[]
@@ -129,6 +130,7 @@ export function Composer({
   onSetDirection,
   suggestionDirection,
   onSetSuggestionDirection,
+  timer,
 }: Props) {
   const insets = useSafeAreaInsets()
   const { width: windowWidth } = useWindowDimensions()
@@ -380,6 +382,7 @@ export function Composer({
       onSetDirection,
       suggestionDirection,
       onSetSuggestionDirection,
+      timer,
       onPick: (source) => {
         restoreKeyboardOnClose.current = false
         setTimeout(() => attach(source), 50)

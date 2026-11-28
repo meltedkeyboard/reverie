@@ -64,7 +64,11 @@ export function formatDelayLabel(minutes: number): string {
   if (minutes === 60) return t('notifications.delay1h')
   if (minutes === 180) return t('notifications.delay3h')
   if (minutes === 480) return t('notifications.delay8h')
-  return `${minutes}m`
+  if (minutes < 60) return t('notifications.delayMinutes', { count: minutes })
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  if (mins === 0) return t('notifications.delayHours', { count: hours })
+  return t('notifications.delayHoursMinutes', { hours, minutes: mins })
 }
 
 async function craftFollowUpLine(
