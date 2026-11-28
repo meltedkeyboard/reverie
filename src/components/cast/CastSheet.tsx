@@ -361,7 +361,7 @@ export function NativeCastList({
             {/* The long press is the list's own menu of the row: the menu of a view inside the
                 row never opened, the row taking the press. */}
             <ContextMenu>
-              <ContextMenu.Items>{menuItemViews(memberMenu(member))}</ContextMenu.Items>
+              <ContextMenu.Items>{menuItemViews(memberMenu(member), colors.danger)}</ContextMenu.Items>
               <ContextMenu.Trigger>
                 <NativeHostedRow>
                   <View style={styles.memberLine}>

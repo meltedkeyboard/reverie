@@ -257,7 +257,7 @@ export default function ServersScreen() {
                 <SwipeActions key={server.id} modifiers={[moveDisabled(true)]}>
                   {/* The long press is the list's own menu of the row, as in the cast sheet. */}
                   <ContextMenu>
-                    <ContextMenu.Items>{menuItemViews(menuOf(server))}</ContextMenu.Items>
+                    <ContextMenu.Items>{menuItemViews(menuOf(server), colors.danger)}</ContextMenu.Items>
                     <ContextMenu.Trigger>{row()}</ContextMenu.Trigger>
                   </ContextMenu>
                   {/* From the other edge the server is asked again at once, without waiting for the next round. */}

@@ -59,8 +59,9 @@ type SymbolName = NonNullable<ComponentProps<NonNullable<typeof swiftUI>['ui']['
 
 // The items as the views of a SwiftUI menu: buttons, submenus and the lines between them.
 // For a menu of SwiftUI's own, as NativeMenu's or the context menu of a row of a list.
-export function menuItemViews(items: MenuItem[]): ReactNode[] {
+export function menuItemViews(items: MenuItem[], dangerColor?: string): ReactNode[] {
   const { Menu, Button, Divider } = swiftUI!.ui
+  const { tint, foregroundStyle } = swiftUI!.modifiers
   // Keyed by place, not by label: two items may read the same (rooms with one name).
   const toView = (item: MenuItem, i: number): ReactNode =>
     item.separated ? (
@@ -78,6 +79,7 @@ export function menuItemViews(items: MenuItem[]): ReactNode[] {
         label={item.label}
         systemImage={item.systemImage as SymbolName | undefined}
         role={item.destructive ? 'destructive' : undefined}
+        modifiers={item.destructive && dangerColor ? [tint(dangerColor), foregroundStyle(dangerColor)] : undefined}
         onPress={item.onSelect}
       />
     )
@@ -88,7 +90,7 @@ export function menuItemViews(items: MenuItem[]): ReactNode[] {
 // On iOS it is hosted inside the label of a SwiftUI menu, which makes the system menu
 // grow out of the trigger itself. Elsewhere the tap opens the action sheet.
 export function NativeMenu({ title, items, children, style, disabled = false, glassRadius }: Props) {
-  const { scheme } = useTheme()
+  const { colors, scheme } = useTheme()
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
 
   if (!swiftUI) {
@@ -106,7 +108,7 @@ export function NativeMenu({ title, items, children, style, disabled = false, gl
 
   const { Group, Host, Menu, RNHostView, Section } = swiftUI.ui
   const m = swiftUI.modifiers
-  const buttons = menuItemViews(items)
+  const buttons = menuItemViews(items, colors.danger)
   const content = title ? <Section title={title}>{buttons}</Section> : buttons
 
   const glass = glassRadius !== undefined && liquidGlass
