@@ -7,4 +7,5 @@ export type SegmentedProps<T extends string> = {
   options: SegmentOption<T>[]
   value: T
   onChange: (value: T) => void
+  disabled?: boolean
 }

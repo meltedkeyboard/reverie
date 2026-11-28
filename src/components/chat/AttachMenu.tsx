@@ -23,7 +23,7 @@ import { listGallery } from '@/db/gallery'
 import type { MessageImage } from '@/db/messages'
 import { deletePersona, listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
 import { useDatabase } from '@/db/provider'
-import { isAttachGalleryEnabled, isRecentAttachmentsEnabled, loadRecentSettings } from '@/db/recentAttachments'
+import { isAttachGalleryEnabled, isRecentAttachmentsEnabled, RECENT_ATTACHMENTS_LIMIT } from '@/db/recentAttachments'
 import { useTranslation } from '@/i18n'
 import { choosePersona, type AttachGallery, type AttachSession, type AttachTimerMode } from '@/lib/chat/attachSession'
 import { isAndroid, isDesktop, isIOS, isWeb } from '@/lib/core/platform'
@@ -47,8 +47,7 @@ import { SFIcon } from '../visuals/SFIcon'
 export async function loadRecentPictures(db: SQLiteDatabase): Promise<MessageImage[] | null> {
   try {
     if (!(await isRecentAttachmentsEnabled(db))) return null
-    const { count, unlimited } = await loadRecentSettings(db)
-    return await listRecentAttachments(db, unlimited ? null : count)
+    return await listRecentAttachments(db, RECENT_ATTACHMENTS_LIMIT)
   } catch {
     return []
   }

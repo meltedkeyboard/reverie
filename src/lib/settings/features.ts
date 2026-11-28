@@ -4,9 +4,9 @@ import { useSyncExternalStore } from 'react'
 // rows and the requests leave out what they would add, while what was set in them is kept
 // for when they are switched on again. Kept in memory so the request builders can check them
 // synchronously; the db layer loads them at startup and Settings writes them.
-export type Feature = 'personas' | 'direction'
+export type Feature = 'personas' | 'direction' | 'attachTimer'
 
-const on: Record<Feature, boolean> = { personas: true, direction: true }
+const on: Record<Feature, boolean> = { personas: true, direction: true, attachTimer: true }
 const listeners = new Set<() => void>()
 
 export const isFeatureOn = (feature: Feature) => on[feature]

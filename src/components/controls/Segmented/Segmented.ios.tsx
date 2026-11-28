@@ -8,7 +8,7 @@ import type { SegmentedProps } from './types'
 
 const HEIGHT = 32
 
-export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
+export function Segmented<T extends string>({ options, value, onChange, disabled }: SegmentedProps<T>) {
   const styles = useStyles(createStyles)
   const { scheme } = useTheme()
   const picked = useRef(value)
@@ -21,19 +21,24 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
 
   if (swiftUI) {
     const { Host, Picker, Text: SwiftText } = swiftUI.ui
-    const { pickerStyle, tag } = swiftUI.modifiers
+    const { pickerStyle, tag, disabled: swiftDisabled } = swiftUI.modifiers
     return (
-      <View style={styles.host} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+      <View
+        style={[styles.host, disabled && styles.disabled]}
+        pointerEvents={disabled ? 'none' : 'auto'}
+        onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}
+      >
         {width > 0 ? (
           <Host key={`${width}:${generation}`} style={styles.host} alignment="center" ignoreSafeArea="all" colorScheme={scheme}>
             <Picker
               selection={value}
               onSelectionChange={(next: T) => {
+                if (disabled) return
                 Haptics.selectionAsync()
                 picked.current = next
                 onChange(next)
               }}
-              modifiers={[pickerStyle('segmented')]}
+              modifiers={[pickerStyle('segmented'), ...(disabled ? [swiftDisabled(true)] : [])]}
             >
               {options.map((option) => (
                 <SwiftText key={option.value} modifiers={[tag(option.value)]}>
@@ -48,16 +53,21 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
   }
 
   return (
-    <View style={styles.track} accessibilityRole="radiogroup">
+    <View
+      style={[styles.track, disabled && styles.disabled]}
+      accessibilityRole="radiogroup"
+      pointerEvents={disabled ? 'none' : 'auto'}
+    >
       {options.map((option) => {
         const chosen = option.value === value
         return (
           <Pressable
             key={option.value}
+            disabled={disabled}
             accessibilityRole="radio"
-            accessibilityState={{ checked: chosen }}
+            accessibilityState={{ checked: chosen, disabled: Boolean(disabled) }}
             onPress={() => {
-              if (chosen) return
+              if (disabled || chosen) return
               Haptics.selectionAsync()
               onChange(option.value)
             }}
@@ -76,6 +86,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     host: { height: HEIGHT },
+    disabled: { opacity: 0.4 },
     track: { flexDirection: 'row', height: HEIGHT, padding: 2, borderRadius: 9, backgroundColor: colors.surfaceRaised },
     segment: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
     chosen: { backgroundColor: colors.bg },

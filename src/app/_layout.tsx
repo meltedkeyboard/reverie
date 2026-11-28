@@ -18,7 +18,7 @@ import { isConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { loadGalleryLayout } from '@/db/prefs/galleryLook'
 import { loadListLook } from '@/db/prefs/listLook'
 import { loadLongMemory } from '@/db/prefs/memory'
-import { isDirectionEnabled, isPersonasEnabled } from '@/db/prefs/features'
+import { isAttachTimerEnabled, isDirectionEnabled, isPersonasEnabled } from '@/db/prefs/features'
 import { isHapticsEnabled, isStreamHapticsEnabled, isSuggestionHapticsEnabled } from '@/db/prefs/haptics'
 import { DatabaseProvider, useDatabase } from '@/db/provider'
 import { loadLocalePreference, loadThemeMode, loadThemeName, saveLocalePreference, saveThemeMode, saveThemeName } from '@/db/prefs/settings'
@@ -71,6 +71,7 @@ function ThemedApp() {
     isSuggestionHapticsEnabled(db)
     isPersonasEnabled(db)
     isDirectionEnabled(db)
+    isAttachTimerEnabled(db)
     isConfirmDeleteEnabled(db)
     loadLongMemory(db)
     loadListLook(db)

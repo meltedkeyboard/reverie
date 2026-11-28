@@ -21,18 +21,13 @@ import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/comp
 import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
 import { setGalleryLayout, useGalleryLayout, type GalleryLayout } from '@/db/prefs/galleryLook'
 import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/prefs/continue'
-import { isDirectionEnabled, isPersonasEnabled, setDirectionEnabled, setPersonasEnabled } from '@/db/prefs/features'
+import { isAttachTimerEnabled, isDirectionEnabled, isPersonasEnabled, setAttachTimerEnabled, setDirectionEnabled, setPersonasEnabled } from '@/db/prefs/features'
 import { isHapticsEnabled, isStreamHapticsEnabled, isSuggestionHapticsEnabled, setHapticsEnabled, setStreamHapticsEnabled, setSuggestionHapticsEnabled } from '@/db/prefs/haptics'
 import {
   isAttachGalleryEnabled,
   isRecentAttachmentsEnabled,
-  loadRecentSettings,
   setAttachGalleryEnabled,
   setRecentAttachmentsEnabled,
-  setRecentCount,
-  setRecentUnlimited,
-  type RecentSettings,
-  DEFAULT_RECENT_COUNT,
 } from '@/db/recentAttachments'
 import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/prefs/privateChat'
 import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
@@ -99,43 +94,6 @@ export default function SettingsScreen() {
   // In the system's list the section is scrolled to by its id, with no flash. The module is
   // there or not for the life of the app, so the hook is called on every render or on none.
   const jumpTo = nativeForm?.ui.useNativeState<string | null>(null)
-
-  // Runs when the parameter arrives and again as sections are laid out, since on the
-  // first visit the one asked for may not have been measured yet. The parameter is
-  // cleared afterwards, so asking for the same section again scrolls once more.
-  const jump = useCallback(() => {
-    const target = section === 'folderSync' ? 'appearance' : section
-    if (jumpTo) {
-      if (!target) return
-      jumpTo.set(null)
-      jumpTo.set(target)
-      router.setParams({ section: undefined })
-      return
-    }
-    const y = target && offsets.current[target]
-    if (!target || y === undefined) return
-    scrollRef.current?.scrollTo({ y: Math.max(0, y - headerHeight - 16), animated: true })
-    setFlashed((prev) => ({ section: target, n: (prev?.n ?? 0) + 1 }))
-    router.setParams({ section: undefined })
-  }, [section, headerHeight, router, jumpTo])
-
-  useEffect(() => {
-    jump()
-  }, [jump])
-
-  // A part of the page a search result can open at.
-  const block = (id: SettingsSection, children: React.ReactNode, style?: object) => (
-    <View
-      style={style}
-      onLayout={(e) => {
-        offsets.current[id] = e.nativeEvent.layout.y
-        if (id === section) jump()
-      }}
-    >
-      {flashed?.section === id ? <Flash key={flashed.n} style={styles.flash} /> : null}
-      {children}
-    </View>
-  )
 
   const CONTINUE_OPTIONS: { value: 'visit' | 'message'; label: string }[] = [
     { value: 'visit', label: t('settings.continueByVisit') },
@@ -228,19 +186,55 @@ export default function SettingsScreen() {
   const [personasOn, togglePersonas] = useStoredFlag(isPersonasEnabled, setPersonasEnabled, true)
   const [directionOn, toggleDirection] = useStoredFlag(isDirectionEnabled, setDirectionEnabled, true)
   const [attachGallery, toggleAttachGallery] = useStoredFlag(isAttachGalleryEnabled, setAttachGalleryEnabled, true)
-  // How many of them: a number that may be empty while retyped, or no limit.
-  const [recent, setRecent] = useState<RecentSettings>({ count: DEFAULT_RECENT_COUNT, unlimited: false })
-  const [recentDraft, setRecentDraft] = useState<string>()
+  const [attachTimer, toggleAttachTimer] = useStoredFlag(isAttachTimerEnabled, setAttachTimerEnabled, true)
+
+  const targetSection =
+    section === 'folderSync'
+      ? 'appearance'
+      : section === 'private' ||
+          section === 'memory' ||
+          section === 'personas' ||
+          section === 'direction' ||
+          section === 'attachGallery' ||
+          section === 'attachTimer'
+        ? 'features'
+        : section
+
+  // Runs when the parameter arrives and again as sections are laid out, since on the
+  // first visit the one asked for may not have been measured yet. The parameter is
+  // cleared afterwards, so asking for the same section again scrolls once more.
+  const jump = useCallback(() => {
+    if (jumpTo) {
+      if (!targetSection) return
+      jumpTo.set(null)
+      jumpTo.set(targetSection)
+      router.setParams({ section: undefined })
+      return
+    }
+    const y = targetSection && offsets.current[targetSection]
+    if (!targetSection || y === undefined) return
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - headerHeight - 16), animated: true })
+    setFlashed((prev) => ({ section: targetSection, n: (prev?.n ?? 0) + 1 }))
+    router.setParams({ section: undefined })
+  }, [targetSection, headerHeight, router, jumpTo])
+
   useEffect(() => {
-    loadRecentSettings(db).then(setRecent)
-  }, [db])
-  const typeRecentCount = (text: string) => {
-    const { digits, count } = typedCount(text)
-    setRecentDraft(digits)
-    if (!count) return
-    setRecent((r) => ({ ...r, count }))
-    setRecentCount(db, count)
-  }
+    jump()
+  }, [jump])
+
+  // A part of the page a search result can open at.
+  const block = (id: SettingsSection, children: React.ReactNode, style?: object) => (
+    <View
+      style={style}
+      onLayout={(e) => {
+        offsets.current[id] = e.nativeEvent.layout.y
+        if (id === targetSection) jump()
+      }}
+    >
+      {flashed?.section === id ? <Flash key={flashed.n} style={styles.flash} /> : null}
+      {children}
+    </View>
+  )
   const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
   const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
   const [streamHaptics, toggleStreamHaptics] = useStoredFlag(isStreamHapticsEnabled, setStreamHapticsEnabled, true)
@@ -423,9 +417,19 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
-  const archiveRow = (
-    <ListSection footer={t('archive.settingsNote')}>
+  const collectionsRow = (
+    <ListSection>
       <LinkCell label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
+      <LinkCell
+        label={t('persona.title')}
+        value={personas.length > 0 ? String(personas.length) : t('persona.none')}
+        onPress={() => router.push('/personas')}
+      />
+      <LinkCell
+        label={t('lore.title')}
+        value={lorebookCount > 0 ? String(lorebookCount) : t('lore.none')}
+        onPress={() => router.push('/lorebooks')}
+      />
     </ListSection>
   )
 
@@ -440,54 +444,18 @@ export default function SettingsScreen() {
     </ListSection>
   )
 
-  const attachGalleryRow = (
-    <ListSection footer={t('settings.attachGalleryNote')}>
-      <SwitchCell label={t('settings.attachGallery')} value={attachGallery} onValueChange={toggleAttachGallery} />
-    </ListSection>
-  )
-
-  // Personas and direction can be switched off whole; their list and texts are kept.
-  const personasRow = (
-    <ListSection header={t('persona.title')} footer={personasOn ? t('persona.emptyText') : t('settings.personasOffNote')}>
-      <SwitchCell label={t('settings.personasOn')} value={personasOn} onValueChange={togglePersonas} />
-      {personasOn ? (
-        <LinkCell
-          label={t('persona.title')}
-          value={personas.length > 0 ? String(personas.length) : t('persona.none')}
-          onPress={() => router.push('/personas')}
-        />
-      ) : null}
-    </ListSection>
-  )
-
-  const directionRow = (
-    <ListSection footer={t('settings.directionNote')}>
-      <SwitchCell label={t('direction.title')} value={directionOn} onValueChange={toggleDirection} />
-    </ListSection>
-  )
-
-  const memoryRows = (
-    <ListSection
-      header={t('memory.section')}
-      footer={
-        <>
-          <ListFooter>{t('memory.longHint')}</ListFooter>
-          <ListFooter>{t('lore.settingsHint')}</ListFooter>
-        </>
-      }
-    >
-      <SwitchCell label={t('memory.long')} value={longMemory} onValueChange={toggleLongMemory} />
-      <LinkCell
-        label={t('lore.title')}
-        value={lorebookCount > 0 ? String(lorebookCount) : t('lore.none')}
-        onPress={() => router.push('/lorebooks')}
-      />
-    </ListSection>
-  )
-
-  const privateRow = (
-    <ListSection header={t('settings.chats')} footer={t('settings.privateButtonNote')}>
+  const featuresRows = (
+    <ListSection header={t('settings.featuresTitle')} footer={t('settings.featuresNote')}>
       <SwitchCell label={t('settings.privateButton')} value={privateButton} onValueChange={togglePrivateButton} />
+      <SwitchCell label={t('memory.long')} value={longMemory} onValueChange={toggleLongMemory} />
+      <SwitchCell label={t('settings.personasOn')} value={personasOn} onValueChange={togglePersonas} />
+      <SwitchCell label={t('direction.title')} value={directionOn} onValueChange={toggleDirection} />
+      <SwitchCell label={t('settings.suggestButton')} value={suggestions} onValueChange={toggleSuggestions} />
+      <SwitchCell label={t('settings.recentPictures')} value={recentPictures} onValueChange={toggleRecentPictures} />
+      <SwitchCell label={t('settings.attachGallery')} value={attachGallery} onValueChange={toggleAttachGallery} />
+      {notifications.available ? (
+        <SwitchCell label={t('settings.attachTimer')} value={attachTimer} onValueChange={toggleAttachTimer} />
+      ) : null}
     </ListSection>
   )
 
@@ -521,74 +489,49 @@ export default function SettingsScreen() {
   )
 
   const suggestRow = (
-    <ListSection footer={suggestFooter}>
-      <SwitchCell label={t('settings.suggestButton')} value={suggestions} onValueChange={toggleSuggestions} />
-      {suggestions ? (
-        <>
-          <SegmentCell
-            label={t('settings.suggestContextMode')}
-            options={SUGGEST_MODE_OPTIONS}
-            value={suggestionContextMode}
-            onChange={pickSuggestionMode}
-          />
-          {suggestionContextMode === 'limit' ? (
-            <InputCell
-              label={t('settings.suggestMessagesCount')}
-              value={suggestionMessagesDraft ?? String(suggestionMessages)}
-              onChangeText={typeSuggestionMessages}
-              keyboardType="number-pad"
-            />
-          ) : null}
-          <SliderCell
-            label={t('settings.suggestTokens')}
-            value={suggestionTokens}
-            min={SUGGESTION_TOKENS.min}
-            max={SUGGESTION_TOKENS.max}
-            step={SUGGESTION_TOKENS.step}
-            onChange={(tokens) => {
-              setSuggestionTokens(tokens)
-              saveSuggestionTokens(db, tokens)
-            }}
-          />
-          {haptics ? (
-            <SwitchCell
-              label={t('settings.suggestionHaptics')}
-              value={suggestionHaptics}
-              onValueChange={toggleSuggestionHaptics}
-            />
-          ) : null}
-          <SwitchCell
-            label={t('settings.suggestImagesReference')}
-            value={suggestionImagesReference}
-            onValueChange={toggleSuggestionImagesReference}
-          />
-        </>
+    <ListSection header={t('settings.suggestButton')} footer={suggestFooter}>
+      <SegmentCell
+        label={t('settings.suggestContextMode')}
+        options={SUGGEST_MODE_OPTIONS}
+        value={suggestionContextMode}
+        onChange={pickSuggestionMode}
+        disabled={!suggestions}
+      />
+      {suggestionContextMode === 'limit' ? (
+        <InputCell
+          label={t('settings.suggestMessagesCount')}
+          value={suggestionMessagesDraft ?? String(suggestionMessages)}
+          onChangeText={typeSuggestionMessages}
+          keyboardType="number-pad"
+          disabled={!suggestions}
+        />
       ) : null}
-    </ListSection>
-  )
-
-  const recentRow = (
-    <ListSection footer={t('settings.recentPicturesNote')}>
-      <SwitchCell label={t('settings.recentPictures')} value={recentPictures} onValueChange={toggleRecentPictures} />
-      {recentPictures ? (
-        <>
-          <SwitchCell
-            label={t('settings.recentUnlimited')}
-            value={recent.unlimited}
-            onValueChange={(unlimited) => {
-              setRecent((r) => ({ ...r, unlimited }))
-              setRecentUnlimited(db, unlimited)
-            }}
-          />
-          <InputCell
-            label={t('settings.recentCount')}
-            value={recentDraft ?? String(recent.count)}
-            onChangeText={typeRecentCount}
-            keyboardType="number-pad"
-            disabled={recent.unlimited}
-          />
-        </>
+      <SliderCell
+        label={t('settings.suggestTokens')}
+        value={suggestionTokens}
+        min={SUGGESTION_TOKENS.min}
+        max={SUGGESTION_TOKENS.max}
+        step={SUGGESTION_TOKENS.step}
+        onChange={(tokens) => {
+          setSuggestionTokens(tokens)
+          saveSuggestionTokens(db, tokens)
+        }}
+        disabled={!suggestions}
+      />
+      {haptics ? (
+        <SwitchCell
+          label={t('settings.suggestionHaptics')}
+          value={suggestionHaptics}
+          onValueChange={toggleSuggestionHaptics}
+          disabled={!suggestions}
+        />
       ) : null}
+      <SwitchCell
+        label={t('settings.suggestImagesReference')}
+        value={suggestionImagesReference}
+        onValueChange={toggleSuggestionImagesReference}
+        disabled={!suggestions}
+      />
     </ListSection>
   )
 
@@ -800,10 +743,6 @@ export default function SettingsScreen() {
           ) : null}
         </NativeSection>
 
-        <NativeSection id="archive" footer={t('archive.settingsNote')}>
-          <NativeLinkRow label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
-        </NativeSection>
-
         <NativeSection id="gallery" footer={t('settings.galleryLayoutNote')}>
           <NativeSegmentRow
             label={t('settings.galleryLayout')}
@@ -813,12 +752,24 @@ export default function SettingsScreen() {
           />
         </NativeSection>
 
-        <NativeSection id="private" title={t('settings.chats')} footer={t('settings.privateButtonNote')}>
+        <NativeSection id="features" title={t('settings.featuresTitle')} footer={t('settings.featuresNote')}>
           {toggle(null, t('settings.privateButton'), privateButton, togglePrivateButton)}
+          {toggle(null, t('memory.long'), longMemory, toggleLongMemory)}
+          {toggle(null, t('settings.personasOn'), personasOn, togglePersonas)}
+          {toggle(null, t('direction.title'), directionOn, toggleDirection)}
+          {toggle(null, t('settings.suggestButton'), suggestions, toggleSuggestions)}
+          {toggle(null, t('settings.recentPictures'), recentPictures, toggleRecentPictures)}
+          {toggle(null, t('settings.attachGallery'), attachGallery, toggleAttachGallery)}
+          {notifications.available ? toggle(null, t('settings.attachTimer'), attachTimer, toggleAttachTimer) : null}
         </NativeSection>
 
-        <NativeSection id="memory" title={t('memory.section')} footer={[{ text: t('memory.longHint') }, { text: t('lore.settingsHint') }]}>
-          {toggle(null, t('memory.long'), longMemory, toggleLongMemory)}
+        <NativeSection id="archive">
+          <NativeLinkRow label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
+          <NativeLinkRow
+            label={t('persona.title')}
+            value={personas.length > 0 ? String(personas.length) : t('persona.none')}
+            onPress={() => router.push('/personas')}
+          />
           <NativeLinkRow
             label={t('lore.title')}
             value={lorebookCount > 0 ? String(lorebookCount) : t('lore.none')}
@@ -826,23 +777,9 @@ export default function SettingsScreen() {
           />
         </NativeSection>
 
-        <NativeSection id="personas" title={t('persona.title')} footer={personasOn ? t('persona.emptyText') : t('settings.personasOffNote')}>
-          {toggle(null, t('settings.personasOn'), personasOn, togglePersonas)}
-          {personasOn ? (
-            <NativeLinkRow
-              label={t('persona.title')}
-              value={personas.length > 0 ? String(personas.length) : t('persona.none')}
-              onPress={() => router.push('/personas')}
-            />
-          ) : null}
-        </NativeSection>
-
-        <NativeSection id="direction" footer={t('settings.directionNote')}>
-          {toggle(null, t('direction.title'), directionOn, toggleDirection)}
-        </NativeSection>
-
         <NativeSection
           id="suggest"
+          title={t('settings.suggestButton')}
           footerNode={
             <VStack alignment="leading" spacing={6}>
               <SwiftText>{t('settings.suggestIntro')}</SwiftText>
@@ -867,52 +804,35 @@ export default function SettingsScreen() {
             </VStack>
           }
         >
-          {toggle(null, t('settings.suggestButton'), suggestions, toggleSuggestions)}
-          {suggestions ? (
-            <>
-              <NativeSegmentRow
-                label={t('settings.suggestContextMode')}
-                options={SUGGEST_MODE_OPTIONS}
-                value={suggestionContextMode}
-                onChange={pickSuggestionMode}
-              />
-              {suggestionContextMode === 'limit'
-                ? numberRow(
-                    t('settings.suggestMessagesCount'),
-                    suggestionMessagesDraft ?? String(suggestionMessages),
-                    typeSuggestionMessages
-                  )
-                : null}
-              <NativeSliderRow
-                label={t('settings.suggestTokens')}
-                value={suggestionTokens}
-                min={SUGGESTION_TOKENS.min}
-                max={SUGGESTION_TOKENS.max}
-                step={SUGGESTION_TOKENS.step}
-                onChange={(tokens) => {
-                  setSuggestionTokens(tokens)
-                  saveSuggestionTokens(db, tokens)
-                }}
-              />
-              {haptics ? toggle(null, t('settings.suggestionHaptics'), suggestionHaptics, toggleSuggestionHaptics) : null}
-              {toggle(null, t('settings.suggestImagesReference'), suggestionImagesReference, toggleSuggestionImagesReference)}
-            </>
-          ) : null}
-        </NativeSection>
-
-        <NativeSection id="recents" footer={t('settings.recentPicturesNote')}>
-          {toggle(null, t('settings.recentPictures'), recentPictures, toggleRecentPictures)}
-          {recentPictures
-            ? toggle(null, t('settings.recentUnlimited'), recent.unlimited, (unlimited) => {
-                setRecent((r) => ({ ...r, unlimited }))
-                setRecentUnlimited(db, unlimited)
-              })
+          <NativeSegmentRow
+            label={t('settings.suggestContextMode')}
+            options={SUGGEST_MODE_OPTIONS}
+            value={suggestionContextMode}
+            onChange={pickSuggestionMode}
+            disabled={!suggestions}
+          />
+          {suggestionContextMode === 'limit'
+            ? numberRow(
+                t('settings.suggestMessagesCount'),
+                suggestionMessagesDraft ?? String(suggestionMessages),
+                typeSuggestionMessages,
+                !suggestions
+              )
             : null}
-          {recentPictures ? numberRow(t('settings.recentCount'), recentDraft ?? String(recent.count), typeRecentCount, recent.unlimited) : null}
-        </NativeSection>
-
-        <NativeSection id="attachGallery" footer={t('settings.attachGalleryNote')}>
-          {toggle(null, t('settings.attachGallery'), attachGallery, toggleAttachGallery)}
+          <NativeSliderRow
+            label={t('settings.suggestTokens')}
+            value={suggestionTokens}
+            min={SUGGESTION_TOKENS.min}
+            max={SUGGESTION_TOKENS.max}
+            step={SUGGESTION_TOKENS.step}
+            onChange={(tokens) => {
+              setSuggestionTokens(tokens)
+              saveSuggestionTokens(db, tokens)
+            }}
+            disabled={!suggestions}
+          />
+          {haptics ? toggle(null, t('settings.suggestionHaptics'), suggestionHaptics, toggleSuggestionHaptics, !suggestions) : null}
+          {toggle(null, t('settings.suggestImagesReference'), suggestionImagesReference, toggleSuggestionImagesReference, !suggestions)}
         </NativeSection>
 
         <NativeSection id="confirmDelete">{toggle(null, t('settings.confirmDelete'), confirmDelete, toggleConfirmDelete)}</NativeSection>
@@ -989,15 +909,10 @@ export default function SettingsScreen() {
           {block('appearance', appearance)}
           {block('language', language)}
           {block('continue', continueRows)}
-          {block('archive', archiveRow)}
           {block('gallery', galleryRow)}
-          {block('private', privateRow)}
-          {block('memory', memoryRows)}
-          {block('personas', personasRow)}
-          {block('direction', directionRow)}
+          {block('features', featuresRows)}
+          {block('archive', collectionsRow)}
           {block('suggest', suggestRow)}
-          {block('recents', recentRow)}
-          {block('attachGallery', attachGalleryRow)}
           {block('confirmDelete', confirmDeleteRow)}
           {block('haptics', hapticsRow)}
           {block('server', server)}

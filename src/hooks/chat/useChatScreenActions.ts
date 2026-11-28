@@ -15,6 +15,7 @@ import type { AttachTimerSession } from '@/lib/chat/attachSession'
 import { formatWhen } from '@/lib/core/format'
 import { scheduleSceneReminder } from '@/lib/notifications/events'
 import { formatDelayLabel, scheduleDelayedFollowUp } from '@/lib/notifications/followUp'
+import { useFeature } from '@/lib/settings/features'
 import { showToast } from '@/lib/ui/toast'
 import { alertError, reportError } from '@/lib/transfer/report'
 
@@ -132,9 +133,10 @@ export function useChatTimer(opts: {
   const db = useDatabase()
   const { t, locale } = useTranslation()
   const { available, settings } = useNotifications()
+  const timerEnabled = useFeature('attachTimer')
 
-  const allowReminder = !opts.disabled && available && settings.enabled && settings.sceneReminder.enabled
-  const allowMessage = !opts.disabled && available && settings.enabled && settings.delayedCharacterMessage.enabled
+  const allowReminder = !opts.disabled && timerEnabled && available && settings.enabled && settings.sceneReminder.enabled
+  const allowMessage = !opts.disabled && timerEnabled && available && settings.enabled && settings.delayedCharacterMessage.enabled
   if (!allowReminder && !allowMessage) return undefined
 
   return {

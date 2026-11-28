@@ -127,12 +127,13 @@ export default function SearchScreen() {
       { label: t('settings.continueButton'), keywords: [t('settings.homeScreen')], symbol: 'play.circle', fallback: 'play-circle-outline', href: settingsAt('continue') },
       { label: t('archive.title'), keywords: [t('characters.title')], symbol: 'archivebox', fallback: 'archive-outline', href: '/archive' },
       { label: t('settings.galleryLayout'), keywords: [t('settings.galleryGrid'), t('settings.galleryCarousel'), t('profile.title'), t('gallery.title')], symbol: 'rectangle.stack', fallback: 'albums-outline', href: settingsAt('gallery') },
-      { label: t('settings.privateButton'), keywords: [t('settings.chats')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('private') },
-      { label: t('memory.long'), keywords: [t('memory.section'), t('lore.title'), t('settings.chats')], symbol: 'brain', fallback: 'book-outline', href: settingsAt('memory') },
-      { label: t('settings.suggestButton'), keywords: [t('settings.chats')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
-      { label: t('direction.title'), keywords: [t('settings.chats'), t('attach.title')], symbol: 'signpost.right', fallback: 'compass-outline', href: settingsAt('direction') },
-      { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: settingsAt('recents') },
-      { label: t('settings.attachGallery'), keywords: [t('settings.chats'), t('attach.title'), t('gallery.title')], symbol: 'photo.on.rectangle.angled', fallback: 'images-outline', href: settingsAt('attachGallery') },
+      { label: t('settings.privateButton'), keywords: [t('settings.chats'), t('settings.featuresTitle')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('features') },
+      { label: t('memory.long'), keywords: [t('memory.section'), t('lore.title'), t('settings.chats'), t('settings.featuresTitle')], symbol: 'brain', fallback: 'book-outline', href: settingsAt('features') },
+      { label: t('settings.personasOn'), keywords: [t('persona.title'), t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'theatermasks', fallback: 'happy-outline', href: settingsAt('features') },
+      { label: t('settings.suggestButton'), keywords: [t('settings.chats'), t('settings.featuresTitle')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
+      { label: t('direction.title'), keywords: [t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'signpost.right', fallback: 'compass-outline', href: settingsAt('features') },
+      { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: settingsAt('features') },
+      { label: t('settings.attachGallery'), keywords: [t('settings.chats'), t('attach.title'), t('gallery.title'), t('settings.featuresTitle')], symbol: 'photo.on.rectangle.angled', fallback: 'images-outline', href: settingsAt('features') },
       { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
       { label: t('settings.haptics'), keywords: [t('settings.feedback'), t('settings.streamHaptics'), t('settings.suggestionHaptics')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
       {
@@ -151,6 +152,14 @@ export default function SearchScreen() {
       entries.splice(language + 1, 0, { label: t('settings.appIcon'), keywords: [t('settings.appearance')], symbol: 'app', fallback: 'apps-outline', href: settingsAt('appearance') })
     }
     if (notificationsAvailable) {
+      const attachGallery = entries.findIndex((entry) => entry.label === t('settings.attachGallery'))
+      entries.splice(attachGallery + 1, 0, {
+        label: t('settings.attachTimer'),
+        keywords: [t('settings.chats'), t('attach.title'), t('notifications.title'), t('settings.featuresTitle')],
+        symbol: 'timer',
+        fallback: 'timer-outline',
+        href: settingsAt('features'),
+      })
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
       entries.splice(backup, 0, {
         label: t('notifications.title'),

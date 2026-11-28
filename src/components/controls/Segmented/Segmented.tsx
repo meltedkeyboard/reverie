@@ -6,20 +6,25 @@ import type { SegmentedProps } from './types'
 
 const HEIGHT = 32
 
-export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
+export function Segmented<T extends string>({ options, value, onChange, disabled }: SegmentedProps<T>) {
   const styles = useStyles(createStyles)
 
   return (
-    <View style={styles.track} accessibilityRole="radiogroup">
+    <View
+      style={[styles.track, disabled && styles.disabled]}
+      accessibilityRole="radiogroup"
+      pointerEvents={disabled ? 'none' : 'auto'}
+    >
       {options.map((option) => {
         const chosen = option.value === value
         return (
           <Pressable
             key={option.value}
+            disabled={disabled}
             accessibilityRole="radio"
-            accessibilityState={{ checked: chosen }}
+            accessibilityState={{ checked: chosen, disabled: Boolean(disabled) }}
             onPress={() => {
-              if (chosen) return
+              if (disabled || chosen) return
               Haptics.selectionAsync()
               onChange(option.value)
             }}
@@ -38,6 +43,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     track: { flexDirection: 'row', height: HEIGHT, padding: 2, borderRadius: 9, backgroundColor: colors.surfaceRaised },
+    disabled: { opacity: 0.4 },
     segment: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
     chosen: { backgroundColor: colors.bg },
     label: { color: colors.textMuted, fontSize: 13, fontWeight: '500' },

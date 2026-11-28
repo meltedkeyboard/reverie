@@ -448,13 +448,30 @@ export function NativeFreeSliderRow({
 }
 
 // Two or three choices as the system's segments, under their name.
-export function NativeSegmentRow<T extends string>({ label, options, value, onChange }: { label: string; options: { value: T; label: string }[]; value: T; onChange: (value: T) => void }) {
+export function NativeSegmentRow<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  disabled: rowDisabled,
+}: {
+  label: string
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (value: T) => void
+  disabled?: boolean
+}) {
+  const { colors } = useTheme()
   const { VStack, Text, Picker } = nativeForm!.ui
-  const { pickerStyle, labelsHidden, tag } = nativeForm!.modifiers
+  const { foregroundStyle, pickerStyle, labelsHidden, tag, disabled: swiftDisabled } = nativeForm!.modifiers
   return (
-    <VStack alignment="leading" spacing={10}>
-      <Text>{label}</Text>
-      <Picker selection={value} onSelectionChange={(next: T) => onChange(next)} modifiers={[pickerStyle('segmented'), labelsHidden()]}>
+    <VStack alignment="leading" spacing={10} modifiers={rowDisabled ? [swiftDisabled(true)] : []}>
+      <Text modifiers={rowDisabled ? [foregroundStyle(colors.textFaint)] : []}>{label}</Text>
+      <Picker
+        selection={value}
+        onSelectionChange={(next: T) => onChange(next)}
+        modifiers={[pickerStyle('segmented'), labelsHidden(), ...(rowDisabled ? [swiftDisabled(true)] : [])]}
+      >
         {options.map((option) => (
           <Text key={option.value} modifiers={[tag(option.value)]}>
             {option.label}

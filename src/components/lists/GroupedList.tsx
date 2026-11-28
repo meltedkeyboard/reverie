@@ -281,7 +281,7 @@ export function SegmentCell<T extends string>({
   const styles = useStyles(createStyles)
   return (
     <View style={styles.segmentCell}>
-      <Text style={styles.capsLabel}>{label}</Text>
+      <Text style={[styles.capsLabel, segmented.disabled && styles.disabled]}>{label}</Text>
       <Segmented {...segmented} />
     </View>
   )
