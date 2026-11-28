@@ -135,15 +135,38 @@ export function CheckCell({
   )
 }
 
+// A leading accent glyph for grouped link rows, fixed width so labels align vertically.
+export function SettingsIcon({
+  symbol,
+  fallback,
+}: {
+  symbol: ComponentProps<typeof SFIcon>['name']
+  fallback: ComponentProps<typeof Icon>['name']
+}) {
+  const colors = useColors()
+  return (
+    <View style={iconStyles.slot}>
+      <SFIcon name={symbol} fallback={fallback} size={19} color={colors.accent} />
+    </View>
+  )
+}
+
+const iconStyles = StyleSheet.create({
+  slot: { width: 24, alignItems: 'center', justifyContent: 'center' },
+})
+
 // A row that opens a screen: the current value in grey and a chevron.
-export function LinkCell({ label, value, onPress }: CellProps & { value?: string; onPress: () => void }) {
+export function LinkCell({ label, value, leading, onPress }: CellProps & { value?: string; leading?: ReactNode; onPress: () => void }) {
   const colors = useColors()
   const styles = useStyles(createStyles)
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-      <Text style={styles.label}>{label}</Text>
+      {leading ? <View style={styles.leading}>{leading}</View> : null}
+      <Text style={[styles.label, value ? styles.linkLabelTrim : undefined]} numberOfLines={1}>
+        {label}
+      </Text>
       {value ? (
-        <Text style={styles.value} numberOfLines={1}>
+        <Text style={[styles.value, styles.linkValue]} numberOfLines={1}>
           {value}
         </Text>
       ) : null}
@@ -379,9 +402,11 @@ const baseStyles = (colors: Colors) =>
     pressed: { backgroundColor: colors.surfaceRaised },
     disabled: { opacity: 0.4 },
     label: { flex: 1, color: colors.text, fontSize: 17 },
+    linkLabelTrim: { flex: 0, flexShrink: 1 },
     leading: { marginRight: 4 },
     labelWithIcon: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
     value: { color: colors.textMuted, fontSize: 17, flexShrink: 1, maxWidth: '55%' },
+    linkValue: { flex: 1, maxWidth: undefined, textAlign: 'right' },
     inputLabel: { color: colors.text, fontSize: 17 },
     input: { flex: 1, color: colors.text, fontSize: 17, textAlign: 'right', paddingVertical: 0 },
     sliderCell: { paddingHorizontal: INSET, paddingTop: 12 },

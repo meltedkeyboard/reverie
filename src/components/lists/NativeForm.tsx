@@ -179,7 +179,7 @@ export function NativeHostedRow({ height, clear = false, children }: { height?: 
 
 // A row that opens another screen: its name, the value in grey and a chevron, as a navigation
 // row of Settings, the whole row highlighting on a tap. `symbol` stands before the name, in
-// the name's color.
+// the name's color or `color`.
 export function NativeLinkRow({
   label,
   value,
@@ -197,12 +197,19 @@ export function NativeLinkRow({
 }) {
   const { colors } = useTheme()
   const { Button, HStack, Spacer, Text, Image } = nativeForm!.ui
-  const { foregroundStyle, lineLimit } = nativeForm!.modifiers
+  const { foregroundStyle, frame, layoutPriority, lineLimit } = nativeForm!.modifiers
   return (
     <Button onPress={onPress}>
-      <HStack spacing={10}>
-        {symbol ? <Image systemName={symbol as never} size={18} color={color ?? colors.text} /> : null}
-        <Text modifiers={[foregroundStyle(colors.text)]}>{label}</Text>
+      <HStack spacing={12}>
+        {symbol ? (
+          <Image
+            systemName={symbol as never}
+            size={18}
+            color={color ?? colors.text}
+            modifiers={[frame({ width: 24 })]}
+          />
+        ) : null}
+        <Text modifiers={[foregroundStyle(colors.text), lineLimit(1), layoutPriority(1)]}>{label}</Text>
         <Spacer />
         {value ? <Text modifiers={[foregroundStyle(colors.textMuted), lineLimit(1)]}>{value}</Text> : null}
         {chevron ? <Image systemName="chevron.right" size={13} color={colors.textFaint} /> : null}

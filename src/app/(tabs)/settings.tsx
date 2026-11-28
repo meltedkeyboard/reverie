@@ -1,208 +1,143 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { AppState, Linking, StyleSheet, Text, View } from 'react-native'
-import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
+import { useCallback, useEffect, useRef, useState, type ComponentProps, type ComponentRef } from 'react'
+import { AppState, Linking, ScrollView, StyleSheet, View } from 'react-native'
 
-import { ButtonCell, CheckCell, InputCell, LinkCell, ListFooter, ListSection, SegmentCell, SliderCell, SwitchCell, ValueCell } from '@/components/lists/GroupedList'
-import {
-  nativeForm,
-  NativeActionRow,
-  NativeForm,
-  NativeHostedRow,
-  NativeLinkRow,
-  NativeSection,
-  NativeSegmentRow,
-  NativeSliderRow,
-  NativeTextRow,
-} from '@/components/lists/NativeForm'
-import { Icon } from '@/components/visuals/Icon'
-import { Flash } from '@/components/overlays/Flash'
 import { GlassHeader, TabTitle, useHeaderHeight, useScreenPadding } from '@/components/chrome/GlassHeader'
-import { isConfirmDeleteEnabled, setConfirmDeleteEnabled } from '@/db/prefs/confirmDelete'
-import { setGalleryLayout, useGalleryLayout, type GalleryLayout } from '@/db/prefs/galleryLook'
-import { isContinueByVisit, isContinueEnabled, setContinueByVisit, setContinueEnabled } from '@/db/prefs/continue'
-import { isAttachTimerEnabled, isDirectionEnabled, isPersonasEnabled, setAttachTimerEnabled, setDirectionEnabled, setPersonasEnabled } from '@/db/prefs/features'
-import { isHapticsEnabled, isStreamHapticsEnabled, isSuggestionHapticsEnabled, setHapticsEnabled, setStreamHapticsEnabled, setSuggestionHapticsEnabled } from '@/db/prefs/haptics'
-import {
-  isAttachGalleryEnabled,
-  isRecentAttachmentsEnabled,
-  setAttachGalleryEnabled,
-  setRecentAttachmentsEnabled,
-} from '@/db/recentAttachments'
-import { isPrivateChatEnabled, setPrivateChatEnabled } from '@/db/prefs/privateChat'
-import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
-import { listLorebooks } from '@/db/lorebooks'
+import { ButtonCell, LinkCell, ListSection, SettingsIcon, ValueCell } from '@/components/lists/GroupedList'
+import { nativeForm, NativeActionRow, NativeForm, NativeHostedRow, NativeLinkRow, NativeSection } from '@/components/lists/NativeForm'
+import { ChipRowCell } from '@/components/lists/PictureCells'
+import { BackupTreeSheet } from '@/components/overlays/BackupTreeSheet'
+import { Flash } from '@/components/overlays/Flash'
+import { Icon } from '@/components/visuals/Icon'
+import { SFIcon } from '@/components/visuals/SFIcon'
 import { listCharacters } from '@/db/characters'
-import { loadLongMemory, saveLongMemory } from '@/db/prefs/memory'
-import { useReloadOnFocus } from '@/hooks/chat/useChatListActions'
+import { listLorebooks } from '@/db/lorebooks'
+import { listPersonas, onPersonasChanged, type Persona } from '@/db/personas'
+import { useGalleryLayout } from '@/db/prefs/galleryLook'
+import { DEFAULT_SETTINGS, loadSettings, serverName, type ContextLimits } from '@/db/prefs/settings'
 import { useDatabase } from '@/db/provider'
-import { DEFAULT_SETTINGS, loadSettings, saveContextLimits, serverName, typedCount, updateServer, type ContextLimits } from '@/db/prefs/settings'
-import {
-  isSuggestionsEnabled,
-  isSuggestionImagesReferenceEnabled,
-  loadSuggestionContextMode,
-  loadSuggestionMessages,
-  loadSuggestionTokens,
-  saveSuggestionContextMode,
-  saveSuggestionMessages,
-  saveSuggestionTokens,
-  setSuggestionsEnabled,
-  setSuggestionImagesReferenceEnabled,
-  SUGGESTION_MESSAGES,
-  SUGGESTION_TOKENS,
-  type SuggestionContextMode,
-} from '@/db/prefs/suggestions'
+import { useBackupImport } from '@/hooks/features/useBackupImport'
 import { useCloudSync } from '@/hooks/features/useCloudSync'
 import { useNotifications } from '@/hooks/features/useNotifications'
 import { useServers } from '@/hooks/features/useServers'
-import { enabledNotificationCount, NOTIFICATION_FEATURE_KEYS } from '@/db/prefs/notifications'
-import { useStoredFlag } from '@/hooks/util/useStoredFlag'
-import { useTranslation, type LocalePreference } from '@/i18n'
-import { CONTEXT_STEP_TOKENS, MAX_CONTEXT_TOKENS, MIN_CONTEXT_TOKENS, formatTokensLabel } from '@/lib/core/context'
-import { ChipRowCell } from '@/components/lists/PictureCells'
-import { BackupTreeSheet } from '@/components/overlays/BackupTreeSheet'
-import { exportBackup, loadBackupTree, wipeAllData } from '@/lib/transfer/backup'
-import { useBackupImport } from '@/hooks/features/useBackupImport'
-import type { BackupTree, Selection } from '@/lib/transfer/backupSelection'
-import { alternateIconsAvailable, currentAppIcon } from '@/lib/settings/appIcons'
-import { confirm } from '@/lib/ui/dialogs'
-import { showToast } from '@/lib/ui/toast'
+import { useTranslation } from '@/i18n'
 import { useChatTextSettings } from '@/lib/chat/chatText'
-import { NotificationFeedbackType, notificationAsync, selectionAsync } from '@/lib/ui/haptics'
+import { formatTokensLabel } from '@/lib/core/context'
+import { isDesktop } from '@/lib/core/platform'
 import type { SettingsSection } from '@/lib/core/searchScope'
-
-import { reportError } from '@/lib/transfer/report'
-import { isAndroid, isDesktop } from '@/lib/core/platform'
 import { APP_COPYRIGHT, APP_VERSION_BUILD, ISSUES_URL, REPO_URL } from '@/lib/core/version'
-import { type Colors, HEADER_ROW_HEIGHT, useColors, useStyles, useTheme } from '@/theme'
+import { alternateIconsAvailable } from '@/lib/settings/appIcons'
+import { exportBackup, loadBackupTree, wipeAllData } from '@/lib/transfer/backup'
+import type { BackupTree, Selection } from '@/lib/transfer/backupSelection'
+import { reportError } from '@/lib/transfer/report'
+import { confirm } from '@/lib/ui/dialogs'
+import { NotificationFeedbackType, notificationAsync } from '@/lib/ui/haptics'
+import { showToast } from '@/lib/ui/toast'
+import { HEADER_ROW_HEIGHT, useStyles, useTheme, type Colors } from '@/theme'
 
+type SettingsRoute =
+  | '/servers'
+  | '/context'
+  | '/notifications'
+  | '/sync'
+  | '/theme'
+  | '/chat-text'
+  | '/chat-background'
+  | '/gallery-layout'
+  | '/app-icon'
+  | '/general'
+  | '/chat-features'
+  | '/suggestions'
+  | '/feedback'
+  | '/archive'
+  | '/personas'
+  | '/lorebooks'
+
+type NavRow = {
+  key: string
+  label: string
+  value?: string
+  symbol: ComponentProps<typeof SFIcon>['name']
+  fallback: ComponentProps<typeof Icon>['name']
+  route: SettingsRoute
+}
 
 export default function SettingsScreen() {
   const db = useDatabase()
   const router = useRouter()
-  const colors = useColors()
   const padding = useScreenPadding('form')
   const styles = useStyles(createStyles)
-  const { t, preference: localePreference, setPreference: setLocalePreference } = useTranslation()
+  const { t } = useTranslation()
   const headerHeight = useHeaderHeight()
   const { section } = useLocalSearchParams<{ section?: SettingsSection }>()
-  const scrollRef = useRef<KeyboardAwareScrollViewRef>(null)
-  // Where each section starts in the scroll content, filled in as they are laid out.
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null)
   const offsets = useRef<Partial<Record<SettingsSection, number>>>({})
-  // `n` tells two jumps to the same section apart, so the tint plays again.
   const [flashed, setFlashed] = useState<{ section: SettingsSection; n: number } | null>(null)
-  // In the system's list the section is scrolled to by its id, with no flash. The module is
-  // there or not for the life of the app, so the hook is called on every render or on none.
   const jumpTo = nativeForm?.ui.useNativeState<string | null>(null)
 
-  const CONTINUE_OPTIONS: { value: 'visit' | 'message'; label: string }[] = [
-    { value: 'visit', label: t('settings.continueByVisit') },
-    { value: 'message', label: t('settings.continueByMessage') },
-  ]
-  const GALLERY_LAYOUT_OPTIONS: { value: GalleryLayout; label: string }[] = [
-    { value: 'grid', label: t('settings.galleryGrid') },
-    { value: 'carousel', label: t('settings.galleryCarousel') },
-  ]
-  const galleryLayout = useGalleryLayout()
-  const pickGalleryLayout = (next: GalleryLayout) => {
-    selectionAsync()
-    setGalleryLayout(db, next)
-  }
-  const LANGUAGE_OPTIONS: { value: LocalePreference; label: string }[] = [
-    { value: 'system', label: t('language.system') },
-    { value: 'ru', label: t('language.ru') },
-    { value: 'en', label: t('language.en') },
-  ]
-
-  // The limits on history hold for every server; the servers themselves have a screen of their own.
   const [context, setContext] = useState<ContextLimits | null>(null)
-  useEffect(() => {
-    loadSettings(db).then(({ limitMessages, chatMessages, roomMessages }) => setContext({ limitMessages, chatMessages, roomMessages }))
-  }, [db])
-  const loaded = context !== null
-  const cfg: ContextLimits = context ?? DEFAULT_SETTINGS
-  const update = (patch: Partial<ContextLimits>) => {
-    const next = { limitMessages: cfg.limitMessages, chatMessages: cfg.chatMessages, roomMessages: cfg.roomMessages, ...patch }
-    setContext(next)
-    saveContextLimits(db, next)
-  }
+  const [lorebookCount, setLorebookCount] = useState(0)
+  const [archivedCount, setArchivedCount] = useState(0)
+  const [personas, setPersonas] = useState<Persona[]>([])
+
   const { servers, activeId } = useServers()
   const activeServer = servers?.find((s) => s.id === activeId)
   const activeServerLabel = activeServer ? serverName(activeServer) || t('servers.untitled') : t('servers.none')
-  // The current server's context window, at hand without opening the server. What the slider
-  // is dragged to is shown until the list read back from the database catches up.
-  const [contextDraft, setContextDraft] = useState<number | null>(null)
-  useEffect(() => setContextDraft(null), [activeId])
-  const contextTokens = contextDraft ?? activeServer?.contextTokens ?? DEFAULT_SETTINGS.contextTokens
-  const setContextTokens = (tokens: number) => {
-    if (!activeServer) return
-    setContextDraft(tokens)
-    updateServer(db, activeServer.id, { contextTokens: tokens })
-  }
+  const { theme, mode, colors } = useTheme()
+  const chatText = useChatTextSettings()
+  const galleryLayout = useGalleryLayout()
+  const cloudSync = useCloudSync()
+  const notifications = useNotifications()
 
-  // What is typed in the message-count fields: it may be empty on the way to a new number.
-  const [messageDrafts, setMessageDrafts] = useState<{ chatMessages?: string; roomMessages?: string }>({})
-  const setMessages = (field: 'chatMessages' | 'roomMessages', text: string) => {
-    const { digits, count } = typedCount(text)
-    setMessageDrafts((d) => ({ ...d, [field]: digits }))
-    if (count) update({ [field]: count })
-  }
-  const [exporting, setExporting] = useState(false)
-  const backupImport = useBackupImport()
-  const importing = backupImport.importing
-  const backingUp = exporting || importing
-  const [wiping, setWiping] = useState(false)
-  const [continueButton, toggleContinueButton] = useStoredFlag(isContinueEnabled, setContinueEnabled, true)
-  const [continueByVisit, setContinueByVisitValue] = useStoredFlag(isContinueByVisit, setContinueByVisit, true)
-  const [privateButton, togglePrivateButton] = useStoredFlag(isPrivateChatEnabled, setPrivateChatEnabled, true)
-  const [suggestions, toggleSuggestions] = useStoredFlag(isSuggestionsEnabled, setSuggestionsEnabled, false)
-  const [suggestionImagesReference, toggleSuggestionImagesReference] = useStoredFlag(
-    isSuggestionImagesReferenceEnabled,
-    setSuggestionImagesReferenceEnabled,
-    true
-  )
-  const [suggestionTokens, setSuggestionTokens] = useState<number>(SUGGESTION_TOKENS.default)
-  const [suggestionContextMode, setSuggestionContextMode] = useState<SuggestionContextMode>('limit')
-  const [suggestionMessages, setSuggestionMessages] = useState<number>(SUGGESTION_MESSAGES.default)
-  const [suggestionMessagesDraft, setSuggestionMessagesDraft] = useState<string>()
-  useEffect(() => {
-    loadSuggestionTokens(db).then(setSuggestionTokens)
-    loadSuggestionContextMode(db).then(setSuggestionContextMode)
-    loadSuggestionMessages(db).then(setSuggestionMessages)
+  const reloadSummaries = useCallback(() => {
+    loadSettings(db).then(({ limitMessages, chatMessages, roomMessages }) => setContext({ limitMessages, chatMessages, roomMessages }))
+    listLorebooks(db).then((list) => setLorebookCount(list.length))
+    listCharacters(db, true).then((list) => setArchivedCount(list.length))
   }, [db])
-  const typeSuggestionMessages = (text: string) => {
-    const { digits, count } = typedCount(text)
-    setSuggestionMessagesDraft(digits)
-    if (!count) return
-    setSuggestionMessages(count)
-    saveSuggestionMessages(db, count)
-  }
-  const pickSuggestionMode = (mode: SuggestionContextMode) => {
-    selectionAsync()
-    setSuggestionContextMode(mode)
-    saveSuggestionContextMode(db, mode)
-  }
-  const [recentPictures, toggleRecentPictures] = useStoredFlag(isRecentAttachmentsEnabled, setRecentAttachmentsEnabled, true)
-  const [personasOn, togglePersonas] = useStoredFlag(isPersonasEnabled, setPersonasEnabled, true)
-  const [directionOn, toggleDirection] = useStoredFlag(isDirectionEnabled, setDirectionEnabled, true)
-  const [attachGallery, toggleAttachGallery] = useStoredFlag(isAttachGalleryEnabled, setAttachGalleryEnabled, true)
-  const [attachTimer, toggleAttachTimer] = useStoredFlag(isAttachTimerEnabled, setAttachTimerEnabled, true)
 
-  const targetSection =
-    section === 'folderSync'
-      ? 'appearance'
-      : section === 'private' ||
+  useFocusEffect(reloadSummaries)
+
+  useEffect(() => {
+    let alive = true
+    const load = () => {
+      listPersonas(db).then((list) => {
+        if (alive) setPersonas(list)
+      })
+    }
+    load()
+    const unsub = onPersonasChanged(load)
+    return () => {
+      alive = false
+      unsub()
+    }
+  }, [db])
+
+  const loaded = context !== null
+  const cfg: ContextLimits = context ?? DEFAULT_SETTINGS
+  const contextTokens = activeServer?.contextTokens ?? DEFAULT_SETTINGS.contextTokens
+
+  const targetSection: SettingsSection | undefined =
+    section === 'server' || section === 'folderSync'
+      ? 'core'
+      : section === 'gallery'
+        ? 'appearance'
+        : section === 'language' ||
+            section === 'continue' ||
+            section === 'confirmDelete' ||
+          section === 'features' ||
+          section === 'private' ||
           section === 'memory' ||
           section === 'personas' ||
           section === 'direction' ||
           section === 'attachGallery' ||
-          section === 'attachTimer'
-        ? 'features'
-        : section
+          section === 'attachTimer' ||
+          section === 'suggest' ||
+          section === 'haptics'
+        ? 'chats'
+        : section === 'archive'
+          ? 'library'
+          : section
 
-  // Runs when the parameter arrives and again as sections are laid out, since on the
-  // first visit the one asked for may not have been measured yet. The parameter is
-  // cleared afterwards, so asking for the same section again scrolls once more.
   const jump = useCallback(() => {
     if (jumpTo) {
       if (!targetSection) return
@@ -222,10 +157,8 @@ export default function SettingsScreen() {
     jump()
   }, [jump])
 
-  // A part of the page a search result can open at.
-  const block = (id: SettingsSection, children: React.ReactNode, style?: object) => (
+  const block = (id: SettingsSection, children: React.ReactNode) => (
     <View
-      style={style}
       onLayout={(e) => {
         offsets.current[id] = e.nativeEvent.layout.y
         if (id === targetSection) jump()
@@ -235,45 +168,16 @@ export default function SettingsScreen() {
       {children}
     </View>
   )
-  const [confirmDelete, toggleConfirmDelete] = useStoredFlag(isConfirmDeleteEnabled, setConfirmDeleteEnabled, true)
-  const [haptics, toggleHaptics] = useStoredFlag(isHapticsEnabled, setHapticsEnabled, true)
-  const [streamHaptics, toggleStreamHaptics] = useStoredFlag(isStreamHapticsEnabled, setStreamHapticsEnabled, true)
-  const [suggestionHaptics, toggleSuggestionHaptics] = useStoredFlag(isSuggestionHapticsEnabled, setSuggestionHapticsEnabled, true)
 
-  const [personas, setPersonas] = useState<Persona[]>([])
-  useEffect(() => {
-    let alive = true
-    const load = () => {
-      listPersonas(db).then((list) => {
-        if (alive) setPersonas(list)
-      })
-    }
-    load()
-    const unsub = onPersonasChanged(load)
-    return () => {
-      alive = false
-      unsub()
-    }
-  }, [db])
-
-  const [longMemory, toggleLongMemory] = useStoredFlag(loadLongMemory, saveLongMemory, false)
-  // How many lorebooks there are, counted again whenever Settings comes back into view.
-  const [lorebookCount, setLorebookCount] = useState(0)
-  const countLorebooks = useCallback(async () => setLorebookCount((await listLorebooks(db)).length), [db])
-  useReloadOnFocus(countLorebooks)
-  // How many characters are in the archive, counted the same way.
-  const [archivedCount, setArchivedCount] = useState(0)
-  const countArchived = useCallback(async () => setArchivedCount((await listCharacters(db, true)).length), [db])
-  useReloadOnFocus(countArchived)
-
-
-
-
-  // Once GitHub has been opened from About, the button thanks the user. On a phone it does so
-  // as they come back from the browser, so that they see it change, with a tap of success; the
-  // desktop app stays in front while the browser opens, so it thanks at once.
+  const [exporting, setExporting] = useState(false)
+  const backupImport = useBackupImport()
+  const importing = backupImport.importing
+  const backingUp = exporting || importing
+  const [wiping, setWiping] = useState(false)
+  const [exportTree, setExportTree] = useState<BackupTree | null>(null)
   const [thanked, setThanked] = useState(false)
   const awayToStar = useRef(false)
+
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state !== 'active' || !awayToStar.current) return
@@ -283,36 +187,6 @@ export default function SettingsScreen() {
     })
     return () => sub.remove()
   }, [])
-
-
-
-  const cloudSync = useCloudSync()
-  const notifications = useNotifications()
-  const notificationsValue =
-    notifications.permission === 'denied'
-      ? t('notifications.summaryDenied')
-      : !notifications.settings.enabled
-        ? t('notifications.summaryOff')
-        : t('notifications.summaryOn', {
-            count: enabledNotificationCount(notifications.settings),
-            total: NOTIFICATION_FEATURE_KEYS.length,
-          })
-  // Expo Go has no sync module. In development the section is still shown there, with
-  // its buttons out and pretending to work, so the layout and animations can be looked at.
-  const cloudPreview = __DEV__ && !cloudSync.available
-  const showCloud = cloudSync.available || cloudPreview
-
-  const destinationLabel =
-    cloudSync.provider === 'smb'
-      ? cloudSync.smb.host
-        ? `SMB: ${cloudSync.smb.host}`
-        : t('sync.smbNotConfigured')
-      : cloudSync.folder
-        ? t('settings.folderSyncFolder', { folder: cloudSync.folder })
-        : t('sync.noFolder')
-
-  // The sheet with what to take or bring in: open while there is a tree.
-  const [exportTree, setExportTree] = useState<BackupTree | null>(null)
 
   const onExport = async () => {
     setExporting(true)
@@ -364,252 +238,70 @@ export default function SettingsScreen() {
     })
   }
 
-  const language = (
-    <ListSection header={t('settings.language')}>
-      {LANGUAGE_OPTIONS.map((o) => (
-        <CheckCell key={o.value} label={o.label} checked={localePreference === o.value} onPress={() => setLocalePreference(o.value)} />
-      ))}
-    </ListSection>
-  )
+  const openRepo = () => {
+    if (isDesktop) setThanked(true)
+    else awayToStar.current = true
+    Linking.openURL(REPO_URL).catch((err) => {
+      awayToStar.current = false
+      reportError(t('settings.starOnGithub'), err)
+    })
+  }
+  const openIssues = () => Linking.openURL(ISSUES_URL).catch((err) => reportError(t('settings.reportBug'), err))
 
-  // The app icon row needs a build with the native module.
-  const [appIcon, setAppIconName] = useState(currentAppIcon)
-  useFocusEffect(useCallback(() => setAppIconName(currentAppIcon()), []))
+  const star = thanked
+    ? { label: t('settings.starThanks'), symbol: 'heart.fill' as const, fallback: 'heart' as const }
+    : { label: t('settings.starOnGithub'), symbol: 'star' as const, fallback: 'star-outline' as const }
 
-  const { theme, mode } = useTheme()
-  const chatText = useChatTextSettings()
+  const cloudPreview = __DEV__ && !cloudSync.available
+  const showCloud = cloudSync.available || cloudPreview
+  const destinationLabel =
+    cloudSync.provider === 'smb'
+      ? cloudSync.smb.host || undefined
+      : cloudSync.folder || undefined
+
+  const contextValue = activeServer
+    ? formatTokensLabel(contextTokens)
+    : cfg.limitMessages
+      ? String(cfg.chatMessages)
+      : t('settings.stateOff')
+
   const themeValue = `${t(`theme.${theme}`)}, ${t(`theme.${mode}`)}`
   const fontValue = `${chatText.font === 'System' ? t('chatFont.system') : chatText.font}, ${Math.round(chatText.scale * 100)}%`
-  const backgroundValue =
-    chatText.pattern === 'custom' && chatText.wallpaper?.file
-      ? t('chatPattern.custom')
-      : t('chatPattern.none')
+  const backgroundValue = chatText.pattern === 'custom' && chatText.wallpaper?.file ? t('chatPattern.custom') : t('chatPattern.none')
 
-  const appearance = (
-    <ListSection>
-      <LinkCell label={t('settings.themeScreen')} value={themeValue} onPress={() => router.push('/theme')} />
-      <LinkCell label={t('settings.fontScreen')} value={fontValue} onPress={() => router.push('/chat-text')} />
-      <LinkCell label={t('settings.backgroundScreen')} value={backgroundValue} onPress={() => router.push('/chat-background')} />
-      {alternateIconsAvailable ? (
-        <LinkCell label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
-      ) : null}
-      <LinkCell label={t('servers.title')} value={activeServerLabel} onPress={() => router.push('/servers')} />
-      {notifications.available ? (
-        <LinkCell label={t('notifications.title')} value={notificationsValue} onPress={() => router.push('/notifications')} />
-      ) : null}
-      {showCloud ? (
-        <LinkCell label={t('sync.title')} value={destinationLabel} onPress={() => router.push('/sync')} />
-      ) : null}
-    </ListSection>
-  )
-
-  const continueRows = (
-    <ListSection header={t('settings.homeScreen')} footer={t('settings.continueButtonNote')}>
-      <SwitchCell label={t('settings.continueButton')} value={continueButton} onValueChange={toggleContinueButton} />
-      {continueButton ? (
-        <SegmentCell
-          label={t('settings.continueBy')}
-          options={CONTINUE_OPTIONS}
-          value={continueByVisit ? 'visit' : 'message'}
-          onChange={(value) => setContinueByVisitValue(value === 'visit')}
-        />
-      ) : null}
-    </ListSection>
-  )
-
-  const collectionsRow = (
-    <ListSection>
-      <LinkCell label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
-      <LinkCell
-        label={t('persona.title')}
-        value={personas.length > 0 ? String(personas.length) : t('persona.none')}
-        onPress={() => router.push('/personas')}
-      />
-      <LinkCell
-        label={t('lore.title')}
-        value={lorebookCount > 0 ? String(lorebookCount) : t('lore.none')}
-        onPress={() => router.push('/lorebooks')}
-      />
-    </ListSection>
-  )
-
-  const galleryRow = (
-    <ListSection footer={t('settings.galleryLayoutNote')}>
-      <SegmentCell
-        label={t('settings.galleryLayout')}
-        options={GALLERY_LAYOUT_OPTIONS}
-        value={galleryLayout}
-        onChange={pickGalleryLayout}
-      />
-    </ListSection>
-  )
-
-  const featuresRows = (
-    <ListSection header={t('settings.featuresTitle')} footer={t('settings.featuresNote')}>
-      <SwitchCell label={t('settings.privateButton')} value={privateButton} onValueChange={togglePrivateButton} />
-      <SwitchCell label={t('memory.long')} value={longMemory} onValueChange={toggleLongMemory} />
-      <SwitchCell label={t('settings.personasOn')} value={personasOn} onValueChange={togglePersonas} />
-      <SwitchCell label={t('direction.title')} value={directionOn} onValueChange={toggleDirection} />
-      <SwitchCell label={t('settings.suggestButton')} value={suggestions} onValueChange={toggleSuggestions} />
-      <SwitchCell label={t('settings.recentPictures')} value={recentPictures} onValueChange={toggleRecentPictures} />
-      <SwitchCell label={t('settings.attachGallery')} value={attachGallery} onValueChange={toggleAttachGallery} />
-      {notifications.available ? (
-        <SwitchCell label={t('settings.attachTimer')} value={attachTimer} onValueChange={toggleAttachTimer} />
-      ) : null}
-    </ListSection>
-  )
-
-  const SUGGEST_MODE_OPTIONS: { value: SuggestionContextMode; label: string }[] = [
-    { value: 'limit', label: t('settings.suggestContextModeLimit') },
-    { value: 'all', label: t('settings.suggestContextModeAll') },
+  const coreRows: NavRow[] = [
+    { key: 'servers', label: t('servers.title'), value: activeServerLabel, symbol: 'server.rack', fallback: 'server-outline', route: '/servers' },
+    { key: 'context', label: t('settings.contextLabel'), value: contextValue, symbol: 'square.stack.3d.up', fallback: 'layers-outline', route: '/context' },
+    ...(notifications.available
+      ? [{ key: 'notifications', label: t('notifications.title'), symbol: 'bell.badge' as const, fallback: 'notifications-outline' as const, route: '/notifications' as const }]
+      : []),
+    ...(showCloud
+      ? [{ key: 'sync', label: t('sync.title'), value: destinationLabel, symbol: 'icloud' as const, fallback: 'cloud-outline' as const, route: '/sync' as const }]
+      : []),
   ]
 
-  const suggestFooter = (
-    <>
-      <ListFooter>{t('settings.suggestIntro')}</ListFooter>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginTop: 4 }}>
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipe')}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-          <Icon name="arrow-forward-outline" size={13} color={colors.textMuted} />
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipeRight')}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-          <Icon name="arrow-back-outline" size={13} color={colors.textMuted} />
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipeLeft')}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-          <Icon name="arrow-up-outline" size={13} color={colors.textMuted} />
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t('settings.suggestSwipeUp')}</Text>
-        </View>
-      </View>
-      {suggestions && suggestionContextMode === 'all' ? (
-        <ListFooter danger>{t('settings.suggestContextAllWarning')}</ListFooter>
-      ) : null}
-    </>
-  )
+  const appearanceRows: NavRow[] = [
+    { key: 'theme', label: t('settings.themeScreen'), value: themeValue, symbol: 'paintbrush', fallback: 'color-palette-outline', route: '/theme' },
+    { key: 'font', label: t('settings.fontScreen'), value: fontValue, symbol: 'textformat.size', fallback: 'text-outline', route: '/chat-text' },
+    { key: 'bg', label: t('settings.backgroundScreen'), value: backgroundValue, symbol: 'photo', fallback: 'image-outline', route: '/chat-background' },
+    { key: 'gallery', label: t('settings.galleryLayout'), value: t(galleryLayout === 'carousel' ? 'settings.galleryCarousel' : 'settings.galleryGrid'), symbol: 'rectangle.stack', fallback: 'images-outline', route: '/gallery-layout' },
+    ...(alternateIconsAvailable
+      ? [{ key: 'icon', label: t('settings.appIcon'), symbol: 'app.badge' as const, fallback: 'apps-outline' as const, route: '/app-icon' as const }]
+      : []),
+  ]
 
-  const suggestRow = (
-    <ListSection header={t('settings.suggestButton')} footer={suggestFooter}>
-      <SegmentCell
-        label={t('settings.suggestContextMode')}
-        options={SUGGEST_MODE_OPTIONS}
-        value={suggestionContextMode}
-        onChange={pickSuggestionMode}
-        disabled={!suggestions}
-      />
-      {suggestionContextMode === 'limit' ? (
-        <InputCell
-          label={t('settings.suggestMessagesCount')}
-          value={suggestionMessagesDraft ?? String(suggestionMessages)}
-          onChangeText={typeSuggestionMessages}
-          keyboardType="number-pad"
-          disabled={!suggestions}
-        />
-      ) : null}
-      <SliderCell
-        label={t('settings.suggestTokens')}
-        value={suggestionTokens}
-        min={SUGGESTION_TOKENS.min}
-        max={SUGGESTION_TOKENS.max}
-        step={SUGGESTION_TOKENS.step}
-        onChange={(tokens) => {
-          setSuggestionTokens(tokens)
-          saveSuggestionTokens(db, tokens)
-        }}
-        disabled={!suggestions}
-      />
-      {haptics ? (
-        <SwitchCell
-          label={t('settings.suggestionHaptics')}
-          value={suggestionHaptics}
-          onValueChange={toggleSuggestionHaptics}
-          disabled={!suggestions}
-        />
-      ) : null}
-      <SwitchCell
-        label={t('settings.suggestImagesReference')}
-        value={suggestionImagesReference}
-        onValueChange={toggleSuggestionImagesReference}
-        disabled={!suggestions}
-      />
-    </ListSection>
-  )
+  const chatRows: NavRow[] = [
+    { key: 'general', label: t('settings.generalTitle'), symbol: 'gearshape', fallback: 'settings-outline', route: '/general' },
+    { key: 'features', label: t('settings.featuresTitle'), symbol: 'switch.2', fallback: 'options-outline', route: '/chat-features' },
+    { key: 'suggestions', label: t('settings.suggestButton'), symbol: 'text.bubble', fallback: 'chatbubble-ellipses-outline', route: '/suggestions' },
+    { key: 'feedback', label: t('settings.feedback'), symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', route: '/feedback' },
+  ]
 
-  const confirmDeleteRow = (
-    <ListSection>
-      <SwitchCell label={t('settings.confirmDelete')} value={confirmDelete} onValueChange={toggleConfirmDelete} />
-    </ListSection>
-  )
-
-  const hapticsRow = (
-    <ListSection header={t('settings.feedback')} footer={haptics ? t('settings.streamHapticsNote') : undefined}>
-      <SwitchCell label={t('settings.haptics')} value={haptics} onValueChange={toggleHaptics} />
-      {haptics ? (
-        <>
-          <SwitchCell
-            label={t('settings.streamHaptics')}
-            value={streamHaptics}
-            onValueChange={toggleStreamHaptics}
-          />
-          <SwitchCell
-            label={t('settings.suggestionHaptics')}
-            value={suggestionHaptics}
-            onValueChange={toggleSuggestionHaptics}
-          />
-        </>
-      ) : null}
-    </ListSection>
-  )
-
-
-  const contextFooter = (
-    <>
-      <ListFooter>{t('settings.contextHint')}</ListFooter>
-      {cfg.limitMessages ? (
-        <>
-          <ListFooter>{t('settings.contextMessagesHint')}</ListFooter>
-          {cfg.chatMessages > 1000 || cfg.roomMessages > 1000 ? <ListFooter danger>{t('settings.contextMessagesWarning')}</ListFooter> : null}
-        </>
-      ) : null}
-    </>
-  )
-
-  const server = (
-    <>
-      <ListSection header={t('settings.contextLabel')} footer={contextFooter}>
-        {activeServer ? (
-          <SliderCell
-            label={t('settings.contextTokensLabel')}
-            value={contextTokens}
-            min={MIN_CONTEXT_TOKENS}
-            max={MAX_CONTEXT_TOKENS}
-            step={CONTEXT_STEP_TOKENS}
-            formatValue={(tokens) => formatTokensLabel(tokens)}
-            onChange={setContextTokens}
-          />
-        ) : null}
-        <SwitchCell
-          label={t('settings.contextMessages')}
-          value={cfg.limitMessages}
-          onValueChange={(limitMessages) => update({ limitMessages })}
-        />
-        <InputCell
-          label={t('settings.contextChatMessages')}
-          value={messageDrafts.chatMessages ?? String(cfg.chatMessages)}
-          onChangeText={(text) => setMessages('chatMessages', text)}
-          keyboardType="number-pad"
-          disabled={!cfg.limitMessages}
-        />
-        <InputCell
-          label={t('settings.contextRoomMessages')}
-          value={messageDrafts.roomMessages ?? String(cfg.roomMessages)}
-          onChangeText={(text) => setMessages('roomMessages', text)}
-          keyboardType="number-pad"
-          disabled={!cfg.limitMessages}
-        />
-      </ListSection>
-    </>
-  )
+  const libraryRows: NavRow[] = [
+    { key: 'archive', label: t('archive.title'), value: archivedCount > 0 ? String(archivedCount) : undefined, symbol: 'archivebox', fallback: 'archive-outline', route: '/archive' },
+    { key: 'personas', label: t('persona.title'), value: personas.length > 0 ? String(personas.length) : undefined, symbol: 'theatermasks', fallback: 'happy-outline', route: '/personas' },
+    { key: 'lorebooks', label: t('lore.title'), value: lorebookCount > 0 ? String(lorebookCount) : undefined, symbol: 'books.vertical', fallback: 'book-outline', route: '/lorebooks' },
+  ]
 
   const cloudBusy = cloudSync.syncing || backingUp
 
@@ -635,238 +327,55 @@ export default function SettingsScreen() {
       ]}
     />
   )
-  // What the backup opens over the page, on either page.
+
   const backupSheets = (
     <>
       <BackupTreeSheet tree={exportTree} confirmLabel={t('settings.exportJson')} onConfirm={runExport} onClose={() => setExportTree(null)} />
       {backupImport.sheet}
     </>
   )
-  const backup = (
-    <>
-      <ListSection header={t('settings.backupTitle')} footer={t('settings.backupNote')}>
-        {backupChips}
-      </ListSection>
-      {backupSheets}
-    </>
-  )
 
-  const openRepo = () => {
-    if (isDesktop) setThanked(true)
-    else awayToStar.current = true
-    Linking.openURL(REPO_URL).catch((err) => {
-      awayToStar.current = false
-      reportError(t('settings.starOnGithub'), err)
-    })
-  }
-  const openIssues = () => Linking.openURL(ISSUES_URL).catch((err) => reportError(t('settings.reportBug'), err))
-  const star = thanked
-    ? { label: t('settings.starThanks'), symbol: 'heart.fill' as const, fallback: 'heart' as const }
-    : { label: t('settings.starOnGithub'), symbol: 'star' as const, fallback: 'star-outline' as const }
-  const about = (
-    <ListSection header={t('settings.aboutTitle')} footer={t('settings.starNote')}>
-      <ValueCell label={t('settings.version')} value={APP_VERSION_BUILD} />
-      <ValueCell label={t('settings.copyright')} value={APP_COPYRIGHT} />
-      <ButtonCell label={star.label} icon={{ symbol: star.symbol, fallback: star.fallback }} onPress={openRepo} />
-      <ButtonCell label={t('settings.reportBug')} icon={{ symbol: 'ladybug', fallback: 'bug-outline' }} onPress={openIssues} />
-    </ListSection>
-  )
+  const renderLinkRows = (rows: NavRow[]) =>
+    rows.map((row) => (
+      <LinkCell
+        key={row.key}
+        label={row.label}
+        value={row.value}
+        leading={<SettingsIcon symbol={row.symbol} fallback={row.fallback} />}
+        onPress={() => router.push(row.route)}
+      />
+    ))
 
-  const wipe = (
-    <ListSection header={t('settings.dangerZone')} footer={t('settings.dangerNote')}>
-      <ButtonCell danger label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} />
-    </ListSection>
-  )
+  const renderNativeLinkRows = (rows: NavRow[]) =>
+    rows.map((row) => (
+      <NativeLinkRow
+        key={row.key}
+        label={row.label}
+        value={row.value}
+        symbol={row.symbol}
+        color={colors.accent}
+        onPress={() => router.push(row.route)}
+      />
+    ))
 
-  // The same page as the system's own list (iOS with SwiftUI). The model's chips and the rows
-  // of chips for the sync and the backup stay React Native views in rows of their own.
-  const renderNative = ({ ui, modifiers }: NonNullable<typeof nativeForm>) => {
-    const { Picker, Text: SwiftText, LabeledContent, HStack, VStack, Spacer, Toggle, Button: SwiftButton, Image, ProgressView, SwipeActions } = ui
-    const { pickerStyle, tag, labelsHidden, disabled, id, tint, foregroundStyle, lineLimit } = modifiers
-    const toggle = (name: string | null, label: string, isOn: boolean, onChange: (on: boolean) => void, off = false) => (
-      <Toggle label={label} isOn={isOn} onIsOnChange={onChange} modifiers={[disabled(off), ...(name ? [id(name)] : [])]} />
-    )
-    const numberRow = (label: string, value: string, onChange: (text: string) => void, off = false) => (
-      <NativeTextRow label={label} value={value} onChangeText={onChange} keyboard="number-pad" disabled={off} />
-    )
+  const renderNative = ({ ui }: NonNullable<typeof nativeForm>) => {
+    const { Text: SwiftText, LabeledContent } = ui
     return (
       <NativeForm jumpTo={jumpTo}>
-        <NativeSection id="appearance" inset={HEADER_ROW_HEIGHT}>
-          <NativeLinkRow label={t('settings.themeScreen')} value={themeValue} onPress={() => router.push('/theme')} />
-          <NativeLinkRow label={t('settings.fontScreen')} value={fontValue} onPress={() => router.push('/chat-text')} />
-          <NativeLinkRow label={t('settings.backgroundScreen')} value={backgroundValue} onPress={() => router.push('/chat-background')} />
-          {alternateIconsAvailable ? (
-            <NativeLinkRow label={t('settings.appIcon')} value={t(`appIcon.${appIcon ?? 'default'}`)} onPress={() => router.push('/app-icon')} />
-          ) : null}
-          <NativeLinkRow label={t('servers.title')} value={activeServerLabel} onPress={() => router.push('/servers')} />
-          {notifications.available ? (
-            <NativeLinkRow label={t('notifications.title')} value={notificationsValue} onPress={() => router.push('/notifications')} />
-          ) : null}
-          {showCloud ? (
-            <NativeLinkRow
-              label={t('sync.title')}
-              value={destinationLabel}
-              onPress={() => router.push('/sync')}
-            />
-          ) : null}
+        <NativeSection id="core" inset={HEADER_ROW_HEIGHT}>
+          {renderNativeLinkRows(coreRows)}
         </NativeSection>
 
-        <NativeSection id="language" title={t('settings.language')}>
-          <Picker
-            selection={localePreference}
-            onSelectionChange={(next: LocalePreference) => {
-              selectionAsync()
-              setLocalePreference(next)
-            }}
-            modifiers={[pickerStyle('inline'), labelsHidden()]}
-          >
-            {LANGUAGE_OPTIONS.map((o) => (
-              <SwiftText key={o.value} modifiers={[tag(o.value)]}>
-                {o.label}
-              </SwiftText>
-            ))}
-          </Picker>
+        <NativeSection id="appearance" title={t('settings.appearance')}>
+          {renderNativeLinkRows(appearanceRows)}
         </NativeSection>
 
-        <NativeSection id="continue" title={t('settings.homeScreen')} footer={t('settings.continueButtonNote')}>
-          {toggle(null, t('settings.continueButton'), continueButton, toggleContinueButton)}
-          {continueButton ? (
-            <NativeSegmentRow
-              label={t('settings.continueBy')}
-              options={CONTINUE_OPTIONS}
-              value={continueByVisit ? 'visit' : 'message'}
-              onChange={(value) => {
-                selectionAsync()
-                setContinueByVisitValue(value === 'visit')
-              }}
-            />
-          ) : null}
+        <NativeSection id="chats" title={t('settings.chats')}>
+          {renderNativeLinkRows(chatRows)}
         </NativeSection>
 
-        <NativeSection id="gallery" footer={t('settings.galleryLayoutNote')}>
-          <NativeSegmentRow
-            label={t('settings.galleryLayout')}
-            options={GALLERY_LAYOUT_OPTIONS}
-            value={galleryLayout}
-            onChange={pickGalleryLayout}
-          />
-        </NativeSection>
-
-        <NativeSection id="features" title={t('settings.featuresTitle')} footer={t('settings.featuresNote')}>
-          {toggle(null, t('settings.privateButton'), privateButton, togglePrivateButton)}
-          {toggle(null, t('memory.long'), longMemory, toggleLongMemory)}
-          {toggle(null, t('settings.personasOn'), personasOn, togglePersonas)}
-          {toggle(null, t('direction.title'), directionOn, toggleDirection)}
-          {toggle(null, t('settings.suggestButton'), suggestions, toggleSuggestions)}
-          {toggle(null, t('settings.recentPictures'), recentPictures, toggleRecentPictures)}
-          {toggle(null, t('settings.attachGallery'), attachGallery, toggleAttachGallery)}
-          {notifications.available ? toggle(null, t('settings.attachTimer'), attachTimer, toggleAttachTimer) : null}
-        </NativeSection>
-
-        <NativeSection id="archive">
-          <NativeLinkRow label={t('archive.title')} value={archivedCount > 0 ? String(archivedCount) : t('archive.none')} onPress={() => router.push('/archive')} />
-          <NativeLinkRow
-            label={t('persona.title')}
-            value={personas.length > 0 ? String(personas.length) : t('persona.none')}
-            onPress={() => router.push('/personas')}
-          />
-          <NativeLinkRow
-            label={t('lore.title')}
-            value={lorebookCount > 0 ? String(lorebookCount) : t('lore.none')}
-            onPress={() => router.push('/lorebooks')}
-          />
-        </NativeSection>
-
-        <NativeSection
-          id="suggest"
-          title={t('settings.suggestButton')}
-          footerNode={
-            <VStack alignment="leading" spacing={6}>
-              <SwiftText>{t('settings.suggestIntro')}</SwiftText>
-              <HStack spacing={10}>
-                <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{t('settings.suggestSwipe')}</SwiftText>
-                <HStack spacing={3}>
-                  <Image systemName="arrow.right" size={11} color={colors.textMuted} />
-                  <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{t('settings.suggestSwipeRight')}</SwiftText>
-                </HStack>
-                <HStack spacing={3}>
-                  <Image systemName="arrow.left" size={11} color={colors.textMuted} />
-                  <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{t('settings.suggestSwipeLeft')}</SwiftText>
-                </HStack>
-                <HStack spacing={3}>
-                  <Image systemName="arrow.up" size={11} color={colors.textMuted} />
-                  <SwiftText modifiers={[foregroundStyle(colors.textMuted)]}>{t('settings.suggestSwipeUp')}</SwiftText>
-                </HStack>
-              </HStack>
-              {suggestions && suggestionContextMode === 'all' ? (
-                <SwiftText modifiers={[foregroundStyle(colors.danger)]}>{t('settings.suggestContextAllWarning')}</SwiftText>
-              ) : null}
-            </VStack>
-          }
-        >
-          <NativeSegmentRow
-            label={t('settings.suggestContextMode')}
-            options={SUGGEST_MODE_OPTIONS}
-            value={suggestionContextMode}
-            onChange={pickSuggestionMode}
-            disabled={!suggestions}
-          />
-          {suggestionContextMode === 'limit'
-            ? numberRow(
-                t('settings.suggestMessagesCount'),
-                suggestionMessagesDraft ?? String(suggestionMessages),
-                typeSuggestionMessages,
-                !suggestions
-              )
-            : null}
-          <NativeSliderRow
-            label={t('settings.suggestTokens')}
-            value={suggestionTokens}
-            min={SUGGESTION_TOKENS.min}
-            max={SUGGESTION_TOKENS.max}
-            step={SUGGESTION_TOKENS.step}
-            onChange={(tokens) => {
-              setSuggestionTokens(tokens)
-              saveSuggestionTokens(db, tokens)
-            }}
-            disabled={!suggestions}
-          />
-          {haptics ? toggle(null, t('settings.suggestionHaptics'), suggestionHaptics, toggleSuggestionHaptics, !suggestions) : null}
-          {toggle(null, t('settings.suggestImagesReference'), suggestionImagesReference, toggleSuggestionImagesReference, !suggestions)}
-        </NativeSection>
-
-        <NativeSection id="confirmDelete">{toggle(null, t('settings.confirmDelete'), confirmDelete, toggleConfirmDelete)}</NativeSection>
-
-        <NativeSection id="haptics" title={t('settings.feedback')} footer={haptics ? t('settings.streamHapticsNote') : undefined}>
-          {toggle(null, t('settings.haptics'), haptics, toggleHaptics)}
-          {haptics ? toggle(null, t('settings.streamHaptics'), streamHaptics, toggleStreamHaptics) : null}
-          {haptics ? toggle(null, t('settings.suggestionHaptics'), suggestionHaptics, toggleSuggestionHaptics) : null}
-        </NativeSection>
-
-
-        <NativeSection
-          id="server"
-          title={t('settings.contextLabel')}
-          footer={[
-            { text: t('settings.contextHint') },
-            ...(cfg.limitMessages ? [{ text: t('settings.contextMessagesHint') }] : []),
-            ...(cfg.limitMessages && (cfg.chatMessages > 1000 || cfg.roomMessages > 1000) ? [{ text: t('settings.contextMessagesWarning'), danger: true }] : []),
-          ]}
-        >
-          {activeServer ? (
-            <NativeSliderRow
-              label={t('settings.contextTokensLabel')}
-              value={contextTokens}
-              min={MIN_CONTEXT_TOKENS}
-              max={MAX_CONTEXT_TOKENS}
-              step={CONTEXT_STEP_TOKENS}
-              format={(tokens) => formatTokensLabel(tokens)}
-              onChange={setContextTokens}
-            />
-          ) : null}
-          {toggle(null, t('settings.contextMessages'), cfg.limitMessages, (limitMessages) => update({ limitMessages }))}
-          {numberRow(t('settings.contextChatMessages'), messageDrafts.chatMessages ?? String(cfg.chatMessages), (text) => setMessages('chatMessages', text), !cfg.limitMessages)}
-          {numberRow(t('settings.contextRoomMessages'), messageDrafts.roomMessages ?? String(cfg.roomMessages), (text) => setMessages('roomMessages', text), !cfg.limitMessages)}
+        <NativeSection id="library" title={t('settings.libraryTitle')}>
+          {renderNativeLinkRows(libraryRows)}
         </NativeSection>
 
         <NativeSection id="backup" title={t('settings.backupTitle')} footer={t('settings.backupNote')}>
@@ -899,27 +408,36 @@ export default function SettingsScreen() {
           {backupSheets}
         </>
       ) : loaded ? (
-        <KeyboardAwareScrollView
-          ref={scrollRef}
-          bottomOffset={24}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          contentContainerStyle={padding}
-        >
-          {block('appearance', appearance)}
-          {block('language', language)}
-          {block('continue', continueRows)}
-          {block('gallery', galleryRow)}
-          {block('features', featuresRows)}
-          {block('archive', collectionsRow)}
-          {block('suggest', suggestRow)}
-          {block('confirmDelete', confirmDeleteRow)}
-          {block('haptics', hapticsRow)}
-          {block('server', server)}
-          {block('backup', backup)}
-          {block('about', about)}
-          {block('wipe', wipe)}
-        </KeyboardAwareScrollView>
+        <ScrollView ref={scrollRef} contentContainerStyle={padding}>
+          {block('core', <ListSection>{renderLinkRows(coreRows)}</ListSection>)}
+          {block('appearance', <ListSection header={t('settings.appearance')}>{renderLinkRows(appearanceRows)}</ListSection>)}
+          {block('chats', <ListSection header={t('settings.chats')}>{renderLinkRows(chatRows)}</ListSection>)}
+          {block('library', <ListSection header={t('settings.libraryTitle')}>{renderLinkRows(libraryRows)}</ListSection>)}
+          {block(
+            'backup',
+            <>
+              <ListSection header={t('settings.backupTitle')} footer={t('settings.backupNote')}>
+                {backupChips}
+              </ListSection>
+              {backupSheets}
+            </>
+          )}
+          {block(
+            'about',
+            <ListSection header={t('settings.aboutTitle')} footer={t('settings.starNote')}>
+              <ValueCell label={t('settings.version')} value={APP_VERSION_BUILD} />
+              <ValueCell label={t('settings.copyright')} value={APP_COPYRIGHT} />
+              <ButtonCell label={star.label} icon={{ symbol: star.symbol, fallback: star.fallback }} onPress={openRepo} />
+              <ButtonCell label={t('settings.reportBug')} icon={{ symbol: 'ladybug', fallback: 'bug-outline' }} onPress={openIssues} />
+            </ListSection>
+          )}
+          {block(
+            'wipe',
+            <ListSection header={t('settings.dangerZone')} footer={t('settings.dangerNote')}>
+              <ButtonCell danger label={t('settings.wipeAll')} onPress={onWipe} loading={wiping} />
+            </ListSection>
+          )}
+        </ScrollView>
       ) : null}
 
       <GlassHeader floating centerTitle tabHeader>
@@ -932,6 +450,5 @@ export default function SettingsScreen() {
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
-    // Reaches a little past the block, so the tint frames it instead of hugging the text.
     flash: { top: -8, bottom: -8, left: -10, right: -10, borderRadius: 30 },
   })

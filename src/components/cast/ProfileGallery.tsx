@@ -55,12 +55,18 @@ const CAROUSEL_MAX_ASPECT = 2.2
 // it does.
 export function ProfileGallery({
   characterId,
+  initialItems,
   system = false,
+  readOnly = false,
+  flush = false,
   color,
   onDragging,
 }: {
   characterId: number
+  initialItems?: GalleryItem[]
   system?: boolean
+  readOnly?: boolean
+  flush?: boolean
   color?: string
   onDragging?: (dragging: boolean) => void
 }) {
@@ -68,7 +74,7 @@ export function ProfileGallery({
   const colors = useColors()
   const { t } = useTranslation()
   const galleryLayout = useGalleryLayout()
-  const { items, adding, add, remove, reorder, measured } = useGallery(characterId)
+  const { items, adding, add, remove, reorder, measured } = useGallery(characterId, initialItems)
   const openViewer = useOpenViewer()
   const [width, setWidth] = useState(0)
   const [page, setPage] = useState(0)
@@ -155,11 +161,12 @@ export function ProfileGallery({
     const index = Math.max(0, items.findIndex((item) => item.id === id))
     const images = items.map((item) => ({ uri: galleryUri(item.file), aspect: aspectOf(item), preview: previews.current.get(item.id) ?? null }))
     const node = grid.current
-    if (!node || !width || !cell) return openViewer(images, index, [], [], removeFromViewer)
+    const onDelete = readOnly ? undefined : removeFromViewer
+    if (!node || !width || !cell) return openViewer(images, index, [], [], onDelete)
     node.measureInWindow((x, y) => {
       gridAt.current = { x, y }
       const origins = placesOf(items, { x, y }, width, cell, adding, galleryLayout, index)
-      openViewer(images, index, origins, items.map((item, i) => (origins[i] ? sourceOf(item) : null)), removeFromViewer)
+      openViewer(images, index, origins, items.map((item, i) => (origins[i] ? sourceOf(item) : null)), onDelete)
     })
   }
 
@@ -177,7 +184,7 @@ export function ProfileGallery({
     if (from !== to) latest.current.reorder(from, to)
   }, [])
 
-  const { single, button, extra, cells } = layoutOf(items.length, adding, carousel)
+  const { single, button, extra, cells } = layoutOf(items.length, adding, carousel, readOnly)
   const rows = Math.ceil(cells / COLUMNS)
   const height = !width
     ? 0
@@ -189,78 +196,83 @@ export function ProfileGallery({
   const next = placeAt(items.length, cell)
   const nextStyle = [styles.cell, { width: cell, height: cell, left: next.x, top: next.y }]
 
+  const content = cells ? (
+    <View ref={grid} style={height !== undefined ? { height } : undefined} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      {width ? (
+        single ? (
+          <SingleGalleryItem
+            item={items[0]}
+            width={width}
+            height={height!}
+            onPreview={setPreview}
+            onOpen={() => open(items[0].id)}
+            onRemove={readOnly ? undefined : () => confirmRemove(items[0])}
+            onVideoSize={(size) => measured(items[0], size.width, size.height)}
+          />
+        ) : carousel ? (
+          <GalleryCarousel
+            items={items}
+            width={width}
+            page={page}
+            jump={jump}
+            onPageChange={onPageChange}
+            onPreview={setPreview}
+            onOpen={open}
+            onRemove={readOnly ? undefined : confirmRemove}
+            onVideoSize={(item, size) => measured(item, size.width, size.height)}
+          />
+        ) : (
+          items.map((item) => (
+            <GalleryTile
+              key={item.id}
+              item={item}
+              cell={cell}
+              count={items.length}
+              slots={slots}
+              draggable={!readOnly}
+              onPreview={setPreview}
+              onOpen={() => open(item.id)}
+              onRemove={readOnly ? undefined : () => confirmRemove(item)}
+              onDragging={dragging}
+              onDrop={dropped}
+              onVideoSize={(size) => measured(item, size.width, size.height)}
+            />
+          ))
+        )
+      ) : null}
+      {cell && extra ? (
+        button ? (
+          // New ones coming in under full rows: a row of their own is starting anyway.
+          <View style={[nextStyle, styles.plusInner]}>
+            <ActivityIndicator color={colors.textMuted} />
+          </View>
+        ) : (
+          <ImageSourceMenu onPick={addItems} disabled={adding} style={nextStyle}>
+            <View style={styles.plusInner} accessible accessibilityRole="button" accessibilityLabel={t('gallery.add')}>
+              {adding ? <ActivityIndicator color={color ?? colors.textMuted} /> : <Icon name="add" size={30} color={color ?? colors.textMuted} />}
+            </View>
+          </ImageSourceMenu>
+        )
+      ) : null}
+    </View>
+  ) : (
+    // Nothing yet: what goes here, in the middle of where the first row of tiles will stand.
+    <View
+      style={[styles.empty, cell ? { height: cell } : null]}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      accessible
+      accessibilityLabel={t('gallery.empty')}
+    >
+      <SFIcon name="photo.on.rectangle.angled" fallback="images-outline" size={28} color={colors.textFaint} />
+      <Text style={styles.emptyText}>{t('gallery.empty')}</Text>
+    </View>
+  )
+
+  if (flush) return <View style={styles.flush}>{content}</View>
+
   return (
     <ListSection header={t('gallery.title')} plainHeader={system}>
-      {cells ? (
-        <View ref={grid} style={height !== undefined ? { height } : undefined} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-          {width ? (
-            single ? (
-              <SingleGalleryItem
-                item={items[0]}
-                width={width}
-                height={height!}
-                onPreview={setPreview}
-                onOpen={() => open(items[0].id)}
-                onRemove={() => confirmRemove(items[0])}
-                onVideoSize={(size) => measured(items[0], size.width, size.height)}
-              />
-            ) : carousel ? (
-              <GalleryCarousel
-                items={items}
-                width={width}
-                page={page}
-                jump={jump}
-                onPageChange={onPageChange}
-                onPreview={setPreview}
-                onOpen={open}
-                onRemove={confirmRemove}
-                onVideoSize={(item, size) => measured(item, size.width, size.height)}
-              />
-            ) : (
-              items.map((item) => (
-                <GalleryTile
-                  key={item.id}
-                  item={item}
-                  cell={cell}
-                  count={items.length}
-                  slots={slots}
-                  onPreview={setPreview}
-                  onOpen={() => open(item.id)}
-                  onRemove={() => confirmRemove(item)}
-                  onDragging={dragging}
-                  onDrop={dropped}
-                  onVideoSize={(size) => measured(item, size.width, size.height)}
-                />
-              ))
-            )
-          ) : null}
-          {cell && extra ? (
-            button ? (
-              // New ones coming in under full rows: a row of their own is starting anyway.
-              <View style={[nextStyle, styles.plusInner]}>
-                <ActivityIndicator color={colors.textMuted} />
-              </View>
-            ) : (
-              <ImageSourceMenu onPick={addItems} disabled={adding} style={nextStyle}>
-                <View style={styles.plusInner} accessible accessibilityRole="button" accessibilityLabel={t('gallery.add')}>
-                  {adding ? <ActivityIndicator color={color ?? colors.textMuted} /> : <Icon name="add" size={30} color={color ?? colors.textMuted} />}
-                </View>
-              </ImageSourceMenu>
-            )
-          ) : null}
-        </View>
-      ) : (
-        // Nothing yet: what goes here, in the middle of where the first row of tiles will stand.
-        <View
-          style={[styles.empty, cell ? { height: cell } : null]}
-          onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-          accessible
-          accessibilityLabel={t('gallery.empty')}
-        >
-          <SFIcon name="photo.on.rectangle.angled" fallback="images-outline" size={28} color={colors.textFaint} />
-          <Text style={styles.emptyText}>{t('gallery.empty')}</Text>
-        </View>
-      )}
+      {content}
       {button ? <SourceCell label={t('gallery.add')} onPick={addItems} color={color} loading={(single || carousel) && adding} /> : null}
     </ListSection>
   )
@@ -271,15 +283,16 @@ type TileProps = {
   cell: number
   count: number
   slots: SharedValue<Record<number, number>>
+  draggable: boolean
   onPreview: (id: number, preview: ImageRef | null) => void
   onOpen: () => void
-  onRemove: () => void
+  onRemove?: () => void
   onDragging: (dragging: boolean) => void
   onDrop: (from: number, to: number) => void
   onVideoSize: (size: { width: number; height: number }) => void
 }
 
-function GalleryTile({ item, cell, count, slots, onPreview, onOpen, onRemove, onDragging, onDrop, onVideoSize }: TileProps) {
+function GalleryTile({ item, cell, count, slots, draggable, onPreview, onOpen, onRemove, onDragging, onDrop, onVideoSize }: TileProps) {
   const styles = useStyles(createStyles)
   const { t } = useTranslation()
   const video = isGalleryVideo(item.file)
@@ -312,6 +325,7 @@ function GalleryTile({ item, cell, count, slots, onPreview, onOpen, onRemove, on
   )
 
   const pan = Gesture.Pan()
+    .enabled(draggable)
     .activateAfterLongPress(LIFT_DELAY)
     .onStart(() => {
       active.value = true
@@ -381,10 +395,14 @@ function GalleryTile({ item, cell, count, slots, onPreview, onOpen, onRemove, on
         accessibilityLabel={t(video ? 'gallery.openVideo' : 'gallery.openPicture')}
         onAccessibilityTap={onOpen}
         // VoiceOver has no long press to drop a tile in place, so taking it out is an action.
-        accessibilityActions={[{ name: 'delete', label: t('common.delete') }]}
-        onAccessibilityAction={(e) => {
-          if (e.nativeEvent.actionName === 'delete') onRemove()
-        }}
+        accessibilityActions={onRemove ? [{ name: 'delete', label: t('common.delete') }] : undefined}
+        onAccessibilityAction={
+          onRemove
+            ? (e) => {
+                if (e.nativeEvent.actionName === 'delete') onRemove()
+              }
+            : undefined
+        }
         style={[styles.cell, { width: cell, height: cell }, style]}
       >
         <GalleryMedia
@@ -416,7 +434,7 @@ function GalleryCarousel({
   onPageChange: (page: number) => void
   onPreview: (id: number, preview: ImageRef | null) => void
   onOpen: (id: number) => void
-  onRemove: (item: GalleryItem) => void
+  onRemove?: (item: GalleryItem) => void
   onVideoSize: (item: GalleryItem, size: { width: number; height: number }) => void
 }) {
   const styles = useStyles(createStyles)
@@ -515,7 +533,7 @@ function GalleryCarousel({
             height={heights[i]}
             onPreview={onPreview}
             onOpen={() => onOpen(item.id)}
-            onRemove={() => onRemove(item)}
+            onRemove={onRemove ? () => onRemove(item) : undefined}
             onVideoSize={(size) => onVideoSize(item, size)}
           />
         ))}
@@ -569,7 +587,7 @@ function SingleGalleryItem({
   height: number
   onPreview: (id: number, preview: ImageRef | null) => void
   onOpen: () => void
-  onRemove: () => void
+  onRemove?: () => void
   onVideoSize: (size: { width: number; height: number }) => void
 }) {
   const styles = useStyles(createStyles)
@@ -588,10 +606,14 @@ function SingleGalleryItem({
       accessible
       accessibilityRole="imagebutton"
       accessibilityLabel={t(video ? 'gallery.openVideo' : 'gallery.openPicture')}
-      accessibilityActions={[{ name: 'delete', label: t('common.delete') }]}
-      onAccessibilityAction={(e) => {
-        if (e.nativeEvent.actionName === 'delete') onRemove()
-      }}
+      accessibilityActions={onRemove ? [{ name: 'delete', label: t('common.delete') }] : undefined}
+      onAccessibilityAction={
+        onRemove
+          ? (e) => {
+              if (e.nativeEvent.actionName === 'delete') onRemove()
+            }
+          : undefined
+      }
       style={[styles.single, { width, height }, lifted && styles.hidden]}
     >
       <GalleryMedia item={item} limits={limits} onPreview={onPreview} onVideoSize={onVideoSize} />
@@ -685,10 +707,10 @@ const sourceOf = (item: GalleryItem) => `gallery:${item.id}`
 // with the add button below; otherwise a plus takes the place after the last while its row
 // has room, or a spinner while new ones come in under full rows, where the add button stands
 // below (and alone with no items at all).
-function layoutOf(count: number, adding: boolean, carousel: boolean) {
+function layoutOf(count: number, adding: boolean, carousel: boolean, readOnly = false) {
   const single = count === 1
-  const button = single || carousel || count % COLUMNS === 0
-  const extra = !single && !carousel && (!button || adding)
+  const button = !readOnly && (single || carousel || count % COLUMNS === 0)
+  const extra = !readOnly && !single && !carousel && (!button || adding)
   return { single, button, extra, cells: count + (extra ? 1 : 0) }
 }
 
@@ -752,6 +774,7 @@ const createStyles = (colors: Colors) =>
     // Every place is laid out from the grid's corner, the tiles by a transform, so a lifted
     // one moves on the UI thread and the rest slide aside by springs.
     cell: { position: 'absolute', left: 0, top: 0, overflow: 'hidden', backgroundColor: colors.surfaceRaised },
+    flush: { width: '100%' },
     carouselWrap: { width: '100%', overflow: 'hidden', backgroundColor: colors.surfaceRaised },
     single: { overflow: 'hidden', backgroundColor: colors.surfaceRaised },
     hidden: { opacity: 0 },

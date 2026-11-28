@@ -1,8 +1,15 @@
+import Constants, { ExecutionEnvironment } from 'expo-constants'
 import { useMemo } from 'react'
 
 import ru from '@/locales/ru.json'
 import en from '@/locales/en.json'
+import { isIOS } from '@/lib/core/platform'
 import { createRequiredContext } from '@/lib/core/requiredContext'
+
+// Native iOS builds expose app language in system Settings; keep the in-app picker
+// in Expo Go for testing and on platforms without a per-app OS language setting.
+export const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+export const languagePickerAvailable = !isIOS || isExpoGo
 
 export type Locale = 'ru' | 'en'
 export type LocalePreference = Locale | 'system'

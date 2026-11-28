@@ -15,9 +15,12 @@ export function getSearchScope() {
   return scope
 }
 
-// The places in Settings a search result opens at: /settings?section=server.
+// The places in Settings a search result opens at: /settings?section=backup.
 export type SettingsSection =
+  | 'core'
   | 'appearance'
+  | 'chats'
+  | 'library'
   | 'language'
   | 'continue'
   | 'archive'

@@ -18,7 +18,7 @@ import { listCharacters, type CharacterPreview } from '@/db/characters'
 import { useDatabase } from '@/db/provider'
 import { listRooms, type RoomPreview } from '@/db/rooms'
 import { listSearchChats, searchMessages, type SearchChat, type SearchMessage } from '@/db/search'
-import { useTranslation } from '@/i18n'
+import { languagePickerAvailable, useTranslation } from '@/i18n'
 import { alternateIconsAvailable } from '@/lib/settings/appIcons'
 import { notificationsAvailable } from '@/lib/notifications/service'
 import { cloudSyncAvailable } from '@/lib/transfer/cloudSync'
@@ -123,19 +123,22 @@ export default function SearchScreen() {
   const settings = useMemo<SettingEntry[]>(() => {
     const entries: SettingEntry[] = [
       { label: t('settings.appearance'), keywords: [t('settings.theme'), t('theme.default'), t('theme.warm'), t('theme.neutral'), t('theme.oled'), t('theme.system'), t('theme.light'), t('theme.dark'), t('settings.chatFontField'), t('settings.chatTextSize'), t('settings.chatPattern')], symbol: 'paintbrush', fallback: 'color-palette-outline', href: settingsAt('appearance') },
-      { label: t('settings.language'), keywords: [t('language.ru'), t('language.en')], symbol: 'globe', fallback: 'globe-outline', href: settingsAt('language') },
-      { label: t('settings.continueButton'), keywords: [t('settings.homeScreen')], symbol: 'play.circle', fallback: 'play-circle-outline', href: settingsAt('continue') },
-      { label: t('archive.title'), keywords: [t('characters.title')], symbol: 'archivebox', fallback: 'archive-outline', href: '/archive' },
-      { label: t('settings.galleryLayout'), keywords: [t('settings.galleryGrid'), t('settings.galleryCarousel'), t('profile.title'), t('gallery.title')], symbol: 'rectangle.stack', fallback: 'albums-outline', href: settingsAt('gallery') },
-      { label: t('settings.privateButton'), keywords: [t('settings.chats'), t('settings.featuresTitle')], symbol: 'eye', fallback: 'eye-outline', href: settingsAt('features') },
-      { label: t('memory.long'), keywords: [t('memory.section'), t('lore.title'), t('settings.chats'), t('settings.featuresTitle')], symbol: 'brain', fallback: 'book-outline', href: settingsAt('features') },
-      { label: t('settings.personasOn'), keywords: [t('persona.title'), t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'theatermasks', fallback: 'happy-outline', href: settingsAt('features') },
-      { label: t('settings.suggestButton'), keywords: [t('settings.chats'), t('settings.featuresTitle')], symbol: 'text.append', fallback: 'sparkles-outline', href: settingsAt('suggest') },
-      { label: t('direction.title'), keywords: [t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'signpost.right', fallback: 'compass-outline', href: settingsAt('features') },
-      { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: settingsAt('features') },
-      { label: t('settings.attachGallery'), keywords: [t('settings.chats'), t('attach.title'), t('gallery.title'), t('settings.featuresTitle')], symbol: 'photo.on.rectangle.angled', fallback: 'images-outline', href: settingsAt('features') },
-      { label: t('settings.confirmDelete'), keywords: [t('settings.chats')], symbol: 'trash', fallback: 'trash-outline', href: settingsAt('confirmDelete') },
-      { label: t('settings.haptics'), keywords: [t('settings.feedback'), t('settings.streamHaptics'), t('settings.suggestionHaptics')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: settingsAt('haptics') },
+      { label: t('settings.generalTitle'), keywords: [...(languagePickerAvailable ? [t('settings.language')] : []), t('settings.homeScreen')], symbol: 'gearshape', fallback: 'settings-outline', href: '/general' },
+      ...(languagePickerAvailable
+        ? [{ label: t('settings.language'), keywords: [t('language.ru'), t('language.en'), t('settings.generalTitle')], symbol: 'globe' as const, fallback: 'globe-outline' as const, href: '/general' as const }]
+        : []),
+      { label: t('settings.continueButton'), keywords: [t('settings.homeScreen'), t('settings.generalTitle')], symbol: 'play.circle', fallback: 'play-circle-outline', href: '/general' },
+      { label: t('archive.title'), keywords: [t('characters.title'), t('settings.libraryTitle')], symbol: 'archivebox', fallback: 'archive-outline', href: '/archive' },
+      { label: t('settings.galleryLayout'), keywords: [t('settings.galleryGrid'), t('settings.galleryCarousel'), t('profile.title'), t('gallery.title'), t('settings.appearance')], symbol: 'rectangle.stack', fallback: 'images-outline', href: '/gallery-layout' },
+      { label: t('settings.privateButton'), keywords: [t('settings.chats'), t('settings.featuresTitle')], symbol: 'eye', fallback: 'eye-outline', href: '/chat-features' },
+      { label: t('memory.long'), keywords: [t('memory.section'), t('lore.title'), t('settings.chats'), t('settings.featuresTitle')], symbol: 'brain', fallback: 'book-outline', href: '/chat-features' },
+      { label: t('settings.personasOn'), keywords: [t('persona.title'), t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'theatermasks', fallback: 'happy-outline', href: '/chat-features' },
+      { label: t('settings.suggestButton'), keywords: [t('settings.chats'), t('settings.featuresTitle')], symbol: 'text.append', fallback: 'sparkles-outline', href: '/suggestions' },
+      { label: t('direction.title'), keywords: [t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'signpost.right', fallback: 'compass-outline', href: '/chat-features' },
+      { label: t('settings.recentPictures'), keywords: [t('settings.chats'), t('attach.title'), t('settings.featuresTitle')], symbol: 'photo.on.rectangle', fallback: 'images-outline', href: '/chat-features' },
+      { label: t('settings.attachGallery'), keywords: [t('settings.chats'), t('attach.title'), t('gallery.title'), t('settings.featuresTitle')], symbol: 'photo.on.rectangle.angled', fallback: 'images-outline', href: '/chat-features' },
+      { label: t('settings.confirmDelete'), keywords: [t('settings.chats'), t('settings.generalTitle')], symbol: 'trash', fallback: 'trash-outline', href: '/general' },
+      { label: t('settings.haptics'), keywords: [t('settings.feedback'), t('settings.streamHaptics'), t('settings.suggestionHaptics')], symbol: 'iphone.radiowaves.left.and.right', fallback: 'phone-portrait-outline', href: '/feedback' },
       {
         label: t('servers.title'),
         keywords: [t('settings.server'), t('settings.baseUrlLabel'), t('settings.apiKeyLabel'), t('settings.modelLabel'), t('settings.testConnection'), t('servers.failover')],
@@ -143,13 +146,20 @@ export default function SearchScreen() {
         fallback: 'server-outline',
         href: '/servers',
       },
+      {
+        label: t('settings.contextLabel'),
+        keywords: [t('settings.contextTokensLabel'), t('settings.contextMessages'), t('settings.contextChatMessages'), t('settings.contextRoomMessages')],
+        symbol: 'square.stack.3d.up',
+        fallback: 'layers-outline',
+        href: '/context',
+      },
       { label: t('settings.backupTitle'), keywords: [t('settings.exportJson'), t('settings.importJson')], symbol: 'externaldrive', fallback: 'archive-outline', href: settingsAt('backup') },
       { label: t('settings.aboutTitle'), keywords: [t('settings.version'), t('settings.copyright'), 'GitHub'], symbol: 'info.circle', fallback: 'information-circle-outline', href: settingsAt('about') },
       { label: t('settings.wipeAll'), keywords: [t('settings.dangerZone')], symbol: 'exclamationmark.triangle', fallback: 'warning-outline', href: settingsAt('wipe'), danger: true },
     ]
     if (alternateIconsAvailable) {
-      const language = entries.findIndex((entry) => entry.label === t('settings.language'))
-      entries.splice(language + 1, 0, { label: t('settings.appIcon'), keywords: [t('settings.appearance')], symbol: 'app', fallback: 'apps-outline', href: settingsAt('appearance') })
+      const appearance = entries.findIndex((entry) => entry.label === t('settings.appearance'))
+      entries.splice(appearance + 1, 0, { label: t('settings.appIcon'), keywords: [t('settings.appearance')], symbol: 'app', fallback: 'apps-outline', href: '/app-icon' })
     }
     if (notificationsAvailable) {
       const attachGallery = entries.findIndex((entry) => entry.label === t('settings.attachGallery'))
@@ -158,7 +168,7 @@ export default function SearchScreen() {
         keywords: [t('settings.chats'), t('attach.title'), t('notifications.title'), t('settings.featuresTitle')],
         symbol: 'timer',
         fallback: 'timer-outline',
-        href: settingsAt('features'),
+        href: '/chat-features',
       })
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
       entries.splice(backup, 0, {
@@ -176,7 +186,7 @@ export default function SearchScreen() {
     }
     if (cloudSyncAvailable) {
       const backup = entries.findIndex((entry) => entry.label === t('settings.backupTitle'))
-      entries.splice(backup, 0, { label: t('settings.folderSync'), keywords: [t('settings.folderSyncSync'), 'iCloud', 'Google Drive'], symbol: 'arrow.triangle.2.circlepath', fallback: 'sync-outline', href: settingsAt('folderSync') })
+      entries.splice(backup, 0, { label: t('settings.folderSync'), keywords: [t('settings.folderSyncSync'), 'iCloud', 'Google Drive'], symbol: 'arrow.triangle.2.circlepath', fallback: 'sync-outline', href: '/sync' })
     }
     return entries
   }, [t])

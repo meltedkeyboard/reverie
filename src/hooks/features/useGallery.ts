@@ -9,10 +9,10 @@ import { alertError } from '@/lib/transfer/report'
 
 // A character's gallery as the profile shows it. Every change is saved at once, apart from
 // the editor's Save: the gallery is a collection of the profile, not a field of the form.
-export function useGallery(characterId: number) {
+export function useGallery(characterId: number, initialItems?: GalleryItem[]) {
   const db = useDatabase()
   const { t } = useTranslation()
-  const [items, setItems] = useState<GalleryItem[]>([])
+  const [items, setItems] = useState<GalleryItem[]>(initialItems ?? [])
   const [adding, setAdding] = useState(false)
 
   const reload = useCallback(() => listGallery(db, characterId).then(setItems), [db, characterId])

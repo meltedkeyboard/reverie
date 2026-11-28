@@ -169,7 +169,13 @@ const PLACES: Record<string, () => TabLabel> = {
   '/theme': () => ({ title: t('settings.themeScreen'), icon: 'color-palette-outline' }),
   '/chat-text': () => ({ title: t('settings.fontScreen'), icon: 'text-outline' }),
   '/chat-background': () => ({ title: t('settings.backgroundScreen'), icon: 'image-outline' }),
+  '/gallery-layout': () => ({ title: t('settings.galleryLayout'), icon: 'images-outline' }),
   '/app-icon': () => ({ title: t('settings.appIcon'), icon: 'apps-outline' }),
+  '/general': () => ({ title: t('settings.generalTitle'), icon: 'settings-outline' }),
+  '/context': () => ({ title: t('settings.contextLabel'), icon: 'layers-outline' }),
+  '/chat-features': () => ({ title: t('settings.featuresTitle'), icon: 'options-outline' }),
+  '/suggestions': () => ({ title: t('settings.suggestButton'), icon: 'chatbubble-ellipses-outline' }),
+  '/feedback': () => ({ title: t('settings.feedback'), icon: 'phone-portrait-outline' }),
   '/character/new': () => ({ title: t('editor.newCharacterTitle'), icon: 'person-add-outline' }),
   '/room/new': () => ({ title: t('roomEditor.newTitle'), icon: 'chatbubbles-outline' }),
 }
